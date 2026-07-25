@@ -4,7 +4,7 @@ MVP de simulador Pokemon tipo roguelite, inspirado en mezcla de roulette + progr
 
 ## Estado actual del MVP
 
-- Configuracion de run por generacion (1-9) y modo (Classic/Nuzlocke).
+- Configuracion de run por generacion (1-9).
 - Roulette inicial desde PokeAPI: Pokemon inicial + item + modificador global.
 - Ruta de 10 nodos: combates, descansos, tiendas y jefe final.
 - Rivales generados desde PokeAPI por generacion, con escalado por progreso.
