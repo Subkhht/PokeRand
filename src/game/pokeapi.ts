@@ -518,6 +518,7 @@ export async function evolvePokemon(currentPokemon: Pokemon): Promise<Pokemon | 
       attack: newBasePokemon.attack + 5,
       defense: newBasePokemon.defense + 5,
       speed: newBasePokemon.speed + 3,
+      holdItem: currentPokemon.holdItem,
     }
 
     return evolvedPokemon
