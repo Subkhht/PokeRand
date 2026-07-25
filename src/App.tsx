@@ -974,7 +974,7 @@ function MainApp() {
       if (playerHit.attackerHeal > 0) {
         const healed = Math.min(nextPlayer.maxHp, nextPlayer.hp + playerHit.attackerHeal)
         nextPlayer = { ...nextPlayer, hp: healed }
-        logs.push(`${nextPlayer.name} recupera ${playerHit.attackerHeal} HP por ${nextPlayer.holdItem}.`)
+        logs.push(`${nextPlayer.name} recupera ${playerHit.attackerHeal} HP por ${nextPlayer.holdItem ?? 'Vampirismo'}.`)
       }
       logs.push(playerHit.line)
 
@@ -985,7 +985,7 @@ function MainApp() {
         if (enemyHit.attackerHeal > 0) {
           const healed = Math.min(nextEnemy.maxHp, nextEnemy.hp + enemyHit.attackerHeal)
           nextEnemy = { ...nextEnemy, hp: healed }
-          logs.push(`${nextEnemy.name} recupera ${enemyHit.attackerHeal} HP por ${nextEnemy.holdItem}.`)
+          logs.push(`${nextEnemy.name} recupera ${enemyHit.attackerHeal} HP por ${nextEnemy.holdItem ?? 'Vampirismo'}.`)
         }
         logs.push(enemyHit.line)
       }
@@ -1006,7 +1006,7 @@ function MainApp() {
         if (playerHit.attackerHeal > 0) {
           const healed = Math.min(nextPlayer.maxHp, nextPlayer.hp + playerHit.attackerHeal)
           nextPlayer = { ...nextPlayer, hp: healed }
-          logs.push(`${nextPlayer.name} recupera ${playerHit.attackerHeal} HP por ${nextPlayer.holdItem}.`)
+          logs.push(`${nextPlayer.name} recupera ${playerHit.attackerHeal} HP por ${nextPlayer.holdItem ?? 'Vampirismo'}.`)
         }
         logs.push(playerHit.line)
       }
