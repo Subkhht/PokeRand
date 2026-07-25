@@ -772,7 +772,6 @@ function MainApp() {
     setTeam((prev) =>
       prev.map((p, i) => {
         if (i !== pokemonIndex) return p
-        const oldItem = p.holdItem
         const stats = HOLDABLE_ITEMS[itemName]
         let updated: Pokemon = {
           ...p,
@@ -968,7 +967,7 @@ function MainApp() {
       else if (levelDiff < -2) baseLevelsGained = 1
 
       // Subida de nivel para TODOS los miembros vivos del equipo
-      const updatedTeamPromises = nextTeam.map(async (pokemon, idx) => {
+      const updatedTeamPromises = nextTeam.map(async (pokemon) => {
         if (pokemon.hp <= 0) return pokemon
 
         const levelsGained = baseLevelsGained
