@@ -41,8 +41,20 @@ export interface RunModifier {
   name: string
   description: string
   enemyAttackDelta?: number
+  enemyDefenseDelta?: number
+  enemySpeedDelta?: number
+  enemyLevelDelta?: number
   shopPotionBonus?: number
   healBonus?: number
+  healReduction?: number
+  playerAttackMod?: number
+  playerDefenseMod?: number
+  playerSpeedMod?: number
+  playerMaxHpBonus?: number
+  playerCritChance?: number
+  playerLifesteal?: number
+  moneyMultiplier?: number
+  shopDiscount?: number
 }
 
 export interface RunConfig {

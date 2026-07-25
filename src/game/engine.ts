@@ -20,9 +20,8 @@ export function healPokemon(pokemon: Pokemon, amount: number): Pokemon {
   }
 }
 
-export function scalePokemonForNode(base: Pokemon, node: RouteNode, stepIndex: number): Pokemon {
-  // Ajustado: Los enemigos suben de nivel más despacio (antes stepIndex * 2, ahora stepIndex * 1.5)
-  const bonusLevel = Math.floor(stepIndex * 1.5) + (node.type === 'boss' ? 2 : 0)
+export function scalePokemonForNode(base: Pokemon, node: RouteNode, stepIndex: number, levelDelta = 0): Pokemon {
+  const bonusLevel = Math.floor(stepIndex * 1.5) + (node.type === 'boss' ? 2 : 0) + levelDelta
   const targetLevel = base.level + bonusLevel
 
   const hpBonus = bonusLevel * 4
@@ -75,17 +74,157 @@ export function randomFrom<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)]
 }
 
-export function startRun(config: { generation: number }) {
-  const modifiers: RunModifier[] = [
-    { id: 'none', name: 'Aventura Normal', description: 'Sin modificadores adicionales.' },
-    { id: 'rich-shops', name: 'Tiendas Abundantes', description: 'Consigues pociones extra en las tiendas.', shopPotionBonus: 1 }
-  ]
+export const RUN_MODIFIERS: RunModifier[] = [
+  {
+    id: 'none',
+    name: 'Aventura Normal',
+    description: 'Sin modificadores adicionales. La experiencia clásica.',
+  },
+  {
+    id: 'tempestad',
+    name: 'Tempestad Feroz',
+    description: 'Los rivales pegan +8 más fuerte, pero ganas +50% dinero.',
+    enemyAttackDelta: 8,
+    moneyMultiplier: 1.5,
+  },
+  {
+    id: 'mercado',
+    name: 'Mercado en Oferta',
+    description: 'Las tiendas regalan 1 poción extra y todo cuesta -20%.',
+    shopPotionBonus: 1,
+    shopDiscount: 0.20,
+  },
+  {
+    id: 'equilibrada',
+    name: 'Ruta Equilibrada',
+    description: 'Descansos curan +15 HP extra. Ideal para aprender.',
+    healBonus: 15,
+  },
+  {
+    id: 'furia',
+    name: 'Furia del Rival',
+    description: 'Enemigos +10 ATK, pero tu equipo tiene +15% Ataque.',
+    enemyAttackDelta: 10,
+    playerAttackMod: 0.15,
+  },
+  {
+    id: 'escudo',
+    name: 'Escudo Natural',
+    description: 'Tu equipo tiene +20% Defensa, pero enemigos +5 ATK.',
+    playerDefenseMod: 0.20,
+    enemyAttackDelta: 5,
+  },
+  {
+    id: 'velocidad',
+    name: 'Velocidad Extrema',
+    description: 'Tu equipo +25% Velocidad, pero enemigos +8 Vel.',
+    playerSpeedMod: 0.25,
+    enemySpeedDelta: 8,
+  },
+  {
+    id: 'codicia',
+    name: 'Codicia',
+    description: 'Ganas +75% dinero, pero enemigos +12 ATK.',
+    moneyMultiplier: 1.75,
+    enemyAttackDelta: 12,
+  },
+  {
+    id: 'vampirismo',
+    name: 'Vampirismo',
+    description: 'Tu equipo tiene 15% Robo de Vida, pero -20 HP máx.',
+    playerLifesteal: 0.15,
+    playerMaxHpBonus: -20,
+  },
+  {
+    id: 'berserker',
+    name: 'Berserker',
+    description: '+25% Ataque para tu equipo, pero -15% Defensa.',
+    playerAttackMod: 0.25,
+    playerDefenseMod: -0.15,
+  },
+  {
+    id: 'fortuna',
+    name: 'Fortuna',
+    description: '+15% Crítico para ambos bandos. Quien golpee primero.',
+    playerCritChance: 0.15,
+  },
+  {
+    id: 'tanque',
+    name: 'Tanque',
+    description: '+25% Defensa, +10 HP máx, pero -10% Velocidad.',
+    playerDefenseMod: 0.25,
+    playerMaxHpBonus: 10,
+    playerSpeedMod: -0.10,
+  },
+  {
+    id: 'asesino',
+    name: 'Asesino',
+    description: '+30% Vel, +10% Crítico, pero -20% Defensa.',
+    playerSpeedMod: 0.30,
+    playerCritChance: 0.10,
+    playerDefenseMod: -0.20,
+  },
+  {
+    id: 'tacano',
+    name: 'Tacaño',
+    description: 'Todo en tienda cuesta -30%, pero descansos curan 50% menos.',
+    shopDiscount: 0.30,
+    healReduction: 0.50,
+  },
+  {
+    id: 'prodigio',
+    name: 'Pródigo',
+    description: 'Descansos curan el doble, pero tiendas +40% precios.',
+    healBonus: 100,
+    shopDiscount: -0.40,
+  },
+  {
+    id: 'hardcore',
+    name: 'Modo Hardcore',
+    description: 'Enemigos +3 niveles y +10 ATK, pero ganas x2 dinero.',
+    enemyLevelDelta: 3,
+    enemyAttackDelta: 10,
+    moneyMultiplier: 2.0,
+  },
+  {
+    id: 'frail',
+    name: 'Huesos Frágiles',
+    description: 'Tu equipo +20% ATK y +20% Vel, pero -30 HP máx.',
+    playerAttackMod: 0.20,
+    playerSpeedMod: 0.20,
+    playerMaxHpBonus: -30,
+  },
+  {
+    id: 'regeneracion',
+    name: 'Regeneración',
+    description: 'Descansos curan +30 HP y tiendas +1 poción, pero enemigos +7 ATK.',
+    healBonus: 30,
+    shopPotionBonus: 1,
+    enemyAttackDelta: 7,
+  },
+  {
+    id: 'critico',
+    name: 'Ojo de Halcón',
+    description: '+20% Crítico y +10% Velocidad, pero enemigos +10 Defensa.',
+    playerCritChance: 0.20,
+    playerSpeedMod: 0.10,
+    enemyDefenseDelta: 10,
+  },
+  {
+    id: 'desesperacion',
+    name: 'Desesperación',
+    description: '+40% Ataque cuando estás bajo 50% HP, pero -15% Defensa.',
+    playerAttackMod: 0.10,
+    playerDefenseMod: -0.15,
+  },
+]
 
+export function startRun(config: { generation: number }) {
   return {
     config,
     route: generateRoute(),
     item: 'Potion',
-    modifier: randomFrom(modifiers)
+    modifier: randomFrom(RUN_MODIFIERS)
   }
 }
 

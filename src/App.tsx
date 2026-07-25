@@ -97,6 +97,16 @@ const ITEM_SPRITES: Record<string, string> = {
   'Eviolite': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/eviolite.png',
   'Life Orb': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/life-orb.png',
   'Rocky Helmet': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rocky-helmet.png',
+  'Scope Lens': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/scope-lens.png',
+  'Shell Bell': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shell-bell.png',
+  'Choice Scarf': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/choice-scarf.png',
+  'Babiri Berry': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/babiri-berry.png',
+  'Big Root': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/big-root.png',
+  'Wide Lens': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/wide-lens.png',
+  'Sitrus Berry': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sitrus-berry.png',
+  'Guts Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/muscle-band.png',
+  'Vest Protector': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/assault-vest.png',
+  'Focus Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/focus-band.png',
 }
 
 interface HoldableItem {
@@ -109,6 +119,11 @@ interface HoldableItem {
   maxHpMod?: number
   healPerTurn?: number
   damageBoost?: number
+  damageReduction?: number
+  critChance?: number
+  lifesteal?: number
+  lowHpBonus?: number
+  firstStrikeBonus?: number
 }
 
 const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
@@ -122,6 +137,16 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Eviolite': { name: 'Eviolite', desc: '+10% Defensa y Ataque', price: 200, attackMod: 0.10, defenseMod: 0.10 },
   'Life Orb': { name: 'Life Orb', desc: '+30% Daño, -5 HP por turno', price: 400, damageBoost: 0.30, healPerTurn: -5 },
   'Rocky Helmet': { name: 'Rocky Helmet', desc: '+15% Defensa', price: 200, defenseMod: 0.15 },
+  'Scope Lens': { name: 'Scope Lens', desc: '20% Golpe Crítico', price: 250, critChance: 0.20 },
+  'Shell Bell': { name: 'Shell Bell', desc: '20% Robo de Vida', price: 300, lifesteal: 0.20 },
+  'Choice Scarf': { name: 'Choice Scarf', desc: '+30% Velocidad', price: 350, speedMod: 0.30 },
+  'Babiri Berry': { name: 'Babiri Berry', desc: '20% Reducción de Daño', price: 250, damageReduction: 0.20 },
+  'Big Root': { name: 'Big Root', desc: '25% Robo de Vida', price: 350, lifesteal: 0.25 },
+  'Wide Lens': { name: 'Wide Lens', desc: '15% Crítico, +10% Velocidad', price: 200, critChance: 0.15, speedMod: 0.10 },
+  'Sitrus Berry': { name: 'Sitrus Berry', desc: '+15 HP máximos, +8 HP/turno', price: 200, maxHpMod: 15, healPerTurn: 8 },
+  'Guts Band': { name: 'Guts Band', desc: '+20% Ataque, +15% daño bajo 30% HP', price: 300, attackMod: 0.20, lowHpBonus: 0.15 },
+  'Vest Protector': { name: 'Vest Protector', desc: '+25% Defensa, 15% Reducción daño', price: 400, defenseMod: 0.25, damageReduction: 0.15 },
+  'Focus Band': { name: 'Focus Band', desc: '25% Crítico, +10% Ataque', price: 300, critChance: 0.25, attackMod: 0.10 },
 }
 
 const HOLDABLE_ITEM_NAMES = Object.keys(HOLDABLE_ITEMS)
@@ -476,7 +501,13 @@ function MainApp() {
         done: false
       })
 
-      setTeam([starter])
+      const hpBonus = run.modifier?.playerMaxHpBonus ?? 0
+      const starterWithBonus = {
+        ...starter,
+        maxHp: starter.maxHp + hpBonus,
+        hp: starter.hp + hpBonus,
+      }
+      setTeam([starterWithBonus])
       setActiveIndex(0)
       setMoney(200)
       setInventory([run.item])
@@ -650,7 +681,7 @@ function MainApp() {
       try {
         const targetGen = getEffectiveGen()
         const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false)
-        const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex)
+        const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0)
         const rewardItem = randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry'])
 
         setRestEncounter(generatedEncounter)
@@ -684,7 +715,7 @@ function MainApp() {
 
         const fetches = Array.from({ length: teamSize }, () =>
           getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss)
-            .then((base) => scalePokemonForNode(base, currentNode, routeIndex))
+            .then((base) => scalePokemonForNode(base, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0))
         )
         const newTrainerTeam = await Promise.all(fetches)
 
@@ -719,7 +750,7 @@ function MainApp() {
         ])
       } else {
         const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false)
-        const generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex)
+        const generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0)
         setIsTrainerBattle(false)
         setTrainerTeam([])
         setTrainerPokemonIndex(0)
@@ -745,20 +776,26 @@ function MainApp() {
 
   function buyShopItem(itemName: string) {
     const item = ALL_SHOP_ITEMS[itemName]
-    if (!item || money < item.price) return
+    if (!item) return
+    const discount = modifier?.shopDiscount ?? 0
+    const finalPrice = Math.floor(item.price * (1 - discount))
+    if (money < finalPrice) return
 
-    setMoney((prev) => prev - item.price)
+    setMoney((prev) => prev - finalPrice)
     setInventory((prev) => [...prev, itemName])
-    setBattleLog((prev) => [`Compraste ${itemName} por $${item.price}.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [`Compraste ${itemName} por $${finalPrice}.`, ...prev].slice(0, 15))
   }
 
   function buyHoldableItem(itemName: string) {
     const item = HOLDABLE_ITEMS[itemName]
-    if (!item || money < item.price) return
+    if (!item) return
+    const discount = modifier?.shopDiscount ?? 0
+    const finalPrice = Math.floor(item.price * (1 - discount))
+    if (money < finalPrice) return
 
-    setMoney((prev) => prev - item.price)
+    setMoney((prev) => prev - finalPrice)
     setInventory((prev) => [...prev, itemName])
-    setBattleLog((prev) => [`Compraste ${itemName} por $${item.price}.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [`Compraste ${itemName} por $${finalPrice}.`, ...prev].slice(0, 15))
   }
 
   function equipItem(itemName: string, pokemonIndex: number) {
@@ -813,14 +850,23 @@ function MainApp() {
   }
 
   function healTeamAtShop() {
-    const healCost = 100
+    const baseHealCost = 100
+    const healCost = Math.floor(baseHealCost * (1 - (modifier?.shopDiscount ?? 0)))
     const needsHealing = team.some((pkmn) => pkmn.hp > 0 && pkmn.hp < pkmn.maxHp)
 
     if (!needsHealing || money < healCost) return
 
+    const healReduction = modifier?.healReduction ?? 0
+    const healBonus = modifier?.healBonus ?? 0
+
     setMoney((prev) => prev - healCost)
     setTeam((prevTeam) =>
-      prevTeam.map((pkmn) => (pkmn.hp > 0 ? { ...pkmn, hp: pkmn.maxHp } : pkmn))
+      prevTeam.map((pkmn) => {
+        if (pkmn.hp <= 0) return pkmn
+        const missing = pkmn.maxHp - pkmn.hp
+        const healed = Math.floor(missing * (1 - healReduction)) + healBonus
+        return { ...pkmn, hp: Math.min(pkmn.maxHp, pkmn.hp + Math.max(0, healed)) }
+      })
     )
     setBattleLog((prev) => [`Restauraste la salud de tu equipo activo por $${healCost}.`, ...prev].slice(0, 15))
   }
@@ -830,20 +876,26 @@ function MainApp() {
     defender: Pokemon,
     move: Move,
     isEnemyHit: boolean
-  ): { updatedDefender: Pokemon; line: string } {
+  ): { updatedDefender: Pokemon; line: string; attackerHeal: number } {
     const enemyBoost = isEnemyHit ? modifier?.enemyAttackDelta ?? 0 : 0
 
     const attackerItem = attacker.holdItem ? HOLDABLE_ITEMS[attacker.holdItem] : null
     const defenderItem = defender.holdItem ? HOLDABLE_ITEMS[defender.holdItem] : null
 
+    const playerAtkMod = !isEnemyHit ? (modifier?.playerAttackMod ?? 0) : 0
+    const playerSpdMod = !isEnemyHit ? (modifier?.playerSpeedMod ?? 0) : 0
+    const playerDefMod = isEnemyHit ? (modifier?.playerDefenseMod ?? 0) : 0
+    const enemyDefDelta = !isEnemyHit ? (modifier?.enemyDefenseDelta ?? 0) : 0
+    const enemySpdDelta = isEnemyHit ? (modifier?.enemySpeedDelta ?? 0) : 0
+
     const effectiveAttacker: Pokemon = {
       ...attacker,
-      attack: Math.round(attacker.attack * (1 + (attackerItem?.attackMod ?? 0))),
-      speed: Math.round(attacker.speed * (1 + (attackerItem?.speedMod ?? 0)))
+      attack: Math.round(attacker.attack * (1 + (attackerItem?.attackMod ?? 0) + playerAtkMod)),
+      speed: Math.round(attacker.speed * (1 + (attackerItem?.speedMod ?? 0) + playerSpdMod) + enemySpdDelta)
     }
     const effectiveDefender: Pokemon = {
       ...defender,
-      defense: Math.round(defender.defense * (1 + (defenderItem?.defenseMod ?? 0)))
+      defense: Math.round(defender.defense * (1 + (defenderItem?.defenseMod ?? 0) + playerDefMod) + enemyDefDelta)
     }
 
     const defTypes = (effectiveDefender as any).types ?? []
@@ -857,6 +909,23 @@ function MainApp() {
     if (attackerItem?.damageBoost) {
       finalDamage = Math.floor(finalDamage * (1 + attackerItem.damageBoost))
     }
+    if (attackerItem?.lowHpBonus && attacker.hp < attacker.maxHp * 0.3) {
+      finalDamage = Math.floor(finalDamage * (1 + attackerItem.lowHpBonus))
+    }
+    if (attackerItem?.firstStrikeBonus && attacker.hp === attacker.maxHp) {
+      finalDamage = Math.floor(finalDamage * (1 + attackerItem.firstStrikeBonus))
+    }
+    if (defenderItem?.damageReduction) {
+      finalDamage = Math.floor(finalDamage * (1 - defenderItem.damageReduction))
+    }
+
+    const modCrit = !isEnemyHit ? (modifier?.playerCritChance ?? 0) : 0
+    const totalCrit = (attackerItem?.critChance ?? 0) + modCrit
+    const isCrit = totalCrit > 0 && Math.random() < totalCrit
+    if (isCrit) {
+      finalDamage = Math.floor(finalDamage * 1.5)
+    }
+
     const newHp = Math.max(0, defender.hp - finalDamage)
 
     const updatedDefender: Pokemon = {
@@ -864,14 +933,23 @@ function MainApp() {
       hp: newHp
     }
 
+    const modLifesteal = !isEnemyHit ? (modifier?.playerLifesteal ?? 0) : 0
+    const totalLifesteal = (attackerItem?.lifesteal ?? 0) + modLifesteal
+    let attackerHeal = 0
+    if (totalLifesteal > 0 && finalDamage > 0) {
+      attackerHeal = Math.floor(finalDamage * totalLifesteal)
+    }
+
     let line = `${attacker.name} usa ${move.name}: ${finalDamage} de daño.`
+    if (isCrit) line += ' ¡Golpe crítico!'
     if (message) {
       line += ` (${message})`
     }
 
     return {
       updatedDefender,
-      line
+      line,
+      attackerHeal
     }
   }
 
@@ -893,37 +971,63 @@ function MainApp() {
     if (playerStarts) {
       const playerHit = performHit(nextPlayer, nextEnemy, move, false)
       nextEnemy = playerHit.updatedDefender
+      if (playerHit.attackerHeal > 0) {
+        const healed = Math.min(nextPlayer.maxHp, nextPlayer.hp + playerHit.attackerHeal)
+        nextPlayer = { ...nextPlayer, hp: healed }
+        logs.push(`${nextPlayer.name} recupera ${playerHit.attackerHeal} HP por ${nextPlayer.holdItem}.`)
+      }
       logs.push(playerHit.line)
 
       if (nextEnemy.hp > 0) {
         const enemyMove = nextEnemy.moves[Math.floor(Math.random() * nextEnemy.moves.length)]
         const enemyHit = performHit(nextEnemy, nextPlayer, enemyMove, true)
         nextPlayer = enemyHit.updatedDefender
+        if (enemyHit.attackerHeal > 0) {
+          const healed = Math.min(nextEnemy.maxHp, nextEnemy.hp + enemyHit.attackerHeal)
+          nextEnemy = { ...nextEnemy, hp: healed }
+          logs.push(`${nextEnemy.name} recupera ${enemyHit.attackerHeal} HP por ${nextEnemy.holdItem}.`)
+        }
         logs.push(enemyHit.line)
       }
     } else {
       const enemyMove = nextEnemy.moves[Math.floor(Math.random() * nextEnemy.moves.length)]
       const enemyHit = performHit(nextEnemy, nextPlayer, enemyMove, true)
       nextPlayer = enemyHit.updatedDefender
+      if (enemyHit.attackerHeal > 0) {
+        const healed = Math.min(nextEnemy.maxHp, nextEnemy.hp + enemyHit.attackerHeal)
+        nextEnemy = { ...nextEnemy, hp: healed }
+        logs.push(`${nextEnemy.name} recupera ${enemyHit.attackerHeal} HP por ${nextEnemy.holdItem}.`)
+      }
       logs.push(enemyHit.line)
 
       if (nextPlayer.hp > 0) {
         const playerHit = performHit(nextPlayer, nextEnemy, move, false)
         nextEnemy = playerHit.updatedDefender
+        if (playerHit.attackerHeal > 0) {
+          const healed = Math.min(nextPlayer.maxHp, nextPlayer.hp + playerHit.attackerHeal)
+          nextPlayer = { ...nextPlayer, hp: healed }
+          logs.push(`${nextPlayer.name} recupera ${playerHit.attackerHeal} HP por ${nextPlayer.holdItem}.`)
+        }
         logs.push(playerHit.line)
       }
     }
 
     // --- Efectos pasivos por turno ---
+    const modHealBonus = modifier?.healBonus ?? 0
+    const modHealReduction = modifier?.healReduction ?? 0
     const applyTurnEffects = (p: Pokemon): Pokemon => {
       const item = p.holdItem ? HOLDABLE_ITEMS[p.holdItem] : null
       if (!item) return p
       let updated = { ...p }
       if (item.healPerTurn && updated.hp > 0) {
-        const newHp = Math.min(updated.maxHp, updated.hp + item.healPerTurn)
+        let healAmount = item.healPerTurn
+        if (healAmount > 0) {
+          healAmount = Math.floor(healAmount * (1 - modHealReduction)) + modHealBonus
+        }
+        const newHp = Math.min(updated.maxHp, updated.hp + healAmount)
         updated = { ...updated, hp: Math.max(1, newHp) }
-        if (item.healPerTurn > 0) logs.push(`${updated.name} recupera ${item.healPerTurn} HP por ${item.name}.`)
-        else logs.push(`${updated.name} pierde ${Math.abs(item.healPerTurn)} HP por ${item.name}.`)
+        if (healAmount > 0) logs.push(`${updated.name} recupera ${healAmount} HP por ${item.name}.`)
+        else logs.push(`${updated.name} pierde ${Math.abs(healAmount)} HP por ${item.name}.`)
       }
       return updated
     }
@@ -998,7 +1102,8 @@ function MainApp() {
 
       const newTeam = await Promise.all(updatedTeamPromises)
 
-      const moneyReward = Math.floor((80 + nextEnemy.level * 10) / (isTrainerBattle ? trainerTeam.length : 1))
+      const baseMoneyReward = Math.floor((80 + nextEnemy.level * 10) / (isTrainerBattle ? trainerTeam.length : 1))
+      const moneyReward = Math.floor(baseMoneyReward * (modifier?.moneyMultiplier ?? 1))
       setMoney((prev) => prev + moneyReward)
 
       let logMsg = `Derrotaste a ${nextEnemy.name}. ¡Todo el equipo ganó experiencia!`
@@ -1009,7 +1114,8 @@ function MainApp() {
         const nextTrainerIndex = updatedTrainerTeam.findIndex((p, idx) => idx > trainerPokemonIndex && p.hp > 0)
 
         if (nextTrainerIndex === -1) {
-          const totalReward = 80 + nextEnemy.level * 10 * trainerTeam.length
+          const baseTotalReward = 80 + nextEnemy.level * 10 * trainerTeam.length
+          const totalReward = Math.floor(baseTotalReward * (modifier?.moneyMultiplier ?? 1))
           setMoney((prev) => prev + totalReward)
           setTeam(newTeam)
           setTrainerTeam(updatedTrainerTeam)
@@ -1132,9 +1238,11 @@ function MainApp() {
       return
     }
 
-    registerInPokedex(restEncounter)
-    setTeam((previous) => [...previous, restEncounter])
-    setBattleLog((prev) => [`Capturaste a ${restEncounter.name}.`, ...prev].slice(0, 15))
+    const hpBonus = modifier?.playerMaxHpBonus ?? 0
+    const captured = { ...restEncounter, maxHp: restEncounter.maxHp + hpBonus, hp: restEncounter.hp + hpBonus }
+    registerInPokedex(captured)
+    setTeam((previous) => [...previous, captured])
+    setBattleLog((prev) => [`Capturaste a ${captured.name}.`, ...prev].slice(0, 15))
     completeCurrentNode()
   }
 
@@ -1877,16 +1985,16 @@ function MainApp() {
                           className="tiny-btn"
                           type="button"
                           onClick={() => isHoldable ? buyHoldableItem(itemName) : buyShopItem(itemName)}
-                          disabled={money < data.price}
+                          disabled={money < Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0)))}
                           style={{
-                            background: money >= data.price ? '#10b981' : '#475569',
+                            background: money >= Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0))) ? '#10b981' : '#475569',
                             minWidth: '70px',
-                            color: money >= data.price ? '#0f172a' : '#cbd5e1',
+                            color: money >= Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0))) ? '#0f172a' : '#cbd5e1',
                             fontWeight: 'bold',
-                            cursor: money >= data.price ? 'pointer' : 'not-allowed'
+                            cursor: money >= Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0))) ? 'pointer' : 'not-allowed'
                           }}
                         >
-                          ${data.price}
+                          ${Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0)))}
                         </button>
                       </div>
                     )
@@ -1894,7 +2002,8 @@ function MainApp() {
 
                   {(() => {
                     const needsHealing = team.some((pkmn) => pkmn.hp > 0 && pkmn.hp < pkmn.maxHp)
-                    const canAffordAndNeeds = money >= 100 && needsHealing
+                    const healCost = Math.floor(100 * (1 - (modifier?.shopDiscount ?? 0)))
+                    const canAffordAndNeeds = money >= healCost && needsHealing
 
                     return (
                       <div
@@ -1929,7 +2038,7 @@ function MainApp() {
                             cursor: canAffordAndNeeds ? 'pointer' : 'not-allowed'
                           }}
                         >
-                          $100
+                          ${healCost}
                         </button>
                       </div>
                     )
