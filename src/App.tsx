@@ -87,64 +87,109 @@ const ITEM_SPRITES: Record<string, string> = {
   'Full Heal': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/full-heal.png',
   'Revive': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/revive.png',
   'Max Revive': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-revive.png',
+  'Muscle Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/muscle-band.png',
+  'Wise Glasses': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/wise-glasses.png',
+  'Choice Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/choice-band.png',
+  'Leftovers': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/leftovers.png',
+  'Focus Sash': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/focus-sash.png',
+  'Assault Vest': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/assault-vest.png',
+  'Quick Claw': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/quick-claw.png',
+  'Eviolite': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/eviolite.png',
+  'Life Orb': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/life-orb.png',
+  'Rocky Helmet': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rocky-helmet.png',
+}
+
+interface HoldableItem {
+  name: string
+  desc: string
+  price: number
+  attackMod?: number
+  defenseMod?: number
+  speedMod?: number
+  maxHpMod?: number
+  healPerTurn?: number
+  damageBoost?: number
+}
+
+const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
+  'Muscle Band': { name: 'Muscle Band', desc: '+15% Ataque', price: 200, attackMod: 0.15 },
+  'Wise Glasses': { name: 'Wise Glasses', desc: '+15% Velocidad', price: 200, speedMod: 0.15 },
+  'Choice Band': { name: 'Choice Band', desc: '+25% Ataque', price: 350, attackMod: 0.25 },
+  'Leftovers': { name: 'Leftovers', desc: 'Recupera 6 HP por turno', price: 300, healPerTurn: 6 },
+  'Focus Sash': { name: 'Focus Sash', desc: '+20 HP máximos', price: 250, maxHpMod: 20 },
+  'Assault Vest': { name: 'Assault Vest', desc: '+20% Defensa', price: 300, defenseMod: 0.20 },
+  'Quick Claw': { name: 'Quick Claw', desc: '+20% Velocidad', price: 250, speedMod: 0.20 },
+  'Eviolite': { name: 'Eviolite', desc: '+10% Defensa y Ataque', price: 200, attackMod: 0.10, defenseMod: 0.10 },
+  'Life Orb': { name: 'Life Orb', desc: '+30% Daño, -5 HP por turno', price: 400, damageBoost: 0.30, healPerTurn: -5 },
+  'Rocky Helmet': { name: 'Rocky Helmet', desc: '+15% Defensa', price: 200, defenseMod: 0.15 },
+}
+
+const HOLDABLE_ITEM_NAMES = Object.keys(HOLDABLE_ITEMS)
+
+const TYPE_COLORS: Record<string, string> = {
+  normal: '#a8a878', fire: '#f08030', water: '#6890f0', electric: '#f8d030',
+  grass: '#78c850', ice: '#98d8d8', fighting: '#c03028', poison: '#a040a0',
+  ground: '#e0c068', flying: '#a890f0', psychic: '#f85888', bug: '#a8b820',
+  rock: '#b8a038', ghost: '#705898', dragon: '#7038f8', dark: '#705848',
+  steel: '#b8b8d0', fairy: '#ee99ac',
 }
 
 // Entrenadores normales (clase + nombre)
 const TRAINER_TYPES: Array<{ label: string; name: string; sprite: string }> = [
-  { label: 'Youngster', name: 'Miguel',   sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/youngster.png' },
-  { label: 'Youngster', name: 'Tommy',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/youngster.png' },
-  { label: 'Lass',      name: 'Laura',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/lass.png' },
-  { label: 'Lass',      name: 'Ana',      sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/lass.png' },
-  { label: 'Hiker',     name: 'Jorge',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/hiker.png' },
-  { label: 'Hiker',     name: 'Bruno',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/hiker.png' },
-  { label: 'Fisherman', name: 'Carlos',   sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/fisherman.png' },
-  { label: 'Fisherman', name: 'Pedro',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/fisherman.png' },
-  { label: 'Camper',    name: 'Ricky',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/camper.png' },
-  { label: 'Biker',     name: 'Gus',      sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/biker.png' },
-  { label: 'Beauty',    name: 'Valeria',  sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/beauty.png' },
-  { label: 'Gentleman', name: 'Arthur',   sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/gentleman.png' },
-  { label: 'Sailor',    name: 'Ramiro',   sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/sailor.png' },
-  { label: 'Bug Catcher', name: 'Diego',  sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/bug-catcher.png' },
-  { label: 'Picnicker', name: 'Mia',      sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/picnicker.png' },
-  { label: 'Ace Trainer', name: 'Sergio', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/ace-trainer-m.png' },
-  { label: 'Ace Trainer', name: 'Elena',  sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/ace-trainer-f.png' },
-  { label: 'Black Belt', name: 'Kenji',   sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/black-belt.png' },
-  { label: 'Psychic',   name: 'Marco',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/psychic-m.png' },
-  { label: 'Swimmer',   name: 'Max',      sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/swimmer-m.png' },
+  { label: 'Youngster', name: 'Miguel', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/youngster.png' },
+  { label: 'Youngster', name: 'Tommy', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/youngster.png' },
+  { label: 'Lass', name: 'Laura', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/lass.png' },
+  { label: 'Lass', name: 'Ana', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/lass.png' },
+  { label: 'Hiker', name: 'Jorge', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/hiker.png' },
+  { label: 'Hiker', name: 'Bruno', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/hiker.png' },
+  { label: 'Fisherman', name: 'Carlos', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/fisherman.png' },
+  { label: 'Fisherman', name: 'Pedro', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/fisherman.png' },
+  { label: 'Camper', name: 'Ricky', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/camper.png' },
+  { label: 'Biker', name: 'Gus', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/biker.png' },
+  { label: 'Beauty', name: 'Valeria', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/beauty.png' },
+  { label: 'Gentleman', name: 'Arthur', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/gentleman.png' },
+  { label: 'Sailor', name: 'Ramiro', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/sailor.png' },
+  { label: 'Bug Catcher', name: 'Diego', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/bugcatcher.png' },
+  { label: 'Picnicker', name: 'Mia', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/picnicker.png' },
+  { label: 'Ace Trainer', name: 'Sergio', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/acetrainer.png' },
+  { label: 'Ace Trainer', name: 'Elena', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/acetrainerf.png' },
+  { label: 'Black Belt', name: 'Kenji', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/blackbelt.png' },
+  { label: 'Psychic', name: 'Marco', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/psychic.png' },
+  { label: 'Swimmer', name: 'Max', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/swimmer.png' },
 ]
 
 // Líderes de Gimnasio (solo aparecen en el Jefe Final)
 const GYM_LEADERS: Array<{ name: string; badge: string; sprite: string }> = [
-  { name: 'Brock',    badge: 'Médalla Roca',       sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/brock.png' },
-  { name: 'Misty',    badge: 'Médalla Cascada',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/misty.png' },
-  { name: 'Surge',    badge: 'Médalla Trueno',     sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/lt-surge.png' },
-  { name: 'Erika',    badge: 'Médalla Arco Iris',  sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/erika.png' },
-  { name: 'Sabrina',  badge: 'Médalla Pantano',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/sabrina.png' },
-  { name: 'Blaine',   badge: 'Médalla Volcán',     sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/blaine.png' },
-  { name: 'Giovanni', badge: 'Médalla Tierra',     sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/giovanni.png' },
-  { name: 'Falkner',  badge: 'Médalla Ala',        sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/falkner.png' },
-  { name: 'Bugsy',    badge: 'Médalla Colmíllo',   sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/bugsy.png' },
-  { name: 'Whitney',  badge: 'Médalla Lisa',       sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/whitney.png' },
-  { name: 'Morty',    badge: 'Médalla Niebla',     sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/morty.png' },
-  { name: 'Chuck',    badge: 'Médalla Tormenta',   sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/chuck.png' },
-  { name: 'Jasmine',  badge: 'Médalla Mineral',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/jasmine.png' },
-  { name: 'Pryce',    badge: 'Médalla Glaciar',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/pryce.png' },
-  { name: 'Clair',    badge: 'Médalla Ascenso',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/clair.png' },
-  { name: 'Roxanne',  badge: 'Médalla Roca',       sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/roxanne.png' },
-  { name: 'Brawly',   badge: 'Médalla Puño',      sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/brawly.png' },
-  { name: 'Wattson',  badge: 'Médalla Dinámo',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/wattson.png' },
-  { name: 'Flannery', badge: 'Médalla Calor',      sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/flannery.png' },
-  { name: 'Norman',   badge: 'Médalla Balance',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/norman.png' },
-  { name: 'Winona',   badge: 'Médalla Pluma',      sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/winona.png' },
-  { name: 'Tate',     badge: 'Médalla Mente',      sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/tate.png' },
-  { name: 'Juan',     badge: 'Médalla Lluvia',     sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/juan.png' },
-  { name: 'Roark',    badge: 'Médalla Carbona',    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/roark.png' },
-  { name: 'Gardenia', badge: 'Médalla Bosque',     sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/gardenia.png' },
-  { name: 'Maylene',  badge: 'Médalla Cobra',      sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/maylene.png' },
-  { name: 'Fantina',  badge: 'Médalla Relevo',     sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/fantina.png' },
-  { name: 'Byron',    badge: 'Médalla Mina',       sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/byron.png' },
-  { name: 'Candice',  badge: 'Médalla Escarcha',   sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/candice.png' },
-  { name: 'Volkner',  badge: 'Médalla Faro',       sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/trainers/volkner.png' },
+  { name: 'Brock', badge: 'Médalla Roca', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/brock.png' },
+  { name: 'Misty', badge: 'Médalla Cascada', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/misty.png' },
+  { name: 'Surge', badge: 'Médalla Trueno', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/ltsurge.png' },
+  { name: 'Erika', badge: 'Médalla Arco Iris', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/erika.png' },
+  { name: 'Sabrina', badge: 'Médalla Pantano', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/sabrina.png' },
+  { name: 'Blaine', badge: 'Médalla Volcán', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/blaine.png' },
+  { name: 'Giovanni', badge: 'Médalla Tierra', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/giovanni.png' },
+  { name: 'Falkner', badge: 'Médalla Ala', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/falkner.png' },
+  { name: 'Bugsy', badge: 'Médalla Colmíllo', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/bugsy.png' },
+  { name: 'Whitney', badge: 'Médalla Lisa', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/whitney.png' },
+  { name: 'Morty', badge: 'Médalla Niebla', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/morty.png' },
+  { name: 'Chuck', badge: 'Médalla Tormenta', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/chuck.png' },
+  { name: 'Jasmine', badge: 'Médalla Mineral', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/jasmine.png' },
+  { name: 'Pryce', badge: 'Médalla Glaciar', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/pryce.png' },
+  { name: 'Clair', badge: 'Médalla Ascenso', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/clair.png' },
+  { name: 'Roxanne', badge: 'Médalla Roca', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/roxanne.png' },
+  { name: 'Brawly', badge: 'Médalla Puño', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/brawly.png' },
+  { name: 'Wattson', badge: 'Médalla Dinámo', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/wattson.png' },
+  { name: 'Flannery', badge: 'Médalla Calor', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/flannery.png' },
+  { name: 'Norman', badge: 'Médalla Balance', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/norman.png' },
+  { name: 'Winona', badge: 'Médalla Pluma', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/winona.png' },
+  { name: 'Tate', badge: 'Médalla Mente', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/tate.png' },
+  { name: 'Juan', badge: 'Médalla Lluvia', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/juan.png' },
+  { name: 'Roark', badge: 'Médalla Carbona', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/roark.png' },
+  { name: 'Gardenia', badge: 'Médalla Bosque', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/gardenia.png' },
+  { name: 'Maylene', badge: 'Médalla Cobra', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/maylene.png' },
+  { name: 'Fantina', badge: 'Médalla Relevo', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/fantina.png' },
+  { name: 'Byron', badge: 'Médalla Mina', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/byron.png' },
+  { name: 'Candice', badge: 'Médalla Escarcha', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/candice.png' },
+  { name: 'Volkner', badge: 'Médalla Faro', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/volkner.png' },
 ]
 
 interface PokedexEntry {
@@ -172,6 +217,17 @@ function nodeTypeLabel(node: RouteNode): string {
 function moveTooltip(move: Move): string {
   const accuracy = move.accuracy === null ? 'Always hits' : `${move.accuracy}% accuracy`
   return `${move.name}\nPower: ${move.power}\n${accuracy}\n${move.description}`
+}
+
+function getEffectiveStats(pokemon: Pokemon): { attack: number; defense: number; speed: number; maxHp: number } {
+  const item = pokemon.holdItem ? HOLDABLE_ITEMS[pokemon.holdItem] : null
+  if (!item) return { attack: pokemon.attack, defense: pokemon.defense, speed: pokemon.speed, maxHp: pokemon.maxHp }
+  return {
+    attack: Math.round(pokemon.attack * (1 + (item.attackMod ?? 0))),
+    defense: Math.round(pokemon.defense * (1 + (item.defenseMod ?? 0))),
+    speed: Math.round(pokemon.speed * (1 + (item.speedMod ?? 0))),
+    maxHp: pokemon.maxHp,
+  }
 }
 
 function groupInventory(items: string[]): Array<{ name: string; count: number; description: string }> {
@@ -257,6 +313,7 @@ function MainApp() {
 
   // Modal de selección de objetivo para Revive
   const [reviveModal, setReviveModal] = useState<{ itemName: string; itemIndex: number } | null>(null)
+  const [equipModal, setEquipModal] = useState<{ itemName: string; itemIndex: number } | null>(null)
 
   // Pokédex
   const [showPokedex, setShowPokedex] = useState<boolean>(false)
@@ -522,21 +579,44 @@ function MainApp() {
     setApiError('')
 
     try {
-      const evolved = await evolvePokemon(targetPokemon)
+      const evolvedBase = await evolvePokemon(targetPokemon)
 
-      if (!evolved) {
+      if (!evolvedBase) {
         setApiError(`${targetPokemon.name} no puede evolucionar más.`)
         return
       }
 
-      registerInPokedex(evolved)
+      // BONUS POR EVOLUCIÓN: +2 Nivel extra y mejora de estadísticas + cura completa
+      const extraLevels = 2
+      const bonusHp = 15
+      const newLevel = evolvedBase.level + extraLevels
+      const newMaxHp = evolvedBase.maxHp + bonusHp
+
+      const evolvedPlusBoost: Pokemon = {
+        ...evolvedBase,
+        level: newLevel,
+        maxHp: newMaxHp,
+        hp: newMaxHp, // Se cura al máximo al evolucionar
+        attack: Math.round(evolvedBase.attack * 1.15), // +15% Ataque
+        defense: Math.round(evolvedBase.defense * 1.15), // +15% Defensa
+        speed: Math.round(evolvedBase.speed * 1.10)   // +10% Velocidad
+      }
+
+      // Comprobar si al subir este nivel aprende un ataque nuevo
+      const { updatedPokemon: finalEvolved } = await checkAndLearnNewMove(
+        evolvedPlusBoost,
+        targetPokemon.level,
+        newLevel
+      )
+
+      registerInPokedex(finalEvolved)
 
       setTeam((prevTeam) =>
-        prevTeam.map((p, i) => (i === index ? evolved : p))
+        prevTeam.map((p, i) => (i === index ? finalEvolved : p))
       )
 
       setBattleLog((prev) => [
-        `¡${targetPokemon.name} evolucionó en ${evolved.name}!`,
+        `✨ ¡${targetPokemon.name} evolucionó en ${finalEvolved.name}! (Nv.${finalEvolved.level} + Stats boosted)`,
         ...prev
       ].slice(0, 15))
 
@@ -552,9 +632,13 @@ function MainApp() {
     if (!activePokemon || !currentNode) return
 
     if (currentNode.type === 'shop') {
-      const allItemKeys = Object.keys(ALL_SHOP_ITEMS)
-      const shuffled = [...allItemKeys].sort(() => 0.5 - Math.random())
-      setShopStock(shuffled.slice(0, 3))
+      const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS)
+      const allHoldableKeys = HOLDABLE_ITEM_NAMES
+      const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
+      const shuffledHoldables = [...allHoldableKeys].sort(() => 0.5 - Math.random())
+      const selectedConsumables = shuffledConsumables.slice(0, 2)
+      const selectedHoldables = shuffledHoldables.slice(0, 1)
+      setShopStock([...selectedConsumables, ...selectedHoldables])
       setScreen('shop')
       return
     }
@@ -591,23 +675,19 @@ function MainApp() {
       const targetGen = getEffectiveGen()
       const isBoss = currentNode.type === 'boss'
 
-      // El jefe siempre es entrenador; el resto se decide aleatoriamente (50/50)
       const willBeTrainer = isBoss || Math.random() < 0.5
 
       if (willBeTrainer) {
-        // Calcular tamaño del equipo entrenador según progreso (1–6)
-        const progress = routeIndex / Math.max(1, route.length - 1) // 0..1
+        const progress = routeIndex / Math.max(1, route.length - 1)
         const maxSize = isBoss ? 6 : Math.max(1, Math.min(6, Math.floor(progress * 6) + 1))
         const teamSize = isBoss ? maxSize : Math.max(1, Math.min(maxSize, 1 + Math.floor(Math.random() * maxSize)))
 
-        // Cargar todos los Pokémon del entrenador en paralelo
         const fetches = Array.from({ length: teamSize }, () =>
           getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss)
             .then((base) => scalePokemonForNode(base, currentNode, routeIndex))
         )
         const newTrainerTeam = await Promise.all(fetches)
 
-        // Elegir entrenador según tipo de nodo
         let chosenName = ''
         let chosenSprite = ''
         let chosenBadge = ''
@@ -638,7 +718,6 @@ function MainApp() {
           ...prev
         ])
       } else {
-        // Combate salvaje (un solo Pokémon)
         const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false)
         const generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex)
         setIsTrainerBattle(false)
@@ -646,7 +725,9 @@ function MainApp() {
         setTrainerPokemonIndex(0)
         setTrainerName('')
         setTrainerSprite('')
-        setTrainerBadge('')
+    setTrainerBadge('')
+    setReviveModal(null)
+    setEquipModal(null)
         setEnemy(generatedEnemy)
         setBattleLog((prev) => [
           `🌿 ¡Un ${generatedEnemy.name} salvaje (Nv.${generatedEnemy.level}) apareció!`,
@@ -671,6 +752,67 @@ function MainApp() {
     setBattleLog((prev) => [`Compraste ${itemName} por $${item.price}.`, ...prev].slice(0, 15))
   }
 
+  function buyHoldableItem(itemName: string) {
+    const item = HOLDABLE_ITEMS[itemName]
+    if (!item || money < item.price) return
+
+    setMoney((prev) => prev - item.price)
+    setInventory((prev) => [...prev, itemName])
+    setBattleLog((prev) => [`Compraste ${itemName} por $${item.price}.`, ...prev].slice(0, 15))
+  }
+
+  function equipItem(itemName: string, pokemonIndex: number) {
+    const pokemon = team[pokemonIndex]
+    if (!pokemon || pokemon.hp <= 0) return
+    if (!HOLDABLE_ITEMS[itemName]) return
+
+    const itemIdx = inventory.indexOf(itemName)
+    if (itemIdx === -1) return
+
+    setTeam((prev) =>
+      prev.map((p, i) => {
+        if (i !== pokemonIndex) return p
+        const oldItem = p.holdItem
+        const stats = HOLDABLE_ITEMS[itemName]
+        let updated: Pokemon = {
+          ...p,
+          holdItem: itemName,
+          maxHp: p.maxHp + (stats.maxHpMod ?? 0),
+          hp: Math.min(p.hp + (stats.maxHpMod ?? 0), p.maxHp + (stats.maxHpMod ?? 0)),
+        }
+        return updated
+      })
+    )
+    setInventory((prev) => {
+      const idx = prev.indexOf(itemName)
+      if (idx === -1) return prev
+      return [...prev.slice(0, idx), ...prev.slice(idx + 1)]
+    })
+    setBattleLog((prev) => [`Equipaste ${itemName} a ${pokemon.name}.`, ...prev].slice(0, 15))
+  }
+
+  function unequipItem(pokemonIndex: number) {
+    const pokemon = team[pokemonIndex]
+    if (!pokemon || !pokemon.holdItem) return
+
+    const itemName = pokemon.holdItem
+    const stats = HOLDABLE_ITEMS[itemName]
+
+    setTeam((prev) =>
+      prev.map((p, i) => {
+        if (i !== pokemonIndex) return p
+        return {
+          ...p,
+          holdItem: null,
+          maxHp: Math.max(1, p.maxHp - (stats?.maxHpMod ?? 0)),
+          hp: Math.max(1, Math.min(p.hp, p.maxHp - (stats?.maxHpMod ?? 0))),
+        }
+      })
+    )
+    setInventory((prev) => [...prev, itemName])
+    setBattleLog((prev) => [`Desequipaste ${itemName} de ${pokemon.name}.`, ...prev].slice(0, 15))
+  }
+
   function healTeamAtShop() {
     const healCost = 100
     const needsHealing = team.some((pkmn) => pkmn.hp > 0 && pkmn.hp < pkmn.maxHp)
@@ -692,14 +834,30 @@ function MainApp() {
   ): { updatedDefender: Pokemon; line: string } {
     const enemyBoost = isEnemyHit ? modifier?.enemyAttackDelta ?? 0 : 0
 
-    const defTypes = (defender as any).types ?? []
+    const attackerItem = attacker.holdItem ? HOLDABLE_ITEMS[attacker.holdItem] : null
+    const defenderItem = defender.holdItem ? HOLDABLE_ITEMS[defender.holdItem] : null
+
+    const effectiveAttacker: Pokemon = {
+      ...attacker,
+      attack: Math.round(attacker.attack * (1 + (attackerItem?.attackMod ?? 0))),
+      speed: Math.round(attacker.speed * (1 + (attackerItem?.speedMod ?? 0)))
+    }
+    const effectiveDefender: Pokemon = {
+      ...defender,
+      defense: Math.round(defender.defense * (1 + (defenderItem?.defenseMod ?? 0)))
+    }
+
+    const defTypes = (effectiveDefender as any).types ?? []
     const primaryType = defTypes[0] || 'normal'
     const secondaryType = defTypes[1] || undefined
 
     const { effectiveness, message } = getTypeEffectiveness(move.type, primaryType, secondaryType)
-    const result = applyDamage(attacker, defender, move, enemyBoost)
+    const result = applyDamage(effectiveAttacker, effectiveDefender, move, enemyBoost)
 
-    const finalDamage = Math.floor(result.damage * effectiveness)
+    let finalDamage = Math.floor(result.damage * effectiveness)
+    if (attackerItem?.damageBoost) {
+      finalDamage = Math.floor(finalDamage * (1 + attackerItem.damageBoost))
+    }
     const newHp = Math.max(0, defender.hp - finalDamage)
 
     const updatedDefender: Pokemon = {
@@ -726,7 +884,12 @@ function MainApp() {
     let nextEnemy = { ...enemy }
     const logs: string[] = []
 
-    const playerStarts = nextPlayer.speed >= nextEnemy.speed
+    const playerItem = nextPlayer.holdItem ? HOLDABLE_ITEMS[nextPlayer.holdItem] : null
+    const enemyItem = nextEnemy.holdItem ? HOLDABLE_ITEMS[nextEnemy.holdItem] : null
+    const playerEffectiveSpeed = Math.round(nextPlayer.speed * (1 + (playerItem?.speedMod ?? 0)))
+    const enemyEffectiveSpeed = Math.round(nextEnemy.speed * (1 + (enemyItem?.speedMod ?? 0)))
+
+    const playerStarts = playerEffectiveSpeed >= enemyEffectiveSpeed
 
     if (playerStarts) {
       const playerHit = performHit(nextPlayer, nextEnemy, move, false)
@@ -751,6 +914,23 @@ function MainApp() {
         logs.push(playerHit.line)
       }
     }
+
+    // --- Efectos pasivos por turno ---
+    const applyTurnEffects = (p: Pokemon): Pokemon => {
+      const item = p.holdItem ? HOLDABLE_ITEMS[p.holdItem] : null
+      if (!item) return p
+      let updated = { ...p }
+      if (item.healPerTurn && updated.hp > 0) {
+        const newHp = Math.min(updated.maxHp, updated.hp + item.healPerTurn)
+        updated = { ...updated, hp: Math.max(1, newHp) }
+        if (item.healPerTurn > 0) logs.push(`${updated.name} recupera ${item.healPerTurn} HP por ${item.name}.`)
+        else logs.push(`${updated.name} pierde ${Math.abs(item.healPerTurn)} HP por ${item.name}.`)
+      }
+      return updated
+    }
+
+    nextPlayer = applyTurnEffects(nextPlayer)
+    nextEnemy = applyTurnEffects(nextEnemy)
 
     // --- Jugador debilitado ---
     if (nextPlayer.hp <= 0) {
@@ -780,44 +960,49 @@ function MainApp() {
       return
     }
 
-    // --- Enemigo derrotado ---
+    // --- Enemigo derrotado (EXP SHARE PARA TODO EL EQUIPO) ---
     if (nextEnemy.hp <= 0) {
-      // Calcular exp por este Pokémon
       const levelDiff = nextEnemy.level - nextPlayer.level
-      let levelsGained = 1
-      if (levelDiff > 0) levelsGained = 1 + levelDiff
-      else if (levelDiff < -2) levelsGained = 0
+      let baseLevelsGained = 1
+      if (levelDiff > 0) baseLevelsGained = 1 + levelDiff
+      else if (levelDiff < -2) baseLevelsGained = 1
 
-      const hpGain = levelsGained * 4
-      const statBoost = (stat: number) => Math.max(1, Math.round((stat * 0.04) * levelsGained))
-      const oldLevel = nextPlayer.level
-      const newLevel = oldLevel + levelsGained
-      const newMaxHp = nextPlayer.maxHp + hpGain
+      // Subida de nivel para TODOS los miembros vivos del equipo
+      const updatedTeamPromises = nextTeam.map(async (pokemon, idx) => {
+        if (pokemon.hp <= 0) return pokemon
 
-      let leveledPlayer: Pokemon = {
-        ...nextPlayer,
-        level: newLevel,
-        maxHp: newMaxHp,
-        hp: Math.min(newMaxHp, nextPlayer.hp + Math.round(newMaxHp * 0.20) + hpGain),
-        attack: nextPlayer.attack + statBoost(nextPlayer.attack),
-        defense: nextPlayer.defense + statBoost(nextPlayer.defense),
-        speed: nextPlayer.speed + statBoost(nextPlayer.speed)
-      }
+        const levelsGained = baseLevelsGained
 
-      let moveLearnedMsg = ''
-      if (levelsGained > 0) {
-        const { updatedPokemon, learnedMoveName } = await checkAndLearnNewMove(leveledPlayer, oldLevel, newLevel)
-        leveledPlayer = updatedPokemon
-        if (learnedMoveName) moveLearnedMsg = ` ¡Aprendió ${learnedMoveName}! ✨`
-      }
+        const hpGain = levelsGained * 4
+        const statBoost = (stat: number) => Math.max(1, Math.round((stat * 0.04) * levelsGained))
+        const oldLevel = pokemon.level
+        const newLevel = oldLevel + levelsGained
+        const newMaxHp = pokemon.maxHp + hpGain
+
+        let updatedPokemon: Pokemon = {
+          ...pokemon,
+          level: newLevel,
+          maxHp: newMaxHp,
+          hp: Math.min(newMaxHp, pokemon.hp + Math.round(newMaxHp * 0.20) + hpGain),
+          attack: pokemon.attack + statBoost(pokemon.attack),
+          defense: pokemon.defense + statBoost(pokemon.defense),
+          speed: pokemon.speed + statBoost(pokemon.speed)
+        }
+
+        if (levelsGained > 0) {
+          const { updatedPokemon: learnedPkmn } = await checkAndLearnNewMove(updatedPokemon, oldLevel, newLevel)
+          updatedPokemon = learnedPkmn
+        }
+
+        return updatedPokemon
+      })
+
+      const newTeam = await Promise.all(updatedTeamPromises)
 
       const moneyReward = Math.floor((80 + nextEnemy.level * 10) / (isTrainerBattle ? trainerTeam.length : 1))
       setMoney((prev) => prev + moneyReward)
-      nextTeam[activeIndex] = leveledPlayer
 
-      let logMsg = `Derrotaste a ${nextEnemy.name}.`
-      if (levelsGained > 1) logMsg += ` Subió +${levelsGained} niveles (Nv. ${newLevel}).${moveLearnedMsg}`
-      else if (levelsGained === 1) logMsg += ` Subió al Nv. ${newLevel}.${moveLearnedMsg}`
+      let logMsg = `Derrotaste a ${nextEnemy.name}. ¡Todo el equipo ganó experiencia!`
 
       // --- Batalla de entrenador: enviar siguiente Pokémon ---
       if (isTrainerBattle) {
@@ -825,10 +1010,9 @@ function MainApp() {
         const nextTrainerIndex = updatedTrainerTeam.findIndex((p, idx) => idx > trainerPokemonIndex && p.hp > 0)
 
         if (nextTrainerIndex === -1) {
-          // Entrenador sin Pokémon → victoria
           const totalReward = 80 + nextEnemy.level * 10 * trainerTeam.length
           setMoney((prev) => prev + totalReward)
-          setTeam(nextTeam)
+          setTeam(newTeam)
           setTrainerTeam(updatedTrainerTeam)
           setEnemy(nextEnemy)
           setBattleLog((prev) => [
@@ -841,12 +1025,11 @@ function MainApp() {
           return
         }
 
-        // Siguiente Pokémon del entrenador
         const nextPkmn = updatedTrainerTeam[nextTrainerIndex]
         setTrainerTeam(updatedTrainerTeam)
         setTrainerPokemonIndex(nextTrainerIndex)
         setEnemy(nextPkmn)
-        setTeam(nextTeam)
+        setTeam(newTeam)
         setBattleLog((prev) => [
           `${trainerName} envía a ${nextPkmn.name} Nv.${nextPkmn.level}!`,
           logMsg,
@@ -857,8 +1040,8 @@ function MainApp() {
       }
 
       // --- Batalla salvaje → victoria directa ---
-      logMsg = `🌿 Derrotaste al ${nextEnemy.name} salvaje y ganaste $${moneyReward}.` + logMsg.replace(`Derrotaste a ${nextEnemy.name}.`, '')
-      setTeam(nextTeam)
+      logMsg = `🌿 Derrotaste al ${nextEnemy.name} salvaje y ganaste $${moneyReward}. ¡Equipo fortalecido!`
+      setTeam(newTeam)
       setEnemy(nextEnemy)
       setBattleLog((prev) => [logMsg, ...logs, ...prev].slice(0, 15))
       completeCurrentNode()
@@ -880,8 +1063,8 @@ function MainApp() {
   function useInventoryItem(itemName: string): void {
     const itemIndex = inventory.indexOf(itemName)
     if (itemIndex === -1) return
+    if (HOLDABLE_ITEMS[itemName]) return
 
-    // Revive y Max Revive: abrir modal de selección
     if (itemName === 'Revive' || itemName === 'Max Revive') {
       const hasFainted = team.some((p) => p.hp <= 0)
       if (!hasFainted) {
@@ -1119,6 +1302,120 @@ function MainApp() {
         </div>
       )}
 
+      {/* Modal Equipar Objeto Pasivo */}
+      {equipModal && (
+        <div className="modal-backdrop" onClick={() => setEquipModal(null)}>
+          <div
+            className="revive-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+              border: '1px solid rgba(168, 85, 247, 0.4)',
+              borderRadius: '16px',
+              padding: '1.5rem',
+              maxWidth: '380px',
+              width: '90%',
+              margin: 'auto',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.6)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
+              {ITEM_SPRITES[equipModal.itemName] && (
+                <img
+                  src={ITEM_SPRITES[equipModal.itemName]}
+                  alt={equipModal.itemName}
+                  style={{ width: '36px', height: '36px', imageRendering: 'pixelated' }}
+                />
+              )}
+              <div>
+                <h3 style={{ margin: 0, color: '#c084fc', fontSize: '1.1rem' }}>{equipModal.itemName}</h3>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8' }}>
+                  {HOLDABLE_ITEMS[equipModal.itemName]?.desc}
+                </p>
+              </div>
+            </div>
+            <p style={{ color: '#cbd5e1', fontSize: '0.85rem', marginBottom: '1rem' }}>Elige a qué Pokémon equipárselo:</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {team.map((pkmn, idx) => {
+                const isAlive = pkmn.hp > 0
+                const hasItem = !!pkmn.holdItem
+                const canEquip = isAlive && !hasItem
+                const eff = getEffectiveStats(pkmn)
+                const item = HOLDABLE_ITEMS[equipModal.itemName]
+                return (
+                  <button
+                    key={`equip-target-${idx}`}
+                    type="button"
+                    onClick={() => {
+                      equipItem(equipModal.itemName, idx)
+                      setEquipModal(null)
+                    }}
+                    disabled={!canEquip}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      border: canEquip ? '1px solid rgba(168, 85, 247, 0.5)' : '1px solid rgba(255,255,255,0.08)',
+                      background: canEquip ? 'rgba(168, 85, 247, 0.08)' : 'rgba(255,255,255,0.03)',
+                      cursor: canEquip ? 'pointer' : 'not-allowed',
+                      opacity: canEquip ? 1 : 0.45,
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <img
+                      src={pkmn.sprite}
+                      alt={pkmn.name}
+                      style={{
+                        width: '44px',
+                        height: '44px',
+                        filter: isAlive ? 'none' : 'grayscale(100%)',
+                        opacity: isAlive ? 1 : 0.5
+                      }}
+                    />
+                    <div style={{ textAlign: 'left', flex: 1 }}>
+                      <strong style={{ display: 'block', fontSize: '0.95rem', textTransform: 'capitalize', color: canEquip ? '#f8fafc' : '#64748b' }}>
+                        {pkmn.name}
+                        {pkmn.holdItem && <span style={{ fontSize: '0.7rem', color: '#a78bfa', marginLeft: '6px' }}>({pkmn.holdItem})</span>}
+                      </strong>
+                      <span style={{ fontSize: '0.75rem', color: canEquip ? '#94a3b8' : '#475569' }}>
+                        Nv. {pkmn.level} · ATK: {eff.attack} · DEF: {eff.defense} · SPD: {eff.speed}
+                      </span>
+                    </div>
+                    {canEquip && item && (
+                      <div style={{ fontSize: '0.65rem', color: '#c084fc', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        {item.attackMod && <div>ATK {eff.attack} → {Math.round(pkmn.attack * (1 + item.attackMod))}</div>}
+                        {item.defenseMod && <div>DEF {eff.defense} → {Math.round(pkmn.defense * (1 + item.defenseMod))}</div>}
+                        {item.speedMod && <div>SPD {eff.speed} → {Math.round(pkmn.speed * (1 + item.speedMod))}</div>}
+                        {item.maxHpMod && <div>HP {pkmn.maxHp} → {pkmn.maxHp + item.maxHpMod}</div>}
+                        {item.healPerTurn && item.healPerTurn > 0 && <div>+{item.healPerTurn} HP/turno</div>}
+                        {item.healPerTurn && item.healPerTurn < 0 && <div>{item.healPerTurn} HP/turno</div>}
+                        {item.damageBoost && <div>+{Math.round(item.damageBoost * 100)}% daño</div>}
+                      </div>
+                    )}
+                    {!isAlive && (
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Debilitado</span>
+                    )}
+                    {hasItem && (
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Ocupado</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            <button
+              type="button"
+              className="secondary"
+              style={{ width: '100%', marginTop: '1rem' }}
+              onClick={() => setEquipModal(null)}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Modal Pokédex */}
       {showPokedex && (
         <div className="modal-backdrop" onClick={() => { setShowPokedex(false); setSelectedPokemonDetail(null); setPokedexSearch(''); }}>
@@ -1333,8 +1630,8 @@ function MainApp() {
                     background: !randomUnlocked
                       ? 'rgba(15, 23, 42, 0.6)'
                       : generation === 0
-                      ? 'rgba(234, 179, 8, 0.25)'
-                      : 'rgba(234, 179, 8, 0.05)',
+                        ? 'rgba(234, 179, 8, 0.25)'
+                        : 'rgba(234, 179, 8, 0.05)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -1426,7 +1723,7 @@ function MainApp() {
             <p className="label">Team {team.length}/{maxTeamSize}</p>
             <div className="team-grid">
               {team.map((pokemon, index) => (
-                <div key={`${pokemon.id}-${index}`} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div key={`${pokemon.id}-${index}`} className="sprite-tooltip-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <button
                     className={`team-slot ${index === activeIndex ? 'is-active' : ''} ${pokemon.hp <= 0 ? 'is-fainted' : ''}`}
                     type="button"
@@ -1434,9 +1731,60 @@ function MainApp() {
                     disabled={pokemon.hp <= 0 || isLoading}
                   >
                     <img src={pokemon.sprite} alt={pokemon.name} />
+                    {pokemon.holdItem && ITEM_SPRITES[pokemon.holdItem] && (
+                      <img
+                        src={ITEM_SPRITES[pokemon.holdItem]}
+                        alt={pokemon.holdItem}
+                        title={`${pokemon.holdItem}: ${HOLDABLE_ITEMS[pokemon.holdItem]?.desc ?? ''}`}
+                        style={{ width: '18px', height: '18px', imageRendering: 'pixelated', position: 'absolute', bottom: '4px', right: '4px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
+                      />
+                    )}
                     <strong>{pokemon.name}</strong>
                     <span>{pokemon.hp}/{pokemon.maxHp}</span>
                   </button>
+                  <div className="sprite-tooltip">
+                    <div className="tooltip-name">{pokemon.name}</div>
+                    {pokemon.holdItem && (
+                      <div style={{ fontSize: '0.65rem', color: '#c084fc', marginBottom: '4px' }}>
+                        {ITEM_SPRITES[pokemon.holdItem] && (
+                          <img src={ITEM_SPRITES[pokemon.holdItem]} alt="" style={{ width: '14px', height: '14px', imageRendering: 'pixelated', verticalAlign: 'middle', marginRight: '3px' }} />
+                        )}
+                        {pokemon.holdItem} — {HOLDABLE_ITEMS[pokemon.holdItem]?.desc}
+                      </div>
+                    )}
+                    {pokemon.types && pokemon.types.length > 0 && (
+                      <div className="tooltip-types">
+                        {pokemon.types.map((t) => (
+                          <span key={t} className="tooltip-type-badge" style={{ background: TYPE_COLORS[t] ?? '#475569', color: '#fff' }}>
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {(() => {
+                      const eff = getEffectiveStats(pokemon)
+                      const hasItem = !!pokemon.holdItem
+                      const fmt = (base: number, eff_: number) => hasItem && base !== eff_
+                        ? <><strong>{eff_}</strong> <span style={{ fontSize: '0.6rem', color: '#4ade80' }}>(+{eff_ - base})</span></>
+                        : <strong>{base}</strong>
+                      return (
+                        <>
+                          <div className="tooltip-stat"><span>Nivel</span><strong>{pokemon.level}</strong></div>
+                          <div className="tooltip-stat"><span>HP</span><strong>{pokemon.hp}/{pokemon.maxHp}</strong></div>
+                          <div className="tooltip-stat"><span>Ataque</span>{fmt(pokemon.attack, eff.attack)}</div>
+                          <div className="tooltip-stat"><span>Defensa</span>{fmt(pokemon.defense, eff.defense)}</div>
+                          <div className="tooltip-stat"><span>Velocidad</span>{fmt(pokemon.speed, eff.speed)}</div>
+                        </>
+                      )
+                    })()}
+                    {pokemon.moves.length > 0 && (
+                      <div className="tooltip-moves">
+                        {pokemon.moves.slice(0, 4).map((m) => (
+                          <span key={m.name}>{m.name}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   {pokemon.hp <= 0 && (
                     <button
                       type="button"
@@ -1445,6 +1793,16 @@ function MainApp() {
                       onClick={() => removeFaintedPokemon(index)}
                     >
                       🗑️ Liberar
+                    </button>
+                  )}
+                  {pokemon.holdItem && (
+                    <button
+                      type="button"
+                      className="tiny-btn"
+                      style={{ background: '#7c3aed', color: '#fff', fontSize: '0.6rem', padding: '1px 4px' }}
+                      onClick={(e) => { e.stopPropagation(); unequipItem(index) }}
+                    >
+                      ✕ Quitar {pokemon.holdItem}
                     </button>
                   )}
                 </div>
@@ -1471,7 +1829,6 @@ function MainApp() {
               })}
             </div>
 
-            {/* Pantalla Interactiva de la Tienda */}
             {screen === 'shop' && (
               <div className="action-block shop-block" style={{ marginTop: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
@@ -1482,11 +1839,13 @@ function MainApp() {
                 </div>
 
                 <div className="shop-items-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '1rem' }}>
-                  {/* Renderiza los 3 objetos seleccionados aleatoriamente */}
                   {shopStock.map((itemName) => {
-                    const data = ALL_SHOP_ITEMS[itemName]
-                    if (!data) return null
+                    const consumable = ALL_SHOP_ITEMS[itemName]
+                    const holdable = HOLDABLE_ITEMS[itemName]
+                    if (!consumable && !holdable) return null
+                    const data = consumable ?? holdable!
                     const itemIcon = ITEM_SPRITES[itemName]
+                    const isHoldable = !!holdable
 
                     return (
                       <div
@@ -1495,9 +1854,10 @@ function MainApp() {
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          background: 'rgba(0,0,0,0.3)',
+                          background: isHoldable ? 'rgba(168, 85, 247, 0.12)' : 'rgba(0,0,0,0.3)',
                           padding: '8px 12px',
-                          borderRadius: '6px'
+                          borderRadius: '6px',
+                          border: isHoldable ? '1px solid rgba(168, 85, 247, 0.3)' : 'none'
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1509,14 +1869,15 @@ function MainApp() {
                             />
                           )}
                           <div>
-                            <strong style={{ color: '#38bdf8' }}>{itemName}</strong>
+                            <strong style={{ color: isHoldable ? '#c084fc' : '#38bdf8' }}>{itemName}</strong>
                             <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8' }}>{data.desc}</p>
+                            {isHoldable && <span style={{ fontSize: '0.65rem', color: '#a78bfa' }}>objeto pasivo</span>}
                           </div>
                         </div>
                         <button
                           className="tiny-btn"
                           type="button"
-                          onClick={() => buyShopItem(itemName)}
+                          onClick={() => isHoldable ? buyHoldableItem(itemName) : buyShopItem(itemName)}
                           disabled={money < data.price}
                           style={{
                             background: money >= data.price ? '#10b981' : '#475569',
@@ -1532,7 +1893,6 @@ function MainApp() {
                     )
                   })}
 
-                  {/* Servicio de Enfermería (Solo activo si hay Pokémon vivos con falta de HP) */}
                   {(() => {
                     const needsHealing = team.some((pkmn) => pkmn.hp > 0 && pkmn.hp < pkmn.maxHp)
                     const canAffordAndNeeds = money >= 100 && needsHealing
@@ -1644,10 +2004,8 @@ function MainApp() {
 
             {screen === 'battle' && enemy && (
               <div className="action-block">
-                {/* Encabezado del combate */}
                 {isTrainerBattle ? (
                   <div style={{ marginBottom: '0.75rem' }}>
-                    {/* Sprite del entrenador */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                       {trainerSprite && (
                         <img
@@ -1669,7 +2027,6 @@ function MainApp() {
                         </p>
                       </div>
                     </div>
-                    {/* Miniaturas del equipo */}
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                       {trainerTeam.map((tp, idx) => {
                         const isActive = idx === trainerPokemonIndex
@@ -1712,7 +2069,6 @@ function MainApp() {
                   <p style={{ margin: '0 0 4px 0', color: '#86efac', fontSize: '0.85rem' }}>🌿 Pokémon Salvaje</p>
                 )}
 
-                {/* Pokémon enemigo activo */}
                 <p style={{ margin: '0 0 4px 0' }}>
                   <strong style={{ textTransform: 'capitalize' }}>{enemy.name}</strong>
                   {' · '}Nv.&nbsp;{enemy.level}
@@ -1752,6 +2108,34 @@ function MainApp() {
               {inventoryEntries.length > 0 ? (
                 inventoryEntries.map((entry) => {
                   const itemIcon = ITEM_SPRITES[entry.name]
+                  const isHoldable = !!HOLDABLE_ITEMS[entry.name]
+                  if (isHoldable) {
+                    const holdableIdx = inventory.indexOf(entry.name)
+                    const holdDesc = HOLDABLE_ITEMS[entry.name]?.desc ?? entry.description
+                    return (
+                      <button
+                        key={entry.name}
+                        className="item-slot filled item-button"
+                        type="button"
+                        onClick={() => setEquipModal({ itemName: entry.name, itemIndex: holdableIdx })}
+                        title={holdDesc}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderLeft: '3px solid #a78bfa' }}
+                      >
+                        {itemIcon && (
+                          <img
+                            src={itemIcon}
+                            alt={entry.name}
+                            style={{ width: '24px', height: '24px', imageRendering: 'pixelated' }}
+                          />
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                          <strong style={{ color: '#c084fc' }}>{entry.name}</strong>
+                          <span style={{ fontSize: '0.65rem', color: '#a78bfa' }}>{holdDesc}</span>
+                          <span style={{ fontSize: '0.6rem', color: '#7c3aed' }}>x{entry.count} · equipar</span>
+                        </div>
+                      </button>
+                    )
+                  }
                   return (
                     <button
                       key={entry.name}

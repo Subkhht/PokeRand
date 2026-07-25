@@ -26,6 +26,7 @@ export interface Pokemon {
   types?: string[]
   baseStatTotal?: number
   rawLevelUpMoves?: RawLevelUpMove[]
+  holdItem?: string | null
 }
 
 export interface RouteNode {

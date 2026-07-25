@@ -358,6 +358,102 @@ button {
   margin-right: auto;
 }
 
+.sprite-tooltip-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.team-grid .sprite-tooltip-wrapper {
+  overflow: visible;
+  z-index: 10;
+}
+
+.sprite-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0f172a;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-width: 170px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  z-index: 100;
+  pointer-events: none;
+  text-align: left;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.sprite-tooltip-wrapper:hover .sprite-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.sprite-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--panel-border);
+}
+
+.tooltip-name {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.tooltip-types {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.tooltip-type-badge {
+  font-size: 0.6rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tooltip-stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  padding: 1px 0;
+}
+
+.tooltip-stat strong {
+  color: var(--text-main);
+}
+
+.tooltip-moves {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--panel-border);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.tooltip-moves span {
+  display: inline-block;
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--accent-blue);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin: 1px 2px;
+  font-weight: 500;
+}
+
 /* ------------------------------------------------------------
    GRID DE NODOS DE RUTA
    ------------------------------------------------------------ */
@@ -428,6 +524,7 @@ button {
   justify-items: center;
   font-size: 12px;
   cursor: pointer;
+  position: relative;
 }
 
 .team-slot img {
