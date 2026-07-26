@@ -74,6 +74,30 @@ export function generateRoute(): RouteNode[] {
   return route
 }
 
+export function generateBossRushRoute(totalNodes: number): RouteNode[] {
+  const route: RouteNode[] = []
+  for (let i = 1; i < totalNodes; i++) {
+    route.push({
+      id: i,
+      type: 'battle',
+      label: `Ruta ${i}`,
+      done: false
+    })
+  }
+  route.push({ id: totalNodes, type: 'boss', label: 'Jefe Final', done: false })
+  return route
+}
+
+export const ALL_TYPES = [
+  'normal', 'fire', 'water', 'electric', 'grass', 'ice', 'fighting', 'poison',
+  'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark',
+  'steel', 'fairy'
+]
+
+export function randomFromType(): string {
+  return randomFrom(ALL_TYPES)
+}
+
 export function randomFrom<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)]
 }
@@ -223,12 +247,15 @@ export const RUN_MODIFIERS: RunModifier[] = [
   },
 ]
 
-export function startRun(config: { generation: number }) {
+export function startRun(config: { generation: number }, doubleModifiers = false) {
+  const modifier1 = randomFrom(RUN_MODIFIERS)
+  const modifier2 = doubleModifiers ? randomFrom(RUN_MODIFIERS.filter(m => m.id !== modifier1.id && m.id !== 'none')) : null
   return {
     config,
     route: generateRoute(),
     item: 'Potion',
-    modifier: randomFrom(RUN_MODIFIERS)
+    modifier: modifier1,
+    modifier2: modifier2 ?? undefined
   }
 }
 

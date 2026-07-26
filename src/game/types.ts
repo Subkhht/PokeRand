@@ -67,6 +67,29 @@ export interface RunChallenges {
   noRests: boolean
   allShiny: boolean
   allTeamRocket: boolean
+  nuzlocke: boolean
+  soloStarter: boolean
+  fixedTeam: boolean
+  noEvolution: boolean
+  noItems: boolean
+  restrictedMoves: boolean
+  firstStrike: boolean
+  fixedLevel: boolean
+  noCrits: boolean
+  typeRandomizer: boolean
+  noPurchasing: boolean
+  blindRoute: boolean
+  bossRush: boolean
+  speedrun: boolean
+  noMoney: boolean
+  doubleModifiers: boolean
+  scalingEnemies: boolean
+  noHealing: boolean
+  ironman: boolean
+  totalRandomizer: boolean
+  nuzlockeHardcore: boolean
+  challengeGauntlet: boolean
+  egglocke: boolean
 }
 
 export interface DefeatSummary {

@@ -1,6 +1,6 @@
-import { useMemo, useState, useEffect, Component, type ReactNode } from 'react'
+import { useMemo, useState, useEffect, useRef, Component, type ReactNode } from 'react'
 import './App.css'
-import { applyDamage, healPokemon, randomFrom, scalePokemonForNode, startRun } from './game/engine'
+import { applyDamage, healPokemon, randomFrom, scalePokemonForNode, startRun, generateBossRushRoute, randomFromType, ALL_TYPES } from './game/engine'
 import { playHover, playClick, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
@@ -348,6 +348,29 @@ function MainApp() {
     noRests: false,
     allShiny: false,
     allTeamRocket: false,
+    nuzlocke: false,
+    soloStarter: false,
+    fixedTeam: false,
+    noEvolution: false,
+    noItems: false,
+    restrictedMoves: false,
+    firstStrike: false,
+    fixedLevel: false,
+    noCrits: false,
+    typeRandomizer: false,
+    noPurchasing: false,
+    blindRoute: false,
+    bossRush: false,
+    speedrun: false,
+    noMoney: false,
+    doubleModifiers: false,
+    scalingEnemies: false,
+    noHealing: false,
+    ironman: false,
+    totalRandomizer: false,
+    nuzlockeHardcore: false,
+    challengeGauntlet: false,
+    egglocke: false,
   })
   const [battleLog, setBattleLog] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(false)
@@ -381,6 +404,15 @@ function MainApp() {
   const [pokeRandWinnerIndex, setPokeRandWinnerIndex] = useState<number | null>(null)
   const [pokeRandRevealed, setPokeRandRevealed] = useState<boolean>(false)
 
+  // Egglocke
+  const [eggInventory, setEggInventory] = useState<Array<{ name: string; sprite: string; types: string[]; hatchIn: number; id: number }>>([])
+  const [modifier2, setModifier2] = useState<RunModifier | null>(null)
+  const [gauntletKeys, setGauntletKeys] = useState<Array<keyof RunChallenges>>([])
+
+  // Speedrun timer
+  const [speedrunSeconds, setSpeedrunSeconds] = useState<number>(0)
+  const speedrunTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   // Pokédex
   const [showPokedex, setShowPokedex] = useState<boolean>(false)
   const [pokedexSearch, setPokedexSearch] = useState<string>('')
@@ -413,6 +445,29 @@ function MainApp() {
 
   useEffect(() => { startMenuMusic() }, [])
 
+  // Speedrun: auto-defeat when timer reaches 0
+  useEffect(() => {
+    if (runChallenges.speedrun && speedrunSeconds === 0 && screen === 'battle') {
+      if (speedrunTimerRef.current) {
+        clearInterval(speedrunTimerRef.current)
+        speedrunTimerRef.current = null
+      }
+      const fullLogs = ['⏱️ ¡Tiempo agotado! Has perdido por Speedrun.', ...battleLog]
+      setBattleLog(fullLogs)
+      setDefeatSummary({
+        finalTeam: team,
+        battleLog: fullLogs,
+        enemy: enemy,
+        lastNodeLabel: currentNode?.label
+      })
+      const losses = record.losses + 1
+      persistRecord(record.wins, losses)
+      setScreen('defeat')
+      playDefeatMusic()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speedrunSeconds])
+
   function isGenUnlocked(gen: number): boolean {
     if (gen === 1) return true
     if (gen === 0) {
@@ -437,8 +492,8 @@ function MainApp() {
     const challengesLocked = gen === 0
       ? !generations.every((g) => progression.completedMedium.includes(g))
       : !progression.completedMedium.includes(gen)
-    if (challengesLocked && (runChallenges.noShops || runChallenges.noRests || runChallenges.allShiny || runChallenges.allTeamRocket)) {
-      setRunChallenges({ noShops: false, noRests: false, allShiny: false, allTeamRocket: false })
+    if (challengesLocked && (runChallenges.noShops || runChallenges.noRests || runChallenges.allShiny || runChallenges.allTeamRocket || runChallenges.nuzlocke || runChallenges.soloStarter || runChallenges.fixedTeam || runChallenges.noEvolution || runChallenges.noItems || runChallenges.restrictedMoves || runChallenges.firstStrike || runChallenges.fixedLevel || runChallenges.noCrits || runChallenges.typeRandomizer || runChallenges.noPurchasing || runChallenges.blindRoute || runChallenges.bossRush || runChallenges.speedrun || runChallenges.noMoney || runChallenges.doubleModifiers || runChallenges.scalingEnemies || runChallenges.noHealing || runChallenges.ironman || runChallenges.totalRandomizer || runChallenges.nuzlockeHardcore || runChallenges.challengeGauntlet || runChallenges.egglocke)) {
+      setRunChallenges({ noShops: false, noRests: false, allShiny: false, allTeamRocket: false, nuzlocke: false, soloStarter: false, fixedTeam: false, noEvolution: false, noItems: false, restrictedMoves: false, firstStrike: false, fixedLevel: false, noCrits: false, typeRandomizer: false, noPurchasing: false, blindRoute: false, bossRush: false, speedrun: false, noMoney: false, doubleModifiers: false, scalingEnemies: false, noHealing: false, ironman: false, totalRandomizer: false, nuzlockeHardcore: false, challengeGauntlet: false, egglocke: false })
     }
   }
 
@@ -504,7 +559,9 @@ function MainApp() {
 
   function generateRandomNodeType(id: number): RouteNode {
     let type: RouteNode['type'] = 'battle'
-    if (runChallenges.allTeamRocket) {
+    if (runChallenges.bossRush) {
+      type = 'battle'
+    } else if (runChallenges.allTeamRocket) {
       type = 'teamRocket'
     } else {
       const rand = Math.random()
@@ -555,16 +612,57 @@ function MainApp() {
       const targetGen = getEffectiveGen()
       setCurrentRunGen(targetGen)
 
-      const starter = await getRandomStarterByGeneration(targetGen, runChallenges.allShiny)
+      // Handle challengeGauntlet: randomly pick 3 challenges
+      let activeChallenges = { ...runChallenges }
+      if (activeChallenges.challengeGauntlet) {
+        const allChallengeKeys: Array<keyof RunChallenges> = [
+          'noShops', 'noRests', 'allShiny', 'allTeamRocket', 'nuzlocke',
+          'soloStarter', 'fixedTeam', 'noEvolution', 'noItems', 'restrictedMoves',
+          'firstStrike', 'fixedLevel', 'noCrits', 'typeRandomizer', 'noPurchasing',
+          'blindRoute', 'bossRush', 'speedrun', 'noMoney', 'doubleModifiers',
+          'scalingEnemies', 'noHealing', 'ironman', 'totalRandomizer', 'egglocke'
+        ]
+        const shuffled = [...allChallengeKeys].sort(() => Math.random() - 0.5)
+        const picked = shuffled.slice(0, 3)
+        activeChallenges = { ...activeChallenges }
+        for (const key of allChallengeKeys) {
+          activeChallenges[key] = picked.includes(key)
+        }
+        activeChallenges.challengeGauntlet = true
+        setRunChallenges(activeChallenges)
+        setGauntletKeys(picked)
+      }
+
+      // Handle nuzlockeHardcore: nuzlocke + noItems + noRests
+      if (activeChallenges.nuzlockeHardcore) {
+        activeChallenges = { ...activeChallenges, nuzlocke: true, noItems: true, noRests: true }
+        setRunChallenges(activeChallenges)
+      }
+
+      // Handle ironman: noEvolution + fixedTeam + noHealing
+      if (activeChallenges.ironman) {
+        activeChallenges = { ...activeChallenges, noEvolution: true, fixedTeam: true, noHealing: true }
+        setRunChallenges(activeChallenges)
+      }
+
+      const starter = await getRandomStarterByGeneration(targetGen, activeChallenges.allShiny)
       const config: RunConfig = { generation: targetGen }
-      const run = startRun(config)
+      const run = startRun(config, activeChallenges.doubleModifiers)
+
+      if (run.modifier2) {
+        setModifier2(run.modifier2)
+      } else {
+        setModifier2(null)
+      }
 
       registerInPokedex(starter)
 
       const totalNodes = difficultyNodeCounts[difficulty]
       let customRoute: RouteNode[] = []
 
-      if (difficulty === 'infinite') {
+      if (activeChallenges.bossRush) {
+        customRoute = generateBossRushRoute(totalNodes)
+      } else if (difficulty === 'infinite') {
         for (let i = 1; i <= 5; i++) {
           customRoute.push(generateRandomNodeType(i))
         }
@@ -596,13 +694,15 @@ function MainApp() {
             type = 'spin'
           } else if (pokeRandPositions.includes(i)) {
             type = 'pokeRand'
-          } else if (runChallenges.allTeamRocket) {
+          } else if (activeChallenges.bossRush) {
+            type = 'battle'
+          } else if (activeChallenges.allTeamRocket) {
             type = 'teamRocket'
           } else {
             const rand = Math.random()
-            if (rand < 0.15 && !runChallenges.noShops) {
+            if (rand < 0.15 && !activeChallenges.noShops) {
               type = 'shop'
-            } else if (rand < 0.40 && !runChallenges.noRests) {
+            } else if (rand < 0.40 && !activeChallenges.noRests) {
               type = 'rest'
             } else if (rand < 0.52) {
               type = 'teamRocket'
@@ -633,7 +733,7 @@ function MainApp() {
       }
       setTeam([starterWithBonus])
       setActiveIndex(0)
-      setMoney(200)
+      setMoney(activeChallenges.noMoney ? 0 : 200)
       setInventory([run.item])
       setModifier(run.modifier)
       setRoute(customRoute)
@@ -649,15 +749,48 @@ function MainApp() {
       setRestRewardItem('')
       setDefeatSummary(null)
       setVictoryUnlocks(null)
+      setEggInventory([])
+      setSpeedrunSeconds(0)
+      if (speedrunTimerRef.current) {
+        clearInterval(speedrunTimerRef.current)
+        speedrunTimerRef.current = null
+      }
+
+      const challengeDescriptions: string[] = []
+      if (activeChallenges.noShops) challengeDescriptions.push('🚫 Desafío: Sin tiendas.')
+      if (activeChallenges.noRests) challengeDescriptions.push('🚫 Desafío: Sin descansos.')
+      if (activeChallenges.allShiny) challengeDescriptions.push('✨ Desafío: Todos los Pokémon son Shiny.')
+      if (activeChallenges.allTeamRocket) challengeDescriptions.push('🔴 Desafío: ¡Todos los nodos son TeamR!')
+      if (activeChallenges.nuzlocke) challengeDescriptions.push('💀 Desafío: Nuzlocke (muerte = liberación).')
+      if (activeChallenges.soloStarter) challengeDescriptions.push('🌟 Desafío: Solo Starter (sin capturas).')
+      if (activeChallenges.fixedTeam) challengeDescriptions.push('🔒 Desafío: Equipo Fijo.')
+      if (activeChallenges.noEvolution) challengeDescriptions.push('🚫 Desafío: Sin Evolución.')
+      if (activeChallenges.noItems) challengeDescriptions.push('🚫 Desafío: Sin Objetos en batalla.')
+      if (activeChallenges.restrictedMoves) challengeDescriptions.push('⚔️ Desafío: Solo 2 movimientos.')
+      if (activeChallenges.firstStrike) challengeDescriptions.push('⚡ Desafío: Primer Golpe (recoil).')
+      if (activeChallenges.fixedLevel) challengeDescriptions.push('📊 Desafío: Nivel Fijo.')
+      if (activeChallenges.noCrits) challengeDescriptions.push('🚫 Desafío: Sin Críticos.')
+      if (activeChallenges.typeRandomizer) challengeDescriptions.push('🎲 Desafío: Tipo Randomizado.')
+      if (activeChallenges.noPurchasing) challengeDescriptions.push('🚫 Desafío: Sin Compras.')
+      if (activeChallenges.blindRoute) challengeDescriptions.push('👁️‍🗨️ Desafío: Ruta Ciega.')
+      if (activeChallenges.bossRush) challengeDescriptions.push('🏆 Desafío: Boss Rush.')
+      if (activeChallenges.speedrun) challengeDescriptions.push('⏱️ Desafío: Speedrun (30s/turno).')
+      if (activeChallenges.noMoney) challengeDescriptions.push('💸 Desafío: Sin Dinero.')
+      if (activeChallenges.doubleModifiers) challengeDescriptions.push('🎰 Desafío: Modifiers Duplos.')
+      if (activeChallenges.scalingEnemies) challengeDescriptions.push('📈 Desafío: Enemigos Reforzados.')
+      if (activeChallenges.noHealing) challengeDescriptions.push('🚫 Desafío: Sin Curación.')
+      if (activeChallenges.ironman) challengeDescriptions.push('🔒 Desafío: Ironman (todo fijo).')
+      if (activeChallenges.totalRandomizer) challengeDescriptions.push('🎲 Desafío: Randomizer Total.')
+      if (activeChallenges.nuzlockeHardcore) challengeDescriptions.push('💀 Desafío: Nuzlocke Hardcore.')
+      if (activeChallenges.challengeGauntlet) challengeDescriptions.push('🎰 Desafío: Gauntlet (3 al azar).')
+      if (activeChallenges.egglocke) challengeDescriptions.push('🥚 Desafío: Egglocke.')
+
       setBattleLog([
         `Tu inicial es ${starter.name}${starter.shiny ? ' ✨' : ''}.`,
         `Modo: ${generation === 0 ? 'Random All-Stars' : `Gen ${generation}`}.`,
         `Dificultad: ${difficultyLabels[difficulty].title}${difficulty === 'infinite' ? ' (Sin límite)' : ` (${totalNodes} rutas)`}.`,
-        `Recibes $200 de inicio e item: ${run.item}.`,
-        ...(runChallenges.noShops ? ['🚫 Desafío: Sin tiendas.'] : []),
-        ...(runChallenges.noRests ? ['🚫 Desafío: Sin descansos.'] : []),
-        ...(runChallenges.allShiny ? ['✨ Desafío: Todos los Pokémon son Shiny.'] : []),
-        ...(runChallenges.allTeamRocket ? ['🔴 Desafío: ¡Todos los nodos son TeamR!'] : []),
+        `Recibes $${activeChallenges.noMoney ? '0' : '200'} de inicio e item: ${run.item}.`,
+        ...challengeDescriptions,
       ])
       setScreen('route')
       startBattleMusic()
@@ -671,6 +804,11 @@ function MainApp() {
   function completeCurrentNode(): void {
     setRestEncounter(null)
     setRestRewardItem('')
+    if (speedrunTimerRef.current) {
+      clearInterval(speedrunTimerRef.current)
+      speedrunTimerRef.current = null
+    }
+    setSpeedrunSeconds(0)
     setRoute((previous) =>
       previous.map((node, index) => (index === routeIndex ? { ...node, done: true } : node))
     )
@@ -733,6 +871,20 @@ function MainApp() {
       setBattleLog((prev) => [`Tu equipo está lleno (6/6). No puedes añadir a ${pokemon.name}.`, ...prev].slice(0, 15))
       return
     }
+    if (runChallenges.soloStarter) {
+      setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
+      setTeamRocketPickModal(false)
+      setTeamRocketTeam([])
+      completeCurrentNode()
+      return
+    }
+    if (runChallenges.fixedTeam) {
+      setBattleLog((prev) => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
+      setTeamRocketPickModal(false)
+      setTeamRocketTeam([])
+      completeCurrentNode()
+      return
+    }
     setTeam((prev) => [...prev, { ...pokemon, hp: Math.floor(pokemon.maxHp / 2) }])
     setTeamRocketPickModal(false)
     setTeamRocketTeam([])
@@ -763,6 +915,11 @@ function MainApp() {
   async function handleEvolveTarget(index: number): Promise<void> {
     const targetPokemon = team[index]
     if (!targetPokemon) return
+
+    if (runChallenges.noEvolution) {
+      setBattleLog((prev) => ['🚫 Desafío Sin Evolución: No puedes evolucionar Pokémon.', ...prev].slice(0, 15))
+      return
+    }
 
     setIsLoading(true)
     setApiError('')
@@ -829,6 +986,12 @@ function MainApp() {
       const selectedConsumables = shuffledConsumables.slice(0, 2)
       const selectedHoldables = shuffledHoldables.slice(0, 1)
       setShopStock([...selectedConsumables, ...selectedHoldables])
+      if (runChallenges.noPurchasing) {
+        setBattleLog((prev) => [
+          `🚫 Desafío Sin Compras: No puedes comprar nada en la tienda.`,
+          ...prev
+        ].slice(0, 15))
+      }
       const potionBonus = modifier?.shopPotionBonus ?? 0
       if (potionBonus > 0) {
         setInventory((prev) => [...prev, ...Array(potionBonus).fill('Potion')])
@@ -878,6 +1041,15 @@ function MainApp() {
     }
 
     if (currentNode.type === 'rest') {
+    if (runChallenges.noHealing) {
+      setBattleLog((prev) => [
+        `🚫 Desafío Sin Curación: Los descansos no curan.`,
+        ...prev
+      ].slice(0, 15))
+      completeCurrentNode()
+      setScreen('route')
+      return
+    }
     setIsLoading(true)
     setApiError('')
 
@@ -887,12 +1059,36 @@ function MainApp() {
       : progression.completedMedium.includes(effectiveGen)
 
     if (!challengesUnlocked) {
-      setRunChallenges({ noShops: false, noRests: false, allShiny: false , allTeamRocket: false })
+      setRunChallenges({ noShops: false, noRests: false, allShiny: false, allTeamRocket: false, nuzlocke: false, soloStarter: false, fixedTeam: false, noEvolution: false, noItems: false, restrictedMoves: false, firstStrike: false, fixedLevel: false, noCrits: false, typeRandomizer: false, noPurchasing: false, blindRoute: false, bossRush: false, speedrun: false, noMoney: false, doubleModifiers: false, scalingEnemies: false, noHealing: false, ironman: false, totalRandomizer: false, nuzlockeHardcore: false, challengeGauntlet: false, egglocke: false })
     }
 
     try {
       const targetGen = getEffectiveGen()
         const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
+
+        if (runChallenges.egglocke) {
+          const eggId = Math.floor(Math.random() * 900) + 1
+          const eggEntry = {
+            name: restPokemonBase.name,
+            sprite: restPokemonBase.sprite,
+            types: (restPokemonBase as any).types ?? ['normal'],
+            hatchIn: 2 + Math.floor(Math.random() * 2),
+            id: eggId
+          }
+          setEggInventory(prev => [...prev, eggEntry])
+          const rewardItem = randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry'])
+          setRestRewardItem(rewardItem)
+          setInventory((previous) => [...previous, rewardItem])
+          setBattleLog((prev) => [
+            `${currentNode.label}: ¡Obtuviste un Huevo de ${eggEntry.name}! (Eclosiona en ${eggEntry.hatchIn} battles)`,
+            `También obtienes ${rewardItem}.`,
+            ...prev
+          ].slice(0, 15))
+          completeCurrentNode()
+          setScreen('route')
+          return
+        }
+
         const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty)
         const rewardItem = randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry'])
 
@@ -919,13 +1115,27 @@ function MainApp() {
       const isBoss = currentNode.type === 'boss'
       const isTeamRocket = currentNode.type === 'teamRocket'
 
+      const extraEnemyLevels = runChallenges.scalingEnemies ? routeIndex : 0
+
       if (isTeamRocket) {
         const progress = routeIndex / Math.max(1, route.length - 1)
         const teamSize = Math.max(2, Math.min(4, 2 + Math.floor(progress * 3)))
 
         const fetches = Array.from({ length: teamSize }, () =>
           getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
-            .then((base) => scalePokemonForNode(base, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty))
+            .then((base) => {
+              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + extraEnemyLevels, difficulty)
+              if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
+              if (runChallenges.totalRandomizer) {
+                scaled = {
+                  ...scaled,
+                  attack: scaled.attack + Math.floor(Math.random() * 20) - 10,
+                  defense: scaled.defense + Math.floor(Math.random() * 20) - 10,
+                  speed: scaled.speed + Math.floor(Math.random() * 20) - 10,
+                }
+              }
+              return scaled
+            })
         )
         const rocketTeam = await Promise.all(fetches)
 
@@ -956,7 +1166,19 @@ function MainApp() {
 
         const fetches = Array.from({ length: teamSize }, () =>
           getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny, difficulty)
-            .then((base) => scalePokemonForNode(base, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty))
+            .then((base) => {
+              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + extraEnemyLevels, difficulty)
+              if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
+              if (runChallenges.totalRandomizer) {
+                scaled = {
+                  ...scaled,
+                  attack: scaled.attack + Math.floor(Math.random() * 20) - 10,
+                  defense: scaled.defense + Math.floor(Math.random() * 20) - 10,
+                  speed: scaled.speed + Math.floor(Math.random() * 20) - 10,
+                }
+              }
+              return scaled
+            })
         )
         const newTrainerTeam = await Promise.all(fetches)
 
@@ -991,7 +1213,16 @@ function MainApp() {
         ])
       } else {
         const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
-        const generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty)
+        let generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + extraEnemyLevels, difficulty)
+        if (runChallenges.fixedLevel) generatedEnemy = { ...generatedEnemy, level: 50 }
+        if (runChallenges.totalRandomizer) {
+          generatedEnemy = {
+            ...generatedEnemy,
+            attack: generatedEnemy.attack + Math.floor(Math.random() * 20) - 10,
+            defense: generatedEnemy.defense + Math.floor(Math.random() * 20) - 10,
+            speed: generatedEnemy.speed + Math.floor(Math.random() * 20) - 10,
+          }
+        }
         setIsTrainerBattle(false)
         setTrainerTeam([])
         setTrainerPokemonIndex(0)
@@ -1009,6 +1240,20 @@ function MainApp() {
       }
 
       setScreen('battle')
+
+      if (runChallenges.speedrun) {
+        setSpeedrunSeconds(30)
+        if (speedrunTimerRef.current) clearInterval(speedrunTimerRef.current)
+        speedrunTimerRef.current = setInterval(() => {
+          setSpeedrunSeconds(prev => {
+            if (prev <= 1) {
+              if (speedrunTimerRef.current) clearInterval(speedrunTimerRef.current)
+              return 0
+            }
+            return prev - 1
+          })
+        }, 1000)
+      }
     } catch {
       setApiError('No se pudo generar rival desde PokeAPI. Reintenta.')
     } finally {
@@ -1090,6 +1335,14 @@ function MainApp() {
       ].slice(0, 15))
       return
     }
+    if (runChallenges.soloStarter) {
+      setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
+      return
+    }
+    if (runChallenges.fixedTeam) {
+      setBattleLog((prev) => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
+      return
+    }
     setTeam((prev) => [...prev, pokemon])
     setBattleLog((prev) => [
       `🎲 ¡PokeRand: ${pokemon.name} se unió a tu equipo!`,
@@ -1109,6 +1362,10 @@ function MainApp() {
   }
 
   function buyShopItem(itemName: string) {
+    if (runChallenges.noPurchasing) {
+      setBattleLog((prev) => ['🚫 Desafío Sin Compras: No puedes comprar nada.', ...prev].slice(0, 15))
+      return
+    }
     const item = ALL_SHOP_ITEMS[itemName]
     if (!item) return
     const discount = modifier?.shopDiscount ?? 0
@@ -1121,6 +1378,10 @@ function MainApp() {
   }
 
   function buyHoldableItem(itemName: string) {
+    if (runChallenges.noPurchasing) {
+      setBattleLog((prev) => ['🚫 Desafío Sin Compras: No puedes comprar nada.', ...prev].slice(0, 15))
+      return
+    }
     const item = HOLDABLE_ITEMS[itemName]
     if (!item) return
     const discount = modifier?.shopDiscount ?? 0
@@ -1184,6 +1445,14 @@ function MainApp() {
   }
 
   function healTeamAtShop() {
+    if (runChallenges.noHealing) {
+      setBattleLog((prev) => ['🚫 Desafío Sin Curación: No puedes curar en tienda.', ...prev].slice(0, 15))
+      return
+    }
+    if (runChallenges.noPurchasing) {
+      setBattleLog((prev) => ['🚫 Desafío Sin Compras: No puedes comprar curación.', ...prev].slice(0, 15))
+      return
+    }
     const baseHealCost = 100
     const healCost = Math.floor(baseHealCost * (1 - (modifier?.shopDiscount ?? 0)))
     const needsHealing = team.some((pkmn) => pkmn.hp > 0 && pkmn.hp < pkmn.maxHp)
@@ -1210,7 +1479,7 @@ function MainApp() {
     defender: Pokemon,
     move: Move,
     isEnemyHit: boolean
-  ): { updatedDefender: Pokemon; line: string; attackerHeal: number } {
+  ): { updatedDefender: Pokemon; line: string; attackerHeal: number; recoilDamage: number } {
     const enemyBoost = isEnemyHit ? modifier?.enemyAttackDelta ?? 0 : 0
 
     const attackerItem = attacker.holdItem ? HOLDABLE_ITEMS[attacker.holdItem] : null
@@ -1232,12 +1501,16 @@ function MainApp() {
       defense: Math.round(defender.defense * (1 + (defenderItem?.defenseMod ?? 0) + playerDefMod) + enemyDefDelta)
     }
 
+    const effectiveMove = runChallenges.typeRandomizer
+      ? { ...move, type: randomFrom(ALL_TYPES) }
+      : move
+
     const defTypes = (effectiveDefender as any).types ?? []
     const primaryType = defTypes[0] || 'normal'
     const secondaryType = defTypes[1] || undefined
 
-    const { effectiveness, message } = getTypeEffectiveness(move.type, primaryType, secondaryType)
-    const result = applyDamage(effectiveAttacker, effectiveDefender, move, enemyBoost)
+    const { effectiveness, message } = getTypeEffectiveness(effectiveMove.type, primaryType, secondaryType)
+    const result = applyDamage(effectiveAttacker, effectiveDefender, effectiveMove, enemyBoost)
 
     let finalDamage = Math.floor(result.damage * effectiveness)
     if (attackerItem?.damageBoost) {
@@ -1255,7 +1528,7 @@ function MainApp() {
 
     const modCrit = !isEnemyHit ? (modifier?.playerCritChance ?? 0) : 0
     const totalCrit = (attackerItem?.critChance ?? 0) + modCrit
-    const isCrit = totalCrit > 0 && Math.random() < totalCrit
+    const isCrit = !runChallenges.noCrits && totalCrit > 0 && Math.random() < totalCrit
     if (isCrit) {
       finalDamage = Math.floor(finalDamage * 1.5)
     }
@@ -1274,7 +1547,9 @@ function MainApp() {
       attackerHeal = Math.floor(finalDamage * totalLifesteal)
     }
 
-    let line = `${attacker.name} usa ${move.name}: ${finalDamage} de daño.`
+    let recoilDamage = 0
+
+    let line = `${attacker.name} usa ${effectiveMove.name}${runChallenges.typeRandomizer && effectiveMove.type !== move.type ? ` [${effectiveMove.type}]` : ''}: ${finalDamage} de daño.`
     if (isCrit) line += ' ¡Golpe crítico!'
     if (message) {
       line += ` (${message})`
@@ -1283,12 +1558,22 @@ function MainApp() {
     return {
       updatedDefender,
       line,
-      attackerHeal
+      attackerHeal,
+      recoilDamage
     }
   }
 
   async function onPlayerMove(move: Move): Promise<void> {
     if (!activePokemon || !enemy) return
+
+    if (runChallenges.speedrun && speedrunSeconds <= 0) {
+      setBattleLog((prev) => ['⏱️ ¡Se acabó el tiempo! Pierdes tu turno.', ...prev].slice(0, 15))
+      return
+    }
+
+    if (runChallenges.speedrun) {
+      if (speedrunTimerRef.current) clearInterval(speedrunTimerRef.current)
+    }
 
     const nextTeam = team.map((pokemon, index) => (index === activeIndex ? { ...pokemon } : pokemon))
     let nextPlayer = { ...nextTeam[activeIndex] }
@@ -1311,6 +1596,12 @@ function MainApp() {
         logs.push(`${nextPlayer.name} recupera ${playerHit.attackerHeal} HP por ${nextPlayer.holdItem ?? 'Vampirismo'}.`)
       }
       logs.push(playerHit.line)
+
+      if (runChallenges.firstStrike && nextEnemy.hp > 0) {
+        const recoil = Math.floor(nextPlayer.maxHp * 0.08)
+        nextPlayer = { ...nextPlayer, hp: Math.max(1, nextPlayer.hp - recoil) }
+        logs.push(`⚡ ¡Recoil por Primer Golpe! ${nextPlayer.name} pierde ${recoil} HP.`)
+      }
 
       if (nextEnemy.hp > 0) {
         const enemyMove = nextEnemy.moves[Math.floor(Math.random() * nextEnemy.moves.length)]
@@ -1343,6 +1634,12 @@ function MainApp() {
           logs.push(`${nextPlayer.name} recupera ${playerHit.attackerHeal} HP por ${nextPlayer.holdItem ?? 'Vampirismo'}.`)
         }
         logs.push(playerHit.line)
+
+        if (runChallenges.firstStrike && nextEnemy.hp > 0) {
+          const recoil = Math.floor(nextPlayer.maxHp * 0.08)
+          nextPlayer = { ...nextPlayer, hp: Math.max(1, nextPlayer.hp - recoil) }
+          logs.push(`⚡ ¡Recoil por Primer Golpe! ${nextPlayer.name} pierde ${recoil} HP.`)
+        }
       }
     }
 
@@ -1376,6 +1673,7 @@ function MainApp() {
 
       if (nextAliveIndex === -1) {
         const fullLogs = ['¡Todo tu equipo ha sido debilitado!', ...logs, ...battleLog]
+        if (speedrunTimerRef.current) clearInterval(speedrunTimerRef.current)
         setTeam(nextTeam)
         setBattleLog(fullLogs)
         setDefeatSummary({
@@ -1391,9 +1689,17 @@ function MainApp() {
         return
       }
 
-      setTeam(nextTeam)
-      setActiveIndex(nextAliveIndex)
-      setBattleLog((prev) => [`${nextPlayer.name} cayó debilitado.`, ...logs, ...prev].slice(0, 15))
+      if (runChallenges.nuzlocke) {
+        const nuzlockeTeam = nextTeam.filter((_, idx) => idx !== activeIndex)
+        const newActiveIdx = Math.min(activeIndex, nuzlockeTeam.length - 1)
+        setTeam(nuzlockeTeam)
+        setActiveIndex(Math.max(0, newActiveIdx))
+        setBattleLog((prev) => [`💀 Nuzlocke: ${nextPlayer.name} fue debilitado y liberado.`, ...logs, ...prev].slice(0, 15))
+      } else {
+        setTeam(nextTeam)
+        setActiveIndex(nextAliveIndex)
+        setBattleLog((prev) => [`${nextPlayer.name} cayó debilitado.`, ...logs, ...prev].slice(0, 15))
+      }
       if (isTeamRocketBattle) setTeamRocketFainted(true)
       setEnemy(nextEnemy)
       return
@@ -1439,10 +1745,49 @@ function MainApp() {
       const newTeam = await Promise.all(updatedTeamPromises)
 
       const baseMoneyReward = Math.floor((80 + nextEnemy.level * 10) / (isTrainerBattle ? trainerTeam.length : 1))
-      const moneyReward = Math.floor(baseMoneyReward * (modifier?.moneyMultiplier ?? 1))
-      setMoney((prev) => prev + moneyReward)
+      const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoneyReward * (modifier?.moneyMultiplier ?? 1))
+      if (!runChallenges.noMoney) setMoney((prev) => prev + moneyReward)
 
-      let logMsg = `Derrotaste a ${nextEnemy.name}. ¡Todo el equipo ganó experiencia!`
+      // Egglocke: hatch eggs after battle
+      if (runChallenges.egglocke && eggInventory.length > 0) {
+        const hatchedEggs: typeof eggInventory = []
+        const remainingEggs: typeof eggInventory = []
+        for (const egg of eggInventory) {
+          if (egg.hatchIn <= 1) {
+            hatchedEggs.push(egg)
+          } else {
+            remainingEggs.push({ ...egg, hatchIn: egg.hatchIn - 1 })
+          }
+        }
+        if (hatchedEggs.length > 0) {
+          for (const egg of hatchedEggs) {
+            if (newTeam.filter(p => p.hp > 0).length < maxTeamSize) {
+              const hatchedPokemon: Pokemon = {
+                id: egg.id,
+                name: egg.name,
+                sprite: egg.sprite,
+                level: nextPlayer.level,
+                hp: 80,
+                maxHp: 80,
+                attack: 12,
+                defense: 10,
+                speed: 10,
+                moves: [],
+                types: egg.types,
+              }
+              newTeam.push(hatchedPokemon)
+              logs.push(`🥚 ¡El Huevo de ${egg.name} ha eclosionado!`)
+            } else {
+              logs.push(`🥚 El Huevo de ${egg.name} eclosionó pero tu equipo está lleno.`)
+            }
+          }
+        }
+        setEggInventory(remainingEggs)
+      }
+
+      let logMsg = runChallenges.noMoney
+        ? `Derrotaste a ${nextEnemy.name}. ¡Todo el equipo ganó experiencia!`
+        : `Derrotaste a ${nextEnemy.name}. ¡Todo el equipo ganó experiencia! +$${moneyReward}`
 
       // --- Batalla de entrenador: enviar siguiente Pokémon ---
       if (isTrainerBattle) {
@@ -1560,6 +1905,16 @@ function MainApp() {
     if (itemIndex === -1) return
     if (HOLDABLE_ITEMS[itemName]) return
 
+    if (runChallenges.noItems) {
+      setBattleLog((prev) => ['🚫 Desafío Sin Objetos: No puedes usar items en batalla.', ...prev].slice(0, 15))
+      return
+    }
+
+    if (runChallenges.noHealing && (itemName.includes('Potion') || itemName.includes('Berry') || itemName === 'Full Restore' || itemName === 'Full Heal')) {
+      setBattleLog((prev) => ['🚫 Desafío Sin Curación: No puedes usar items de curación.', ...prev].slice(0, 15))
+      return
+    }
+
     if (itemName === 'Revive' || itemName === 'Max Revive') {
       const hasFainted = team.some((p) => p.hp <= 0)
       if (!hasFainted) {
@@ -1628,6 +1983,16 @@ function MainApp() {
       return
     }
 
+    if (runChallenges.soloStarter) {
+      setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
+      return
+    }
+
+    if (runChallenges.fixedTeam) {
+      setBattleLog((prev) => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
+      return
+    }
+
     const hpBonus = modifier?.playerMaxHpBonus ?? 0
     const captured = { ...restEncounter, maxHp: restEncounter.maxHp + hpBonus, hp: restEncounter.hp + hpBonus }
     registerInPokedex(captured)
@@ -1655,6 +2020,7 @@ function MainApp() {
     setMoney(200)
     setShopStock([])
     setModifier(null)
+    setModifier2(null)
     setBattleLog([])
     setApiError('')
     setRestEncounter(null)
@@ -1676,6 +2042,12 @@ function MainApp() {
     setSpinWinnerIndex(null)
     setSpinRevealed(false)
     setSpinAnimating(false)
+    setEggInventory([])
+    setSpeedrunSeconds(0)
+    if (speedrunTimerRef.current) {
+      clearInterval(speedrunTimerRef.current)
+      speedrunTimerRef.current = null
+    }
   }
 
   function onRestartRun(): void {
@@ -2352,7 +2724,7 @@ function MainApp() {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '1.2rem', color: '#c084fc' }}>♾️ INFINITE</span>
-                <strong style={{ fontSize: '1rem', color: '#c084fc' }}>— Rutas infinitas + nodos Spin aleatorios</strong>
+                <strong style={{ fontSize: '1rem', color: '#c084fc' }}>— Rutas infinitas</strong>
               </div>
             </button>
           </div>
@@ -2363,6 +2735,71 @@ function MainApp() {
               ? generations.every((g) => progression.completedMedium.includes(g))
               : progression.completedMedium.includes(generation)
 
+            const challengeCategories = [
+              {
+                title: '🗺️ Ruta',
+                items: [
+                  { key: 'noShops' as const, label: '🚫🏪 Sin Tiendas', desc: 'Se eliminan todos los nodos de tienda de la ruta.' },
+                  { key: 'noRests' as const, label: '🚫🏕️ Sin Descansos', desc: 'Se eliminan todos los nodos de descanso de la ruta.' },
+                  { key: 'allTeamRocket' as const, label: '🔴 Solo TeamR', desc: 'Todos los nodos no-boss se convierten en batallas Team Rocket.' },
+                  { key: 'bossRush' as const, label: '🏆 Boss Rush', desc: 'Solo combates y boss final, sin tiendas ni descansos.' },
+                  { key: 'blindRoute' as const, label: '👁️‍🗨️ Ruta Ciega', desc: 'No puedes ver qué nodo sigue hasta completar el actual.' },
+                ]
+              },
+              {
+                title: '✨ Visual',
+                items: [
+                  { key: 'allShiny' as const, label: '✨ Solo Shiny', desc: 'Todos los Pokémon (aliados y rivales) son Shiny.' },
+                ]
+              },
+              {
+                title: '⚔️ Combate',
+                items: [
+                  { key: 'noItems' as const, label: '🚫🎒 Sin Objetos', desc: 'No puedes usar consumables (pociones, X items, etc.) en batalla.' },
+                  { key: 'restrictedMoves' as const, label: '⚔️ 2 Movimientos', desc: 'Cada Pokémon solo puede usar sus 2 primeros movimientos.' },
+                  { key: 'firstStrike' as const, label: '⚡ Primer Golpe', desc: 'Si atacas primero y no debilitas al rival, recibes recoil del 8% HP.' },
+                  { key: 'noCrits' as const, label: '🚫💥 Sin Críticos', desc: 'Se desactivan completamente los golpes críticos.' },
+                  { key: 'typeRandomizer' as const, label: '🎲🎯 Tipo Random', desc: 'El tipo de cada movimiento se randomiza cada turno.' },
+                  { key: 'fixedLevel' as const, label: '📊 Nivel Fijo', desc: 'Todos los Pokémon rivales se escalan a nivel 50.' },
+                ]
+              },
+              {
+                title: '🎯 Equipo',
+                items: [
+                  { key: 'soloStarter' as const, label: '🌟 Solo Starter', desc: 'No puedes capturar ni agregar Pokémon a tu equipo.' },
+                  { key: 'fixedTeam' as const, label: '🔒 Equipo Fijo', desc: 'Tu equipo inicial no puede cambiarse durante la run.' },
+                  { key: 'noEvolution' as const, label: '🚫🧬 Sin Evolución', desc: 'No puedes evolucionar Pokémon en los descansos.' },
+                  { key: 'egglocke' as const, label: '🥚 Egglocke', desc: 'En los descansos obtienes huevos que eclosionan tras 2-3 batallas.' },
+                ]
+              },
+              {
+                title: '💰 Economía',
+                items: [
+                  { key: 'noPurchasing' as const, label: '🚫💰 Sin Compras', desc: 'No puedes comprar nada en la Pokémart.' },
+                  { key: 'noMoney' as const, label: '💸 Sin Dinero', desc: 'No recibes dinero por derrotar rivales.' },
+                ]
+              },
+              {
+                title: '📈 Dificultad',
+                items: [
+                  { key: 'scalingEnemies' as const, label: '📈 Enemigos Reforzados', desc: 'Los enemigos ganan +1 nivel extra por cada nodo avanzado.' },
+                  { key: 'noHealing' as const, label: '🚫💊 Sin Curación', desc: 'Ni tiendas, ni descansos, ni items curan HP.' },
+                  { key: 'doubleModifiers' as const, label: '🎰 2 Modifiers', desc: 'Recibes 2 modificadores aleatorios en vez de 1.' },
+                  { key: 'speedrun' as const, label: '⏱️ Speedrun', desc: 'Tienes 30 segundos por turno. Si se agota, pierdes 15% HP.' },
+                  { key: 'totalRandomizer' as const, label: '🎲 Total Random', desc: 'Stats de ataque, defensa y velocidad de los enemigos son randomizados.' },
+                ]
+              },
+              {
+                title: '💀 Extremo',
+                items: [
+                  { key: 'nuzlocke' as const, label: '💀 Nuzlocke', desc: 'Si un Pokémon muere, se libera automáticamente.' },
+                  { key: 'ironman' as const, label: '🔒 Ironman', desc: 'Activa Sin Evolución + Equipo Fijo + Sin Curación.' },
+                  { key: 'nuzlockeHardcore' as const, label: '💀💀 Nuzlocke Hardcore', desc: 'Activa Nuzlocke + Sin Objetos + Sin Descansos.' },
+                  { key: 'challengeGauntlet' as const, label: '🎰 Gauntlet (3 al azar)', desc: 'Se seleccionan 3 desafíos aleatorios al iniciar la run.' },
+                ]
+              },
+            ]
+
             return (
               <div className="challenge-section" style={!challengesUnlocked ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
                 {!challengesUnlocked && (
@@ -2370,44 +2807,49 @@ function MainApp() {
                     🔒 Completa la {generation === 0 ? 'todas las generaciones' : `Gen ${generation} (${generationRegions[generation]})`} en Intermedio o Difícil para desbloquear los desafíos.
                   </p>
                 )}
-                <div className="challenge-toggles">
-                  <button
-                    className={`challenge-toggle ${runChallenges.noShops ? 'is-active' : ''}`}
-                    onClick={() => { playClick(); setRunChallenges((c) => ({ ...c, noShops: !c.noShops })) }}
-                    onMouseEnter={playHover}
-                    type="button"
-                    disabled={!challengesUnlocked}
-                  >
-                    🚫🏪 Sin Tiendas
-                  </button>
-                  <button
-                    className={`challenge-toggle ${runChallenges.noRests ? 'is-active' : ''}`}
-                    onClick={() => { playClick(); setRunChallenges((c) => ({ ...c, noRests: !c.noRests })) }}
-                    onMouseEnter={playHover}
-                    type="button"
-                    disabled={!challengesUnlocked}
-                  >
-                    🚫🏕️ Sin Descansos
-                  </button>
-                  <button
-                    className={`challenge-toggle ${runChallenges.allShiny ? 'is-active' : ''}`}
-                    onClick={() => { playClick(); setRunChallenges((c) => ({ ...c, allShiny: !c.allShiny })) }}
-                    onMouseEnter={playHover}
-                    type="button"
-                    disabled={!challengesUnlocked}
-                  >
-                    ✨ Solo Shiny
-                  </button>
-                  <button
-                    className={`challenge-toggle ${runChallenges.allTeamRocket ? 'is-active' : ''}`}
-                    onClick={() => { playClick(); setRunChallenges((c) => ({ ...c, allTeamRocket: !c.allTeamRocket })) }}
-                    onMouseEnter={playHover}
-                    type="button"
-                    disabled={!challengesUnlocked}
-                  >
-                    🔴 Solo TeamR
-                  </button>
-                </div>
+                {challengeCategories.map((cat) => (
+                  <div key={cat.title} style={{ marginBottom: '0.75rem' }}>
+                    <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'normal', textAlign: 'center' }}>{cat.title}</h3>
+                    <div className="challenge-toggles">
+                      {cat.items.map((item) => (
+                        <button
+                          key={item.key}
+                          className={`challenge-toggle ${runChallenges[item.key] ? 'is-active' : ''}`}
+                          onClick={() => {
+                            playClick()
+                            if (item.key === 'challengeGauntlet' && runChallenges.challengeGauntlet && gauntletKeys.length > 0) {
+                              setRunChallenges((c) => {
+                                const next = { ...c, challengeGauntlet: false }
+                                for (const key of gauntletKeys) {
+                                  next[key] = false
+                                }
+                                return next
+                              })
+                              setGauntletKeys([])
+                              return
+                            }
+                            setRunChallenges((c) => {
+                              const next = !c[item.key]
+                              if (item.key === 'ironman') {
+                                return { ...c, ironman: next, noEvolution: next, fixedTeam: next, noHealing: next }
+                              }
+                              if (item.key === 'nuzlockeHardcore') {
+                                return { ...c, nuzlockeHardcore: next, nuzlocke: next, noItems: next, noRests: next }
+                              }
+                              return { ...c, [item.key]: next }
+                            })
+                          }}
+                          onMouseEnter={playHover}
+                          type="button"
+                          disabled={!challengesUnlocked}
+                          title={item.desc}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             )
           })()}
@@ -2538,13 +2980,39 @@ function MainApp() {
           </article>
 
           <article className="panel center-panel">
-            <h2>{difficulty === 'infinite' ? `Ruta #${route.length}` : `Ruta (${routeIndex + 1}/${route.length})`}</h2>
+            <h2>
+              {difficulty === 'infinite' ? `Ruta #${route.length}` : `Ruta (${routeIndex + 1}/${route.length})`}
+              {runChallenges.speedrun && screen === 'battle' && (
+                <span style={{ marginLeft: '10px', fontSize: '0.9rem', color: speedrunSeconds <= 10 ? '#ef4444' : '#facc15', fontWeight: 'bold' }}>
+                  ⏱️ {speedrunSeconds}s
+                </span>
+              )}
+            </h2>
+            {runChallenges.egglocke && eggInventory.length > 0 && (
+              <div style={{ fontSize: '0.8rem', color: '#fbbf24', marginBottom: '0.5rem' }}>
+                🥚 Huevos: {eggInventory.length} {eggInventory.map(e => `(${e.name}: ${e.hatchIn})`).join(' ')}
+              </div>
+            )}
+            {modifier2 && (
+              <div style={{ fontSize: '0.75rem', color: '#c084fc', marginBottom: '0.5rem' }}>
+                🎰 Modifier 2: <strong>{modifier2.name}</strong> — {modifier2.description}
+              </div>
+            )}
             <div className="route-grid" style={{ maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }}>
               {route.map((node, index) => {
+                const isBlindHidden = runChallenges.blindRoute && index > routeIndex
                 const stateClass = index === routeIndex ? 'current' : node.done ? 'done' : 'pending'
                 const rocketClass = node.type === 'teamRocket' ? ' node-teamrocket' : ''
                 const spinClass = node.type === 'spin' ? ' node-spin' : ''
                 const pokeRandClass = node.type === 'pokeRand' ? ' node-pokerand' : ''
+                if (isBlindHidden) {
+                  return (
+                    <div key={node.id} className={`node pending`} style={{ opacity: 0.4 }}>
+                      <span>#{node.id}</span>
+                      <strong>???</strong>
+                    </div>
+                  )
+                }
                 return (
                   <div key={node.id} className={`node ${stateClass}${rocketClass}${spinClass}${pokeRandClass}`}>
                     <span>#{node.id}</span>
@@ -2919,16 +3387,16 @@ function MainApp() {
                 </div>
 
                 <div className="moves-grid">
-                  {activePokemon.moves.map((move) => (
+                  {(runChallenges.restrictedMoves ? activePokemon.moves.slice(0, 2) : activePokemon.moves).map((move) => (
                     <button
                       key={move.name}
                       className="move-btn"
                       onClick={() => onPlayerMove(move)}
                       type="button"
-                      disabled={isLoading}
+                      disabled={isLoading || (runChallenges.speedrun && speedrunSeconds <= 0)}
                       title={moveTooltip(move)}
                     >
-                      {move.name} ({move.type})
+                      {move.name} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''})
                     </button>
                   ))}
                 </div>
