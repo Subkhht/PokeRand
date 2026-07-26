@@ -21,9 +21,9 @@ export function healPokemon(pokemon: Pokemon, amount: number): Pokemon {
 }
 
 export function scalePokemonForNode(base: Pokemon, node: RouteNode, stepIndex: number, levelDelta = 0, difficulty: string = 'medium'): Pokemon {
-  const levelMultiplier = difficulty === 'infinite' ? 2.5 : 1.5
-  const hpMultiplier = difficulty === 'infinite' ? 6 : 4
-  const statMultiplier = difficulty === 'infinite' ? 3 : 2
+  const levelMultiplier = difficulty === 'infinite' ? 2.5 : difficulty === 'hard' ? 2.0 : 1.5
+  const hpMultiplier = difficulty === 'infinite' ? 6 : difficulty === 'hard' ? 5 : 4
+  const statMultiplier = difficulty === 'infinite' ? 3 : difficulty === 'hard' ? 2.5 : 2
 
   const bonusLevel = Math.floor(stepIndex * levelMultiplier) + (node.type === 'boss' ? 2 : 0) + levelDelta
   const targetLevel = base.level + bonusLevel

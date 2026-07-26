@@ -181,6 +181,11 @@ export function getMaxMovePowerForLevel(level: number, difficulty: string = 'med
     if (level <= 22) return 130
     return 150
   }
+  if (difficulty === 'hard') {
+    if (level <= 12) return 85
+    if (level <= 20) return 100
+    return 150
+  }
   if (level <= 12) return 60
   if (level <= 22) return 85
   return 150
@@ -409,6 +414,24 @@ function filterSpeciesIdsForProgress(
   return nonLegendaryIds.length > 0 ? nonLegendaryIds : ids
 }
 
+const HARD_HELD_ITEMS = [
+  { name: 'Muscle Band', attackMod: 0.15 },
+  { name: 'Wise Glasses', speedMod: 0.15 },
+  { name: 'Rocky Helmet', defenseMod: 0.15 },
+  { name: 'Sitrus Berry', maxHpMod: 15, healPerTurn: 8 },
+  { name: 'Quick Claw', speedMod: 0.20 },
+  { name: 'Scope Lens', critChance: 0.20 },
+  { name: 'Choice Band', attackMod: 0.25 },
+]
+
+function applyHardHeldItem(pokemon: Pokemon, difficulty: string, isBoss: boolean): Pokemon {
+  if (difficulty !== 'hard' || pokemon.holdItem) return pokemon
+  const chance = isBoss ? 1.0 : 0.4
+  if (Math.random() > chance) return pokemon
+  const item = HARD_HELD_ITEMS[Math.floor(Math.random() * HARD_HELD_ITEMS.length)]
+  return { ...pokemon, holdItem: item.name }
+}
+
 export async function getBalancedPokemonByGeneration(
   generation: number,
   stepIndex: number,
@@ -422,7 +445,7 @@ export async function getBalancedPokemonByGeneration(
 
   const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss)
 
-  const levelMult = difficulty === 'infinite' ? 2.5 : 1.5
+  const levelMult = difficulty === 'infinite' ? 2.5 : difficulty === 'hard' ? 2.0 : 1.5
   const scaledLevel = 10 + Math.floor(stepIndex * levelMult) + (isBoss ? 2 : 0)
 
   let minBst = 150
@@ -444,6 +467,20 @@ export async function getBalancedPokemonByGeneration(
     } else {
       minBst = 550
       maxBst = 999
+    }
+  } else if (difficulty === 'hard') {
+    if (isBoss) {
+      minBst = 530
+      maxBst = 999
+    } else if (progressRatio < 0.35) {
+      minBst = 200
+      maxBst = 420
+    } else if (progressRatio < 0.70) {
+      minBst = 380
+      maxBst = 530
+    } else {
+      minBst = 480
+      maxBst = 700
     }
   } else {
     if (isBoss) {
@@ -474,7 +511,7 @@ export async function getBalancedPokemonByGeneration(
       const bst = pokemon.baseStatTotal ?? 350
 
       if (bst >= minBst && bst <= maxBst) {
-        return pokemon
+        return applyHardHeldItem(pokemon, difficulty, isBoss)
       }
 
       const targetMid = (minBst + maxBst) / 2
@@ -488,10 +525,10 @@ export async function getBalancedPokemonByGeneration(
     }
   }
 
-  if (bestCandidate) return bestCandidate
+  if (bestCandidate) return applyHardHeldItem(bestCandidate, difficulty, isBoss)
 
   const randomId = randomFrom(allIds)
-  return buildPokemonFromApi(randomId, generation, scaledLevel, shiny, difficulty)
+  return applyHardHeldItem(await buildPokemonFromApi(randomId, generation, scaledLevel, shiny, difficulty), difficulty, isBoss)
 }
 
 export async function getRandomPokemonByGeneration(generation: number): Promise<Pokemon> {
