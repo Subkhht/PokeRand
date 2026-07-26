@@ -287,6 +287,7 @@ function groupInventory(items: string[]): Array<{ name: string; count: number; d
 interface ProgressionData {
   completedMedium: number[]
   completedAny: number[]
+  completedHard: number[]
 }
 
 interface VictoryUnlocks {
@@ -294,6 +295,7 @@ interface VictoryUnlocks {
   nextGenNumber: number | null
   nextGenName: string | null
   unlockedHard: boolean
+  unlockedInfinite: boolean
 }
 
 function getFirstHealthyIndex(team: Pokemon[], currentIndex: number): number {
@@ -314,13 +316,14 @@ function MainApp() {
         const parsed = JSON.parse(saved)
         return {
           completedMedium: Array.isArray(parsed.completedMedium) ? parsed.completedMedium : [],
-          completedAny: Array.isArray(parsed.completedAny) ? parsed.completedAny : []
+          completedAny: Array.isArray(parsed.completedAny) ? parsed.completedAny : [],
+          completedHard: Array.isArray(parsed.completedHard) ? parsed.completedHard : []
         }
       }
     } catch {
       // fallback
     }
-    return { completedMedium: [], completedAny: [] }
+    return { completedMedium: [], completedAny: [], completedHard: [] }
   })
 
   const [team, setTeam] = useState<Pokemon[]>([])
@@ -483,10 +486,17 @@ function MainApp() {
     return progression.completedAny.includes(gen)
   }
 
+  function isInfiniteUnlocked(gen: number): boolean {
+    return progression.completedHard.includes(gen)
+  }
+
   function handleSelectGeneration(gen: number) {
     if (!isGenUnlocked(gen)) return
     setGeneration(gen)
     if (difficulty === 'hard' && !isHardUnlocked(gen)) {
+      setDifficulty('medium')
+    }
+    if (difficulty === 'infinite' && !isInfiniteUnlocked(gen)) {
       setDifficulty('medium')
     }
     const challengesLocked = gen === 0
@@ -499,6 +509,7 @@ function MainApp() {
 
   function handleSelectDifficulty(diff: Difficulty) {
     if (diff === 'hard' && !isHardUnlocked(generation)) return
+    if (diff === 'infinite' && !isInfiniteUnlocked(generation)) return
     setDifficulty(diff)
   }
 
@@ -602,6 +613,10 @@ function MainApp() {
     }
     if (difficulty === 'hard' && !isHardUnlocked(generation)) {
       setApiError('El modo difícil para esta generación aún está bloqueado.')
+      return
+    }
+    if (difficulty === 'infinite' && !isInfiniteUnlocked(generation)) {
+      setApiError('El modo Infinite se desbloquea completando Difícil en esta generación.')
       return
     }
 
@@ -836,15 +851,20 @@ function MainApp() {
 
       const newlyUnlockedHard = !progression.completedAny.includes(genPlayed)
       const newlyUnlockedNextGen = isMediumOrHard && genPlayed < 9 && !progression.completedMedium.includes(genPlayed)
+      const newlyUnlockedInfinite = difficulty === 'hard' && !progression.completedHard.includes(genPlayed)
 
       const nextCompletedAny = Array.from(new Set([...progression.completedAny, genPlayed]))
       const nextCompletedMedium = isMediumOrHard
         ? Array.from(new Set([...progression.completedMedium, genPlayed]))
         : progression.completedMedium
+      const nextCompletedHard = difficulty === 'hard'
+        ? Array.from(new Set([...progression.completedHard, genPlayed]))
+        : progression.completedHard
 
       const updatedProgression: ProgressionData = {
         completedAny: nextCompletedAny,
-        completedMedium: nextCompletedMedium
+        completedMedium: nextCompletedMedium,
+        completedHard: nextCompletedHard
       }
 
       localStorage.setItem('pokerand_progression', JSON.stringify(updatedProgression))
@@ -854,7 +874,8 @@ function MainApp() {
         genName: generationRegions[genPlayed],
         nextGenNumber: newlyUnlockedNextGen ? genPlayed + 1 : null,
         nextGenName: newlyUnlockedNextGen ? generationRegions[genPlayed + 1] : null,
-        unlockedHard: newlyUnlockedHard
+        unlockedHard: newlyUnlockedHard,
+        unlockedInfinite: newlyUnlockedInfinite
       })
 
       setScreen('victory')
@@ -2595,6 +2616,7 @@ function MainApp() {
               const hardUnlocked = isHardUnlocked(gen)
               const completedMed = progression.completedMedium.includes(gen)
               const completedAny = progression.completedAny.includes(gen)
+              const completedHard = progression.completedHard.includes(gen)
 
               return (
                 <button
@@ -2607,8 +2629,10 @@ function MainApp() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>Gen {gen} {unlocked ? '' : '🔒'}</span>
-                    {completedMed ? (
-                      <span className="badge-medium" title="Completado en Intermedio / Difícil">🏆</span>
+                    {completedHard ? (
+                      <span className="badge-medium" title="Completado en Difícil">🏆🏆</span>
+                    ) : completedMed ? (
+                      <span className="badge-medium" title="Completado en Intermedio">🏆</span>
                     ) : completedAny ? (
                       <span className="badge-easy" title="Completado en Fácil">⭐</span>
                     ) : null}
@@ -2705,28 +2729,42 @@ function MainApp() {
           </div>
 
           <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
-            <button
-              className={`gen-tile ${difficulty === 'infinite' ? 'is-active' : ''}`}
-              onClick={() => { playClick(); handleSelectDifficulty('infinite') }}
-              onMouseEnter={playHover}
-              type="button"
-              disabled={isLoading}
-              style={{
-                borderColor: '#a855f7',
-                background: difficulty === 'infinite' ? 'rgba(168, 85, 247, 0.25)' : 'rgba(168, 85, 247, 0.05)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '4px',
-                padding: '12px'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem', color: '#c084fc' }}>♾️ INFINITE</span>
-                <strong style={{ fontSize: '1rem', color: '#c084fc' }}>— Rutas infinitas</strong>
-              </div>
-            </button>
+            {(() => {
+              const infUnlocked = isInfiniteUnlocked(generation)
+              return (
+                <button
+                  className={`gen-tile ${difficulty === 'infinite' ? 'is-active' : ''} ${!infUnlocked ? 'is-locked' : ''}`}
+                  onClick={() => { playClick(); handleSelectDifficulty('infinite') }}
+                  onMouseEnter={playHover}
+                  type="button"
+                  disabled={isLoading || !infUnlocked}
+                  style={{
+                    borderColor: infUnlocked ? '#a855f7' : '#475569',
+                    background: !infUnlocked
+                      ? 'rgba(15, 23, 42, 0.6)'
+                      : difficulty === 'infinite' ? 'rgba(168, 85, 247, 0.25)' : 'rgba(168, 85, 247, 0.05)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    padding: '12px',
+                    opacity: infUnlocked ? 1 : 0.65,
+                    cursor: infUnlocked ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1.2rem', color: infUnlocked ? '#c084fc' : '#64748b' }}>♾️ INFINITE {infUnlocked ? '' : '🔒'}</span>
+                    <strong style={{ fontSize: '1rem', color: infUnlocked ? '#c084fc' : '#64748b' }}>— Rutas infinitas</strong>
+                  </div>
+                  {!infUnlocked && (
+                    <span className="lock-text">
+                      🔒 Completa {generationRegions[generation]} en Difícil
+                    </span>
+                  )}
+                </button>
+              )
+            })()}
           </div>
 
           <h2 style={{ marginTop: '1.5rem' }}>3. Desafíos de Run <span className="muted" style={{ fontSize: '0.75rem', fontWeight: 'normal' }}>(opcional)</span></h2>
@@ -3521,6 +3559,11 @@ function MainApp() {
               {victoryUnlocks.unlockedHard && (
                 <p style={{ margin: '6px 0', color: '#fb923c', fontSize: '0.95rem' }}>
                   🔥 <strong>¡MODO DÍFICIL DESBLOQUEADO!</strong> Ahora puedes desafiar la Gen {currentRunGen} ({victoryUnlocks.genName}) en dificultad Difícil (25 rutas).
+                </p>
+              )}
+              {victoryUnlocks.unlockedInfinite && (
+                <p style={{ margin: '6px 0', color: '#c084fc', fontSize: '0.95rem' }}>
+                  ♾️ <strong>¡MODO INFINITE DESBLOQUEADO!</strong> Ahora puedes jugar la Gen {currentRunGen} ({victoryUnlocks.genName}) en modo Infinite (rutas infinitas).
                 </p>
               )}
             </div>
