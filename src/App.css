@@ -1129,6 +1129,24 @@ button {
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.5) !important;
 }
 
+.node-spin {
+  border-color: #a855f7 !important;
+  background: rgba(168, 85, 247, 0.12) !important;
+}
+
+.node-spin.current {
+  box-shadow: 0 0 8px rgba(192, 132, 252, 0.5) !important;
+}
+
+.node-pokerand {
+  border-color: #38bdf8 !important;
+  background: rgba(56, 189, 248, 0.12) !important;
+}
+
+.node-pokerand.current {
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.5) !important;
+}
+
 .cta-danger {
   background: linear-gradient(135deg, #dc2626, #b91c1c);
   border-color: #ef4444;
@@ -1228,4 +1246,100 @@ button {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+}
+
+.roulette-wheel {
+  background: rgba(168, 85, 247, 0.06);
+  border: 2px solid rgba(168, 85, 247, 0.3);
+  border-radius: 16px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.roulette-items {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.roulette-items.spinning {
+  animation: roulette-shake 0.12s infinite;
+}
+
+@keyframes roulette-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px) rotate(-0.5deg); }
+  75% { transform: translateX(3px) rotate(0.5deg); }
+}
+
+.roulette-item {
+  background: rgba(0, 0, 0, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 6px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: border-color 0.3s, background 0.3s, box-shadow 0.3s, transform 0.3s;
+  min-height: 90px;
+  justify-content: center;
+}
+
+.roulette-item.highlight {
+  border-color: rgba(192, 132, 252, 0.6);
+  background: rgba(168, 85, 247, 0.15);
+}
+
+.roulette-item.winner {
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.2);
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.4);
+  transform: scale(1.05);
+}
+
+.roulette-item-icon {
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+}
+
+.roulette-item-name {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-main);
+  line-height: 1.1;
+}
+
+.roulette-item-desc {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.spin-cta {
+  background: linear-gradient(135deg, #9333ea, #7e22ce) !important;
+  border-color: #a855f7 !important;
+  width: 100%;
+  font-size: 1.1rem;
+  padding: 12px;
+}
+
+.spin-cta:hover {
+  background: linear-gradient(135deg, #a855f7, #9333ea) !important;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.4);
+}
+
+.pokeRand-cta {
+  background: linear-gradient(135deg, #0284c7, #0369a1) !important;
+  border-color: #38bdf8 !important;
+  width: 100%;
+  font-size: 1.1rem;
+  padding: 12px;
+}
+
+.pokeRand-cta:hover {
+  background: linear-gradient(135deg, #38bdf8, #0284c7) !important;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
 }

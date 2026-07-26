@@ -175,7 +175,12 @@ async function getMoveDetails(moveUrl: string): Promise<Move | null> {
 }
 
 // Límite realista de potencia de movimiento según el nivel del Pokémon
-export function getMaxMovePowerForLevel(level: number): number {
+export function getMaxMovePowerForLevel(level: number, difficulty: string = 'medium'): number {
+  if (difficulty === 'infinite') {
+    if (level <= 14) return 100
+    if (level <= 22) return 130
+    return 150
+  }
   if (level <= 12) return 60
   if (level <= 22) return 85
   return 150
@@ -192,9 +197,10 @@ const FALLBACK_MOVES: Move[] = [
 // Procesa movimientos asignando solo aquellos acordes al nivel actual del Pokémon
 export async function fetchPokemonMoves(
   moveEntries: any[],
-  level: number = 10
+  level: number = 10,
+  difficulty: string = 'medium'
 ): Promise<{ moves: Move[]; rawLevelUpMoves: RawLevelUpMove[] }> {
-  const maxAllowedPower = getMaxMovePowerForLevel(level)
+  const maxAllowedPower = getMaxMovePowerForLevel(level, difficulty)
 
   const rawLevelUpMoves: RawLevelUpMove[] = []
   for (const m of moveEntries) {
@@ -268,7 +274,8 @@ export async function buildPokemonFromApi(
   identifier: string | number,
   _generation: number,
   targetLevel: number = 10,
-  shiny: boolean = false
+  shiny: boolean = false,
+  difficulty: string = 'medium'
 ): Promise<Pokemon> {
   const cacheKey = `${identifier}_lvl${targetLevel}`
   const cached = pokemonCache.get(cacheKey)
@@ -286,7 +293,7 @@ export async function buildPokemonFromApi(
   const statMap = new Map(data.stats.map((entry) => [entry.stat.name, entry.base_stat]))
   const baseStatTotal = data.stats.reduce((acc, entry) => acc + entry.base_stat, 0)
   
-  const { moves: parsedMoves, rawLevelUpMoves } = await fetchPokemonMoves(data.moves, targetLevel)
+  const { moves: parsedMoves, rawLevelUpMoves } = await fetchPokemonMoves(data.moves, targetLevel, difficulty)
   const sortedTypes = [...data.types].sort((a, b) => a.slot - b.slot).map(t => t.type.name)
 
   const pokemon: Pokemon = {
@@ -320,13 +327,14 @@ export async function buildPokemonFromApi(
 export async function checkAndLearnNewMove(
   pokemon: Pokemon,
   _oldLevel: number,
-  newLevel: number
+  newLevel: number,
+  difficulty: string = 'medium'
 ): Promise<{ updatedPokemon: Pokemon; learnedMoveName: string | null }> {
   if (!pokemon.rawLevelUpMoves || pokemon.rawLevelUpMoves.length === 0) {
     return { updatedPokemon: pokemon, learnedMoveName: null }
   }
 
-  const maxPower = getMaxMovePowerForLevel(newLevel)
+  const maxPower = getMaxMovePowerForLevel(newLevel, difficulty)
   const knownMoveNames = new Set(pokemon.moves.map((m) => m.name))
 
   const candidates = pokemon.rawLevelUpMoves.filter(
@@ -406,30 +414,51 @@ export async function getBalancedPokemonByGeneration(
   stepIndex: number,
   totalNodes: number,
   isBoss: boolean = false,
-  shiny: boolean = false
+  shiny: boolean = false,
+  difficulty: string = 'medium'
 ): Promise<Pokemon> {
   const allIds = await getSpeciesIdsByGeneration(generation)
   const progressRatio = stepIndex / Math.max(1, totalNodes - 1)
 
   const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss)
-  const scaledLevel = 10 + Math.floor(stepIndex * 1.5) + (isBoss ? 2 : 0)
 
-  // Rangos de stats base (BST) según la progresión de la ruta
+  const levelMult = difficulty === 'infinite' ? 2.5 : 1.5
+  const scaledLevel = 10 + Math.floor(stepIndex * levelMult) + (isBoss ? 2 : 0)
+
   let minBst = 150
   let maxBst = 999
 
-  if (isBoss) {
-    minBst = 470
-    maxBst = 999
-  } else if (progressRatio < 0.35) {
-    minBst = 150
-    maxBst = 385
-  } else if (progressRatio < 0.70) {
-    minBst = 320
-    maxBst = 485
+  if (difficulty === 'infinite') {
+    if (isBoss) {
+      minBst = 500
+      maxBst = 999
+    } else if (progressRatio < 0.25) {
+      minBst = 280
+      maxBst = 500
+    } else if (progressRatio < 0.50) {
+      minBst = 400
+      maxBst = 600
+    } else if (progressRatio < 0.75) {
+      minBst = 480
+      maxBst = 700
+    } else {
+      minBst = 550
+      maxBst = 999
+    }
   } else {
-    minBst = 420
-    maxBst = 620
+    if (isBoss) {
+      minBst = 470
+      maxBst = 999
+    } else if (progressRatio < 0.35) {
+      minBst = 150
+      maxBst = 385
+    } else if (progressRatio < 0.70) {
+      minBst = 320
+      maxBst = 485
+    } else {
+      minBst = 420
+      maxBst = 620
+    }
   }
 
   const shuffledCandidates = [...candidateIds].sort(() => 0.5 - Math.random())
@@ -441,7 +470,7 @@ export async function getBalancedPokemonByGeneration(
   for (let i = 0; i < attempts; i++) {
     const candidateId = shuffledCandidates[i]
     try {
-      const pokemon = await buildPokemonFromApi(candidateId, generation, scaledLevel, shiny)
+      const pokemon = await buildPokemonFromApi(candidateId, generation, scaledLevel, shiny, difficulty)
       const bst = pokemon.baseStatTotal ?? 350
 
       if (bst >= minBst && bst <= maxBst) {
@@ -462,7 +491,7 @@ export async function getBalancedPokemonByGeneration(
   if (bestCandidate) return bestCandidate
 
   const randomId = randomFrom(allIds)
-  return buildPokemonFromApi(randomId, generation, scaledLevel, shiny)
+  return buildPokemonFromApi(randomId, generation, scaledLevel, shiny, difficulty)
 }
 
 export async function getRandomPokemonByGeneration(generation: number): Promise<Pokemon> {

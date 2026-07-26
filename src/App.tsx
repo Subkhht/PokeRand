@@ -13,19 +13,21 @@ import {
 import { getTypeEffectiveness } from './game/typesChart'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges } from './game/types'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'victory' | 'defeat'
-type Difficulty = 'easy' | 'medium' | 'hard'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'victory' | 'defeat'
+type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite'
 
 const difficultyNodeCounts: Record<Difficulty, number> = {
   easy: 5,
   medium: 10,
-  hard: 25
+  hard: 25,
+  infinite: 0
 }
 
 const difficultyLabels: Record<Difficulty, { title: string; desc: string }> = {
   easy: { title: 'Fácil', desc: '5 rutas (Aventura corta)' },
   medium: { title: 'Intermedia', desc: '10 rutas (Aventura estándar)' },
-  hard: { title: 'Difícil', desc: '25 rutas (Desafío extremo)' }
+  hard: { title: 'Difícil', desc: '25 rutas (Desafío extremo)' },
+  infinite: { title: 'Infinite', desc: 'Sin límite (Aventura infinita)' }
 }
 
 const generations = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -244,6 +246,10 @@ function nodeTypeLabel(node: RouteNode): string {
       return 'Jefe'
     case 'teamRocket':
       return 'TeamR'
+    case 'spin':
+      return 'Spin'
+    case 'pokeRand':
+      return 'PokeRand'
     default:
       return node.type
   }
@@ -363,6 +369,18 @@ function MainApp() {
   const [teamRocketStealMessage, setTeamRocketStealMessage] = useState<string>('')
   const [teamRocketPickModal, setTeamRocketPickModal] = useState<boolean>(false)
 
+  // Spin (Ruleta)
+  const [spinItems, setSpinItems] = useState<string[]>([])
+  const [spinAnimating, setSpinAnimating] = useState<boolean>(false)
+  const [spinWinnerIndex, setSpinWinnerIndex] = useState<number | null>(null)
+  const [spinRevealed, setSpinRevealed] = useState<boolean>(false)
+
+  // PokeRand (Ruleta de Pokémon)
+  const [pokeRandPokemon, setPokeRandPokemon] = useState<Pokemon[]>([])
+  const [pokeRandAnimating, setPokeRandAnimating] = useState<boolean>(false)
+  const [pokeRandWinnerIndex, setPokeRandWinnerIndex] = useState<number | null>(null)
+  const [pokeRandRevealed, setPokeRandRevealed] = useState<boolean>(false)
+
   // Pokédex
   const [showPokedex, setShowPokedex] = useState<boolean>(false)
   const [pokedexSearch, setPokedexSearch] = useState<string>('')
@@ -415,6 +433,12 @@ function MainApp() {
     setGeneration(gen)
     if (difficulty === 'hard' && !isHardUnlocked(gen)) {
       setDifficulty('medium')
+    }
+    const challengesLocked = gen === 0
+      ? !generations.every((g) => progression.completedMedium.includes(g))
+      : !progression.completedMedium.includes(gen)
+    if (challengesLocked && (runChallenges.noShops || runChallenges.noRests || runChallenges.allShiny || runChallenges.allTeamRocket)) {
+      setRunChallenges({ noShops: false, noRests: false, allShiny: false, allTeamRocket: false })
     }
   }
 
@@ -478,6 +502,42 @@ function MainApp() {
     setRecord({ wins: nextWins, losses: nextLosses })
   }
 
+  function generateRandomNodeType(id: number): RouteNode {
+    let type: RouteNode['type'] = 'battle'
+    if (runChallenges.allTeamRocket) {
+      type = 'teamRocket'
+    } else {
+      const rand = Math.random()
+      if (difficulty === 'infinite') {
+        if (rand < 0.10 && !runChallenges.noShops) {
+          type = 'shop'
+        } else if (rand < 0.20 && !runChallenges.noRests) {
+          type = 'rest'
+        } else if (rand < 0.30) {
+          type = 'teamRocket'
+        } else if (rand < 0.36) {
+          type = 'spin'
+        } else if (rand < 0.42) {
+          type = 'pokeRand'
+        }
+      } else {
+        if (rand < 0.15 && !runChallenges.noShops) {
+          type = 'shop'
+        } else if (rand < 0.40 && !runChallenges.noRests) {
+          type = 'rest'
+        } else if (rand < 0.52) {
+          type = 'teamRocket'
+        }
+      }
+    }
+    return {
+      id,
+      type,
+      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : `Ruta ${id}`,
+      done: false
+    }
+  }
+
   async function startNewRun(): Promise<void> {
     if (!isGenUnlocked(generation)) {
       setApiError('Esta generación aún está bloqueada.')
@@ -504,36 +564,66 @@ function MainApp() {
       const totalNodes = difficultyNodeCounts[difficulty]
       let customRoute: RouteNode[] = []
 
-      for (let i = 1; i < totalNodes; i++) {
-        let type: RouteNode['type'] = 'battle'
-
-        if (runChallenges.allTeamRocket) {
-          type = 'teamRocket'
-        } else if (i > 0) {
-          const rand = Math.random()
-          if (rand < 0.15 && !runChallenges.noShops) {
-            type = 'shop'
-          } else if (rand < 0.40 && !runChallenges.noRests) {
-            type = 'rest'
-          } else if (rand < 0.52) {
-            type = 'teamRocket'
+      if (difficulty === 'infinite') {
+        for (let i = 1; i <= 5; i++) {
+          customRoute.push(generateRandomNodeType(i))
+        }
+      } else {
+        const spinPositions: number[] = []
+        const pokeRandPositions: number[] = []
+        if (difficulty === 'hard') {
+          const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
+          while (spinPositions.length < 2 && available.length > 0) {
+            const idx = Math.floor(Math.random() * available.length)
+            spinPositions.push(available[idx])
+            available.splice(idx, 1)
           }
+          while (pokeRandPositions.length < 2 && available.length > 0) {
+            const idx = Math.floor(Math.random() * available.length)
+            pokeRandPositions.push(available[idx])
+            available.splice(idx, 1)
+          }
+        } else if (difficulty === 'medium') {
+          const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
+          const idx = Math.floor(Math.random() * available.length)
+          pokeRandPositions.push(available[idx])
+        }
+
+        for (let i = 1; i < totalNodes; i++) {
+          let type: RouteNode['type'] = 'battle'
+
+          if (spinPositions.includes(i)) {
+            type = 'spin'
+          } else if (pokeRandPositions.includes(i)) {
+            type = 'pokeRand'
+          } else if (runChallenges.allTeamRocket) {
+            type = 'teamRocket'
+          } else {
+            const rand = Math.random()
+            if (rand < 0.15 && !runChallenges.noShops) {
+              type = 'shop'
+            } else if (rand < 0.40 && !runChallenges.noRests) {
+              type = 'rest'
+            } else if (rand < 0.52) {
+              type = 'teamRocket'
+            }
+          }
+
+          customRoute.push({
+            id: i,
+            type,
+            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : `Ruta ${i}`,
+            done: false
+          })
         }
 
         customRoute.push({
-          id: i,
-          type,
-          label: type === 'teamRocket' ? `TeamR #${i}` : `Ruta ${i}`,
+          id: totalNodes,
+          type: 'boss',
+          label: `Combate Final (#${totalNodes})`,
           done: false
         })
       }
-
-      customRoute.push({
-        id: totalNodes,
-        type: 'boss',
-        label: `Combate Final (#${totalNodes})`,
-        done: false
-      })
 
       const hpBonus = run.modifier?.playerMaxHpBonus ?? 0
       const starterWithBonus = {
@@ -562,7 +652,7 @@ function MainApp() {
       setBattleLog([
         `Tu inicial es ${starter.name}${starter.shiny ? ' ✨' : ''}.`,
         `Modo: ${generation === 0 ? 'Random All-Stars' : `Gen ${generation}`}.`,
-        `Dificultad: ${difficultyLabels[difficulty].title} (${totalNodes} rutas).`,
+        `Dificultad: ${difficultyLabels[difficulty].title}${difficulty === 'infinite' ? ' (Sin límite)' : ` (${totalNodes} rutas)`}.`,
         `Recibes $200 de inicio e item: ${run.item}.`,
         ...(runChallenges.noShops ? ['🚫 Desafío: Sin tiendas.'] : []),
         ...(runChallenges.noRests ? ['🚫 Desafío: Sin descansos.'] : []),
@@ -586,6 +676,19 @@ function MainApp() {
     )
 
     if (routeIndex >= route.length - 1) {
+      if (difficulty === 'infinite') {
+        const nextId = route.length + 1
+        const batch = Array.from({ length: 5 }, (_, k) => generateRandomNodeType(nextId + k))
+        setRoute((previous) => [...previous, ...batch])
+        setBattleLog((prev) => [
+          `♾️ ¡Modo Infinite! Aparecen 5 nuevas rutas...`,
+          ...prev
+        ].slice(0, 15))
+        setRouteIndex((previous) => previous + 1)
+        setScreen('route')
+        return
+      }
+
       const wins = record.wins + 1
       persistRecord(wins, record.losses)
 
@@ -692,7 +795,8 @@ function MainApp() {
       const { updatedPokemon: finalEvolved } = await checkAndLearnNewMove(
         evolvedPlusBoost,
         targetPokemon.level,
-        newLevel
+        newLevel,
+        difficulty
       )
 
       registerInPokedex(finalEvolved)
@@ -725,7 +829,51 @@ function MainApp() {
       const selectedConsumables = shuffledConsumables.slice(0, 2)
       const selectedHoldables = shuffledHoldables.slice(0, 1)
       setShopStock([...selectedConsumables, ...selectedHoldables])
+      const potionBonus = modifier?.shopPotionBonus ?? 0
+      if (potionBonus > 0) {
+        setInventory((prev) => [...prev, ...Array(potionBonus).fill('Potion')])
+        setBattleLog((prev) => [
+          `Mercado en Oferta: ¡Recibes ${potionBonus} Poción${potionBonus > 1 ? 'es' : ''} gratis!`,
+          ...prev
+        ].slice(0, 15))
+      }
       setScreen('shop')
+      return
+    }
+
+    if (currentNode.type === 'spin') {
+      const healingPool = Object.keys(ALL_SHOP_ITEMS)
+      const passivePool = HOLDABLE_ITEM_NAMES
+      const shuffledH = [...healingPool].sort(() => 0.5 - Math.random())
+      const shuffledP = [...passivePool].sort(() => 0.5 - Math.random())
+      const items = [...shuffledH.slice(0, 4), ...shuffledP.slice(0, 2)].sort(() => 0.5 - Math.random())
+      setSpinItems(items)
+      setSpinWinnerIndex(null)
+      setSpinRevealed(false)
+      setSpinAnimating(false)
+      setScreen('spin')
+      return
+    }
+
+    if (currentNode.type === 'pokeRand') {
+      setIsLoading(true)
+      setApiError('')
+      try {
+        const targetGen = getEffectiveGen()
+        const fetches = Array.from({ length: 6 }, () =>
+          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
+        )
+        const pokemonList = await Promise.all(fetches)
+        setPokeRandPokemon(pokemonList)
+        setPokeRandWinnerIndex(null)
+        setPokeRandRevealed(false)
+        setPokeRandAnimating(false)
+        setScreen('pokeRand')
+      } catch {
+        setApiError('No se pudieron generar Pokémon. Reintenta.')
+      } finally {
+        setIsLoading(false)
+      }
       return
     }
 
@@ -744,8 +892,8 @@ function MainApp() {
 
     try {
       const targetGen = getEffectiveGen()
-        const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny)
-        const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0)
+        const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
+        const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty)
         const rewardItem = randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry'])
 
         setRestEncounter(generatedEncounter)
@@ -776,8 +924,8 @@ function MainApp() {
         const teamSize = Math.max(2, Math.min(4, 2 + Math.floor(progress * 3)))
 
         const fetches = Array.from({ length: teamSize }, () =>
-          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny)
-            .then((base) => scalePokemonForNode(base, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0))
+          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
+            .then((base) => scalePokemonForNode(base, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty))
         )
         const rocketTeam = await Promise.all(fetches)
 
@@ -807,8 +955,8 @@ function MainApp() {
         const teamSize = isBoss ? maxSize : Math.max(1, Math.min(maxSize, 1 + Math.floor(Math.random() * maxSize)))
 
         const fetches = Array.from({ length: teamSize }, () =>
-          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny)
-            .then((base) => scalePokemonForNode(base, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0))
+          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny, difficulty)
+            .then((base) => scalePokemonForNode(base, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty))
         )
         const newTrainerTeam = await Promise.all(fetches)
 
@@ -842,8 +990,8 @@ function MainApp() {
           ...prev
         ])
       } else {
-        const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny)
-        const generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0)
+        const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
+        const generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty)
         setIsTrainerBattle(false)
         setTrainerTeam([])
         setTrainerPokemonIndex(0)
@@ -866,6 +1014,98 @@ function MainApp() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  function spinRoulette(): void {
+    if (spinAnimating || spinRevealed) return
+    setSpinAnimating(true)
+    setSpinWinnerIndex(null)
+    setSpinRevealed(false)
+
+    const winner = Math.floor(Math.random() * spinItems.length)
+    const spinDuration = 3000
+    const startTime = Date.now()
+
+    function tick() {
+      const elapsed = Date.now() - startTime
+      if (elapsed < spinDuration) {
+        setSpinWinnerIndex(Math.floor(Math.random() * spinItems.length))
+        requestAnimationFrame(tick)
+      } else {
+        setSpinWinnerIndex(winner)
+    setSpinAnimating(false)
+    setPokeRandPokemon([])
+    setPokeRandWinnerIndex(null)
+    setPokeRandRevealed(false)
+    setPokeRandAnimating(false)
+        setSpinRevealed(true)
+      }
+    }
+    requestAnimationFrame(tick)
+  }
+
+  function claimSpinItem(): void {
+    if (spinWinnerIndex === null) return
+    const item = spinItems[spinWinnerIndex]
+    setInventory((prev) => [...prev, item])
+    setBattleLog((prev) => [
+      `🎰 ¡Giraste la Ruleta y obtuviste ${item}!`,
+      ...prev
+    ].slice(0, 15))
+    completeCurrentNode()
+    setScreen('route')
+  }
+
+  function pokeRandSpin(): void {
+    if (pokeRandAnimating || pokeRandRevealed) return
+    setPokeRandAnimating(true)
+    setPokeRandWinnerIndex(null)
+    setPokeRandRevealed(false)
+
+    const winner = Math.floor(Math.random() * pokeRandPokemon.length)
+    const spinDuration = 3000
+    const startTime = Date.now()
+
+    function tick() {
+      const elapsed = Date.now() - startTime
+      if (elapsed < spinDuration) {
+        setPokeRandWinnerIndex(Math.floor(Math.random() * pokeRandPokemon.length))
+        requestAnimationFrame(tick)
+      } else {
+        setPokeRandWinnerIndex(winner)
+        setPokeRandAnimating(false)
+        setPokeRandRevealed(true)
+      }
+    }
+    requestAnimationFrame(tick)
+  }
+
+  function claimPokeRandPokemon(): void {
+    if (pokeRandWinnerIndex === null) return
+    const pokemon = pokeRandPokemon[pokeRandWinnerIndex]
+    if (team.length >= maxTeamSize) {
+      setBattleLog((prev) => [
+        `Tu equipo está lleno (${maxTeamSize}/${maxTeamSize}). No puedes añadir a ${pokemon.name}.`,
+        ...prev
+      ].slice(0, 15))
+      return
+    }
+    setTeam((prev) => [...prev, pokemon])
+    setBattleLog((prev) => [
+      `🎲 ¡PokeRand: ${pokemon.name} se unió a tu equipo!`,
+      ...prev
+    ].slice(0, 15))
+    completeCurrentNode()
+    setScreen('route')
+  }
+
+  function skipPokeRandPokemon(): void {
+    setBattleLog((prev) => [
+      `🎲 ¡PokeRand: decidiste no capturar al Pokémon.`,
+      ...prev
+    ].slice(0, 15))
+    completeCurrentNode()
+    setScreen('route')
   }
 
   function buyShopItem(itemName: string) {
@@ -1189,7 +1429,7 @@ function MainApp() {
         }
 
         if (levelsGained > 0) {
-          const { updatedPokemon: learnedPkmn } = await checkAndLearnNewMove(updatedPokemon, oldLevel, newLevel)
+          const { updatedPokemon: learnedPkmn } = await checkAndLearnNewMove(updatedPokemon, oldLevel, newLevel, difficulty)
           updatedPokemon = learnedPkmn
         }
 
@@ -1432,10 +1672,14 @@ function MainApp() {
     setTeamRocketTeam([])
     setTeamRocketStealMessage('')
     setTeamRocketPickModal(false)
+    setSpinItems([])
+    setSpinWinnerIndex(null)
+    setSpinRevealed(false)
+    setSpinAnimating(false)
   }
 
   function onRestartRun(): void {
-    if (screen === 'route' || screen === 'battle' || screen === 'shop') {
+    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand') {
       resetToSetup()
     }
   }
@@ -2088,6 +2332,31 @@ function MainApp() {
             })}
           </div>
 
+          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
+            <button
+              className={`gen-tile ${difficulty === 'infinite' ? 'is-active' : ''}`}
+              onClick={() => { playClick(); handleSelectDifficulty('infinite') }}
+              onMouseEnter={playHover}
+              type="button"
+              disabled={isLoading}
+              style={{
+                borderColor: '#a855f7',
+                background: difficulty === 'infinite' ? 'rgba(168, 85, 247, 0.25)' : 'rgba(168, 85, 247, 0.05)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                padding: '12px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.2rem', color: '#c084fc' }}>♾️ INFINITE</span>
+                <strong style={{ fontSize: '1rem', color: '#c084fc' }}>— Rutas infinitas + nodos Spin aleatorios</strong>
+              </div>
+            </button>
+          </div>
+
           <h2 style={{ marginTop: '1.5rem' }}>3. Desafíos de Run <span className="muted" style={{ fontSize: '0.75rem', fontWeight: 'normal' }}>(opcional)</span></h2>
           {(() => {
             const challengesUnlocked = generation === 0
@@ -2155,7 +2424,7 @@ function MainApp() {
         </section>
       )}
 
-      {(screen === 'route' || screen === 'battle' || screen === 'shop') && activePokemon && (
+      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand') && activePokemon && (
         <section className="roulette-layout">
           <article className="panel trainer-panel">
             <p className="muted small-tag">Trainer</p>
@@ -2269,13 +2538,15 @@ function MainApp() {
           </article>
 
           <article className="panel center-panel">
-            <h2>Ruta ({routeIndex + 1}/{route.length})</h2>
+            <h2>{difficulty === 'infinite' ? `Ruta #${route.length}` : `Ruta (${routeIndex + 1}/${route.length})`}</h2>
             <div className="route-grid" style={{ maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }}>
               {route.map((node, index) => {
                 const stateClass = index === routeIndex ? 'current' : node.done ? 'done' : 'pending'
                 const rocketClass = node.type === 'teamRocket' ? ' node-teamrocket' : ''
+                const spinClass = node.type === 'spin' ? ' node-spin' : ''
+                const pokeRandClass = node.type === 'pokeRand' ? ' node-pokerand' : ''
                 return (
-                  <div key={node.id} className={`node ${stateClass}${rocketClass}`}>
+                  <div key={node.id} className={`node ${stateClass}${rocketClass}${spinClass}${pokeRandClass}`}>
                     <span>#{node.id}</span>
                     <strong>{nodeTypeLabel(node)}</strong>
                   </div>
@@ -2398,6 +2669,115 @@ function MainApp() {
               </div>
             )}
 
+            {screen === 'spin' && (
+              <div className="action-block spin-block">
+                <h3 style={{ margin: '0 0 0.5rem', color: '#c084fc', textAlign: 'center' }}>🎰 ¡Ruleta del Botín!</h3>
+                <p className="muted" style={{ textAlign: 'center', margin: '0 0 1rem' }}>Gira para obtener un objeto al azar</p>
+                <div className="roulette-wheel">
+                  <div className={`roulette-items ${spinAnimating ? 'spinning' : ''}`}>
+                    {spinItems.map((item, idx) => {
+                      const isHoldable = !!HOLDABLE_ITEMS[item]
+                      const itemIcon = ITEM_SPRITES[item]
+                      const isWinner = spinRevealed && idx === spinWinnerIndex
+                      const desc = isHoldable ? HOLDABLE_ITEMS[item].desc : ALL_SHOP_ITEMS[item]?.desc ?? ''
+                      return (
+                        <div
+                          key={`spin-${idx}`}
+                          className={`roulette-item ${isWinner ? 'winner' : ''} ${spinWinnerIndex === idx && spinAnimating ? 'highlight' : ''}`}
+                        >
+                          {itemIcon && (
+                            <img src={itemIcon} alt={item} className="roulette-item-icon" />
+                          )}
+                          <span className="roulette-item-name">{item}</span>
+                          <span className="roulette-item-desc">{desc}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+                {!spinRevealed && !spinAnimating && (
+                  <button className="cta spin-cta" onClick={spinRoulette} type="button">
+                    ¡Girar!
+                  </button>
+                )}
+                {spinAnimating && (
+                  <p style={{ textAlign: 'center', color: '#c084fc', fontWeight: 'bold', margin: '0.5rem 0' }}>Girando...</p>
+                )}
+                {spinRevealed && spinWinnerIndex !== null && (
+                  <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
+                    <p style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '1.1rem', margin: '0 0 0.5rem' }}>
+                      ¡Obtuviste {spinItems[spinWinnerIndex]}!
+                    </p>
+                    <button className="cta spin-cta" onClick={claimSpinItem} type="button">
+                      Recoger objeto
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {screen === 'pokeRand' && (
+              <div className="action-block pokeRand-block">
+                <h3 style={{ margin: '0 0 0.5rem', color: '#38bdf8', textAlign: 'center' }}>🎲 ¡PokeRand Ruleta!</h3>
+                <p className="muted" style={{ textAlign: 'center', margin: '0 0 1rem' }}>Gira para obtener un Pokémon que se una a tu equipo</p>
+                <div className="roulette-wheel" style={{ borderColor: 'rgba(56, 189, 248, 0.3)', background: 'rgba(56, 189, 248, 0.06)' }}>
+                  <div className={`roulette-items ${pokeRandAnimating ? 'spinning' : ''}`}>
+                    {pokeRandPokemon.map((pokemon, idx) => {
+                      const isWinner = pokeRandRevealed && idx === pokeRandWinnerIndex
+                      return (
+                        <div
+                          key={`pr-${pokemon.id}-${idx}`}
+                          className={`roulette-item ${isWinner ? 'winner' : ''} ${pokeRandWinnerIndex === idx && pokeRandAnimating ? 'highlight' : ''}`}
+                          style={isWinner ? { borderColor: '#38bdf8', boxShadow: '0 0 16px rgba(56, 189, 248, 0.4)' } : undefined}
+                        >
+                          <img src={pokemon.sprite} alt={pokemon.name} className="roulette-item-icon" onError={fallbackSprite} style={{ width: '48px', height: '48px' }} />
+                          <span className="roulette-item-name">{pokemon.name}</span>
+                          <span className="roulette-item-desc">Nv.{pokemon.level}</span>
+                          <span className="roulette-item-desc" style={{ fontSize: '0.55rem', color: '#94a3b8' }}>
+                            {pokemon.types?.join('/')}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+                {!pokeRandRevealed && !pokeRandAnimating && (
+                  <button className="cta pokeRand-cta" onClick={pokeRandSpin} type="button">
+                    ¡Girar!
+                  </button>
+                )}
+                {pokeRandAnimating && (
+                  <p style={{ textAlign: 'center', color: '#38bdf8', fontWeight: 'bold', margin: '0.5rem 0' }}>Girando...</p>
+                )}
+                {pokeRandRevealed && pokeRandWinnerIndex !== null && (
+                  <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
+                    <p style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '1.1rem', margin: '0 0 0.5rem' }}>
+                      ¡{pokeRandPokemon[pokeRandWinnerIndex].name} quiere unirse a tu equipo!
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                      <button
+                        className="cta pokeRand-cta"
+                        onClick={claimPokeRandPokemon}
+                        type="button"
+                        disabled={team.length >= maxTeamSize}
+                        style={{ width: 'auto', padding: '10px 24px' }}
+                      >
+                        Capturar ({team.length}/{maxTeamSize})
+                      </button>
+                      <button
+                        className="secondary"
+                        onClick={skipPokeRandPokemon}
+                        type="button"
+                        style={{ padding: '10px 24px' }}
+                      >
+                        Liberar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {screen === 'route' && currentNode && currentNode.type === 'rest' && restEncounter && (
               <div className="action-block">
                 <p>
@@ -2441,7 +2821,7 @@ function MainApp() {
                   Next node: <strong>{currentNode.label}</strong> ({nodeTypeLabel(currentNode)})
                 </p>
                 <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={enterNode} type="button" disabled={isLoading}>
-                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : 'Enter node'}
+                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : 'Enter node'}
                 </button>
               </div>
             )}
