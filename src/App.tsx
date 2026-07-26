@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef, Component, type ReactNode } from 'react'
 import './App.css'
-import { applyDamage, healPokemon, randomFrom, scalePokemonForNode, startRun, generateBossRushRoute, ALL_TYPES } from './game/engine'
+import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, startRun, generateBossRushRoute, ALL_TYPES } from './game/engine'
 import { playHover, playClick, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
@@ -418,6 +418,7 @@ function MainApp() {
   // Speedrun timer
   const [speedrunSeconds, setSpeedrunSeconds] = useState<number>(0)
   const speedrunTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const speedrunStoppedRef = useRef<boolean>(false)
 
   // Pokédex
   const [showPokedex, setShowPokedex] = useState<boolean>(false)
@@ -744,10 +745,13 @@ function MainApp() {
       }
 
       const hpBonus = run.modifier?.playerMaxHpBonus ?? 0
-      const starterWithBonus = {
+      let starterWithBonus = {
         ...starter,
         maxHp: starter.maxHp + hpBonus,
         hp: starter.hp + hpBonus,
+      }
+      if (activeChallenges.noEvolution) {
+        starterWithBonus = applyNoEvolutionBuff(starterWithBonus)
       }
       setTeam([starterWithBonus])
       setActiveIndex(0)
@@ -769,6 +773,7 @@ function MainApp() {
       setVictoryUnlocks(null)
       setEggInventory([])
       setSpeedrunSeconds(0)
+      speedrunStoppedRef.current = false
       if (speedrunTimerRef.current) {
         clearInterval(speedrunTimerRef.current)
         speedrunTimerRef.current = null
@@ -905,14 +910,26 @@ function MainApp() {
       completeCurrentNode()
       return
     }
-    const captured = { ...pokemon, hp: Math.floor(pokemon.maxHp / 2) }
+    let captured = { ...pokemon, hp: Math.floor(pokemon.maxHp / 2) }
+    if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
     registerInPokedex(captured)
     if (team.length >= 6) {
-      setPcStorage((prev) => [...prev, captured])
-      setBattleLog((prev) => [
-        `✅ ¡${pokemon.name} se envió al PC (equipo lleno)!`,
-        ...prev
-      ].slice(0, 15))
+      const faintedIndex = team.findIndex((p) => p.hp <= 0)
+      if (faintedIndex !== -1) {
+        const newTeam = [...team]
+        newTeam[faintedIndex] = captured
+        setTeam(newTeam)
+        setBattleLog((prev) => [
+          `✅ ¡${pokemon.name} reemplazó a ${team[faintedIndex].name} (borrado)!`,
+          ...prev
+        ].slice(0, 15))
+      } else {
+        setPcStorage((prev) => [...prev, captured])
+        setBattleLog((prev) => [
+          `✅ ¡${pokemon.name} se envió al PC (equipo lleno)!`,
+          ...prev
+        ].slice(0, 15))
+      }
     } else {
       setTeam((prev) => [...prev, captured])
       setBattleLog((prev) => [
@@ -1314,7 +1331,7 @@ function MainApp() {
 
       setScreen('battle')
 
-      if (runChallenges.speedrun) {
+      if (runChallenges.speedrun && !speedrunStoppedRef.current) {
         setSpeedrunSeconds(30)
         if (speedrunTimerRef.current) clearInterval(speedrunTimerRef.current)
         speedrunTimerRef.current = setInterval(() => {
@@ -1400,7 +1417,7 @@ function MainApp() {
 
   function claimPokeRandPokemon(): void {
     if (pokeRandWinnerIndex === null) return
-    const pokemon = pokeRandPokemon[pokeRandWinnerIndex]
+    let pokemon = pokeRandPokemon[pokeRandWinnerIndex]
     if (runChallenges.soloStarter) {
       setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
       return
@@ -1409,6 +1426,7 @@ function MainApp() {
       setBattleLog((prev) => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
       return
     }
+    if (runChallenges.noEvolution) pokemon = applyNoEvolutionBuff(pokemon)
     if (team.length >= maxTeamSize) {
       setPcStorage((prev) => [...prev, pokemon])
       registerInPokedex(pokemon)
@@ -1652,6 +1670,7 @@ function MainApp() {
 
     if (runChallenges.speedrun) {
       if (speedrunTimerRef.current) clearInterval(speedrunTimerRef.current)
+      speedrunStoppedRef.current = true
     }
 
     const nextTeam = team.map((pokemon, index) => (index === activeIndex ? { ...pokemon } : pokemon))
@@ -2068,7 +2087,8 @@ function MainApp() {
     }
 
     const hpBonus = modifier?.playerMaxHpBonus ?? 0
-    const captured = { ...restEncounter, maxHp: restEncounter.maxHp + hpBonus, hp: restEncounter.hp + hpBonus }
+    let captured = { ...restEncounter, maxHp: restEncounter.maxHp + hpBonus, hp: restEncounter.hp + hpBonus }
+    if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
     registerInPokedex(captured)
     if (team.length >= maxTeamSize) {
       setPcStorage((prev) => [...prev, captured])
@@ -2124,6 +2144,7 @@ function MainApp() {
     setEggInventory([])
     setPcStorage([])
     setSpeedrunSeconds(0)
+    speedrunStoppedRef.current = false
     if (speedrunTimerRef.current) {
       clearInterval(speedrunTimerRef.current)
       speedrunTimerRef.current = null
