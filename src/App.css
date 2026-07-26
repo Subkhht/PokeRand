@@ -345,8 +345,8 @@ button {
 }
 
 .sprite {
-  width: 86px;
-  height: 86px;
+  width: 96px;
+  height: 96px;
   image-rendering: pixelated;
   margin-bottom: 6px;
   filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
@@ -1077,4 +1077,155 @@ button {
 .defeat-log-container li {
   padding: 3px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ─── Challenge Section ─── */
+
+.challenge-section {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+}
+
+.challenge-toggles {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.challenge-toggle {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 8px 14px;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.challenge-toggle:hover {
+  border-color: #64748b;
+  color: #cbd5e1;
+}
+
+.challenge-toggle.is-active {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #f87171;
+  color: #fca5a5;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+}
+
+/* ─── Team Rocket ─── */
+
+.node-teamrocket {
+  border-color: #ef4444 !important;
+  background: rgba(220, 38, 38, 0.12) !important;
+}
+
+.node-teamrocket.current {
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5) !important;
+}
+
+.cta-danger {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  border-color: #ef4444;
+}
+
+.cta-danger:hover {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+}
+
+.teamrocket-steal-banner {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+  pointer-events: none;
+  animation: rocketFadeInOut 3s ease-in-out forwards;
+}
+
+.teamrocket-steal-content {
+  background: rgba(15, 23, 42, 0.95);
+  border: 2px solid #ef4444;
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  text-align: center;
+  box-shadow: 0 0 40px rgba(239, 68, 68, 0.4), 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.teamrocket-steal-icon {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.teamrocket-steal-content p {
+  color: #fca5a5;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+@keyframes rocketFadeInOut {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  15% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+  25% { transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+}
+
+.teamrocket-pick-panel {
+  background: #1e293b;
+  border: 2px solid #ef4444;
+  border-radius: 14px;
+  padding: 1.5rem;
+  max-width: 500px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 0 40px rgba(239, 68, 68, 0.3);
+}
+
+.teamrocket-pick-panel h3 {
+  color: #fca5a5;
+  margin: 0 0 0.25rem 0;
+  font-size: 1.2rem;
+}
+
+.teamrocket-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.teamrocket-pick-card {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid #475569;
+  border-radius: 10px;
+  padding: 10px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-main);
+  font-family: inherit;
+}
+
+.teamrocket-pick-card:hover {
+  border-color: #ef4444;
+  background: rgba(220, 38, 38, 0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+.teamrocket-pick-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }

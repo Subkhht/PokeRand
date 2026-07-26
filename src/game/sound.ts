@@ -4,6 +4,7 @@ let musicPlaying = false
 let musicTimeoutId: ReturnType<typeof setTimeout> | null = null
 let currentTrack: string = 'none'
 let masterVolume = 0.5
+let sfxVolume = 0.5
 
 function getCtx(): AudioContext {
   if (!ctx) ctx = new AudioContext()
@@ -74,7 +75,7 @@ export function playHover(): void {
     osc.type = 'square'
     osc.frequency.setValueAtTime(600, ac.currentTime)
     osc.frequency.exponentialRampToValueAtTime(900, ac.currentTime + 0.06)
-    g.gain.setValueAtTime(0.08, ac.currentTime)
+    g.gain.setValueAtTime(0.16 * sfxVolume, ac.currentTime)
     g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.08)
     osc.connect(g).connect(ac.destination)
     osc.start(ac.currentTime)
@@ -90,7 +91,7 @@ export function playClick(): void {
     osc.type = 'square'
     osc.frequency.setValueAtTime(880, ac.currentTime)
     osc.frequency.exponentialRampToValueAtTime(440, ac.currentTime + 0.1)
-    g.gain.setValueAtTime(0.12, ac.currentTime)
+    g.gain.setValueAtTime(0.24 * sfxVolume, ac.currentTime)
     g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12)
     osc.connect(g).connect(ac.destination)
     osc.start(ac.currentTime)
@@ -209,7 +210,8 @@ export function playVictoryFanfare(): void {
   currentTrack = 'none'
 
   const ac = getCtx()
-  const dest = ac.destination
+  createMusicChain()
+  const dest = musicGain!
   const now = ac.currentTime + 0.05
 
   // Triumphant ascending fanfare
@@ -243,7 +245,8 @@ export function playDefeatMusic(): void {
   currentTrack = 'none'
 
   const ac = getCtx()
-  const dest = ac.destination
+  createMusicChain()
+  const dest = musicGain!
   const now = ac.currentTime + 0.1
 
   // Sad descending melody in minor key
@@ -290,4 +293,12 @@ export function setVolume(v: number): void {
 
 export function getVolume(): number {
   return masterVolume
+}
+
+export function setSfxVolume(v: number): void {
+  sfxVolume = Math.max(0, Math.min(1, v))
+}
+
+export function getSfxVolume(): number {
+  return sfxVolume
 }

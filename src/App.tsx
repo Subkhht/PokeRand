@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, Component, type ReactNode } from 'react'
 import './App.css'
 import { applyDamage, healPokemon, randomFrom, scalePokemonForNode, startRun } from './game/engine'
-import { playHover, playClick, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume } from './game/sound'
+import { playHover, playClick, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -11,7 +11,7 @@ import {
   type PokemonDetails
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
-import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary } from './game/types'
+import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges } from './game/types'
 
 type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'victory' | 'defeat'
 type Difficulty = 'easy' | 'medium' | 'hard'
@@ -152,6 +152,13 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
 
 const HOLDABLE_ITEM_NAMES = Object.keys(HOLDABLE_ITEMS)
 
+function fallbackSprite(e: React.SyntheticEvent<HTMLImageElement>) {
+  const img = e.currentTarget
+  if (img.dataset.fallback) return
+  img.dataset.fallback = '1'
+  img.src = img.src.replace(/\/animated\/(\d+)\.gif/, '/$1.png')
+}
+
 const TYPE_COLORS: Record<string, string> = {
   normal: '#a8a878', fire: '#f08030', water: '#6890f0', electric: '#f8d030',
   grass: '#78c850', ice: '#98d8d8', fighting: '#c03028', poison: '#a040a0',
@@ -235,6 +242,8 @@ function nodeTypeLabel(node: RouteNode): string {
       return 'Tienda'
     case 'boss':
       return 'Jefe'
+    case 'teamRocket':
+      return 'TeamR'
     default:
       return node.type
   }
@@ -328,6 +337,12 @@ function MainApp() {
 
   const [inventory, setInventory] = useState<string[]>([])
   const [modifier, setModifier] = useState<RunModifier | null>(null)
+  const [runChallenges, setRunChallenges] = useState<RunChallenges>({
+    noShops: false,
+    noRests: false,
+    allShiny: false,
+    allTeamRocket: false,
+  })
   const [battleLog, setBattleLog] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [apiError, setApiError] = useState<string>('')
@@ -341,6 +356,13 @@ function MainApp() {
   const [reviveModal, setReviveModal] = useState<{ itemName: string; itemIndex: number } | null>(null)
   const [equipModal, setEquipModal] = useState<{ itemName: string; itemIndex: number } | null>(null)
 
+  // Team Rocket
+  const [isTeamRocketBattle, setIsTeamRocketBattle] = useState<boolean>(false)
+  const [teamRocketFainted, setTeamRocketFainted] = useState<boolean>(false)
+  const [teamRocketTeam, setTeamRocketTeam] = useState<Pokemon[]>([])
+  const [teamRocketStealMessage, setTeamRocketStealMessage] = useState<string>('')
+  const [teamRocketPickModal, setTeamRocketPickModal] = useState<boolean>(false)
+
   // Pokédex
   const [showPokedex, setShowPokedex] = useState<boolean>(false)
   const [pokedexSearch, setPokedexSearch] = useState<string>('')
@@ -350,6 +372,7 @@ function MainApp() {
   // Opciones / Volumen
   const [showOptions, setShowOptions] = useState<boolean>(false)
   const [volume, setVolumeState] = useState<number>(() => Math.round(getVolume() * 100))
+  const [sfxVol, setSfxVolState] = useState<number>(() => Math.round(getSfxVolume() * 100))
 
   const [pokedex, setPokedex] = useState<Record<number, PokedexEntry>>(() => {
     try {
@@ -426,7 +449,7 @@ function MainApp() {
       let pokemonId = Number(pokemon.id)
 
       if (isNaN(pokemonId) && pokemon.sprite) {
-        const match = pokemon.sprite.match(/\/(\d+)\.png/)
+        const match = pokemon.sprite.match(/\/(\d+)\.(png|gif)/)
         if (match) {
           pokemonId = parseInt(match[1], 10)
         }
@@ -472,7 +495,7 @@ function MainApp() {
       const targetGen = getEffectiveGen()
       setCurrentRunGen(targetGen)
 
-      const starter = await getRandomStarterByGeneration(targetGen)
+      const starter = await getRandomStarterByGeneration(targetGen, runChallenges.allShiny)
       const config: RunConfig = { generation: targetGen }
       const run = startRun(config)
 
@@ -484,19 +507,23 @@ function MainApp() {
       for (let i = 1; i < totalNodes; i++) {
         let type: RouteNode['type'] = 'battle'
 
-        if (i > 0) {
+        if (runChallenges.allTeamRocket) {
+          type = 'teamRocket'
+        } else if (i > 0) {
           const rand = Math.random()
-          if (rand < 0.15) {
+          if (rand < 0.15 && !runChallenges.noShops) {
             type = 'shop'
-          } else if (rand < 0.40) {
+          } else if (rand < 0.40 && !runChallenges.noRests) {
             type = 'rest'
+          } else if (rand < 0.52) {
+            type = 'teamRocket'
           }
         }
 
         customRoute.push({
           id: i,
           type,
-          label: `Ruta ${i}`,
+          label: type === 'teamRocket' ? `TeamR #${i}` : `Ruta ${i}`,
           done: false
         })
       }
@@ -533,10 +560,14 @@ function MainApp() {
       setDefeatSummary(null)
       setVictoryUnlocks(null)
       setBattleLog([
-        `Tu inicial es ${starter.name}.`,
+        `Tu inicial es ${starter.name}${starter.shiny ? ' ✨' : ''}.`,
         `Modo: ${generation === 0 ? 'Random All-Stars' : `Gen ${generation}`}.`,
         `Dificultad: ${difficultyLabels[difficulty].title} (${totalNodes} rutas).`,
-        `Recibes $200 de inicio e item: ${run.item}.`
+        `Recibes $200 de inicio e item: ${run.item}.`,
+        ...(runChallenges.noShops ? ['🚫 Desafío: Sin tiendas.'] : []),
+        ...(runChallenges.noRests ? ['🚫 Desafío: Sin descansos.'] : []),
+        ...(runChallenges.allShiny ? ['✨ Desafío: Todos los Pokémon son Shiny.'] : []),
+        ...(runChallenges.allTeamRocket ? ['🔴 Desafío: ¡Todos los nodos son TeamR!'] : []),
       ])
       setScreen('route')
       startBattleMusic()
@@ -592,6 +623,21 @@ function MainApp() {
 
     setRouteIndex((previous) => previous + 1)
     setScreen('route')
+  }
+
+  function pickRocketPokemon(pokemon: Pokemon): void {
+    if (team.length >= 6) {
+      setBattleLog((prev) => [`Tu equipo está lleno (6/6). No puedes añadir a ${pokemon.name}.`, ...prev].slice(0, 15))
+      return
+    }
+    setTeam((prev) => [...prev, { ...pokemon, hp: Math.floor(pokemon.maxHp / 2) }])
+    setTeamRocketPickModal(false)
+    setTeamRocketTeam([])
+    setBattleLog((prev) => [
+      `✅ ¡${pokemon.name} se unió a tu equipo!`,
+      ...prev
+    ].slice(0, 15))
+    completeCurrentNode()
   }
 
   function removeFaintedPokemon(indexToRemove: number): void {
@@ -684,12 +730,21 @@ function MainApp() {
     }
 
     if (currentNode.type === 'rest') {
-      setIsLoading(true)
-      setApiError('')
+    setIsLoading(true)
+    setApiError('')
 
-      try {
-        const targetGen = getEffectiveGen()
-        const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false)
+    const effectiveGen = getEffectiveGen()
+    const challengesUnlocked = effectiveGen === 0
+      ? generations.every((g) => progression.completedMedium.includes(g))
+      : progression.completedMedium.includes(effectiveGen)
+
+    if (!challengesUnlocked) {
+      setRunChallenges({ noShops: false, noRests: false, allShiny: false , allTeamRocket: false })
+    }
+
+    try {
+      const targetGen = getEffectiveGen()
+        const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny)
         const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0)
         const rewardItem = randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry'])
 
@@ -714,8 +769,37 @@ function MainApp() {
     try {
       const targetGen = getEffectiveGen()
       const isBoss = currentNode.type === 'boss'
+      const isTeamRocket = currentNode.type === 'teamRocket'
 
-      const willBeTrainer = isBoss || Math.random() < 0.5
+      if (isTeamRocket) {
+        const progress = routeIndex / Math.max(1, route.length - 1)
+        const teamSize = Math.max(2, Math.min(4, 2 + Math.floor(progress * 3)))
+
+        const fetches = Array.from({ length: teamSize }, () =>
+          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny)
+            .then((base) => scalePokemonForNode(base, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0))
+        )
+        const rocketTeam = await Promise.all(fetches)
+
+        setIsTrainerBattle(true)
+        setTrainerTeam(rocketTeam)
+        setTrainerPokemonIndex(0)
+        setTrainerName('TeamR Grunt')
+        setTrainerSprite("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='12' fill='%23111'/%3E%3Ctext x='48' y='62' font-family='Arial Black,Arial' font-size='52' font-weight='900' fill='%23ef4444' text-anchor='middle'%3ER%3C/text%3E%3Ccircle cx='48' cy='80' r='3' fill='%23ef4444'/%3E%3C/svg%3E")
+        setTrainerBadge('')
+        setEnemy(rocketTeam[0])
+        setIsTeamRocketBattle(true)
+        setTeamRocketFainted(false)
+        setTeamRocketTeam(rocketTeam)
+        setTeamRocketStealMessage('')
+        setTeamRocketPickModal(false)
+        setBattleLog((prev) => [
+          `🔴 ¡Un TeamR Grunt te desafía! Tiene ${teamSize} Pokémon.`,
+          `Envía a ${rocketTeam[0].name} Nv.${rocketTeam[0].level}.`,
+          ...prev
+        ])
+      } else {
+        const willBeTrainer = isBoss || Math.random() < 0.5
 
       if (willBeTrainer) {
         const progress = routeIndex / Math.max(1, route.length - 1)
@@ -723,7 +807,7 @@ function MainApp() {
         const teamSize = isBoss ? maxSize : Math.max(1, Math.min(maxSize, 1 + Math.floor(Math.random() * maxSize)))
 
         const fetches = Array.from({ length: teamSize }, () =>
-          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss)
+          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny)
             .then((base) => scalePokemonForNode(base, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0))
         )
         const newTrainerTeam = await Promise.all(fetches)
@@ -758,7 +842,7 @@ function MainApp() {
           ...prev
         ])
       } else {
-        const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false)
+        const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny)
         const generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0)
         setIsTrainerBattle(false)
         setTrainerTeam([])
@@ -773,6 +857,7 @@ function MainApp() {
           `🌿 ¡Un ${generatedEnemy.name} salvaje (Nv.${generatedEnemy.level}) apareció!`,
           ...prev
         ])
+      }
       }
 
       setScreen('battle')
@@ -1069,6 +1154,7 @@ function MainApp() {
       setTeam(nextTeam)
       setActiveIndex(nextAliveIndex)
       setBattleLog((prev) => [`${nextPlayer.name} cayó debilitado.`, ...logs, ...prev].slice(0, 15))
+      if (isTeamRocketBattle) setTeamRocketFainted(true)
       setEnemy(nextEnemy)
       return
     }
@@ -1130,6 +1216,60 @@ function MainApp() {
           setTeam(newTeam)
           setTrainerTeam(updatedTrainerTeam)
           setEnemy(nextEnemy)
+
+          if (isTeamRocketBattle) {
+            setIsTeamRocketBattle(false)
+            if (teamRocketFainted) {
+              const aliveTeam = newTeam.filter((p) => p.hp > 0)
+              if (aliveTeam.length > 0) {
+                const stolen = aliveTeam[Math.floor(Math.random() * aliveTeam.length)]
+                const remainingTeam = newTeam.filter((p) => p !== stolen)
+                const msg = `🔴 ¡TeamR te robó a ${stolen.name}! Se lo llevan...`
+                setTeamRocketStealMessage(msg)
+                setBattleLog((prev) => [
+                  msg,
+                  `🏆 ¡Derrotaste al TeamR Grunt! +$${totalReward + moneyReward}`,
+                  logMsg,
+                  ...logs,
+                  ...prev
+                ].slice(0, 15))
+                const hasAliveAfter = remainingTeam.some((p) => p.hp > 0)
+                if (hasAliveAfter) {
+                  setTeam(remainingTeam)
+                  setTimeout(() => { setTeamRocketStealMessage(''); completeCurrentNode() }, 3000)
+                } else {
+                  setTimeout(() => {
+                    setTeamRocketStealMessage('')
+                    setTeam(remainingTeam)
+                    setDefeatSummary({
+                      finalTeam: remainingTeam,
+                      battleLog: [`¡TeamR te dejó sin Pokémon vivos!`, ...battleLog],
+                      enemy: nextEnemy,
+                      lastNodeLabel: currentNode?.label
+                    })
+                    const losses = record.losses + 1
+                    persistRecord(record.wins, losses)
+                    setScreen('defeat')
+                    playDefeatMusic()
+                  }, 3000)
+                }
+                return
+              }
+            } else {
+              const defeated = updatedTrainerTeam.filter((p) => p.hp <= 0)
+              setTeamRocketTeam(defeated)
+              setTeamRocketPickModal(true)
+              setBattleLog((prev) => [
+                `🏆 ¡Derrotaste al TeamR Grunt sin bajas! ¡Elige un Pokémon! +$${totalReward + moneyReward}`,
+                logMsg,
+                ...logs,
+                ...prev
+              ].slice(0, 15))
+              setTeam(newTeam)
+              return
+            }
+          }
+
           setBattleLog((prev) => [
             `🏆 ¡Derrotaste al entrenador ${trainerName}! +$${totalReward + moneyReward}`,
             logMsg,
@@ -1287,6 +1427,11 @@ function MainApp() {
     setTrainerName('')
     setTrainerSprite('')
     setTrainerBadge('')
+    setIsTeamRocketBattle(false)
+    setTeamRocketFainted(false)
+    setTeamRocketTeam([])
+    setTeamRocketStealMessage('')
+    setTeamRocketPickModal(false)
   }
 
   function onRestartRun(): void {
@@ -1310,7 +1455,7 @@ function MainApp() {
           <button className="tiny-btn" type="button" onClick={() => setShowPokedex(true)}>
             📖 Pokédex ({pokedexList.length})
           </button>
-          <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowOptions(!showOptions) }} onMouseEnter={playHover}>
+          <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowOptions(!showOptions) }}>
             ⚙️ Opciones
           </button>
           <button className="tiny-btn" type="button" onClick={onRestartRun}>
@@ -1384,6 +1529,7 @@ function MainApp() {
                     <img
                       src={pkmn.sprite}
                       alt={pkmn.name}
+                      onError={fallbackSprite}
                       style={{
                         width: '44px',
                         height: '44px',
@@ -1488,6 +1634,7 @@ function MainApp() {
                     <img
                       src={pkmn.sprite}
                       alt={pkmn.name}
+                      onError={fallbackSprite}
                       style={{
                         width: '44px',
                         height: '44px',
@@ -1671,7 +1818,7 @@ function MainApp() {
                           onClick={() => handleSelectPokedexPokemon(pkmn.id)}
                         >
                           <span className="pokedex-id">#{String(pkmn.id).padStart(3, '0')}</span>
-                          <img src={pkmn.sprite} alt={pkmn.name} style={{ width: '60px', height: '60px' }} />
+                          <img src={pkmn.id >= 1 && pkmn.id <= 649 ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pkmn.id}.gif` : pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '60px', height: '60px' }} />
                           <strong style={{ textTransform: 'capitalize', display: 'block', fontSize: '0.85rem' }}>
                             {pkmn.name}
                           </strong>
@@ -1713,7 +1860,7 @@ function MainApp() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div>
                   <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
-                    🔊 Volumen de Música
+                    🎵 Volumen de Música
                   </strong>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <span style={{ fontSize: '0.8rem', color: '#94a3b8', minWidth: '20px' }}>🔈</span>
@@ -1734,17 +1881,25 @@ function MainApp() {
                 </div>
 
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
-                  <strong style={{ fontSize: '0.85rem', color: '#94a3b8', display: 'block', marginBottom: '0.35rem' }}>
-                    Modifier activo
+                  <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
+                    🔉 Volumen de Efectos
                   </strong>
-                  {modifier ? (
-                    <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.5rem 0.75rem' }}>
-                      <span style={{ color: '#facc15', fontWeight: 'bold', fontSize: '0.9rem' }}>{modifier.name}</span>
-                      <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>{modifier.description}</p>
-                    </div>
-                  ) : (
-                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Ninguno</span>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', minWidth: '20px' }}>🔈</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={sfxVol}
+                      onChange={(e) => {
+                        const v = Number(e.target.value)
+                        setSfxVolState(v)
+                        setSfxVolume(v / 100)
+                      }}
+                      style={{ flex: 1, accentColor: '#f59e0b', height: '6px', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', minWidth: '32px', textAlign: 'right' }}>{sfxVol}%</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1756,6 +1911,59 @@ function MainApp() {
                 onClick={() => setShowOptions(false)}
               >
                 CERRAR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Team Rocket: Mensaje de robo */}
+      {teamRocketStealMessage && (
+        <div className="teamrocket-steal-banner">
+          <div className="teamrocket-steal-content">
+            <span className="teamrocket-steal-icon">🔴</span>
+            <p>{teamRocketStealMessage}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Team Rocket: Elegir Pokémon */}
+      {teamRocketPickModal && (
+        <div className="modal-backdrop" onClick={() => { setTeamRocketPickModal(false); setTeamRocketTeam([]); completeCurrentNode() }}>
+          <div className="teamrocket-pick-panel" onClick={(e) => e.stopPropagation()}>
+            <h3>🔴 ¡TeamR derrotado!</h3>
+            <p className="muted" style={{ margin: '0.5rem 0 1rem' }}>No perdiste ningún Pokémon. ¡Elige uno del equipo enemigo para unirlo al tuyo!</p>
+            <div className="teamrocket-pick-grid">
+              {teamRocketTeam.filter((p) => p.hp <= 0).map((pkmn, idx) => (
+                <button
+                  key={`rocket-pick-${idx}`}
+                  className="teamrocket-pick-card"
+                  onClick={() => { playClick(); pickRocketPokemon(pkmn) }}
+                  onMouseEnter={playHover}
+                  type="button"
+                  disabled={team.length >= 6}
+                >
+                  <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '64px', height: '64px', imageRendering: 'pixelated' }} />
+                  <strong style={{ textTransform: 'capitalize' }}>{pkmn.name}</strong>
+                  <span className="muted" style={{ fontSize: '0.75rem' }}>Nv. {pkmn.level}</span>
+                  {pkmn.types && (
+                    <div style={{ display: 'flex', gap: '3px', justifyContent: 'center', marginTop: '4px' }}>
+                      {pkmn.types.map((t) => (
+                        <span key={t} style={{ background: TYPE_COLORS[t] ?? '#475569', color: '#fff', fontSize: '0.6rem', padding: '1px 5px', borderRadius: '4px' }}>{t}</span>
+                      ))}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+              <button
+                className="secondary"
+                onClick={() => { playClick(); setTeamRocketPickModal(false); setTeamRocketTeam([]); completeCurrentNode() }}
+                onMouseEnter={playHover}
+                type="button"
+              >
+                Omitir (no quedarse con ninguno)
               </button>
             </div>
           </div>
@@ -1880,6 +2088,61 @@ function MainApp() {
             })}
           </div>
 
+          <h2 style={{ marginTop: '1.5rem' }}>3. Desafíos de Run <span className="muted" style={{ fontSize: '0.75rem', fontWeight: 'normal' }}>(opcional)</span></h2>
+          {(() => {
+            const challengesUnlocked = generation === 0
+              ? generations.every((g) => progression.completedMedium.includes(g))
+              : progression.completedMedium.includes(generation)
+
+            return (
+              <div className="challenge-section" style={!challengesUnlocked ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
+                {!challengesUnlocked && (
+                  <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem', color: '#fbbf24' }}>
+                    🔒 Completa la {generation === 0 ? 'todas las generaciones' : `Gen ${generation} (${generationRegions[generation]})`} en Intermedio o Difícil para desbloquear los desafíos.
+                  </p>
+                )}
+                <div className="challenge-toggles">
+                  <button
+                    className={`challenge-toggle ${runChallenges.noShops ? 'is-active' : ''}`}
+                    onClick={() => { playClick(); setRunChallenges((c) => ({ ...c, noShops: !c.noShops })) }}
+                    onMouseEnter={playHover}
+                    type="button"
+                    disabled={!challengesUnlocked}
+                  >
+                    🚫🏪 Sin Tiendas
+                  </button>
+                  <button
+                    className={`challenge-toggle ${runChallenges.noRests ? 'is-active' : ''}`}
+                    onClick={() => { playClick(); setRunChallenges((c) => ({ ...c, noRests: !c.noRests })) }}
+                    onMouseEnter={playHover}
+                    type="button"
+                    disabled={!challengesUnlocked}
+                  >
+                    🚫🏕️ Sin Descansos
+                  </button>
+                  <button
+                    className={`challenge-toggle ${runChallenges.allShiny ? 'is-active' : ''}`}
+                    onClick={() => { playClick(); setRunChallenges((c) => ({ ...c, allShiny: !c.allShiny })) }}
+                    onMouseEnter={playHover}
+                    type="button"
+                    disabled={!challengesUnlocked}
+                  >
+                    ✨ Solo Shiny
+                  </button>
+                  <button
+                    className={`challenge-toggle ${runChallenges.allTeamRocket ? 'is-active' : ''}`}
+                    onClick={() => { playClick(); setRunChallenges((c) => ({ ...c, allTeamRocket: !c.allTeamRocket })) }}
+                    onMouseEnter={playHover}
+                    type="button"
+                    disabled={!challengesUnlocked}
+                  >
+                    🔴 Solo TeamR
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
+
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '1.5rem' }}>
             <button className="cta" onClick={() => { playClick(); startNewRun() }} onMouseEnter={playHover} type="button" disabled={isLoading}>
               {isLoading ? 'Cargando PokeAPI...' : "Iniciar Aventura"}
@@ -1896,8 +2159,8 @@ function MainApp() {
         <section className="roulette-layout">
           <article className="panel trainer-panel">
             <p className="muted small-tag">Trainer</p>
-            <img className="sprite trainer-sprite" src={activePokemon.sprite} alt={activePokemon.name} />
-            <h2>{activePokemon.name}</h2>
+            <img className="sprite trainer-sprite" src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
+            <h2>{activePokemon.name}{activePokemon.shiny ? ' ✨' : ''}</h2>
             <p className="muted">
               {generation === 0 ? 'Random All-Stars' : `Gen ${generation}`} · Nv.{activePokemon.level}
             </p>
@@ -1920,7 +2183,7 @@ function MainApp() {
                     onClick={() => switchActive(index)}
                     disabled={pokemon.hp <= 0 || isLoading}
                   >
-                    <img src={pokemon.sprite} alt={pokemon.name} />
+                    <img src={pokemon.sprite} alt={pokemon.name} onError={fallbackSprite} />
                     {pokemon.holdItem && ITEM_SPRITES[pokemon.holdItem] && (
                       <img
                         src={ITEM_SPRITES[pokemon.holdItem]}
@@ -1929,7 +2192,7 @@ function MainApp() {
                         style={{ width: '18px', height: '18px', imageRendering: 'pixelated', position: 'absolute', bottom: '4px', right: '4px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
                       />
                     )}
-                    <strong>{pokemon.name}</strong>
+                    <strong>{pokemon.name}{pokemon.shiny ? ' ✨' : ''}</strong>
                     <span>{pokemon.hp}/{pokemon.maxHp}</span>
                   </button>
                   <div className="sprite-tooltip">
@@ -2010,8 +2273,9 @@ function MainApp() {
             <div className="route-grid" style={{ maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }}>
               {route.map((node, index) => {
                 const stateClass = index === routeIndex ? 'current' : node.done ? 'done' : 'pending'
+                const rocketClass = node.type === 'teamRocket' ? ' node-teamrocket' : ''
                 return (
-                  <div key={node.id} className={`node ${stateClass}`}>
+                  <div key={node.id} className={`node ${stateClass}${rocketClass}`}>
                     <span>#{node.id}</span>
                     <strong>{nodeTypeLabel(node)}</strong>
                   </div>
@@ -2141,7 +2405,7 @@ function MainApp() {
                 </p>
                 <p className="muted">Reward item added: {restRewardItem}</p>
                 <div className="capture-card">
-                  <img className="sprite" src={restEncounter.sprite} alt={restEncounter.name} />
+                  <img className="sprite" src={restEncounter.sprite} alt={restEncounter.name} onError={fallbackSprite} />
                 </div>
                 <div className="moves-grid" style={{ marginBottom: '1rem' }}>
                   <button className="cta" onClick={captureRestPokemon} type="button" disabled={team.length >= maxTeamSize}>
@@ -2176,8 +2440,8 @@ function MainApp() {
                 <p>
                   Next node: <strong>{currentNode.label}</strong> ({nodeTypeLabel(currentNode)})
                 </p>
-                <button className="cta" onClick={enterNode} type="button" disabled={isLoading}>
-                  {isLoading ? 'Searching rival...' : 'Enter node'}
+                <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={enterNode} type="button" disabled={isLoading}>
+                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : 'Enter node'}
                 </button>
               </div>
             )}
@@ -2239,6 +2503,7 @@ function MainApp() {
                             <img
                               src={tp.sprite}
                               alt={tp.name}
+                              onError={fallbackSprite}
                               style={{
                                 width: '34px', height: '34px',
                                 filter: isDefeated ? 'grayscale(100%) brightness(0.5)' : 'none',
@@ -2261,10 +2526,10 @@ function MainApp() {
                 )}
 
                 <p style={{ margin: '0 0 4px 0' }}>
-                  <strong style={{ textTransform: 'capitalize' }}>{enemy.name}</strong>
+                  <strong style={{ textTransform: 'capitalize' }}>{enemy.name}{enemy.shiny ? ' ✨' : ''}</strong>
                   {' · '}Nv.&nbsp;{enemy.level}
                 </p>
-                <img className="sprite enemy-sprite" src={enemy.sprite} alt={enemy.name} />
+                <img className="sprite enemy-sprite" src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} />
                 <div className="hp-line">
                   <span>HP rival</span>
                   <strong>{enemy.hp}/{enemy.maxHp}</strong>
@@ -2433,7 +2698,7 @@ function MainApp() {
                 <div className="fainted-team-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.5rem', marginTop: '0.5rem' }}>
                   {defeatSummary.finalTeam.map((pkmn, idx) => (
                     <div key={`${pkmn.id}-${idx}`} className="fainted-card" style={{ background: 'rgba(0,0,0,0.3)', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                      <img src={pkmn.sprite} alt={pkmn.name} style={{ width: '48px', height: '48px', opacity: 0.6, filter: 'grayscale(100%)' }} />
+                      <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '48px', height: '48px', opacity: 0.6, filter: 'grayscale(100%)' }} />
                       <strong style={{ display: 'block', fontSize: '0.85rem' }}>{pkmn.name}</strong>
                       <span className="muted" style={{ fontSize: '0.75rem' }}>Nv. {pkmn.level}</span>
                     </div>

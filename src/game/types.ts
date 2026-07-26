@@ -27,11 +27,12 @@ export interface Pokemon {
   baseStatTotal?: number
   rawLevelUpMoves?: RawLevelUpMove[]
   holdItem?: string | null
+  shiny?: boolean
 }
 
 export interface RouteNode {
   id: number
-  type: 'battle' | 'rest' | 'shop' | 'boss'
+  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket'
   label: string
   done: boolean
 }
@@ -59,6 +60,13 @@ export interface RunModifier {
 
 export interface RunConfig {
   generation: number
+}
+
+export interface RunChallenges {
+  noShops: boolean
+  noRests: boolean
+  allShiny: boolean
+  allTeamRocket: boolean
 }
 
 export interface DefeatSummary {

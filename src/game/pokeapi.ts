@@ -119,6 +119,13 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
+function makeShinySprite(sprite: string, id: number): string {
+  if (sprite.includes('/animated/')) {
+    return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/shiny/${id}.gif`
+  }
+  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url)
   if (!response.ok) {
@@ -260,12 +267,18 @@ export async function fetchPokemonMoves(
 export async function buildPokemonFromApi(
   identifier: string | number,
   _generation: number,
-  targetLevel: number = 10
+  targetLevel: number = 10,
+  shiny: boolean = false
 ): Promise<Pokemon> {
   const cacheKey = `${identifier}_lvl${targetLevel}`
   const cached = pokemonCache.get(cacheKey)
   if (cached) {
-    return { ...cached, hp: cached.maxHp }
+    const result = { ...cached, hp: cached.maxHp }
+    if (shiny) {
+      result.shiny = true
+      result.sprite = makeShinySprite(result.sprite, result.id)
+    }
+    return result
   }
 
   const data = await fetchJson<PokeApiPokemon>(`${API_BASE}/pokemon/${identifier}`)
@@ -287,9 +300,14 @@ export async function buildPokemonFromApi(
     speed: (statMap.get('speed') ?? 50) + (targetLevel - 10) * 2,
     types: sortedTypes,
     baseStatTotal,
-    sprite:
-      data.sprites.front_default ??
-      'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png',
+    sprite: (() => {
+      const id = data.id
+      const baseSprite = id >= 1 && id <= 649
+        ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${id}.gif`
+        : data.sprites.front_default ?? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+      return shiny ? makeShinySprite(baseSprite, id) : baseSprite
+    })(),
+    shiny: shiny || undefined,
     moves: parsedMoves,
     rawLevelUpMoves
   }
@@ -387,7 +405,8 @@ export async function getBalancedPokemonByGeneration(
   generation: number,
   stepIndex: number,
   totalNodes: number,
-  isBoss: boolean = false
+  isBoss: boolean = false,
+  shiny: boolean = false
 ): Promise<Pokemon> {
   const allIds = await getSpeciesIdsByGeneration(generation)
   const progressRatio = stepIndex / Math.max(1, totalNodes - 1)
@@ -422,7 +441,7 @@ export async function getBalancedPokemonByGeneration(
   for (let i = 0; i < attempts; i++) {
     const candidateId = shuffledCandidates[i]
     try {
-      const pokemon = await buildPokemonFromApi(candidateId, generation, scaledLevel)
+      const pokemon = await buildPokemonFromApi(candidateId, generation, scaledLevel, shiny)
       const bst = pokemon.baseStatTotal ?? 350
 
       if (bst >= minBst && bst <= maxBst) {
@@ -443,7 +462,7 @@ export async function getBalancedPokemonByGeneration(
   if (bestCandidate) return bestCandidate
 
   const randomId = randomFrom(allIds)
-  return buildPokemonFromApi(randomId, generation, scaledLevel)
+  return buildPokemonFromApi(randomId, generation, scaledLevel, shiny)
 }
 
 export async function getRandomPokemonByGeneration(generation: number): Promise<Pokemon> {
@@ -452,10 +471,10 @@ export async function getRandomPokemonByGeneration(generation: number): Promise<
   return buildPokemonFromApi(randomId, generation)
 }
 
-export async function getRandomStarterByGeneration(generation: number): Promise<Pokemon> {
+export async function getRandomStarterByGeneration(generation: number, shiny: boolean = false): Promise<Pokemon> {
   const starters = startersByGen[generation] ?? startersByGen[1]
   const randomStarterId = randomFrom(starters)
-  return buildPokemonFromApi(randomStarterId, generation)
+  return buildPokemonFromApi(randomStarterId, generation, 10, shiny)
 }
 
 export async function evolvePokemon(currentPokemon: Pokemon): Promise<Pokemon | null> {
@@ -463,7 +482,7 @@ export async function evolvePokemon(currentPokemon: Pokemon): Promise<Pokemon | 
     let identifier: string | number = currentPokemon.id
 
     if (!identifier || Number.isNaN(Number(identifier))) {
-      const match = currentPokemon.sprite?.match(/\/(\d+)\.png/)
+      const match = currentPokemon.sprite?.match(/\/(\d+)\.(png|gif)/)
       if (match) {
         identifier = parseInt(match[1], 10)
       } else {
@@ -508,7 +527,7 @@ export async function evolvePokemon(currentPokemon: Pokemon): Promise<Pokemon | 
       return null 
     }
 
-    const newBasePokemon = await buildPokemonFromApi(nextEvoName, 1, currentPokemon.level)
+    const newBasePokemon = await buildPokemonFromApi(nextEvoName, 1, currentPokemon.level, currentPokemon.shiny ?? false)
 
     const evolvedPokemon: Pokemon = {
       ...newBasePokemon,
