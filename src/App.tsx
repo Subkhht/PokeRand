@@ -342,7 +342,7 @@ function MainApp() {
   const [trainerBadge, setTrainerBadge] = useState<string>('')
 
   // Economía y Tienda
-  const [money, setMoney] = useState<number>(200)
+  const [money, setMoney] = useState<number>(100)
   const [shopStock, setShopStock] = useState<string[]>([])
 
   const [inventory, setInventory] = useState<string[]>([])
@@ -751,7 +751,7 @@ function MainApp() {
       }
       setTeam([starterWithBonus])
       setActiveIndex(0)
-      setMoney(activeChallenges.noMoney ? 0 : 200)
+      setMoney(activeChallenges.noMoney ? 0 : 100)
       setInventory([run.item])
       setModifier(run.modifier)
       setRoute(customRoute)
@@ -807,7 +807,7 @@ function MainApp() {
         `Tu inicial es ${starter.name}${starter.shiny ? ' ✨' : ''}.`,
         `Modo: ${generation === 0 ? 'Random All-Stars' : `Gen ${generation}`}.`,
         `Dificultad: ${difficultyLabels[difficulty].title}${difficulty === 'infinite' ? ' (Sin límite)' : ` (${totalNodes} rutas)`}.`,
-        `Recibes $${activeChallenges.noMoney ? '0' : '200'} de inicio e item: ${run.item}.`,
+        `Recibes $${activeChallenges.noMoney ? '0' : '100'} de inicio e item: ${run.item}.`,
         ...challengeDescriptions,
       ])
       setScreen('route')
@@ -1821,7 +1821,7 @@ function MainApp() {
       const newTeam = await Promise.all(updatedTeamPromises)
       const pendingPc: Pokemon[] = []
 
-      const baseMoneyReward = Math.floor((80 + nextEnemy.level * 10) / (isTrainerBattle ? trainerTeam.length : 1))
+      const baseMoneyReward = Math.floor((40 + nextEnemy.level * 5) / (isTrainerBattle ? trainerTeam.length : 1))
       const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoneyReward * (modifier?.moneyMultiplier ?? 1))
       if (!runChallenges.noMoney) setMoney((prev) => prev + moneyReward)
 
@@ -1870,7 +1870,7 @@ function MainApp() {
         const nextTrainerIndex = updatedTrainerTeam.findIndex((p, idx) => idx > trainerPokemonIndex && p.hp > 0)
 
         if (nextTrainerIndex === -1) {
-          const baseTotalReward = 80 + nextEnemy.level * 10 * trainerTeam.length
+          const baseTotalReward = 40 + nextEnemy.level * 5 * trainerTeam.length
           const totalReward = Math.floor(baseTotalReward * (modifier?.moneyMultiplier ?? 1))
           setMoney((prev) => prev + totalReward)
           setTeam(newTeam)
@@ -2092,7 +2092,7 @@ function MainApp() {
     setRoute([])
     setRouteIndex(0)
     setInventory([])
-    setMoney(200)
+    setMoney(100)
     setShopStock([])
     setModifier(null)
     setModifier2(null)
