@@ -1,4 +1,4 @@
-import type { Move, Pokemon, RouteNode, RunModifier, ShopItem, RunChallenges } from './types'
+import type { Move, Pokemon, RouteNode, RunModifier, ShopItem } from './types'
 
 export function applyDamage(
   attacker: Pokemon,
@@ -50,10 +50,6 @@ export function applyNoEvolutionBuff(pokemon: Pokemon): Pokemon {
     speed: Math.floor(pokemon.speed * 1.3),
     maxHp: Math.floor(pokemon.maxHp * 1.3),
     hp: Math.floor(pokemon.hp * 1.3),
-    moves: pokemon.moves.map((m) => ({
-      ...m,
-      power: m.power != null ? Math.floor(m.power * 1.3) : null
-    }))
   }
 }
 
