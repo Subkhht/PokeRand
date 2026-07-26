@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef, Component, type ReactNode } from 'react'
 import './App.css'
-import { applyDamage, healPokemon, randomFrom, scalePokemonForNode, startRun, generateBossRushRoute, randomFromType, ALL_TYPES } from './game/engine'
+import { applyDamage, healPokemon, randomFrom, scalePokemonForNode, startRun, generateBossRushRoute, ALL_TYPES } from './game/engine'
 import { playHover, playClick, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
