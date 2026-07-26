@@ -8,6 +8,7 @@ import {
   evolvePokemon,
   fetchPokemonDetails,
   checkAndLearnNewMove,
+  buildPokemonFromApi,
   type PokemonDetails
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
@@ -1837,19 +1838,12 @@ function MainApp() {
         }
         if (hatchedEggs.length > 0) {
           for (const egg of hatchedEggs) {
+            const built = await buildPokemonFromApi(egg.id, getEffectiveGen(), nextPlayer.level, false, difficulty)
             const hatchedPokemon: Pokemon = {
-              id: egg.id,
-              name: egg.name,
-              sprite: egg.sprite,
+              ...built,
               level: nextPlayer.level,
-              hp: 80,
-              maxHp: 80,
-              attack: 12,
-              defense: 10,
-              speed: 10,
-              moves: [],
-              types: egg.types,
             }
+            registerInPokedex(hatchedPokemon)
             if (newTeam.filter(p => p.hp > 0).length < maxTeamSize) {
               newTeam.push(hatchedPokemon)
               logs.push(`🥚 ¡El Huevo de ${egg.name} ha eclosionado!`)
