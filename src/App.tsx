@@ -1,6 +1,7 @@
-import { useMemo, useState, Component, type ReactNode } from 'react'
+import { useMemo, useState, useEffect, Component, type ReactNode } from 'react'
 import './App.css'
 import { applyDamage, healPokemon, randomFrom, scalePokemonForNode, startRun } from './game/engine'
+import { playHover, playClick, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -346,6 +347,10 @@ function MainApp() {
   const [selectedPokemonDetail, setSelectedPokemonDetail] = useState<PokemonDetails | null>(null)
   const [isLoadingDetail, setIsLoadingDetail] = useState<boolean>(false)
 
+  // Opciones / Volumen
+  const [showOptions, setShowOptions] = useState<boolean>(false)
+  const [volume, setVolumeState] = useState<number>(() => Math.round(getVolume() * 100))
+
   const [pokedex, setPokedex] = useState<Record<number, PokedexEntry>>(() => {
     try {
       const saved = localStorage.getItem('pokerand_pokedex')
@@ -364,6 +369,8 @@ function MainApp() {
   const currentNode = useMemo(() => route[routeIndex] ?? null, [route, routeIndex])
   const activePokemon = useMemo(() => team[activeIndex] ?? null, [team, activeIndex])
   const inventoryEntries = useMemo(() => groupInventory(inventory), [inventory])
+
+  useEffect(() => { startMenuMusic() }, [])
 
   function isGenUnlocked(gen: number): boolean {
     if (gen === 1) return true
@@ -532,6 +539,7 @@ function MainApp() {
         `Recibes $200 de inicio e item: ${run.item}.`
       ])
       setScreen('route')
+      startBattleMusic()
     } catch {
       setApiError('No se pudo cargar PokeAPI. Reintenta en unos segundos.')
     } finally {
@@ -578,6 +586,7 @@ function MainApp() {
       })
 
       setScreen('victory')
+      playVictoryFanfare()
       return
     }
 
@@ -1053,6 +1062,7 @@ function MainApp() {
         const losses = record.losses + 1
         persistRecord(record.wins, losses)
         setScreen('defeat')
+        playDefeatMusic()
         return
       }
 
@@ -1255,6 +1265,7 @@ function MainApp() {
 
   function resetToSetup(): void {
     setScreen('setup')
+    startMenuMusic()
     setTeam([])
     setActiveIndex(0)
     setEnemy(null)
@@ -1298,6 +1309,9 @@ function MainApp() {
         <div className="left-toolbar">
           <button className="tiny-btn" type="button" onClick={() => setShowPokedex(true)}>
             📖 Pokédex ({pokedexList.length})
+          </button>
+          <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowOptions(!showOptions) }} onMouseEnter={playHover}>
+            ⚙️ Opciones
           </button>
           <button className="tiny-btn" type="button" onClick={onRestartRun}>
             Restart
@@ -1682,6 +1696,72 @@ function MainApp() {
         </div>
       )}
 
+      {/* Modal Opciones */}
+      {showOptions && (
+        <div className="modal-backdrop" onClick={() => setShowOptions(false)}>
+          <div className="pokedex-frame" style={{ maxWidth: '380px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="pokedex-top-bar">
+              <div className="big-blue-sensor"></div>
+              <div className="mini-leds">
+                <div className="led red"></div>
+                <div className="led yellow"></div>
+                <div className="led green"></div>
+              </div>
+            </div>
+
+            <div className="pokedex-screen" style={{ padding: '1.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div>
+                  <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
+                    🔊 Volumen de Música
+                  </strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', minWidth: '20px' }}>🔈</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={volume}
+                      onChange={(e) => {
+                        const v = Number(e.target.value)
+                        setVolumeState(v)
+                        setVolume(v / 100)
+                      }}
+                      style={{ flex: 1, accentColor: '#10b981', height: '6px', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', minWidth: '32px', textAlign: 'right' }}>{volume}%</span>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+                  <strong style={{ fontSize: '0.85rem', color: '#94a3b8', display: 'block', marginBottom: '0.35rem' }}>
+                    Modifier activo
+                  </strong>
+                  {modifier ? (
+                    <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '6px', padding: '0.5rem 0.75rem' }}>
+                      <span style={{ color: '#facc15', fontWeight: 'bold', fontSize: '0.9rem' }}>{modifier.name}</span>
+                      <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>{modifier.description}</p>
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Ninguno</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="pokedex-controls">
+              <div className="d-pad" title="D-Pad Options"></div>
+              <button
+                className="pokedex-close-btn"
+                onClick={() => setShowOptions(false)}
+              >
+                CERRAR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {screen === 'setup' && (
         <section className="panel setup-panel">
           <h2>1. Selecciona la Generación</h2>
@@ -1696,7 +1776,8 @@ function MainApp() {
                 <button
                   key={gen}
                   className={`gen-tile ${generation === gen ? 'is-active' : ''} ${!unlocked ? 'is-locked' : ''}`}
-                  onClick={() => handleSelectGeneration(gen)}
+                  onClick={() => { playClick(); handleSelectGeneration(gen) }}
+                  onMouseEnter={playHover}
                   type="button"
                   disabled={isLoading || !unlocked}
                 >
@@ -1728,7 +1809,8 @@ function MainApp() {
                 <button
                   key={0}
                   className={`gen-tile ${generation === 0 ? 'is-active' : ''} ${!randomUnlocked ? 'is-locked' : ''}`}
-                  onClick={() => handleSelectGeneration(0)}
+                  onClick={() => { playClick(); handleSelectGeneration(0) }}
+                  onMouseEnter={playHover}
                   type="button"
                   disabled={isLoading || !randomUnlocked}
                   style={{
@@ -1778,7 +1860,8 @@ function MainApp() {
                 <button
                   key={diff}
                   className={`gen-tile ${difficulty === diff ? 'is-active' : ''} ${isLocked ? 'is-locked' : ''}`}
-                  onClick={() => handleSelectDifficulty(diff)}
+                  onClick={() => { playClick(); handleSelectDifficulty(diff) }}
+                  onMouseEnter={playHover}
                   type="button"
                   disabled={isLoading || isLocked}
                   style={{ opacity: isLocked ? 0.65 : 1, cursor: isLocked ? 'not-allowed' : 'pointer' }}
@@ -1798,10 +1881,10 @@ function MainApp() {
           </div>
 
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '1.5rem' }}>
-            <button className="cta" onClick={startNewRun} type="button" disabled={isLoading}>
+            <button className="cta" onClick={() => { playClick(); startNewRun() }} onMouseEnter={playHover} type="button" disabled={isLoading}>
               {isLoading ? 'Cargando PokeAPI...' : "Iniciar Aventura"}
             </button>
-            <button className="secondary" onClick={() => setShowPokedex(true)} type="button">
+            <button className="secondary" onClick={() => { playClick(); setShowPokedex(true) }} onMouseEnter={playHover} type="button">
               📖 Abrir Pokédex
             </button>
           </div>
