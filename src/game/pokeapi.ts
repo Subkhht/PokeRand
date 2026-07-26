@@ -425,8 +425,9 @@ const HARD_HELD_ITEMS = [
 ]
 
 function applyHardHeldItem(pokemon: Pokemon, difficulty: string, isBoss: boolean): Pokemon {
-  if (difficulty !== 'hard' || pokemon.holdItem) return pokemon
-  const chance = isBoss ? 1.0 : 0.4
+  if (difficulty !== 'hard' && difficulty !== 'infinite') return pokemon
+  if (pokemon.holdItem) return pokemon
+  const chance = isBoss ? 1.0 : difficulty === 'infinite' ? 0.65 : 0.4
   if (Math.random() > chance) return pokemon
   const item = HARD_HELD_ITEMS[Math.floor(Math.random() * HARD_HELD_ITEMS.length)]
   return { ...pokemon, holdItem: item.name }
@@ -453,19 +454,19 @@ export async function getBalancedPokemonByGeneration(
 
   if (difficulty === 'infinite') {
     if (isBoss) {
-      minBst = 500
+      minBst = 580
       maxBst = 999
     } else if (progressRatio < 0.25) {
-      minBst = 280
-      maxBst = 500
+      minBst = 320
+      maxBst = 550
     } else if (progressRatio < 0.50) {
-      minBst = 400
-      maxBst = 600
+      minBst = 440
+      maxBst = 650
     } else if (progressRatio < 0.75) {
-      minBst = 480
-      maxBst = 700
+      minBst = 520
+      maxBst = 750
     } else {
-      minBst = 550
+      minBst = 600
       maxBst = 999
     }
   } else if (difficulty === 'hard') {

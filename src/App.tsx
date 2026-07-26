@@ -1445,7 +1445,7 @@ function MainApp() {
     const item = ALL_SHOP_ITEMS[itemName]
     if (!item) return
     const discount = modifier?.shopDiscount ?? 0
-    const hardMarkup = difficulty === 'hard' ? 1.4 : 1
+    const hardMarkup = difficulty === 'hard' ? 1.4 : difficulty === 'infinite' ? 1.5 : 1
     const finalPrice = Math.floor(item.price * (1 - discount) * hardMarkup)
     if (money < finalPrice) return
 
@@ -1462,7 +1462,7 @@ function MainApp() {
     const item = HOLDABLE_ITEMS[itemName]
     if (!item) return
     const discount = modifier?.shopDiscount ?? 0
-    const hardMarkup = difficulty === 'hard' ? 1.4 : 1
+    const hardMarkup = difficulty === 'hard' ? 1.4 : difficulty === 'infinite' ? 1.5 : 1
     const finalPrice = Math.floor(item.price * (1 - discount) * hardMarkup)
     if (money < finalPrice) return
 
@@ -1532,7 +1532,7 @@ function MainApp() {
       return
     }
     const baseHealCost = 100
-    const hardMarkup = difficulty === 'hard' ? 1.4 : 1
+    const hardMarkup = difficulty === 'hard' ? 1.4 : difficulty === 'infinite' ? 1.5 : 1
     const healCost = Math.floor(baseHealCost * (1 - (modifier?.shopDiscount ?? 0)) * hardMarkup)
     const needsHealing = team.some((pkmn) => pkmn.hp > 0 && pkmn.hp < pkmn.maxHp)
 
@@ -1825,7 +1825,7 @@ function MainApp() {
       const pendingPc: Pokemon[] = []
 
       const baseMoneyReward = Math.floor((40 + nextEnemy.level * 5) / (isTrainerBattle ? trainerTeam.length : 1))
-      const hardMoneyPenalty = difficulty === 'hard' ? 0.6 : 1
+      const hardMoneyPenalty = difficulty === 'hard' ? 0.6 : difficulty === 'infinite' ? 0.5 : 1
       const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoneyReward * (modifier?.moneyMultiplier ?? 1) * hardMoneyPenalty)
       if (!runChallenges.noMoney) setMoney((prev) => prev + moneyReward)
 
@@ -3239,7 +3239,7 @@ function MainApp() {
 
                   {(() => {
                     const needsHealing = team.some((pkmn) => pkmn.hp > 0 && pkmn.hp < pkmn.maxHp)
-                    const healCost = Math.floor(100 * (1 - (modifier?.shopDiscount ?? 0)) * (difficulty === 'hard' ? 1.4 : 1))
+                    const healCost = Math.floor(100 * (1 - (modifier?.shopDiscount ?? 0)) * (difficulty === 'hard' ? 1.4 : difficulty === 'infinite' ? 1.5 : 1))
                     const canAffordAndNeeds = money >= healCost && needsHealing
 
                     return (
