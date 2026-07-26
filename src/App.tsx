@@ -409,6 +409,11 @@ function MainApp() {
 
   // Egglocke
   const [eggInventory, setEggInventory] = useState<Array<{ name: string; sprite: string; types: string[]; hatchIn: number; id: number }>>([])
+
+  const [pcStorage, setPcStorage] = useState<Pokemon[]>([])
+
+  const [pcSwapping, setPcSwapping] = useState<boolean>(false)
+  const [pcSwapFrom, setPcSwapFrom] = useState<{ source: 'team' | 'pc'; index: number } | null>(null)
   const [modifier2, setModifier2] = useState<RunModifier | null>(null)
   const [gauntletKeys, setGauntletKeys] = useState<Array<keyof RunChallenges>>([])
 
@@ -888,10 +893,6 @@ function MainApp() {
   }
 
   function pickRocketPokemon(pokemon: Pokemon): void {
-    if (team.length >= 6) {
-      setBattleLog((prev) => [`Tu equipo está lleno (6/6). No puedes añadir a ${pokemon.name}.`, ...prev].slice(0, 15))
-      return
-    }
     if (runChallenges.soloStarter) {
       setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
       setTeamRocketPickModal(false)
@@ -906,13 +907,23 @@ function MainApp() {
       completeCurrentNode()
       return
     }
-    setTeam((prev) => [...prev, { ...pokemon, hp: Math.floor(pokemon.maxHp / 2) }])
+    const captured = { ...pokemon, hp: Math.floor(pokemon.maxHp / 2) }
+    registerInPokedex(captured)
+    if (team.length >= 6) {
+      setPcStorage((prev) => [...prev, captured])
+      setBattleLog((prev) => [
+        `✅ ¡${pokemon.name} se envió al PC (equipo lleno)!`,
+        ...prev
+      ].slice(0, 15))
+    } else {
+      setTeam((prev) => [...prev, captured])
+      setBattleLog((prev) => [
+        `✅ ¡${pokemon.name} se unió a tu equipo!`,
+        ...prev
+      ].slice(0, 15))
+    }
     setTeamRocketPickModal(false)
     setTeamRocketTeam([])
-    setBattleLog((prev) => [
-      `✅ ¡${pokemon.name} se unió a tu equipo!`,
-      ...prev
-    ].slice(0, 15))
     completeCurrentNode()
   }
 
@@ -931,6 +942,49 @@ function MainApp() {
     }
 
     setBattleLog((prev) => [`Liberaste a ${target.name} del equipo.`, ...prev].slice(0, 15))
+  }
+
+  function withdrawFromPC(pcIndex: number): void {
+    const pokemon = pcStorage[pcIndex]
+    if (!pokemon) return
+    if (runChallenges.soloStarter || runChallenges.fixedTeam) {
+      setBattleLog((prev) => ['🚫 No puedes modificar tu equipo con este desafío.', ...prev].slice(0, 15))
+      return
+    }
+    if (team.length < maxTeamSize) {
+      setTeam((prev) => [...prev, pokemon])
+      setPcStorage((prev) => prev.filter((_, i) => i !== pcIndex))
+      setBattleLog((prev) => [`📦 ${pokemon.name} pasó del PC al equipo.`, ...prev].slice(0, 15))
+    } else {
+      const swapOut = team[activeIndex]
+      const newTeam = team.map((p, i) => i === activeIndex ? pokemon : p)
+      setTeam(newTeam)
+      setPcStorage((prev) => prev.map((p, i) => i === pcIndex ? swapOut : p))
+      setBattleLog((prev) => [`📦 Intercambiaste a ${swapOut.name} por ${pokemon.name} del PC.`, ...prev].slice(0, 15))
+    }
+  }
+
+  function depositToPC(teamIndex: number): void {
+    const pokemon = team[teamIndex]
+    if (!pokemon) return
+    if (runChallenges.soloStarter || runChallenges.fixedTeam) {
+      setBattleLog((prev) => ['🚫 No puedes modificar tu equipo con este desafío.', ...prev].slice(0, 15))
+      return
+    }
+    if (team.length <= 1) {
+      setBattleLog((prev) => ['No puedes depositar a tu único Pokémon.', ...prev].slice(0, 15))
+      return
+    }
+    setPcStorage((prev) => [...prev, pokemon])
+    const newTeam = team.filter((_, i) => i !== teamIndex)
+    setTeam(newTeam)
+    if (activeIndex >= newTeam.length) {
+      const healthyIdx = newTeam.findIndex((p) => p.hp > 0)
+      setActiveIndex(healthyIdx !== -1 ? healthyIdx : 0)
+    } else if (teamIndex < activeIndex) {
+      setActiveIndex((prev) => Math.max(0, prev - 1))
+    }
+    setBattleLog((prev) => [`📦 ${pokemon.name} fue depositado en el PC.`, ...prev].slice(0, 15))
   }
 
   async function handleEvolveTarget(index: number): Promise<void> {
@@ -1349,13 +1403,6 @@ function MainApp() {
   function claimPokeRandPokemon(): void {
     if (pokeRandWinnerIndex === null) return
     const pokemon = pokeRandPokemon[pokeRandWinnerIndex]
-    if (team.length >= maxTeamSize) {
-      setBattleLog((prev) => [
-        `Tu equipo está lleno (${maxTeamSize}/${maxTeamSize}). No puedes añadir a ${pokemon.name}.`,
-        ...prev
-      ].slice(0, 15))
-      return
-    }
     if (runChallenges.soloStarter) {
       setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
       return
@@ -1364,11 +1411,21 @@ function MainApp() {
       setBattleLog((prev) => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
       return
     }
-    setTeam((prev) => [...prev, pokemon])
-    setBattleLog((prev) => [
-      `🎲 ¡PokeRand: ${pokemon.name} se unió a tu equipo!`,
-      ...prev
-    ].slice(0, 15))
+    if (team.length >= maxTeamSize) {
+      setPcStorage((prev) => [...prev, pokemon])
+      registerInPokedex(pokemon)
+      setBattleLog((prev) => [
+        `🎲 ¡PokeRand: ${pokemon.name} se envió al PC (equipo lleno)!`,
+        ...prev
+      ].slice(0, 15))
+    } else {
+      setTeam((prev) => [...prev, pokemon])
+      registerInPokedex(pokemon)
+      setBattleLog((prev) => [
+        `🎲 ¡PokeRand: ${pokemon.name} se unió a tu equipo!`,
+        ...prev
+      ].slice(0, 15))
+    }
     completeCurrentNode()
     setScreen('route')
   }
@@ -1764,6 +1821,7 @@ function MainApp() {
       })
 
       const newTeam = await Promise.all(updatedTeamPromises)
+      const pendingPc: Pokemon[] = []
 
       const baseMoneyReward = Math.floor((80 + nextEnemy.level * 10) / (isTrainerBattle ? trainerTeam.length : 1))
       const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoneyReward * (modifier?.moneyMultiplier ?? 1))
@@ -1782,28 +1840,33 @@ function MainApp() {
         }
         if (hatchedEggs.length > 0) {
           for (const egg of hatchedEggs) {
+            const hatchedPokemon: Pokemon = {
+              id: egg.id,
+              name: egg.name,
+              sprite: egg.sprite,
+              level: nextPlayer.level,
+              hp: 80,
+              maxHp: 80,
+              attack: 12,
+              defense: 10,
+              speed: 10,
+              moves: [],
+              types: egg.types,
+            }
             if (newTeam.filter(p => p.hp > 0).length < maxTeamSize) {
-              const hatchedPokemon: Pokemon = {
-                id: egg.id,
-                name: egg.name,
-                sprite: egg.sprite,
-                level: nextPlayer.level,
-                hp: 80,
-                maxHp: 80,
-                attack: 12,
-                defense: 10,
-                speed: 10,
-                moves: [],
-                types: egg.types,
-              }
               newTeam.push(hatchedPokemon)
               logs.push(`🥚 ¡El Huevo de ${egg.name} ha eclosionado!`)
             } else {
-              logs.push(`🥚 El Huevo de ${egg.name} eclosionó pero tu equipo está lleno.`)
+              pendingPc.push(hatchedPokemon)
+              logs.push(`🥚 El Huevo de ${egg.name} eclosionó y fue enviado al PC.`)
             }
           }
         }
         setEggInventory(remainingEggs)
+      }
+
+      if (pendingPc.length > 0) {
+        setPcStorage((prev) => [...prev, ...pendingPc])
       }
 
       let logMsg = runChallenges.noMoney
@@ -1999,11 +2062,6 @@ function MainApp() {
   function captureRestPokemon(): void {
     if (!restEncounter) return
 
-    if (team.length >= maxTeamSize) {
-      setBattleLog((prev) => ['Tu equipo ya esta completo.', ...prev].slice(0, 15))
-      return
-    }
-
     if (runChallenges.soloStarter) {
       setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
       return
@@ -2017,8 +2075,13 @@ function MainApp() {
     const hpBonus = modifier?.playerMaxHpBonus ?? 0
     const captured = { ...restEncounter, maxHp: restEncounter.maxHp + hpBonus, hp: restEncounter.hp + hpBonus }
     registerInPokedex(captured)
-    setTeam((previous) => [...previous, captured])
-    setBattleLog((prev) => [`Capturaste a ${captured.name}.`, ...prev].slice(0, 15))
+    if (team.length >= maxTeamSize) {
+      setPcStorage((prev) => [...prev, captured])
+      setBattleLog((prev) => [`Capturaste a ${captured.name} y se envió al PC (equipo lleno).`, ...prev].slice(0, 15))
+    } else {
+      setTeam((previous) => [...previous, captured])
+      setBattleLog((prev) => [`Capturaste a ${captured.name}.`, ...prev].slice(0, 15))
+    }
     completeCurrentNode()
   }
 
@@ -2064,6 +2127,9 @@ function MainApp() {
     setSpinRevealed(false)
     setSpinAnimating(false)
     setEggInventory([])
+    setPcStorage([])
+    setPcSwapping(false)
+    setPcSwapFrom(null)
     setSpeedrunSeconds(0)
     if (speedrunTimerRef.current) {
       clearInterval(speedrunTimerRef.current)
@@ -3007,6 +3073,16 @@ function MainApp() {
                       ✕ Quitar {pokemon.holdItem}
                     </button>
                   )}
+                  {pokemon.hp > 0 && team.length > 1 && (
+                    <button
+                      type="button"
+                      className="tiny-btn"
+                      style={{ background: '#3b82f6', color: '#fff', fontSize: '0.6rem', padding: '1px 4px' }}
+                      onClick={(e) => { e.stopPropagation(); depositToPC(index) }}
+                    >
+                      → PC
+                    </button>
+                  )}
                 </div>
               ))}
               {Array.from({ length: Math.max(0, maxTeamSize - team.length) }).map((_, index) => (
@@ -3015,6 +3091,50 @@ function MainApp() {
                 </div>
               ))}
             </div>
+
+            {pcStorage.length > 0 && (
+              <>
+                <p className="label" style={{ marginTop: '0.75rem' }}>PC ({pcStorage.length})</p>
+                <div className="team-grid">
+                  {pcStorage.map((pokemon, index) => (
+                    <div key={`pc-${index}`} className="sprite-tooltip-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <button
+                        className="team-slot"
+                        type="button"
+                        onClick={() => withdrawFromPC(index)}
+                        disabled={isLoading}
+                      >
+                        <img src={pokemon.sprite} alt={pokemon.name} onError={fallbackSprite} />
+                        {pokemon.holdItem && ITEM_SPRITES[pokemon.holdItem] && (
+                          <img
+                            src={ITEM_SPRITES[pokemon.holdItem]}
+                            alt={pokemon.holdItem}
+                            title={`${pokemon.holdItem}: ${HOLDABLE_ITEMS[pokemon.holdItem]?.desc ?? ''}`}
+                            style={{ width: '18px', height: '18px', imageRendering: 'pixelated', position: 'absolute', bottom: '4px', right: '4px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
+                          />
+                        )}
+                        <strong>{pokemon.name}{pokemon.shiny ? ' ✨' : ''}</strong>
+                        <span>{pokemon.hp}/{pokemon.maxHp}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="tiny-btn"
+                        style={{ background: '#3b82f6', color: '#fff', fontSize: '0.6rem', padding: '1px 4px' }}
+                        onClick={() => withdrawFromPC(index)}
+                      >
+                        → Equipo
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {team.length > 1 && pcStorage.length > 0 && (
+              <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem', textAlign: 'center' }}>
+                Haz clic en "→ Equipo" para sacar del PC. Si el equipo está lleno, se intercambia con el activo.
+              </p>
+            )}
           </article>
 
           <article className="panel center-panel">
