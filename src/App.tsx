@@ -411,9 +411,6 @@ function MainApp() {
   const [eggInventory, setEggInventory] = useState<Array<{ name: string; sprite: string; types: string[]; hatchIn: number; id: number }>>([])
 
   const [pcStorage, setPcStorage] = useState<Pokemon[]>([])
-
-  const [pcSwapping, setPcSwapping] = useState<boolean>(false)
-  const [pcSwapFrom, setPcSwapFrom] = useState<{ source: 'team' | 'pc'; index: number } | null>(null)
   const [modifier2, setModifier2] = useState<RunModifier | null>(null)
   const [gauntletKeys, setGauntletKeys] = useState<Array<keyof RunChallenges>>([])
 
@@ -2128,8 +2125,6 @@ function MainApp() {
     setSpinAnimating(false)
     setEggInventory([])
     setPcStorage([])
-    setPcSwapping(false)
-    setPcSwapFrom(null)
     setSpeedrunSeconds(0)
     if (speedrunTimerRef.current) {
       clearInterval(speedrunTimerRef.current)
