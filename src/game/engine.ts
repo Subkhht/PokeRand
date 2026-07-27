@@ -43,14 +43,7 @@ export function scalePokemonForNode(base: Pokemon, node: RouteNode, stepIndex: n
 }
 
 export function applyNoEvolutionBuff(pokemon: Pokemon): Pokemon {
-  return {
-    ...pokemon,
-    attack: Math.floor(pokemon.attack * 1.3),
-    defense: Math.floor(pokemon.defense * 1.3),
-    speed: Math.floor(pokemon.speed * 1.3),
-    maxHp: Math.floor(pokemon.maxHp * 1.3),
-    hp: Math.floor(pokemon.hp * 1.3),
-  }
+  return pokemon
 }
 
 export function generateRoute(): RouteNode[] {

@@ -4,6 +4,7 @@ export interface Move {
   type: string
   accuracy: number | null
   description: string
+  url?: string
 }
 
 export interface RawLevelUpMove {
@@ -32,7 +33,7 @@ export interface Pokemon {
 
 export interface RouteNode {
   id: number
-  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket' | 'spin' | 'pokeRand'
+  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket' | 'spin' | 'pokeRand' | 'move'
   label: string
   done: boolean
 }

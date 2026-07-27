@@ -32,6 +32,9 @@ interface PokeApiPokemon {
 interface EvolutionChainNode {
   species: PokeApiNamedResource
   evolves_to: EvolutionChainNode[]
+  evolution_details?: Array<{
+    evolved_form?: PokeApiNamedResource | null
+  }>
 }
 
 // IDs oficiales de los starters por generación
@@ -148,7 +151,7 @@ async function getSpeciesIdsByGeneration(generation: number): Promise<number[]> 
 }
 
 // 1. Obtiene detalles del movimiento y descarta los de estado/sin daño
-async function getMoveDetails(moveUrl: string): Promise<Move | null> {
+export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
   try {
     const res = await fetch(moveUrl)
     const data = await res.json()
@@ -162,12 +165,18 @@ async function getMoveDetails(moveUrl: string): Promise<Move | null> {
       return null
     }
 
+    const esName = data.names?.find((n: any) => n.language?.name === 'es')?.name
+    const moveName = esName || capitalize(data.name.replace(/-/g, ' '))
+
     return {
-      name: capitalize(data.name.replace(/-/g, ' ')),
+      name: moveName,
       type: data.type.name,
       power: data.power,
       accuracy: data.accuracy ?? 100,
-      description: data.effect_entries.find((e: any) => e.language.name === 'en')?.short_effect || 'Ataque de daño directo.'
+      description: data.effect_entries.find((e: any) => e.language.name === 'es')?.short_effect
+        || data.effect_entries.find((e: any) => e.language.name === 'en')?.short_effect
+        || 'Ataque de daño directo.',
+      url: moveUrl
     }
   } catch {
     return null
@@ -193,10 +202,10 @@ export function getMaxMovePowerForLevel(level: number, difficulty: string = 'med
 
 // Lista de ataques básicos de relleno por si el Pokémon tiene menos de 4 ataques de daño válidos
 const FALLBACK_MOVES: Move[] = [
-  { name: 'Tackle', type: 'normal', power: 40, accuracy: 100, description: 'Ataque físico básico.' },
-  { name: 'Quick Attack', type: 'normal', power: 40, accuracy: 100, description: 'Ataque rápido de daño directo.' },
-  { name: 'Headbutt', type: 'normal', power: 70, accuracy: 100, description: 'Golpe de cabeza potente.' },
-  { name: 'Take Down', type: 'normal', power: 90, accuracy: 85, description: 'Carga contundente de gran impacto.' }
+  { name: 'Placaje', type: 'normal', power: 40, accuracy: 100, description: 'Ataque físico básico.' },
+  { name: 'Ataque Rápido', type: 'normal', power: 40, accuracy: 100, description: 'Ataque rápido de daño directo.' },
+  { name: 'Cabezazo', type: 'normal', power: 70, accuracy: 100, description: 'Golpe de cabeza potente.' },
+  { name: 'Derribo', type: 'normal', power: 90, accuracy: 85, description: 'Carga contundente de gran impacto.' }
 ]
 
 // Procesa movimientos asignando solo aquellos acordes al nivel actual del Pokémon
@@ -340,10 +349,10 @@ export async function checkAndLearnNewMove(
   }
 
   const maxPower = getMaxMovePowerForLevel(newLevel, difficulty)
-  const knownMoveNames = new Set(pokemon.moves.map((m) => m.name))
+  const knownMoveUrls = new Set(pokemon.moves.map((m) => m.url).filter(Boolean))
 
   const candidates = pokemon.rawLevelUpMoves.filter(
-    (m) => m.level <= newLevel && !knownMoveNames.has(m.name)
+    (m) => m.level <= newLevel && !knownMoveUrls.has(m.url)
   )
 
   if (candidates.length === 0) {
@@ -575,6 +584,12 @@ export async function evolvePokemon(currentPokemon: Pokemon): Promise<Pokemon | 
       if (chainNode.species.name.toLowerCase() === currentSpeciesName) {
         if (chainNode.evolves_to && chainNode.evolves_to.length > 0) {
           const randomEvo = randomFrom(chainNode.evolves_to)
+          const validForms = (randomEvo.evolution_details ?? [])
+            .map(d => d.evolved_form?.name)
+            .filter((n): n is string => !!n)
+          if (validForms.length > 0) {
+            return randomFrom(validForms)
+          }
           return randomEvo.species.name
         }
         return null

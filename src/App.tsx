@@ -8,13 +8,14 @@ import {
   evolvePokemon,
   fetchPokemonDetails,
   checkAndLearnNewMove,
+  getMoveDetails,
   buildPokemonFromApi,
   type PokemonDetails
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges } from './game/types'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'victory' | 'defeat'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'victory' | 'defeat'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite'
 
 const difficultyNodeCounts: Record<Difficulty, number> = {
@@ -251,6 +252,8 @@ function nodeTypeLabel(node: RouteNode): string {
       return 'Spin'
     case 'pokeRand':
       return 'PokeRand'
+    case 'move':
+      return 'Move'
     default:
       return node.type
   }
@@ -408,6 +411,11 @@ function MainApp() {
   const [pokeRandWinnerIndex, setPokeRandWinnerIndex] = useState<number | null>(null)
   const [pokeRandRevealed, setPokeRandRevealed] = useState<boolean>(false)
 
+  // Move node (intercambio de movimientos)
+  const [moveOptions, setMoveOptions] = useState<Move[]>([])
+  const [selectedNewMove, setSelectedNewMove] = useState<Move | null>(null)
+  const [moveOptionsByIndex, setMoveOptionsByIndex] = useState<Record<number, Move[]>>({})
+
   // Egglocke
   const [eggInventory, setEggInventory] = useState<Array<{ name: string; sprite: string; types: string[]; hatchIn: number; id: number }>>([])
 
@@ -418,7 +426,6 @@ function MainApp() {
   // Speedrun timer
   const [speedrunSeconds, setSpeedrunSeconds] = useState<number>(0)
   const speedrunTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const speedrunStoppedRef = useRef<boolean>(false)
 
   // Pokédex
   const [showPokedex, setShowPokedex] = useState<boolean>(false)
@@ -591,6 +598,8 @@ function MainApp() {
           type = 'spin'
         } else if (rand < 0.42) {
           type = 'pokeRand'
+        } else if (rand < 0.52) {
+          type = 'move'
         }
       } else {
         if (rand < 0.15 && !runChallenges.noShops) {
@@ -605,7 +614,7 @@ function MainApp() {
     return {
       id,
       type,
-      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : `Ruta ${id}`,
+      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : `Ruta ${id}`,
       done: false
     }
   }
@@ -688,6 +697,7 @@ function MainApp() {
       } else {
         const spinPositions: number[] = []
         const pokeRandPositions: number[] = []
+        const movePositions: number[] = []
         if (difficulty === 'hard') {
           const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
           while (spinPositions.length < 2 && available.length > 0) {
@@ -700,10 +710,21 @@ function MainApp() {
             pokeRandPositions.push(available[idx])
             available.splice(idx, 1)
           }
+          if (available.length > 0) {
+            const idx = Math.floor(Math.random() * available.length)
+            movePositions.push(available[idx])
+            available.splice(idx, 1)
+          }
         } else if (difficulty === 'medium') {
           const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
           const idx = Math.floor(Math.random() * available.length)
           pokeRandPositions.push(available[idx])
+          available.splice(idx, 1)
+          if (available.length > 0) {
+            const idx2 = Math.floor(Math.random() * available.length)
+            movePositions.push(available[idx2])
+            available.splice(idx2, 1)
+          }
         }
 
         for (let i = 1; i < totalNodes; i++) {
@@ -713,6 +734,8 @@ function MainApp() {
             type = 'spin'
           } else if (pokeRandPositions.includes(i)) {
             type = 'pokeRand'
+          } else if (movePositions.includes(i)) {
+            type = 'move'
           } else if (activeChallenges.bossRush) {
             type = 'battle'
           } else if (activeChallenges.allTeamRocket) {
@@ -731,7 +754,7 @@ function MainApp() {
           customRoute.push({
             id: i,
             type,
-            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : `Ruta ${i}`,
+            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : `Ruta ${i}`,
             done: false
           })
         }
@@ -753,6 +776,9 @@ function MainApp() {
       if (activeChallenges.noEvolution) {
         starterWithBonus = applyNoEvolutionBuff(starterWithBonus)
       }
+      if (activeChallenges.fixedLevel) {
+        starterWithBonus = { ...starterWithBonus, level: 50 }
+      }
       setTeam([starterWithBonus])
       setActiveIndex(0)
       setMoney(activeChallenges.noMoney ? 0 : 100)
@@ -773,7 +799,6 @@ function MainApp() {
       setVictoryUnlocks(null)
       setEggInventory([])
       setSpeedrunSeconds(0)
-      speedrunStoppedRef.current = false
       if (speedrunTimerRef.current) {
         clearInterval(speedrunTimerRef.current)
         speedrunTimerRef.current = null
@@ -912,6 +937,7 @@ function MainApp() {
     }
     let captured = { ...pokemon, hp: Math.floor(pokemon.maxHp / 2) }
     if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
+    if (runChallenges.fixedLevel) captured = { ...captured, level: 50 }
     registerInPokedex(captured)
     if (team.length >= 6) {
       const faintedIndex = team.findIndex((p) => p.hp <= 0)
@@ -1027,12 +1053,13 @@ function MainApp() {
       const bonusHp = 15
       const newLevel = evolvedBase.level + extraLevels
       const newMaxHp = evolvedBase.maxHp + bonusHp
+      const hpRatio = targetPokemon.maxHp > 0 ? targetPokemon.hp / targetPokemon.maxHp : 1
 
       const evolvedPlusBoost: Pokemon = {
         ...evolvedBase,
-        level: newLevel,
+        level: runChallenges.fixedLevel ? 50 : newLevel,
         maxHp: newMaxHp,
-        hp: newMaxHp, // Se cura al máximo al evolucionar
+        hp: runChallenges.noHealing ? Math.max(1, Math.floor(newMaxHp * hpRatio)) : newMaxHp,
         attack: Math.round(evolvedBase.attack * 1.15), // +15% Ataque
         defense: Math.round(evolvedBase.defense * 1.15), // +15% Defensa
         speed: Math.round(evolvedBase.speed * 1.10)   // +10% Velocidad
@@ -1042,7 +1069,7 @@ function MainApp() {
       const { updatedPokemon: finalEvolved } = await checkAndLearnNewMove(
         evolvedPlusBoost,
         targetPokemon.level,
-        newLevel,
+        runChallenges.fixedLevel ? 50 : newLevel,
         difficulty
       )
 
@@ -1130,16 +1157,43 @@ function MainApp() {
       return
     }
 
-    if (currentNode.type === 'rest') {
-    if (runChallenges.noHealing) {
-      setBattleLog((prev) => [
-        `🚫 Desafío Sin Curación: Los descansos no curan.`,
-        ...prev
-      ].slice(0, 15))
-      completeCurrentNode()
-      setScreen('route')
+    if (currentNode.type === 'move') {
+      setIsLoading(true)
+      setApiError('')
+      setSelectedNewMove(null)
+      setMoveOptionsByIndex({})
+      try {
+        const pokemon = team[activeIndex]
+        if (!pokemon || !pokemon.rawLevelUpMoves || pokemon.rawLevelUpMoves.length === 0) {
+          setBattleLog((prev) => ['Tu Pokémon no tiene movimientos disponibles para aprender.', ...prev].slice(0, 15))
+          completeCurrentNode()
+          setScreen('route')
+          return
+        }
+        const currentMoveUrls = new Set(pokemon.moves.map(m => m.url).filter(Boolean))
+        const learnable = pokemon.rawLevelUpMoves.filter(m => !currentMoveUrls.has(m.url))
+        const pool = learnable.length >= 2 ? learnable : [...learnable, ...pokemon.rawLevelUpMoves.filter(m => currentMoveUrls.has(m.url))]
+        const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, 10)
+        const allDetails = (await Promise.all(shuffled.map(m => getMoveDetails(m.url)))).filter((m): m is Move => m !== null)
+        const moveDetails = allDetails.slice(0, 2)
+        if (moveDetails.length === 0) {
+          setBattleLog((prev) => ['No se encontraron movimientos compatibles.', ...prev].slice(0, 15))
+          completeCurrentNode()
+          setScreen('route')
+          return
+        }
+        setMoveOptions(moveDetails)
+        setMoveOptionsByIndex({ [activeIndex]: moveDetails })
+        setScreen('move')
+      } catch {
+        setApiError('No se pudieron cargar los movimientos. Reintenta.')
+      } finally {
+        setIsLoading(false)
+      }
       return
     }
+
+    if (currentNode.type === 'rest') {
     setIsLoading(true)
     setApiError('')
 
@@ -1166,7 +1220,9 @@ function MainApp() {
             id: eggId
           }
           setEggInventory(prev => [...prev, eggEntry])
-          const rewardItem = randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry'])
+          const rewardItem = runChallenges.noHealing
+            ? randomFrom(['X Attack', 'X Defense', 'Rare Candy'])
+            : randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry'])
           setRestRewardItem(rewardItem)
           setInventory((previous) => [...previous, rewardItem])
           setBattleLog((prev) => [
@@ -1180,7 +1236,9 @@ function MainApp() {
         }
 
         const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty)
-        const rewardItem = randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry'])
+        const rewardItem = runChallenges.noHealing
+          ? randomFrom(['X Attack', 'X Defense', 'Rare Candy'])
+          : randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry'])
 
         setRestEncounter(generatedEncounter)
         setRestRewardItem(rewardItem)
@@ -1214,7 +1272,7 @@ function MainApp() {
         const fetches = Array.from({ length: teamSize }, () =>
           getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
             .then((base) => {
-              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + extraEnemyLevels, difficulty)
+              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + extraEnemyLevels , difficulty)
               if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
               if (runChallenges.totalRandomizer) {
                 scaled = {
@@ -1257,7 +1315,7 @@ function MainApp() {
         const fetches = Array.from({ length: teamSize }, () =>
           getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny, difficulty)
             .then((base) => {
-              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + extraEnemyLevels, difficulty)
+              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + extraEnemyLevels , difficulty)
               if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
               if (runChallenges.totalRandomizer) {
                 scaled = {
@@ -1303,7 +1361,7 @@ function MainApp() {
         ])
       } else {
         const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
-        let generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + extraEnemyLevels, difficulty)
+        let generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + extraEnemyLevels , difficulty)
         if (runChallenges.fixedLevel) generatedEnemy = { ...generatedEnemy, level: 50 }
         if (runChallenges.totalRandomizer) {
           generatedEnemy = {
@@ -1331,7 +1389,7 @@ function MainApp() {
 
       setScreen('battle')
 
-      if (runChallenges.speedrun && !speedrunStoppedRef.current) {
+      if (runChallenges.speedrun) {
         setSpeedrunSeconds(30)
         if (speedrunTimerRef.current) clearInterval(speedrunTimerRef.current)
         speedrunTimerRef.current = setInterval(() => {
@@ -1427,6 +1485,7 @@ function MainApp() {
       return
     }
     if (runChallenges.noEvolution) pokemon = applyNoEvolutionBuff(pokemon)
+    if (runChallenges.fixedLevel) pokemon = { ...pokemon, level: 50 }
     if (team.length >= maxTeamSize) {
       setPcStorage((prev) => [...prev, pokemon])
       registerInPokedex(pokemon)
@@ -1451,6 +1510,39 @@ function MainApp() {
       `🎲 ¡PokeRand: decidiste no capturar al Pokémon.`,
       ...prev
     ].slice(0, 15))
+    completeCurrentNode()
+    setScreen('route')
+  }
+
+  function replaceTeamMove(moveIndex: number): void {
+    if (!selectedNewMove || !activePokemon) return
+    const nextTeam = team.map((pokemon, index) => {
+      if (index !== activeIndex) return pokemon
+      const newMoves = [...pokemon.moves]
+      const oldName = newMoves[moveIndex].name
+      newMoves[moveIndex] = selectedNewMove
+      return { ...pokemon, moves: newMoves }
+    })
+    setTeam(nextTeam)
+    setBattleLog((prev) => [
+      `📝 ¡${activePokemon.name} reemplazó ${activePokemon.moves[moveIndex].name} por ${selectedNewMove.name}!`,
+      ...prev
+    ].slice(0, 15))
+    setMoveOptions([])
+    setSelectedNewMove(null)
+    setMoveOptionsByIndex({})
+    completeCurrentNode()
+    setScreen('route')
+  }
+
+  function skipMoveNode(): void {
+    setBattleLog((prev) => [
+      `📝 Decidiste no cambiar movimientos.`,
+      ...prev
+    ].slice(0, 15))
+    setMoveOptions([])
+    setSelectedNewMove(null)
+    setMoveOptionsByIndex({})
     completeCurrentNode()
     setScreen('route')
   }
@@ -1668,11 +1760,6 @@ function MainApp() {
       return
     }
 
-    if (runChallenges.speedrun) {
-      if (speedrunTimerRef.current) clearInterval(speedrunTimerRef.current)
-      speedrunStoppedRef.current = true
-    }
-
     const nextTeam = team.map((pokemon, index) => (index === activeIndex ? { ...pokemon } : pokemon))
     let nextPlayer = { ...nextTeam[activeIndex] }
     let nextEnemy = { ...enemy }
@@ -1814,22 +1901,24 @@ function MainApp() {
       const updatedTeamPromises = nextTeam.map(async (pokemon) => {
         if (pokemon.hp <= 0) return pokemon
 
-        const levelsGained = baseLevelsGained
+        const levelsGained = runChallenges.fixedLevel ? 0 : baseLevelsGained
 
-        const hpGain = levelsGained * 4
-        const statBoost = (stat: number) => Math.max(1, Math.round((stat * 0.04) * levelsGained))
+        const hpGain = levelsGained * 3
+        const atkGain = levelsGained * 2
+        const defGain = levelsGained * 2
+        const spdGain = levelsGained * 2
         const oldLevel = pokemon.level
         const newLevel = oldLevel + levelsGained
         const newMaxHp = pokemon.maxHp + hpGain
 
         let updatedPokemon: Pokemon = {
           ...pokemon,
-          level: newLevel,
+          level: runChallenges.fixedLevel ? 50 : newLevel,
           maxHp: newMaxHp,
-          hp: Math.min(newMaxHp, pokemon.hp + Math.round(newMaxHp * 0.20) + hpGain),
-          attack: pokemon.attack + statBoost(pokemon.attack),
-          defense: pokemon.defense + statBoost(pokemon.defense),
-          speed: pokemon.speed + statBoost(pokemon.speed)
+          hp: Math.min(newMaxHp, pokemon.hp + Math.round(newMaxHp * 0.10) + hpGain),
+          attack: pokemon.attack + atkGain,
+          defense: pokemon.defense + defGain,
+          speed: pokemon.speed + spdGain
         }
 
         if (levelsGained > 0) {
@@ -1864,7 +1953,7 @@ function MainApp() {
             const built = await buildPokemonFromApi(egg.id, getEffectiveGen(), nextPlayer.level, false, difficulty)
             const hatchedPokemon: Pokemon = {
               ...built,
-              level: nextPlayer.level,
+              level: runChallenges.fixedLevel ? 50 : nextPlayer.level,
             }
             registerInPokedex(hatchedPokemon)
             if (newTeam.filter(p => p.hp > 0).length < maxTeamSize) {
@@ -1996,6 +2085,26 @@ function MainApp() {
     const target = team[index]
     if (!target || target.hp <= 0 || index === activeIndex) return
     setActiveIndex(index)
+    if (screen === 'move') {
+      setSelectedNewMove(null)
+      if (moveOptionsByIndex[index]) {
+        setMoveOptions(moveOptionsByIndex[index])
+      } else {
+        setMoveOptions([])
+        const pokemon = team[index]
+        if (pokemon?.rawLevelUpMoves && pokemon.rawLevelUpMoves.length > 0) {
+          const currentMoveUrls = new Set(pokemon.moves.map(m => m.url).filter(Boolean))
+          const learnable = pokemon.rawLevelUpMoves.filter(m => !currentMoveUrls.has(m.url))
+          const pool = learnable.length >= 2 ? learnable : [...learnable, ...pokemon.rawLevelUpMoves.filter(m => currentMoveUrls.has(m.url))]
+          const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, 10)
+          Promise.all(shuffled.map(m => getMoveDetails(m.url))).then(moveDetails => {
+            const filtered = moveDetails.filter((m): m is Move => m !== null).slice(0, 2)
+            setMoveOptions(filtered)
+            setMoveOptionsByIndex(prev => ({ ...prev, [index]: filtered }))
+          })
+        }
+      }
+    }
   }
 
   function useInventoryItem(itemName: string): void {
@@ -2089,6 +2198,7 @@ function MainApp() {
     const hpBonus = modifier?.playerMaxHpBonus ?? 0
     let captured = { ...restEncounter, maxHp: restEncounter.maxHp + hpBonus, hp: restEncounter.hp + hpBonus }
     if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
+    if (runChallenges.fixedLevel) captured = { ...captured, level: 50 }
     registerInPokedex(captured)
     if (team.length >= maxTeamSize) {
       setPcStorage((prev) => [...prev, captured])
@@ -2144,7 +2254,6 @@ function MainApp() {
     setEggInventory([])
     setPcStorage([])
     setSpeedrunSeconds(0)
-    speedrunStoppedRef.current = false
     if (speedrunTimerRef.current) {
       clearInterval(speedrunTimerRef.current)
       speedrunTimerRef.current = null
@@ -2152,7 +2261,7 @@ function MainApp() {
   }
 
   function onRestartRun(): void {
-    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand') {
+    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move') {
       resetToSetup()
     }
   }
@@ -2658,7 +2767,6 @@ function MainApp() {
                   onClick={() => { playClick(); pickRocketPokemon(pkmn) }}
                   onMouseEnter={playHover}
                   type="button"
-                  disabled={team.length >= 6}
                 >
                   <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '64px', height: '64px', imageRendering: 'pixelated' }} />
                   <strong style={{ textTransform: 'capitalize' }}>{pkmn.name}</strong>
@@ -2878,7 +2986,7 @@ function MainApp() {
                   { key: 'firstStrike' as const, label: '⚡ Primer Golpe', desc: 'Si atacas primero y no debilitas al rival, recibes recoil del 8% HP.' },
                   { key: 'noCrits' as const, label: '🚫💥 Sin Críticos', desc: 'Se desactivan completamente los golpes críticos.' },
                   { key: 'typeRandomizer' as const, label: '🎲🎯 Tipo Random', desc: 'El tipo de cada movimiento se randomiza cada turno.' },
-                  { key: 'fixedLevel' as const, label: '📊 Nivel Fijo', desc: 'Todos los Pokémon rivales se escalan a nivel 50.' },
+                  { key: 'fixedLevel' as const, label: '📊 Nivel Fijo', desc: 'Todos los Pokémon están en nivel 50, siempre.' },
                 ]
               },
               {
@@ -2984,7 +3092,7 @@ function MainApp() {
         </section>
       )}
 
-      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand') && activePokemon && (
+      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move') && activePokemon && (
         <section className="roulette-layout">
           <article className="panel trainer-panel">
             <p className="muted small-tag">Trainer</p>
@@ -3177,6 +3285,7 @@ function MainApp() {
                 const rocketClass = node.type === 'teamRocket' ? ' node-teamrocket' : ''
                 const spinClass = node.type === 'spin' ? ' node-spin' : ''
                 const pokeRandClass = node.type === 'pokeRand' ? ' node-pokerand' : ''
+                const moveClass = node.type === 'move' ? ' node-move' : ''
                 if (isBlindHidden) {
                   return (
                     <div key={node.id} className={`node pending`} style={{ opacity: 0.4 }}>
@@ -3186,7 +3295,7 @@ function MainApp() {
                   )
                 }
                 return (
-                  <div key={node.id} className={`node ${stateClass}${rocketClass}${spinClass}${pokeRandClass}`}>
+                  <div key={node.id} className={`node ${stateClass}${rocketClass}${spinClass}${pokeRandClass}${moveClass}`}>
                     <span>#{node.id}</span>
                     <strong>{nodeTypeLabel(node)}</strong>
                   </div>
@@ -3399,10 +3508,9 @@ function MainApp() {
                         className="cta pokeRand-cta"
                         onClick={claimPokeRandPokemon}
                         type="button"
-                        disabled={team.length >= maxTeamSize}
                         style={{ width: 'auto', padding: '10px 24px' }}
                       >
-                        Capturar ({team.length}/{maxTeamSize})
+                        {team.length >= maxTeamSize ? `Capturar → PC (${pcStorage.length} en PC)` : `Capturar (${team.length}/${maxTeamSize})`}
                       </button>
                       <button
                         className="secondary"
@@ -3418,6 +3526,68 @@ function MainApp() {
               </div>
             )}
 
+            {screen === 'move' && (
+              <div className="action-block">
+                <h3 style={{ margin: '0 0 0.5rem', color: '#e2e8f0', textAlign: 'center' }}>📝 ¡Move Tutor!</h3>
+                {!selectedNewMove ? (
+                  <>
+                    <p className="muted" style={{ textAlign: 'center', margin: '0 0 0.75rem' }}>
+                      Elige un movimiento para <strong>{activePokemon?.name}</strong> o salta el nodo.
+                    </p>
+                    <div className="moves-grid" style={{ marginBottom: '1rem' }}>
+                      {moveOptions.map((move) => (
+                        <button
+                          key={`move-opt-${move.name}`}
+                          className="move-btn"
+                          type="button"
+                          onClick={() => setSelectedNewMove(move)}
+                          style={{ borderColor: TYPE_COLORS[move.type] ?? '#475569' }}
+                        >
+                          <strong>{move.name}</strong>
+                          <span className="muted" style={{ fontSize: '0.7rem' }}>
+                            {move.type.toUpperCase()} · Pwr {move.power} · Acc {move.accuracy ?? '—'}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <button className="secondary" onClick={skipMoveNode} type="button">
+                        Saltar
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="muted" style={{ textAlign: 'center', margin: '0 0 0.75rem' }}>
+                      <strong style={{ color: TYPE_COLORS[selectedNewMove.type] ?? '#e2e8f0' }}>{selectedNewMove.name}</strong>
+                      {' '} — Elige qué movimiento reemplazar:
+                    </p>
+                    <div className="moves-grid" style={{ marginBottom: '1rem' }}>
+                      {activePokemon?.moves.map((move, idx) => (
+                        <button
+                          key={`move-replace-${idx}`}
+                          className="move-btn"
+                          type="button"
+                          onClick={() => replaceTeamMove(idx)}
+                          style={{ borderColor: TYPE_COLORS[move.type] ?? '#475569' }}
+                        >
+                          <strong>{move.name}</strong>
+                          <span className="muted" style={{ fontSize: '0.7rem' }}>
+                            {move.type.toUpperCase()} · Pwr {move.power}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <button className="secondary" onClick={() => { setSelectedNewMove(null) }} type="button">
+                        ← Volver
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {screen === 'route' && currentNode && currentNode.type === 'rest' && restEncounter && (
               <div className="action-block">
                 <p>
@@ -3428,8 +3598,8 @@ function MainApp() {
                   <img className="sprite" src={restEncounter.sprite} alt={restEncounter.name} onError={fallbackSprite} />
                 </div>
                 <div className="moves-grid" style={{ marginBottom: '1rem' }}>
-                  <button className="cta" onClick={captureRestPokemon} type="button" disabled={team.length >= maxTeamSize}>
-                    Capture
+                  <button className="cta" onClick={captureRestPokemon} type="button">
+                    {team.length >= maxTeamSize ? `Capturar → PC (${pcStorage.length} en PC)` : 'Capture'}
                   </button>
                   <button className="secondary" onClick={skipRestCapture} type="button">
                     Skip

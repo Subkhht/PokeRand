@@ -1344,3 +1344,12 @@ button {
   background: linear-gradient(135deg, #38bdf8, #0284c7) !important;
   box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
 }
+
+.node-move {
+  border-color: #e2e8f0 !important;
+  background: rgba(226, 232, 240, 0.12) !important;
+}
+
+.node-move.current {
+  box-shadow: 0 0 8px rgba(226, 232, 240, 0.5) !important;
+}
