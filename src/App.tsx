@@ -1519,7 +1519,6 @@ function MainApp() {
     const nextTeam = team.map((pokemon, index) => {
       if (index !== activeIndex) return pokemon
       const newMoves = [...pokemon.moves]
-      const oldName = newMoves[moveIndex].name
       newMoves[moveIndex] = selectedNewMove
       return { ...pokemon, moves: newMoves }
     })
