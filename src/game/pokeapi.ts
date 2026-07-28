@@ -122,7 +122,7 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
-function makeShinySprite(sprite: string, id: number): string {
+export function makeShinySprite(sprite: string, id: number): string {
   if (sprite.includes('/animated/')) {
     return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/shiny/${id}.gif`
   }
@@ -158,6 +158,7 @@ const AILMENT_MAP: Record<string, StatusType> = {
   'freeze': 'freeze',
   'sleep': 'sleep',
   'confusion': 'confusion',
+  'flinch': 'flinch',
 }
 
 export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
@@ -189,6 +190,8 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
     const recoilPercent = recoilCategory && rawDrain < 0 ? Math.abs(rawDrain) / 100 : undefined
     const drainPercent = rawDrain > 0 ? rawDrain / 100 : undefined
 
+    const critRateStage: number | undefined = (data.meta?.crit_rate ?? 0) > 0 ? data.meta.crit_rate : undefined
+
     return {
       name: moveName,
       type: data.type.name,
@@ -204,6 +207,7 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
       maxHits,
       recoilPercent,
       drainPercent,
+      critRatio: critRateStage,
     }
   } catch {
     return null

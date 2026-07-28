@@ -11,6 +11,7 @@ import {
   checkAndLearnNewMove,
   getMoveDetails,
   buildPokemonFromApi,
+  makeShinySprite,
   type PokemonDetails
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
@@ -26,6 +27,7 @@ const STATUS_LABELS: Record<StatusType, string> = {
   freeze: '🧊 Congelado',
   sleep: '💤 Dormido',
   confusion: '💫 Confundido',
+  flinch: '❕ Aturdido',
 }
 
 const STATUS_COLORS: Record<StatusType, string> = {
@@ -35,6 +37,7 @@ const STATUS_COLORS: Record<StatusType, string> = {
   freeze: '#38bdf8',
   sleep: '#94a3b8',
   confusion: '#ec4899',
+  flinch: '#facc15',
 }
 
 const difficultyNodeCounts: Record<Difficulty, number> = {
@@ -352,7 +355,7 @@ const RANDOM_EVENTS = [
     weight: 2,
     icon: '✨',
     title: 'Zona Brillante',
-    desc: 'El suelo brilla. Tu próximo encounter tiene 50% chance de ser shiny.',
+    desc: 'El suelo brilla. Tu próximo encuentro de descanso será shiny.',
     minRouteProgress: 0.4,
   },
 ]
@@ -537,6 +540,9 @@ function moveTooltip(move: Move): string {
   }
   if (move.drainPercent) {
     info += `\nDrena: ${Math.round(move.drainPercent * 100)}% HP`
+  }
+  if (move.critRatio && move.critRatio > 0) {
+    info += `\nAlto ratio de crítico`
   }
   info += `\n${move.description}`
   return info
@@ -1130,7 +1136,7 @@ function MainApp() {
       }
       case 'shiny_spot': {
         setShinyNextEncounter(true)
-        setBattleLog(prev => [`✨ ¡La zona brilla! Tu próximo encounter será especial.`, ...prev])
+        setBattleLog(prev => [`✨ ¡La zona brilla! Tu próximo encuentro de descanso será shiny.`, ...prev])
         break
       }
     }
@@ -1301,32 +1307,34 @@ function MainApp() {
         const spinPositions: number[] = []
         const pokeRandPositions: number[] = []
         const movePositions: number[] = []
-        if (effectiveDifficulty === 'hard') {
-          const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
-          while (spinPositions.length < 2 && available.length > 0) {
-            const idx = Math.floor(rr() * available.length)
-            spinPositions.push(available[idx])
-            available.splice(idx, 1)
-          }
-          while (pokeRandPositions.length < 2 && available.length > 0) {
+        if (!activeChallenges.allTeamRocket) {
+          if (effectiveDifficulty === 'hard') {
+            const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
+            while (spinPositions.length < 2 && available.length > 0) {
+              const idx = Math.floor(rr() * available.length)
+              spinPositions.push(available[idx])
+              available.splice(idx, 1)
+            }
+            while (pokeRandPositions.length < 2 && available.length > 0) {
+              const idx = Math.floor(rr() * available.length)
+              pokeRandPositions.push(available[idx])
+              available.splice(idx, 1)
+            }
+            if (available.length > 0) {
+              const idx = Math.floor(rr() * available.length)
+              movePositions.push(available[idx])
+              available.splice(idx, 1)
+            }
+          } else if (effectiveDifficulty === 'medium') {
+            const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
             const idx = Math.floor(rr() * available.length)
             pokeRandPositions.push(available[idx])
             available.splice(idx, 1)
-          }
-          if (available.length > 0) {
-            const idx = Math.floor(rr() * available.length)
-            movePositions.push(available[idx])
-            available.splice(idx, 1)
-          }
-        } else if (effectiveDifficulty === 'medium') {
-          const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
-          const idx = Math.floor(rr() * available.length)
-          pokeRandPositions.push(available[idx])
-          available.splice(idx, 1)
-          if (available.length > 0) {
-            const idx2 = Math.floor(rr() * available.length)
-            movePositions.push(available[idx2])
-            available.splice(idx2, 1)
+            if (available.length > 0) {
+              const idx2 = Math.floor(rr() * available.length)
+              movePositions.push(available[idx2])
+              available.splice(idx2, 1)
+            }
           }
         }
 
@@ -1906,6 +1914,12 @@ function MainApp() {
         const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty)
         if (!runChallenges.allShiny && Math.random() < 0.02) {
           generatedEncounter.shiny = true
+          generatedEncounter.sprite = makeShinySprite(generatedEncounter.sprite, generatedEncounter.id)
+        }
+        if (shinyNextEncounter) {
+          generatedEncounter.shiny = true
+          generatedEncounter.sprite = makeShinySprite(generatedEncounter.sprite, generatedEncounter.id)
+          setShinyNextEncounter(false)
         }
         const rewardItem = runChallenges.noHealing
           ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
@@ -2044,10 +2058,6 @@ function MainApp() {
             defense: generatedEnemy.defense + Math.floor(Math.random() * 20) - 10,
             speed: generatedEnemy.speed + Math.floor(Math.random() * 20) - 10,
           }
-        }
-        if (shinyNextEncounter) {
-          generatedEnemy = { ...generatedEnemy, shiny: true }
-          setShinyNextEncounter(false)
         }
         setIsTrainerBattle(false)
         setTrainerTeam([])
@@ -2415,6 +2425,12 @@ function MainApp() {
         }
         break
       }
+      case 'flinch': {
+        skipTurn = true
+        updated = { ...updated, status: undefined }
+        logs.push(`❕ ${updated.name} está aturdido y pierde su turno.`)
+        break
+      }
     }
 
     if (updated.hp <= 0) {
@@ -2437,6 +2453,7 @@ function MainApp() {
       freeze: 999,
       sleep: Math.floor(Math.random() * 2) + 2,
       confusion: Math.floor(Math.random() * 3) + 2,
+      flinch: 1,
     }
 
     return {
@@ -2464,11 +2481,12 @@ function MainApp() {
 
     // Burn halves attacker's physical attack
     const burnNerf = attacker.status?.type === 'burn' ? 0.5 : 1
+    const paralysisSpdNerf = attacker.status?.type === 'paralysis' ? 0.75 : 1
 
     const effectiveAttacker: Pokemon = {
       ...attacker,
       attack: Math.round(attacker.attack * (1 + (attackerItem?.attackMod ?? 0) + playerAtkMod) * burnNerf),
-      speed: Math.round(attacker.speed * (1 + (attackerItem?.speedMod ?? 0) + playerSpdMod) + enemySpdDelta)
+      speed: Math.round(attacker.speed * (1 + (attackerItem?.speedMod ?? 0) + playerSpdMod) * paralysisSpdNerf + enemySpdDelta)
     }
     const effectiveDefender: Pokemon = {
       ...defender,
@@ -2484,6 +2502,10 @@ function MainApp() {
     const secondaryType = defTypes[1] || undefined
 
     const { effectiveness, message } = getTypeEffectiveness(effectiveMove.type, primaryType, secondaryType)
+
+    // --- STAB (Same-Type Attack Bonus) ---
+    const attackerTypes: string[] = (attacker as any).types ?? []
+    const stabBonus = attackerTypes.some(t => t === effectiveMove.type) ? 1.5 : 1
 
     // --- Accuracy check ---
     if (move.accuracy !== null && move.accuracy < 100) {
@@ -2510,7 +2532,7 @@ function MainApp() {
 
     for (let hit = 0; hit < totalHits; hit++) {
       const result = applyDamage(effectiveAttacker, currentDefender, effectiveMove, enemyBoost)
-      let finalDamage = Math.floor(result.damage * effectiveness)
+      let finalDamage = Math.floor(result.damage * effectiveness * stabBonus)
       if (attackerItem?.damageBoost) {
         finalDamage = Math.floor(finalDamage * (1 + attackerItem.damageBoost))
       }
@@ -2524,8 +2546,11 @@ function MainApp() {
         finalDamage = Math.floor(finalDamage * (1 - defenderItem.damageReduction))
       }
 
+      // --- Crit: base from items/modifiers + move crit stage ---
       const modCrit = !isEnemyHit ? (modifier?.playerCritChance ?? 0) : 0
-      const totalCrit = (attackerItem?.critChance ?? 0) + modCrit
+      const moveCritStage = move.critRatio ?? 0
+      const moveCritChance = moveCritStage >= 3 ? 0.5 : moveCritStage === 2 ? 0.25 : moveCritStage === 1 ? 0.125 : 0
+      const totalCrit = (attackerItem?.critChance ?? 0) + modCrit + moveCritChance
       const isCrit = !runChallenges.noCrits && totalCrit > 0 && Math.random() < totalCrit
       if (isCrit) {
         finalDamage = Math.floor(finalDamage * 1.5)
@@ -2553,6 +2578,12 @@ function MainApp() {
         const ailmentLabel = STATUS_LABELS[ailmentedDefender.status.type]
         lines.push(`${currentDefender.name} fue ${ailmentLabel.split(' ')[1]} ${ailmentLabel.split(' ')[0]}.`)
       }
+    }
+
+    // --- Fire thaws frozen ---
+    if (effectiveMove.type === 'fire' && currentDefender.status?.type === 'freeze' && currentDefender.hp > 0) {
+      currentDefender = { ...currentDefender, status: undefined }
+      lines.push(`🔥 ¡El ataque de fuego descongeló a ${currentDefender.name}!`)
     }
 
     // --- Recoil damage ---
@@ -2677,8 +2708,10 @@ function MainApp() {
 
     const playerItem = nextPlayer.holdItem ? HOLDABLE_ITEMS[nextPlayer.holdItem] : null
     const enemyItem = nextEnemy.holdItem ? HOLDABLE_ITEMS[nextEnemy.holdItem] : null
-    const playerEffectiveSpeed = Math.round(nextPlayer.speed * (1 + (playerItem?.speedMod ?? 0)))
-    const enemyEffectiveSpeed = Math.round(nextEnemy.speed * (1 + (enemyItem?.speedMod ?? 0)))
+    const playerParalysisNerf = nextPlayer.status?.type === 'paralysis' ? 0.75 : 1
+    const enemyParalysisNerf = nextEnemy.status?.type === 'paralysis' ? 0.75 : 1
+    const playerEffectiveSpeed = Math.round(nextPlayer.speed * (1 + (playerItem?.speedMod ?? 0)) * playerParalysisNerf)
+    const enemyEffectiveSpeed = Math.round(nextEnemy.speed * (1 + (enemyItem?.speedMod ?? 0)) * enemyParalysisNerf)
     const playerStarts = playerEffectiveSpeed >= enemyEffectiveSpeed
 
     const doPlayerAttack = async () => {
@@ -2935,6 +2968,10 @@ function MainApp() {
                 const hasAliveAfter = remainingTeam.some((p) => p.hp > 0)
                 if (hasAliveAfter) {
                   setTeam(remainingTeam)
+                  if (activeIndex >= remainingTeam.length) {
+                    const healthyIdx = remainingTeam.findIndex((p) => p.hp > 0)
+                    setActiveIndex(healthyIdx !== -1 ? healthyIdx : 0)
+                  }
                   setTimeout(() => { setTeamRocketStealMessage(''); completeCurrentNode() }, 3000)
                 } else {
                   setTimeout(() => {
@@ -4342,6 +4379,9 @@ function MainApp() {
                     const data = consumable ?? holdable!
                     const itemIcon = ITEM_SPRITES[itemName]
                     const isHoldable = !!holdable
+                    const hardMarkup = difficulty === 'hard' ? 1.4 : difficulty === 'infinite' ? 1.5 : 1
+                    const finalPrice = Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0)) * hardMarkup)
+                    const canBuy = money >= finalPrice
 
                     return (
                       <div
@@ -4374,16 +4414,16 @@ function MainApp() {
                           className="tiny-btn"
                           type="button"
                           onClick={() => isHoldable ? buyHoldableItem(itemName) : buyShopItem(itemName)}
-                          disabled={money < Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0)))}
+                          disabled={!canBuy}
                           style={{
-                            background: money >= Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0))) ? '#10b981' : '#475569',
+                            background: canBuy ? '#10b981' : '#475569',
                             minWidth: '70px',
-                            color: money >= Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0))) ? '#0f172a' : '#cbd5e1',
+                            color: canBuy ? '#0f172a' : '#cbd5e1',
                             fontWeight: 'bold',
-                            cursor: money >= Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0))) ? 'pointer' : 'not-allowed'
+                            cursor: canBuy ? 'pointer' : 'not-allowed'
                           }}
                         >
-                          ${Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0)))}
+                          ${finalPrice}
                         </button>
                       </div>
                     )
@@ -4613,10 +4653,10 @@ function MainApp() {
             {screen === 'route' && currentNode && currentNode.type === 'rest' && restEncounter && (
               <div className="action-block">
                 <p>
-                  Rest stop: <strong>{restEncounter.name}</strong> is waiting to be captured.
+                  Rest stop: <strong>{restEncounter.name}{restEncounter.shiny ? ' ✨' : ''}</strong> is waiting to be captured.
                 </p>
                 <p className="muted">Reward item added: {restRewardItem}</p>
-                <div className="capture-card">
+                <div className="capture-card" style={restEncounter.shiny ? { border: '2px solid #facc15', boxShadow: '0 0 12px rgba(250,204,21,0.4)' } : undefined}>
                   <img className="sprite" src={restEncounter.sprite} alt={restEncounter.name} onError={fallbackSprite} />
                 </div>
                 <div className="moves-grid" style={{ marginBottom: '1rem' }}>
@@ -4954,7 +4994,7 @@ function MainApp() {
 
       {/* Achievement Popup */}
       {newAchievement && (
-        <div style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 9999, background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', border: '2px solid #facc15', borderRadius: '16px', padding: '1rem 1.5rem', boxShadow: '0 0 30px rgba(250,204,21,0.3)', animation: 'slideInRight 0.5s ease', maxWidth: '300px' }}>
+        <div style={{ position: 'fixed', top: '20px', right: '20px', left: '20px', zIndex: 9999, background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', border: '2px solid #facc15', borderRadius: '16px', padding: '1rem 1.5rem', boxShadow: '0 0 30px rgba(250,204,21,0.3)', animation: 'slideInRight 0.5s ease', maxWidth: '300px', marginLeft: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <span style={{ fontSize: '2rem' }}>{newAchievement.icon}</span>
           <div>

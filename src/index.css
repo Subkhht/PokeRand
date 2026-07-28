@@ -44,3 +44,23 @@ h2 {
   margin-bottom: 6px;
   letter-spacing: 0;
 }
+
+@media (max-width: 768px) {
+  #root {
+    padding: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  #root {
+    padding: 4px;
+  }
+
+  h1 {
+    font-size: clamp(1rem, 4vw, 1.3rem);
+  }
+
+  h2 {
+    font-size: 0.95rem;
+  }
+}

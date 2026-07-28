@@ -1,4 +1,4 @@
-export type StatusType = 'burn' | 'poison' | 'paralysis' | 'freeze' | 'sleep' | 'confusion'
+export type StatusType = 'burn' | 'poison' | 'paralysis' | 'freeze' | 'sleep' | 'confusion' | 'flinch'
 
 export interface StatusCondition {
   type: StatusType
@@ -19,6 +19,7 @@ export interface Move {
   maxHits?: number
   recoilPercent?: number
   drainPercent?: number
+  critRatio?: number
 }
 
 export interface RawLevelUpMove {
