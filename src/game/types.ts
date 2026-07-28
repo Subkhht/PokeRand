@@ -1,3 +1,11 @@
+export type StatusType = 'burn' | 'poison' | 'paralysis' | 'freeze' | 'sleep' | 'confusion'
+
+export interface StatusCondition {
+  type: StatusType
+  turns: number
+  damage?: number
+}
+
 export interface Move {
   name: string
   power: number
@@ -5,6 +13,12 @@ export interface Move {
   accuracy: number | null
   description: string
   url?: string
+  ailment?: StatusType
+  ailmentChance?: number
+  minHits?: number
+  maxHits?: number
+  recoilPercent?: number
+  drainPercent?: number
 }
 
 export interface RawLevelUpMove {
@@ -29,6 +43,7 @@ export interface Pokemon {
   rawLevelUpMoves?: RawLevelUpMove[]
   holdItem?: string | null
   shiny?: boolean
+  status?: StatusCondition
 }
 
 export interface RouteNode {
@@ -106,5 +121,48 @@ export interface ShopItem {
   price: number
   description: string
   type: 'heal' | 'buff' | 'level' | 'revive'
-  value: number // Cantidad de cura o buff
+  value: number
+}
+
+export interface RunStats {
+  battlesWon: number
+  battlesLost: number
+  totalDamageDealt: number
+  totalDamageTaken: number
+  critsLanded: number
+  superEffectiveHits: number
+  koFirstTurn: number
+  captures: number
+  itemsUsed: number
+  moneySpent: number
+  moneyEarned: number
+  nodesCleared: number
+  teamSizeMax: number
+  lowestHPEver: number
+  totalTurns: number
+  pokemonUsed: string[]
+  challengesActive: string[]
+}
+
+export interface Achievement {
+  id: string
+  name: string
+  desc: string
+  icon: string
+  hidden: boolean
+}
+
+export interface AchievementState {
+  [id: string]: { unlocked: boolean; date: string }
+}
+
+export interface MetaProgression {
+  pokeCoins: number
+  totalRuns: number
+  totalWins: number
+  bestStreak: number
+  unlockedStarters: string[]
+  permanentlyUnlockedItems: string[]
+  ownedThemes: string[]
+  activeTheme: string
 }

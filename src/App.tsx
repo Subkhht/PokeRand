@@ -1,10 +1,11 @@
 import { useMemo, useState, useEffect, useRef, Component, type ReactNode } from 'react'
 import './App.css'
-import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, startRun, generateBossRushRoute, ALL_TYPES } from './game/engine'
+import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
 import { playHover, playClick, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
+  getRandomPokemonByGeneration,
   evolvePokemon,
   fetchPokemonDetails,
   checkAndLearnNewMove,
@@ -13,10 +14,28 @@ import {
   type PokemonDetails
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
-import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges } from './game/types'
+import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType, StatusCondition } from './game/types'
 
 type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'victory' | 'defeat'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite'
+
+const STATUS_LABELS: Record<StatusType, string> = {
+  burn: '🔥 Quemado',
+  poison: '☠️ Envenenado',
+  paralysis: '⚡ Paralizado',
+  freeze: '🧊 Congelado',
+  sleep: '💤 Dormido',
+  confusion: '💫 Confundido',
+}
+
+const STATUS_COLORS: Record<StatusType, string> = {
+  burn: '#f97316',
+  poison: '#a855f7',
+  paralysis: '#eab308',
+  freeze: '#38bdf8',
+  sleep: '#94a3b8',
+  confusion: '#ec4899',
+}
 
 const difficultyNodeCounts: Record<Difficulty, number> = {
   easy: 5,
@@ -53,30 +72,42 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'Potion': { price: 50, desc: 'Restaura 25 HP de un Pokémon.' },
   'Super Potion': { price: 100, desc: 'Restaura 50 HP de un Pokémon.' },
   'Hyper Potion': { price: 160, desc: 'Restaura 120 HP de un Pokémon.' },
-  'Full Restore': { price: 300, desc: 'Restaura todo el HP del Pokémon activo.' },
+  'Full Restore': { price: 300, desc: 'Restaura todo el HP y cura estados.' },
   'Oran Berry': { price: 30, desc: 'Restaura 15 HP de un Pokémon.' },
-  'Lum Berry': { price: 60, desc: 'Restaura 30 HP de un Pokémon.' },
+  'Lum Berry': { price: 60, desc: 'Restaura 30 HP y cura estados.' },
   'X Attack': { price: 75, desc: 'Aumenta permanentemente en +5 el ataque.' },
   'X Defense': { price: 75, desc: 'Aumenta permanentemente en +5 la defensa.' },
   'X Speed': { price: 75, desc: 'Aumenta permanentemente en +5 la velocidad.' },
-  'Full Heal': { price: 80, desc: 'Restaura 40 HP del Pokémon activo.' },
+  'Full Heal': { price: 80, desc: 'Restaura 40 HP y cura estados.' },
   'Revive': { price: 150, desc: 'Revive a un Pokémon debilitado con el 50% de su HP.' },
-  'Max Revive': { price: 300, desc: 'Revive a un Pokémon debilitado con el HP completo.' }
+  'Max Revive': { price: 300, desc: 'Revive a un Pokémon debilitado con el HP completo.' },
+  'Elixir': { price: 120, desc: 'Restaura 80 HP de un Pokémon.' },
+  'Super Elixir': { price: 250, desc: 'Restaura 200 HP de un Pokémon.' },
+  'Full Elixir': { price: 400, desc: 'Restaura todo el HP y cura todos los estados.' },
+  'X Attack 2': { price: 150, desc: 'Aumenta permanentemente en +10 el ataque.' },
+  'X Defense 2': { price: 150, desc: 'Aumenta permanentemente en +10 la defensa.' },
+  'X Speed 2': { price: 150, desc: 'Aumenta permanentemente en +10 la velocidad.' },
 }
 
 const itemDescriptions: Record<string, string> = {
   Potion: 'Restaura 25 HP al Pokémon activo.',
   'Super Potion': 'Restaura 50 HP al Pokémon activo.',
   'Hyper Potion': 'Restaura 120 HP al Pokémon activo.',
-  'Full Restore': 'Restaura todo el HP del Pokémon activo.',
+  'Full Restore': 'Restaura todo el HP y cura estados.',
   'X Attack': 'Aumenta permanentemente en +5 el ataque.',
   'X Defense': 'Aumenta permanentemente en +5 la defensa.',
   'X Speed': 'Aumenta permanentemente en +5 la velocidad.',
   'Oran Berry': 'Restaura 15 HP al Pokémon activo.',
-  'Lum Berry': 'Restaura 30 HP al Pokémon activo.',
-  'Full Heal': 'Restaura 40 HP al Pokémon activo.',
+  'Lum Berry': 'Restaura 30 HP y cura estados.',
+  'Full Heal': 'Restaura 40 HP y cura estados.',
   'Revive': 'Revive a un Pokémon debilitado con 50% HP.',
-  'Max Revive': 'Revive a un Pokémon debilitado con el HP completo.'
+  'Max Revive': 'Revive a un Pokémon debilitado con el HP completo.',
+  'Elixir': 'Restaura 80 HP al Pokémon activo.',
+  'Super Elixir': 'Restaura 200 HP al Pokémon activo.',
+  'Full Elixir': 'Restaura todo el HP y cura estados.',
+  'X Attack 2': 'Aumenta permanentemente en +10 el ataque.',
+  'X Defense 2': 'Aumenta permanentemente en +10 la defensa.',
+  'X Speed 2': 'Aumenta permanentemente en +10 la velocidad.',
 }
 
 const ITEM_SPRITES: Record<string, string> = {
@@ -112,6 +143,21 @@ const ITEM_SPRITES: Record<string, string> = {
   'Guts Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/muscle-band.png',
   'Vest Protector': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/assault-vest.png',
   'Focus Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/focus-band.png',
+  'Rare Candy': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rare-candy.png',
+  'Elixir': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/elixir.png',
+  'Super Elixir': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-elixir.png',
+  'Full Elixir': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-potion.png',
+  'X Attack 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-attack.png',
+  'X Defense 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-defense.png',
+  'X Speed 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-speed.png',
+  'Dragon Fang': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dragon-fang.png',
+  'Guardian Charm': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/guard-spec.png',
+  'Berserker Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/macho-brace.png',
+  'Phantom Cloak': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/black-sludge.png',
+  'Swift Feather': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png',
+  'Iron Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/iron-ball.png',
+  'Vampire Fang': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/float-stone.png',
+  'Cursed Blade': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/razor-claw.png',
 }
 
 interface HoldableItem {
@@ -152,9 +198,224 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Guts Band': { name: 'Guts Band', desc: '+20% Ataque, +15% daño bajo 30% HP', price: 300, attackMod: 0.20, lowHpBonus: 0.15 },
   'Vest Protector': { name: 'Vest Protector', desc: '+25% Defensa, 15% Reducción daño', price: 400, defenseMod: 0.25, damageReduction: 0.15 },
   'Focus Band': { name: 'Focus Band', desc: '25% Crítico, +10% Ataque', price: 300, critChance: 0.25, attackMod: 0.10 },
+  'Dragon Fang': { name: 'Dragon Fang', desc: '+20% Ataque, +10% Velocidad', price: 350, attackMod: 0.20, speedMod: 0.10 },
+  'Guardian Charm': { name: 'Guardian Charm', desc: '+15% Defensa, +10 HP máximos', price: 300, defenseMod: 0.15, maxHpMod: 10 },
+  'Berserker Band': { name: 'Berserker Band', desc: '+30% Ataque bajo 25% HP', price: 400, attackMod: 0.10, lowHpBonus: 0.30 },
+  'Phantom Cloak': { name: 'Phantom Cloak', desc: '10% Reducción daño, +10% Velocidad', price: 350, damageReduction: 0.10, speedMod: 0.10 },
+  'Swift Feather': { name: 'Swift Feather', desc: '+15% Velocidad, 10% Crítico', price: 300, speedMod: 0.15, critChance: 0.10 },
+  'Iron Ball': { name: 'Iron Ball', desc: '+25% Defensa, -10% Velocidad', price: 250, defenseMod: 0.25, speedMod: -0.10 },
+  'Vampire Fang': { name: 'Vampire Fang', desc: '15% Robo de Vida', price: 350, lifesteal: 0.15 },
+  'Cursed Blade': { name: 'Cursed Blade', desc: '+35% Ataque, -5 HP por turno', price: 450, attackMod: 0.35, healPerTurn: -5 },
 }
 
 const HOLDABLE_ITEM_NAMES = Object.keys(HOLDABLE_ITEMS)
+
+const ACHIEVEMENTS: Achievement[] = [
+  { id: 'first_win', name: 'Primera Victoria', desc: 'Gana tu primera partida', icon: '🏆', hidden: false },
+  { id: 'streak_3', name: 'En Racha', desc: 'Gana 3 partidas seguidas', icon: '🔥', hidden: false },
+  { id: 'streak_5', name: 'Incombustible', desc: 'Gana 5 partidas seguidas', icon: '🌋', hidden: false },
+  { id: 'streak_10', name: 'Leyenda Viva', desc: 'Gana 10 partidas seguidas', icon: '👑', hidden: false },
+  { id: 'nuzlocke_win', name: 'Superviviente', desc: 'Gana una partida con Nuzlocke', icon: '💀', hidden: false },
+  { id: 'solo_win', name: 'Uno Contra Todos', desc: 'Gana con solo 1 Pokémon en el equipo', icon: '⭐', hidden: false },
+  { id: 'speedrun_win', name: 'Relámpago', desc: 'Gana una partida con Speedrun activo', icon: '⚡', hidden: false },
+  { id: 'no_item_win', name: 'Purista', desc: 'Gana sin usar items', icon: '🚫', hidden: false },
+  { id: 'ironman_win', name: 'Invencible', desc: 'Gana una partida Ironman', icon: '🛡️', hidden: false },
+  { id: 'perfect_battle', name: 'Flawless', desc: 'Gana un combate sin recibir daño', icon: '✨', hidden: true },
+  { id: 'one_shot', name: 'Golpe Definitivo', desc: 'Derrota a un Pokémon enemigo en 1 golpe', icon: '💥', hidden: true },
+  { id: 'comeback', name: 'Resurgir', desc: 'Gana un combate con solo 1 Pokémon con ≤10% HP', icon: '❤️‍🔥', hidden: true },
+  { id: 'collector_10', name: 'Coleccionista', desc: 'Captura 10 Pokémon en una partida', icon: '📦', hidden: false },
+  { id: 'collector_25', name: 'Maestro Pokédex', desc: 'Captura 25 Pokémon en una partida', icon: '📖', hidden: false },
+  { id: 'rich', name: 'Magnate', desc: 'Acumula $999 en una partida', icon: '💰', hidden: true },
+  { id: 'crit_master', name: 'Crítico Nato', desc: 'Lanza 5 golpes críticos en una partida', icon: '🎯', hidden: true },
+  { id: 'all_gens', name: 'Viajero Multiversal', desc: 'Gana al menos 1 partida en cada generación', icon: '🌍', hidden: false },
+  { id: 'infinite_20', name: 'Infinito y Más Allá', desc: 'Llega al nodo 20 en modo Infinite', icon: '🚀', hidden: false },
+  { id: 'shiny_catch', name: 'Afortunado', desc: 'Captura un Pokémon shiny', icon: '✨', hidden: true },
+  { id: 'legendary_catch', name: 'Cazador de Leyendas', desc: 'Captura un Pokémon con BST ≥ 600', icon: '🐉', hidden: true },
+  { id: 'daily_3', name: 'Habitual', desc: 'Juega  desafíos diarios', icon: '📅', hidden: false },
+  { id: 'meta_100', name: 'Inversor', desc: 'Acumula 100 PokéCoins', icon: '🪙', hidden: false },
+  { id: 'boss_rush_win', name: 'Rush Total', desc: 'Gana una partida Boss Rush', icon: '🏆', hidden: false },
+  { id: 'hard_win', name: 'Veterano', desc: 'Gana una partida en dificultad Hard', icon: '🎖️', hidden: false },
+  { id: 'gauntlet_win', name: 'Gauntlet Master', desc: 'Gana una partida Challenge Gauntlet', icon: '🎯', hidden: false },
+  { id: 'synergy_master', name: 'Maestro de Sinergias', desc: 'Activa una sinergia de items', icon: '🔗', hidden: true },
+]
+
+const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (pokemon: Pokemon) => Partial<Pokemon> }> = [
+  {
+    items: ['Life Orb', 'Guts Band'],
+    name: 'Furia Desatada',
+    desc: '+20% daño adicional y +20% a bajo HP',
+    effect: (p) => ({ attack: Math.round(p.attack * 1.1) })
+  },
+  {
+    items: ['Choice Band', 'Choice Scarf'],
+    name: 'Elección Absoluta',
+    desc: '+15% a todos los stats ofensivos',
+    effect: (p) => ({ attack: Math.round(p.attack * 1.1), speed: Math.round(p.speed * 1.1) })
+  },
+  {
+    items: ['Leftovers', 'Sitrus Berry'],
+    name: 'Regeneración Total',
+    desc: '+4 HP/turno extra',
+    effect: (p) => ({ maxHp: p.maxHp + 10, hp: Math.min(p.hp + 10, p.maxHp + 10) })
+  },
+  {
+    items: ['Scope Lens', 'Wide Lens'],
+    name: 'Ojo de Águila',
+    desc: '+15% crítico adicional y +5% SPD',
+    effect: (p) => ({ speed: Math.round(p.speed * 1.05) })
+  },
+  {
+    items: ['Shell Bell', 'Big Root'],
+    name: 'Vampirismo Extremo',
+    desc: '+10% lifesteal adicional',
+    effect: (p) => ({ attack: Math.round(p.attack * 1.05) })
+  },
+  {
+    items: ['Assault Vest', 'Vest Protector'],
+    name: 'Fortaleza Total',
+    desc: '+10% defensa y +10 maxHP',
+    effect: (p) => ({ defense: Math.round(p.defense * 1.1), maxHp: p.maxHp + 10, hp: Math.min(p.hp + 10, p.maxHp + 10) })
+  },
+  {
+    items: ['Muscle Band', 'Focus Band'],
+    name: 'Potencia Bruta',
+    desc: '+10% ataque y +5% crítico',
+    effect: (p) => ({ attack: Math.round(p.attack * 1.1) })
+  },
+  {
+    items: ['Quick Claw', 'Choice Scarf'],
+    name: 'Velocidad Límite',
+    desc: '+15% velocidad',
+    effect: (p) => ({ speed: Math.round(p.speed * 1.15) })
+  },
+  {
+    items: ['Rocky Helmet', 'Babiri Berry'],
+    name: 'Castigo Reflejado',
+    desc: '+15 defensa permanente',
+    effect: (p) => ({ defense: p.defense + 15 })
+  },
+  {
+    items: ['Eviolite', 'Focus Sash'],
+    name: 'Juventud Eterna',
+    desc: '+10% a todos los stats',
+    effect: (p) => ({
+      attack: Math.round(p.attack * 1.1),
+      defense: Math.round(p.defense * 1.1),
+      speed: Math.round(p.speed * 1.1),
+    })
+  },
+]
+
+const RANDOM_EVENTS = [
+  {
+    id: 'legendary_appears',
+    weight: 3,
+    icon: '🐉',
+    title: '¡Pokémon Legendario!',
+    desc: 'Un Pokémon poderoso aparece delante de ti. ¿Capturarlo?',
+    minRouteProgress: 0.5,
+  },
+  {
+    id: 'mysterious_trader',
+    weight: 5,
+    icon: '🎭',
+    title: 'Comerciante Misterioso',
+    desc: 'Un extraño ofrece intercambiar uno de tus Pokémon por uno más fuerte.',
+    minRouteProgress: 0.3,
+  },
+  {
+    id: 'trap',
+    weight: 6,
+    icon: '⚠️',
+    title: '¡Trampa de Team Rocket!',
+    desc: 'Una bomba explota. Tu Pokémon activo pierde 30% HP.',
+    minRouteProgress: 0.2,
+  },
+  {
+    id: 'fairy_blessing',
+    weight: 5,
+    icon: '🧚',
+    title: 'Bendición del Hada',
+    desc: 'Un hada te bendice. Tu Pokémon activo recupera HP completo.',
+    minRouteProgress: 0.1,
+  },
+  {
+    id: 'treasure_chest',
+    weight: 4,
+    icon: '📦',
+    title: 'Cofre del Tesoro',
+    desc: 'Encuentras un cofre con una poción y dinero.',
+    minRouteProgress: 0.0,
+  },
+  {
+    id: 'shiny_spot',
+    weight: 2,
+    icon: '✨',
+    title: 'Zona Brillante',
+    desc: 'El suelo brilla. Tu próximo encounter tiene 50% chance de ser shiny.',
+    minRouteProgress: 0.4,
+  },
+]
+
+const THEMES: Array<{ id: string; name: string; desc: string; price: number; colors: Record<string, string> }> = [
+  { id: 'dark', name: 'Oscuro (Default)', desc: 'El tema clásico oscuro', price: 0, colors: { bg: '#0f172a', surface: '#1e293b', border: '#334155', text: '#f8fafc', accent: '#38bdf8', muted: '#94a3b8' } },
+  { id: 'retro', name: 'Retro Game Boy', desc: 'Verde y negro clásico', price: 50, colors: { bg: '#0f380f', surface: '#1a5c1a', border: '#306230', text: '#9bbc0f', accent: '#9bbc0f', muted: '#306230' } },
+  { id: 'light', name: 'Claro', desc: 'Tema blanco limpio', price: 40, colors: { bg: '#f1f5f9', surface: '#ffffff', border: '#cbd5e1', text: '#1e293b', accent: '#2563eb', muted: '#94a3b8' } },
+  { id: 'neon', name: 'Neón Cyberpunk', desc: 'Rosa neón y negro', price: 75, colors: { bg: '#0a0a0f', surface: '#1a1a2e', border: '#e94560', text: '#e2e8f0', accent: '#e94560', muted: '#7c7c9a' } },
+  { id: 'crimson', name: 'Carmesí', desc: 'Rojo oscuro y dorado', price: 75, colors: { bg: '#1a0000', surface: '#2d0a0a', border: '#8b0000', text: '#ffd700', accent: '#ff4444', muted: '#8b4513' } },
+  { id: 'ocean', name: 'Océano Profundo', desc: 'Azules y turquesa', price: 60, colors: { bg: '#001220', surface: '#001f3f', border: '#0074D9', text: '#e2e8f0', accent: '#7FDBFF', muted: '#39CCCC' } },
+  { id: 'forest', name: 'Bosque Encantado', desc: 'Verdes y tierra', price: 60, colors: { bg: '#0d1f0d', surface: '#1a2e1a', border: '#2d5a27', text: '#d4edda', accent: '#28a745', muted: '#6b8e23' } },
+]
+
+interface MetaShopItem {
+  id: string
+  name: string
+  desc: string
+  price: number
+  spriteKey: string
+  category: 'consumable' | 'holdable' | 'theme'
+}
+
+const META_SHOP_ITEMS: MetaShopItem[] = [
+  { id: 'unlock_hyper_potion', name: 'Hyper Potion', desc: 'Restaura 120 HP. Aparece en tiendas.', price: 30, spriteKey: 'Hyper Potion', category: 'consumable' },
+  { id: 'unlock_full_restore', name: 'Full Restore', desc: 'Cura total. Aparece en tiendas.', price: 60, spriteKey: 'Full Restore', category: 'consumable' },
+  { id: 'unlock_max_revive', name: 'Max Revive', desc: 'Revive con HP completo.', price: 80, spriteKey: 'Max Revive', category: 'consumable' },
+  { id: 'unlock_rare_candy', name: 'Rare Candy', desc: 'Sube 1 nivel. Aparece en drops.', price: 40, spriteKey: 'Rare Candy', category: 'consumable' },
+  { id: 'unlock_elixir', name: 'Elixir', desc: 'Restaura 80 HP.', price: 25, spriteKey: 'Elixir', category: 'consumable' },
+  { id: 'unlock_super_elixir', name: 'Super Elixir', desc: 'Restaura 200 HP.', price: 50, spriteKey: 'Super Elixir', category: 'consumable' },
+  { id: 'unlock_full_elixir', name: 'Full Elixir', desc: 'Restaura todo HP y cura estados.', price: 80, spriteKey: 'Full Elixir', category: 'consumable' },
+  { id: 'unlock_x_attack_2', name: 'X Attack 2', desc: '+10 ataque permanente.', price: 45, spriteKey: 'X Attack 2', category: 'consumable' },
+  { id: 'unlock_x_defense_2', name: 'X Defense 2', desc: '+10 defensa permanente.', price: 45, spriteKey: 'X Defense 2', category: 'consumable' },
+  { id: 'unlock_x_speed_2', name: 'X Speed 2', desc: '+10 velocidad permanente.', price: 45, spriteKey: 'X Speed 2', category: 'consumable' },
+  { id: 'unlock_muscle_band', name: 'Muscle Band', desc: '+15% Ataque.', price: 40, spriteKey: 'Muscle Band', category: 'holdable' },
+  { id: 'unlock_wise_glasses', name: 'Wise Glasses', desc: '+15% Velocidad.', price: 40, spriteKey: 'Wise Glasses', category: 'holdable' },
+  { id: 'unlock_choice_band', name: 'Choice Band', desc: '+25% Ataque.', price: 70, spriteKey: 'Choice Band', category: 'holdable' },
+  { id: 'unlock_leftovers', name: 'Leftovers', desc: 'Recupera 6 HP por turno.', price: 60, spriteKey: 'Leftovers', category: 'holdable' },
+  { id: 'unlock_focus_sash', name: 'Focus Sash', desc: '+20 HP máximos.', price: 50, spriteKey: 'Focus Sash', category: 'holdable' },
+  { id: 'unlock_assault_vest', name: 'Assault Vest', desc: '+20% Defensa.', price: 60, spriteKey: 'Assault Vest', category: 'holdable' },
+  { id: 'unlock_quick_claw', name: 'Quick Claw', desc: '+20% Velocidad.', price: 50, spriteKey: 'Quick Claw', category: 'holdable' },
+  { id: 'unlock_eviolite', name: 'Eviolite', desc: '+10% Ataque y Defensa.', price: 40, spriteKey: 'Eviolite', category: 'holdable' },
+  { id: 'unlock_life_orb', name: 'Life Orb', desc: '+30% Daño, -5 HP/turno.', price: 100, spriteKey: 'Life Orb', category: 'holdable' },
+  { id: 'unlock_rocky_helmet', name: 'Rocky Helmet', desc: '+15% Defensa.', price: 40, spriteKey: 'Rocky Helmet', category: 'holdable' },
+  { id: 'unlock_scope_lens', name: 'Scope Lens', desc: '20% Golpe Crítico.', price: 70, spriteKey: 'Scope Lens', category: 'holdable' },
+  { id: 'unlock_shell_bell', name: 'Shell Bell', desc: '20% Lifesteal.', price: 90, spriteKey: 'Shell Bell', category: 'holdable' },
+  { id: 'unlock_choice_scarf', name: 'Choice Scarf', desc: '+30% Velocidad.', price: 70, spriteKey: 'Choice Scarf', category: 'holdable' },
+  { id: 'unlock_babiri_berry', name: 'Babiri Berry', desc: '20% Reducción de Daño.', price: 50, spriteKey: 'Babiri Berry', category: 'holdable' },
+  { id: 'unlock_big_root', name: 'Big Root', desc: '25% Lifesteal.', price: 90, spriteKey: 'Big Root', category: 'holdable' },
+  { id: 'unlock_wide_lens', name: 'Wide Lens', desc: '15% Crítico, +10% Velocidad.', price: 40, spriteKey: 'Wide Lens', category: 'holdable' },
+  { id: 'unlock_sitrus_berry', name: 'Sitrus Berry', desc: '+15 HP máx, +8 HP/turno.', price: 40, spriteKey: 'Sitrus Berry', category: 'holdable' },
+  { id: 'unlock_guts_band', name: 'Guts Band', desc: '+20% ATK, +15% bajo 30% HP.', price: 60, spriteKey: 'Guts Band', category: 'holdable' },
+  { id: 'unlock_vest_protector', name: 'Vest Protector', desc: '+25% DEF, -15% daño.', price: 80, spriteKey: 'Vest Protector', category: 'holdable' },
+  { id: 'unlock_focus_band', name: 'Focus Band', desc: '25% Crítico, +10% ATK.', price: 60, spriteKey: 'Focus Band', category: 'holdable' },
+  { id: 'unlock_dragon_fang', name: 'Dragon Fang', desc: '+20% ATK, +10% Velocidad.', price: 70, spriteKey: 'Dragon Fang', category: 'holdable' },
+  { id: 'unlock_guardian_charm', name: 'Guardian Charm', desc: '+15% DEF, +10 HP máx.', price: 60, spriteKey: 'Guardian Charm', category: 'holdable' },
+  { id: 'unlock_berserker_band', name: 'Berserker Band', desc: '+30% ATK bajo 25% HP.', price: 80, spriteKey: 'Berserker Band', category: 'holdable' },
+  { id: 'unlock_phantom_cloak', name: 'Phantom Cloak', desc: '10% Reducción, +10% Vel.', price: 70, spriteKey: 'Phantom Cloak', category: 'holdable' },
+  { id: 'unlock_swift_feather', name: 'Swift Feather', desc: '+15% Vel, 10% Crítico.', price: 60, spriteKey: 'Swift Feather', category: 'holdable' },
+  { id: 'unlock_iron_ball', name: 'Iron Ball', desc: '+25% DEF, -10% Vel.', price: 50, spriteKey: 'Iron Ball', category: 'holdable' },
+  { id: 'unlock_vampire_fang', name: 'Vampire Fang', desc: '15% Lifesteal.', price: 70, spriteKey: 'Vampire Fang', category: 'holdable' },
+  { id: 'unlock_cursed_blade', name: 'Cursed Blade', desc: '+35% ATK, -5 HP/turno.', price: 90, spriteKey: 'Cursed Blade', category: 'holdable' },
+]
 
 function fallbackSprite(e: React.SyntheticEvent<HTMLImageElement>) {
   const img = e.currentTarget
@@ -234,6 +495,8 @@ interface PokedexEntry {
   name: string
   sprite: string
   types: string[]
+  seen: boolean
+  caught: boolean
 }
 
 function nodeTypeLabel(node: RouteNode): string {
@@ -260,8 +523,23 @@ function nodeTypeLabel(node: RouteNode): string {
 }
 
 function moveTooltip(move: Move): string {
-  const accuracy = move.accuracy === null ? 'Always hits' : `${move.accuracy}% accuracy`
-  return `${move.name}\nPower: ${move.power}\n${accuracy}\n${move.description}`
+  const accuracy = move.accuracy === null ? 'Siempre acierta' : `${move.accuracy}% precisión`
+  let info = `${move.name}\nPotencia: ${move.power}\n${accuracy}`
+  if (move.ailment) {
+    const chance = move.ailmentChance ? ` (${Math.round(move.ailmentChance * 100)}%)` : ''
+    info += `\nEfecto: ${STATUS_LABELS[move.ailment]}${chance}`
+  }
+  if (move.minHits && move.maxHits) {
+    info += `\nGolpes: ${move.minHits}-${move.maxHits}`
+  }
+  if (move.recoilPercent) {
+    info += `\nRecoil: ${Math.round(move.recoilPercent * 100)}%`
+  }
+  if (move.drainPercent) {
+    info += `\nDrena: ${Math.round(move.drainPercent * 100)}% HP`
+  }
+  info += `\n${move.description}`
+  return info
 }
 
 function getEffectiveStats(pokemon: Pokemon): { attack: number; defense: number; speed: number; maxHp: number } {
@@ -441,7 +719,18 @@ function MainApp() {
   const [pokedex, setPokedex] = useState<Record<number, PokedexEntry>>(() => {
     try {
       const saved = localStorage.getItem('pokerand_pokedex')
-      return saved ? JSON.parse(saved) : {}
+      if (!saved) return {}
+      const parsed = JSON.parse(saved)
+      const migrated: Record<number, PokedexEntry> = {}
+      for (const [key, val] of Object.entries(parsed) as [string, any][]) {
+        const id = Number(key)
+        migrated[id] = {
+          ...val,
+          seen: val.seen ?? true,
+          caught: val.caught ?? true
+        }
+      }
+      return migrated
     } catch {
       return {}
     }
@@ -452,6 +741,49 @@ function MainApp() {
     const losses = Number(localStorage.getItem('pokerand_losses') ?? '0')
     return { wins, losses }
   })
+
+  const [winStreak, setWinStreak] = useState<number>(() => Number(localStorage.getItem('pokerand_streak') ?? '0'))
+  const [bestStreak, setBestStreak] = useState<number>(() => Number(localStorage.getItem('pokerand_best_streak') ?? '0'))
+  const [runStats, setRunStats] = useState<RunStats>({
+    battlesWon: 0, battlesLost: 0, totalDamageDealt: 0, totalDamageTaken: 0,
+    critsLanded: 0, superEffectiveHits: 0, koFirstTurn: 0, captures: 0,
+    itemsUsed: 0, moneySpent: 0, moneyEarned: 0, nodesCleared: 0,
+    teamSizeMax: 1, lowestHPEver: 999, totalTurns: 0, pokemonUsed: [],
+    challengesActive: []
+  })
+  const [achievements, setAchievements] = useState<AchievementState>(() => {
+    try {
+      const saved = localStorage.getItem('pokerand_achievements')
+      return saved ? JSON.parse(saved) : {}
+    } catch { return {} }
+  })
+  const [metaProgression, setMetaProgression] = useState<MetaProgression>(() => {
+    try {
+      const saved = localStorage.getItem('pokerand_meta')
+      if (saved) return JSON.parse(saved)
+    } catch {}
+    return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark' }
+  })
+  const [showAchievements, setShowAchievements] = useState<boolean>(false)
+  const [newAchievement, setNewAchievement] = useState<Achievement | null>(null)
+  const [shinyNextEncounter, setShinyNextEncounter] = useState<boolean>(false)
+  const [dailySeed, setDailySeed] = useState<string>(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
+  })
+  const dailySeedRef = useRef(dailySeed)
+  const [dailyPlayed, setDailyPlayed] = useState<boolean>(() => {
+    try { return localStorage.getItem('pokerand_daily') === dailySeedRef.current } catch { return false }
+  })
+  const [isDailyRun, setIsDailyRun] = useState<boolean>(false)
+  const isDailyRunRef = useRef(false)
+
+  const [synergyActive, setSynergyActive] = useState<string | null>(null)
+  const [activeRandomEvent, setActiveRandomEvent] = useState<{ id: string; icon: string; title: string; desc: string } | null>(null)
+  const [traderModal, setTraderModal] = useState<boolean>(false)
+  const [randomEventUsed, setRandomEventUsed] = useState<Set<string>>(new Set())
+  const [showMetaShop, setShowMetaShop] = useState<boolean>(false)
+  const [unlockPopup, setUnlockPopup] = useState<{ name: string; spriteKey: string } | null>(null)
 
   const currentNode = useMemo(() => route[routeIndex] ?? null, [route, routeIndex])
   const activePokemon = useMemo(() => team[activeIndex] ?? null, [team, activeIndex])
@@ -476,11 +808,106 @@ function MainApp() {
       })
       const losses = record.losses + 1
       persistRecord(record.wins, losses)
+      if (isDailyRunRef.current) {
+        setDailyPlayed(true)
+        localStorage.setItem('pokerand_daily', dailySeed)
+      }
       setScreen('defeat')
       playDefeatMusic()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [speedrunSeconds])
+
+  useEffect(() => {
+    const theme = THEMES.find(t => t.id === metaProgression.activeTheme) ?? THEMES[0]
+    const root = document.documentElement
+    if (theme.id === 'dark') {
+      root.style.removeProperty('--surface')
+      root.style.removeProperty('--border')
+      root.style.removeProperty('--text')
+      root.style.removeProperty('--accent')
+      root.style.removeProperty('--muted')
+    } else {
+      root.style.setProperty('--surface', theme.colors.surface)
+      root.style.setProperty('--border', theme.colors.border)
+      root.style.setProperty('--text', theme.colors.text)
+      root.style.setProperty('--accent', theme.colors.accent)
+      root.style.removeProperty('--muted')
+      root.style.setProperty('--muted', theme.colors.muted)
+    }
+    document.body.style.color = theme.colors.text
+  }, [metaProgression.activeTheme])
+
+  function buyMetaItem(item: MetaShopItem & { category: 'consumable' | 'holdable' | 'theme' }): void {
+    if (metaProgression.pokeCoins < item.price) return
+    if (item.category === 'theme') {
+      if (metaProgression.ownedThemes.includes(item.id)) return
+      const updated = { ...metaProgression, pokeCoins: metaProgression.pokeCoins - item.price, ownedThemes: [...metaProgression.ownedThemes, item.id] }
+      setMetaProgression(updated)
+      localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+      setUnlockPopup({ name: item.name, spriteKey: 'Potion' })
+      setTimeout(() => setUnlockPopup(null), 3000)
+      return
+    }
+    if (metaProgression.permanentlyUnlockedItems.includes(item.id)) return
+    const updated = { ...metaProgression, pokeCoins: metaProgression.pokeCoins - item.price, permanentlyUnlockedItems: [...metaProgression.permanentlyUnlockedItems, item.id] }
+    setMetaProgression(updated)
+    localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+    setUnlockPopup({ name: item.name, spriteKey: 'spriteKey' in item ? (item as MetaShopItem).spriteKey : 'Potion' })
+    setTimeout(() => setUnlockPopup(null), 3000)
+  }
+
+  function setTheme(themeId: string): void {
+    if (!metaProgression.ownedThemes.includes(themeId)) return
+    const updated = { ...metaProgression, activeTheme: themeId }
+    setMetaProgression(updated)
+    localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+  }
+
+  const LOCKED_CONSUMABLE_MAP: Record<string, string> = {
+    unlock_hyper_potion: 'Hyper Potion',
+    unlock_full_restore: 'Full Restore',
+    unlock_max_revive: 'Max Revive',
+    unlock_rare_candy: 'Rare Candy',
+    unlock_elixir: 'Elixir',
+    unlock_super_elixir: 'Super Elixir',
+    unlock_full_elixir: 'Full Elixir',
+    unlock_x_attack_2: 'X Attack 2',
+    unlock_x_defense_2: 'X Defense 2',
+    unlock_x_speed_2: 'X Speed 2',
+  }
+  const LOCKED_HOLDABLE_MAP: Record<string, string> = {
+    unlock_muscle_band: 'Muscle Band',
+    unlock_wise_glasses: 'Wise Glasses',
+    unlock_choice_band: 'Choice Band',
+    unlock_leftovers: 'Leftovers',
+    unlock_focus_sash: 'Focus Sash',
+    unlock_assault_vest: 'Assault Vest',
+    unlock_quick_claw: 'Quick Claw',
+    unlock_eviolite: 'Eviolite',
+    unlock_life_orb: 'Life Orb',
+    unlock_rocky_helmet: 'Rocky Helmet',
+    unlock_scope_lens: 'Scope Lens',
+    unlock_shell_bell: 'Shell Bell',
+    unlock_choice_scarf: 'Choice Scarf',
+    unlock_babiri_berry: 'Babiri Berry',
+    unlock_big_root: 'Big Root',
+    unlock_wide_lens: 'Wide Lens',
+    unlock_sitrus_berry: 'Sitrus Berry',
+    unlock_guts_band: 'Guts Band',
+    unlock_vest_protector: 'Vest Protector',
+    unlock_focus_band: 'Focus Band',
+    unlock_dragon_fang: 'Dragon Fang',
+    unlock_guardian_charm: 'Guardian Charm',
+    unlock_berserker_band: 'Berserker Band',
+    unlock_phantom_cloak: 'Phantom Cloak',
+    unlock_swift_feather: 'Swift Feather',
+    unlock_iron_ball: 'Iron Ball',
+    unlock_vampire_fang: 'Vampire Fang',
+    unlock_cursed_blade: 'Cursed Blade',
+  }
+  const isConsumableUnlocked = (name: string) => !Object.values(LOCKED_CONSUMABLE_MAP).includes(name) || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_CONSUMABLE_MAP[k] === name)
+  const isHoldableUnlocked = (name: string) => !Object.values(LOCKED_HOLDABLE_MAP).includes(name) || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_HOLDABLE_MAP[k] === name)
 
   function isGenUnlocked(gen: number): boolean {
     if (gen === 1) return true
@@ -557,6 +984,36 @@ function MainApp() {
       }
 
       if (isNaN(pokemonId) || !pokemonId) return prev
+      if (prev[pokemonId]?.caught) return prev
+
+      const updated: Record<number, PokedexEntry> = {
+        ...prev,
+        [pokemonId]: {
+          id: pokemonId,
+          name: pokemon.name,
+          sprite: pokemon.sprite,
+          types: (pokemon as any).types ?? [],
+          seen: true,
+          caught: true
+        }
+      }
+      localStorage.setItem('pokerand_pokedex', JSON.stringify(updated))
+      return updated
+    })
+  }
+
+  function seenInPokedex(pokemon: Pokemon): void {
+    setPokedex((prev) => {
+      let pokemonId = Number(pokemon.id)
+
+      if (isNaN(pokemonId) && pokemon.sprite) {
+        const match = pokemon.sprite.match(/\/(\d+)\.(png|gif)/)
+        if (match) {
+          pokemonId = parseInt(match[1], 10)
+        }
+      }
+
+      if (isNaN(pokemonId) || !pokemonId) return prev
       if (prev[pokemonId]) return prev
 
       const updated: Record<number, PokedexEntry> = {
@@ -565,7 +1022,9 @@ function MainApp() {
           id: pokemonId,
           name: pokemon.name,
           sprite: pokemon.sprite,
-          types: (pokemon as any).types ?? []
+          types: (pokemon as any).types ?? [],
+          seen: true,
+          caught: false
         }
       }
       localStorage.setItem('pokerand_pokedex', JSON.stringify(updated))
@@ -577,6 +1036,150 @@ function MainApp() {
     localStorage.setItem('pokerand_wins', String(nextWins))
     localStorage.setItem('pokerand_losses', String(nextLosses))
     setRecord({ wins: nextWins, losses: nextLosses })
+  }
+
+  function unlockAchievement(id: string): void {
+    setAchievements(prev => {
+      if (prev[id]?.unlocked) return prev
+      const updated = { ...prev, [id]: { unlocked: true, date: new Date().toISOString() } }
+      localStorage.setItem('pokerand_achievements', JSON.stringify(updated))
+      const achievement = ACHIEVEMENTS.find(a => a.id === id)
+      if (achievement) setNewAchievement(achievement)
+      return updated
+    })
+  }
+
+  function checkAchievements(): void {
+    if (runStats.captures >= 10) unlockAchievement('collector_10')
+    if (runStats.captures >= 25) unlockAchievement('collector_25')
+    if (runStats.moneyEarned >= 999) unlockAchievement('rich')
+    if (runStats.critsLanded >= 5) unlockAchievement('crit_master')
+    if (runStats.koFirstTurn >= 1) unlockAchievement('one_shot')
+    if (metaProgression.pokeCoins >= 100) unlockAchievement('meta_100')
+  }
+
+  function awardPokeCoins(amount: number, reason: string): void {
+    setMetaProgression(prev => {
+      const updated = { ...prev, pokeCoins: prev.pokeCoins + amount }
+      localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+      return updated
+    })
+    setBattleLog(prev => [`🪙 +${amount} PokéCoins (${reason})`, ...prev])
+  }
+
+  function detectSynergy(pkmn: Pokemon): string | null {
+    if (!pkmn.holdItem) return null
+    for (const syn of SYNERGIES) {
+      if (syn.items.includes(pkmn.holdItem)) {
+        const otherItem = syn.items.find(i => i !== pkmn.holdItem)
+        const hasOther = team.some(t => t.holdItem === otherItem && t.name !== pkmn.name)
+        if (hasOther) return syn.name
+      }
+    }
+    return null
+  }
+
+  function triggerRandomEvent(routeProgress: number): void {
+    if (Math.random() > 0.25) return
+    const eligible = RANDOM_EVENTS.filter(e => routeProgress >= e.minRouteProgress && !randomEventUsed.has(e.id))
+    if (eligible.length === 0) return
+    const totalWeight = eligible.reduce((s, e) => s + e.weight, 0)
+    let roll = Math.random() * totalWeight
+    for (const event of eligible) {
+      roll -= event.weight
+      if (roll <= 0) {
+        setActiveRandomEvent({ id: event.id, icon: event.icon, title: event.title, desc: event.desc })
+        setRandomEventUsed(prev => new Set(prev).add(event.id))
+        return
+      }
+    }
+  }
+
+  function handleRandomEventChoice(): void {
+    if (!activeRandomEvent) return
+    const event = activeRandomEvent
+    setActiveRandomEvent(null)
+    const current = team[activeIndex]
+    if (!current) return
+
+    switch (event.id) {
+      case 'legendary_appears': {
+        const legendaryIds = [144,145,146,150,151,243,244,245,249,250,251,377,378,379,380,381,382,383,384,385,480,481,482,483,484,485,486,487,488,491,492,493,494,638,639,640,641,642,643,644,645,646,647,648,649]
+          const id = legendaryIds[Math.floor(Math.random() * legendaryIds.length)]
+          const sprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+          const legendary: Pokemon = {
+            id, name: `legendary-${id}`, sprite,
+            level: current.level + 5, hp: current.maxHp + 40, maxHp: current.maxHp + 40,
+            attack: current.attack + 20, defense: current.defense + 10, speed: current.speed + 10,
+            moves: [...current.moves], types: ['normal']
+          }
+          setBattleLog(prev => [`🐉 ¡Un Pokémon legendario apareció!`, ...prev])
+          setEnemy(legendary)
+          setScreen('battle')
+        break
+      }
+      case 'mysterious_trader': {
+        setTraderModal(true)
+        break
+      }
+      case 'trap': {
+        const dmg = Math.floor(current.maxHp * 0.3)
+        setTeam(prev => prev.map((p, i) => i === activeIndex ? { ...p, hp: Math.max(1, p.hp - dmg) } : p))
+        setBattleLog(prev => [`⚠️ ¡La trampa explotó! ${current.name} perdió ${dmg} HP.`, ...prev])
+        break
+      }
+      case 'fairy_blessing': {
+        setTeam(prev => prev.map((p, i) => i === activeIndex ? { ...p, hp: p.maxHp } : p))
+        setBattleLog(prev => [`🧚 ¡${current.name} fue curado completamente!`, ...prev])
+        break
+      }
+      case 'treasure_chest': {
+        const gold = 50 + Math.floor(Math.random() * 100)
+        setMoney(prev => prev + gold)
+        const items = ['Potion', 'X Attack', 'Oran Berry', 'Lum Berry']
+        const item = items[Math.floor(Math.random() * items.length)]
+        setInventory(prev => [...prev, item])
+        setBattleLog(prev => [`📦 ¡Cofre abierto! +$${gold} y ${item}`, ...prev])
+        break
+      }
+      case 'shiny_spot': {
+        setShinyNextEncounter(true)
+        setBattleLog(prev => [`✨ ¡La zona brilla! Tu próximo encounter será especial.`, ...prev])
+        break
+      }
+    }
+  }
+
+  async function handleTraderChoice(index: number): Promise<void> {
+    setTraderModal(false)
+    const traded = team[index]
+    if (!traded) return
+    try {
+      const gen = currentRunGen === 0 ? 1 : currentRunGen
+      const newPkmn = await getRandomPokemonByGeneration(gen)
+      const scaled: Pokemon = {
+        ...newPkmn,
+        level: traded.level,
+        hp: newPkmn.maxHp + (traded.level - 10) * 3,
+        maxHp: newPkmn.maxHp + (traded.level - 10) * 3,
+        attack: newPkmn.attack + (traded.level - 10) * 2,
+        defense: newPkmn.defense + (traded.level - 10) * 2,
+        speed: newPkmn.speed + (traded.level - 10) * 2,
+      }
+      scaled.hp = scaled.maxHp
+      registerInPokedex(scaled)
+      setTeam(prev => prev.map((p, i) => i === index ? scaled : p))
+      if (index === activeIndex) {
+        setActiveIndex(0)
+      }
+      setBattleLog(prev => [`🎭 El comerciante intercambió a ${traded.name} por ${scaled.name}!`, ...prev].slice(0, 15))
+    } catch {
+      setBattleLog(prev => [`🎭 El comerciante se fue sin hacer nada.`, ...prev].slice(0, 15))
+    }
+  }
+
+  function handleAchievementDismiss(): void {
+    setNewAchievement(null)
   }
 
   function generateRandomNodeType(id: number): RouteNode {
@@ -620,15 +1223,20 @@ function MainApp() {
   }
 
   async function startNewRun(): Promise<void> {
-    if (!isGenUnlocked(generation)) {
+    const unlockedGens = generations.filter(g => isGenUnlocked(g))
+    const dailyCfg = isDailyRunRef.current && unlockedGens.length > 0 ? getDailyConfig(dailySeed, unlockedGens) : null
+    const effectiveGen = dailyCfg ? dailyCfg.generation : generation
+    const effectiveDifficulty = dailyCfg ? dailyCfg.difficulty : difficulty
+
+    if (!isGenUnlocked(effectiveGen)) {
       setApiError('Esta generación aún está bloqueada.')
       return
     }
-    if (difficulty === 'hard' && !isHardUnlocked(generation)) {
+    if (effectiveDifficulty === 'hard' && !isHardUnlocked(effectiveGen)) {
       setApiError('El modo difícil para esta generación aún está bloqueado.')
       return
     }
-    if (difficulty === 'infinite' && !isInfiniteUnlocked(generation)) {
+    if (effectiveDifficulty === 'infinite' && !isInfiniteUnlocked(effectiveGen)) {
       setApiError('El modo Infinite se desbloquea completando Difícil en esta generación.')
       return
     }
@@ -637,7 +1245,7 @@ function MainApp() {
     setApiError('')
 
     try {
-      const targetGen = getEffectiveGen()
+      const targetGen = dailyCfg ? effectiveGen : getEffectiveGen()
       setCurrentRunGen(targetGen)
 
       // Handle challengeGauntlet: randomly pick 3 challenges
@@ -677,6 +1285,12 @@ function MainApp() {
       const config: RunConfig = { generation: targetGen }
       const run = startRun(config, activeChallenges.doubleModifiers)
 
+      if (isDailyRunRef.current) {
+        const dailyCfg = getDailyConfig(dailySeed, [targetGen])
+        const fixedMod = RUN_MODIFIERS.find(m => m.id === dailyCfg.modifierId)
+        if (fixedMod) run.modifier = fixedMod
+      }
+
       if (run.modifier2) {
         setModifier2(run.modifier2)
       } else {
@@ -685,12 +1299,15 @@ function MainApp() {
 
       registerInPokedex(starter)
 
-      const totalNodes = difficultyNodeCounts[difficulty]
+      const totalNodes = difficultyNodeCounts[effectiveDifficulty]
       let customRoute: RouteNode[] = []
+
+      const routeRand = isDailyRunRef.current ? createSeededRandom(dailySeed) : null
+      const rr = () => routeRand ? routeRand() : Math.random()
 
       if (activeChallenges.bossRush) {
         customRoute = generateBossRushRoute(totalNodes)
-      } else if (difficulty === 'infinite') {
+      } else if (effectiveDifficulty === 'infinite') {
         for (let i = 1; i <= 5; i++) {
           customRoute.push(generateRandomNodeType(i))
         }
@@ -698,30 +1315,30 @@ function MainApp() {
         const spinPositions: number[] = []
         const pokeRandPositions: number[] = []
         const movePositions: number[] = []
-        if (difficulty === 'hard') {
+        if (effectiveDifficulty === 'hard') {
           const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
           while (spinPositions.length < 2 && available.length > 0) {
-            const idx = Math.floor(Math.random() * available.length)
+            const idx = Math.floor(rr() * available.length)
             spinPositions.push(available[idx])
             available.splice(idx, 1)
           }
           while (pokeRandPositions.length < 2 && available.length > 0) {
-            const idx = Math.floor(Math.random() * available.length)
+            const idx = Math.floor(rr() * available.length)
             pokeRandPositions.push(available[idx])
             available.splice(idx, 1)
           }
           if (available.length > 0) {
-            const idx = Math.floor(Math.random() * available.length)
+            const idx = Math.floor(rr() * available.length)
             movePositions.push(available[idx])
             available.splice(idx, 1)
           }
-        } else if (difficulty === 'medium') {
+        } else if (effectiveDifficulty === 'medium') {
           const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
-          const idx = Math.floor(Math.random() * available.length)
+          const idx = Math.floor(rr() * available.length)
           pokeRandPositions.push(available[idx])
           available.splice(idx, 1)
           if (available.length > 0) {
-            const idx2 = Math.floor(Math.random() * available.length)
+            const idx2 = Math.floor(rr() * available.length)
             movePositions.push(available[idx2])
             available.splice(idx2, 1)
           }
@@ -741,7 +1358,7 @@ function MainApp() {
           } else if (activeChallenges.allTeamRocket) {
             type = 'teamRocket'
           } else {
-            const rand = Math.random()
+            const rand = rr()
             if (rand < 0.15 && !activeChallenges.noShops) {
               type = 'shop'
             } else if (rand < 0.40 && !activeChallenges.noRests) {
@@ -835,11 +1452,32 @@ function MainApp() {
 
       setBattleLog([
         `Tu inicial es ${starter.name}${starter.shiny ? ' ✨' : ''}.`,
-        `Modo: ${generation === 0 ? 'Random All-Stars' : `Gen ${generation}`}.`,
-        `Dificultad: ${difficultyLabels[difficulty].title}${difficulty === 'infinite' ? ' (Sin límite)' : ` (${totalNodes} rutas)`}.`,
+        `Modo: ${effectiveGen === 0 ? 'Random All-Stars' : `Gen ${effectiveGen}`}.`,
+        `Dificultad: ${difficultyLabels[effectiveDifficulty].title}${effectiveDifficulty === 'infinite' ? ' (Sin límite)' : ` (${totalNodes} rutas)`}.`,
         `Recibes $${activeChallenges.noMoney ? '0' : '100'} de inicio e item: ${run.item}.`,
         ...challengeDescriptions,
       ])
+      const activeChallengeNames: string[] = []
+      if (activeChallenges.nuzlocke) activeChallengeNames.push('Nuzlocke')
+      if (activeChallenges.soloStarter) activeChallengeNames.push('Solo Starter')
+      if (activeChallenges.noItems) activeChallengeNames.push('Sin Items')
+      if (activeChallenges.noHealing) activeChallengeNames.push('Sin Curación')
+      if (activeChallenges.bossRush) activeChallengeNames.push('Boss Rush')
+      if (activeChallenges.speedrun) activeChallengeNames.push('Speedrun')
+      if (activeChallenges.ironman) activeChallengeNames.push('Ironman')
+
+      setRunStats({
+        battlesWon: 0, battlesLost: 0, totalDamageDealt: 0, totalDamageTaken: 0,
+        critsLanded: 0, superEffectiveHits: 0, koFirstTurn: 0, captures: 0,
+        itemsUsed: 0, moneySpent: 0, moneyEarned: 0, nodesCleared: 0,
+        teamSizeMax: 1, lowestHPEver: starterWithBonus.hp, totalTurns: 0,
+        pokemonUsed: [starterWithBonus.name], challengesActive: activeChallengeNames,
+      })
+      setRandomEventUsed(new Set())
+      setShinyNextEncounter(false)
+      setSynergyActive(null)
+      setActiveRandomEvent(null)
+
       setScreen('route')
       startBattleMusic()
     } catch {
@@ -911,13 +1549,57 @@ function MainApp() {
         unlockedInfinite: newlyUnlockedInfinite
       })
 
+      const newStreak = winStreak + 1
+      setWinStreak(newStreak)
+      localStorage.setItem('pokerand_streak', String(newStreak))
+      if (newStreak > bestStreak) {
+        setBestStreak(newStreak)
+        localStorage.setItem('pokerand_best_streak', String(newStreak))
+      }
+      if (newStreak >= 3) unlockAchievement('streak_3')
+      if (newStreak >= 5) unlockAchievement('streak_5')
+      if (newStreak >= 10) unlockAchievement('streak_10')
+      unlockAchievement('first_win')
+      if (runChallenges.nuzlocke || runChallenges.nuzlockeHardcore) unlockAchievement('nuzlocke_win')
+      if (team.length <= 1) unlockAchievement('solo_win')
+      if (runChallenges.speedrun) unlockAchievement('speedrun_win')
+      if (runChallenges.noItems) unlockAchievement('no_item_win')
+      if (runChallenges.ironman) unlockAchievement('ironman_win')
+      if (runStats.lowestHPEver > 0 && team.some(p => p.hp > 0 && p.hp <= p.maxHp * 0.1)) unlockAchievement('comeback')
+      if (difficulty === 'hard') unlockAchievement('hard_win')
+      if (runChallenges.bossRush) unlockAchievement('boss_rush_win')
+      if (runChallenges.challengeGauntlet) unlockAchievement('gauntlet_win')
+      checkAchievements()
+
+      const hasActiveChallenge = Object.entries(runChallenges).some(([k, v]) => v && k !== 'allShiny')
+      const baseCoins = difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15
+
+      setMetaProgression(prev => {
+        const coins = baseCoins + (hasActiveChallenge ? 15 : 0)
+        const updated = { ...prev, totalRuns: prev.totalRuns + 1, totalWins: prev.totalWins + 1, bestStreak: Math.max(prev.bestStreak, newStreak), pokeCoins: prev.pokeCoins + coins }
+        localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+        return updated
+      })
+      awardPokeCoins(baseCoins, `¡Victoria! (${difficulty === 'easy' ? 'Fácil' : difficulty === 'hard' ? 'Difícil' : 'Medio'})`)
+      if (hasActiveChallenge) awardPokeCoins(15, 'Bonus Desafío Activo')
+      if (team.length <= 1) awardPokeCoins(5, 'Bonus Solo Pokémon')
+
       setScreen('victory')
       playVictoryFanfare()
+      if (isDailyRunRef.current && Object.values(runChallenges).every(v => !v)) {
+        setDailyPlayed(true)
+        localStorage.setItem('pokerand_daily', dailySeed)
+        awardPokeCoins(15, 'Bonus Desafío Diario')
+        unlockAchievement('daily_3')
+      }
       return
     }
 
     setRouteIndex((previous) => previous + 1)
-    setScreen('route')
+    setRunStats(prev => ({ ...prev, nodesCleared: prev.nodesCleared + 1 }))
+    const progress = route.length > 0 ? (routeIndex + 1) / route.length : 0
+    triggerRandomEvent(progress)
+    if (!activeRandomEvent) setScreen('route')
   }
 
   function pickRocketPokemon(pokemon: Pokemon): void {
@@ -935,7 +1617,7 @@ function MainApp() {
       completeCurrentNode()
       return
     }
-    let captured = { ...pokemon, hp: Math.floor(pokemon.maxHp / 2) }
+    let captured = { ...pokemon, hp: Math.floor(pokemon.maxHp / 2), holdItem: difficulty === 'hard' ? null : pokemon.holdItem }
     if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
     if (runChallenges.fixedLevel) captured = { ...captured, level: 50 }
     registerInPokedex(captured)
@@ -965,6 +1647,7 @@ function MainApp() {
     }
     setTeamRocketPickModal(false)
     setTeamRocketTeam([])
+    setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
     completeCurrentNode()
   }
 
@@ -1096,8 +1779,8 @@ function MainApp() {
     if (!activePokemon || !currentNode) return
 
     if (currentNode.type === 'shop') {
-      const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS)
-      const allHoldableKeys = HOLDABLE_ITEM_NAMES
+      const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(isConsumableUnlocked)
+      const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked)
       const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
       const shuffledHoldables = [...allHoldableKeys].sort(() => 0.5 - Math.random())
       const selectedConsumables = shuffledConsumables.slice(0, 2)
@@ -1122,8 +1805,8 @@ function MainApp() {
     }
 
     if (currentNode.type === 'spin') {
-      const healingPool = Object.keys(ALL_SHOP_ITEMS)
-      const passivePool = HOLDABLE_ITEM_NAMES
+      const healingPool = Object.keys(ALL_SHOP_ITEMS).filter(isConsumableUnlocked)
+      const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked)
       const shuffledH = [...healingPool].sort(() => 0.5 - Math.random())
       const shuffledP = [...passivePool].sort(() => 0.5 - Math.random())
       const items = [...shuffledH.slice(0, 4), ...shuffledP.slice(0, 2)].sort(() => 0.5 - Math.random())
@@ -1221,7 +1904,7 @@ function MainApp() {
           }
           setEggInventory(prev => [...prev, eggEntry])
           const rewardItem = runChallenges.noHealing
-            ? randomFrom(['X Attack', 'X Defense', 'Rare Candy'])
+            ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
             : randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry'])
           setRestRewardItem(rewardItem)
           setInventory((previous) => [...previous, rewardItem])
@@ -1236,11 +1919,15 @@ function MainApp() {
         }
 
         const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty)
+        if (!runChallenges.allShiny && Math.random() < 0.02) {
+          generatedEncounter.shiny = true
+        }
         const rewardItem = runChallenges.noHealing
-          ? randomFrom(['X Attack', 'X Defense', 'Rare Candy'])
+          ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
           : randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry'])
 
         setRestEncounter(generatedEncounter)
+        seenInPokedex(generatedEncounter)
         setRestRewardItem(rewardItem)
         setInventory((previous) => [...previous, rewardItem])
         setBattleLog((prev) => [
@@ -1286,6 +1973,7 @@ function MainApp() {
             })
         )
         const rocketTeam = await Promise.all(fetches)
+        rocketTeam.forEach(p => seenInPokedex(p))
 
         setIsTrainerBattle(true)
         setTrainerTeam(rocketTeam)
@@ -1347,6 +2035,7 @@ function MainApp() {
 
         setIsTrainerBattle(true)
         setTrainerTeam(newTrainerTeam)
+        newTrainerTeam.forEach(p => seenInPokedex(p))
         setTrainerPokemonIndex(0)
         setTrainerName(chosenName)
         setTrainerSprite(chosenSprite)
@@ -1371,6 +2060,10 @@ function MainApp() {
             speed: generatedEnemy.speed + Math.floor(Math.random() * 20) - 10,
           }
         }
+        if (shinyNextEncounter) {
+          generatedEnemy = { ...generatedEnemy, shiny: true }
+          setShinyNextEncounter(false)
+        }
         setIsTrainerBattle(false)
         setTrainerTeam([])
         setTrainerPokemonIndex(0)
@@ -1380,6 +2073,7 @@ function MainApp() {
     setReviveModal(null)
     setEquipModal(null)
         setEnemy(generatedEnemy)
+        seenInPokedex(generatedEnemy)
         setBattleLog((prev) => [
           `🌿 ¡Un ${generatedEnemy.name} salvaje (Nv.${generatedEnemy.level}) apareció!`,
           ...prev
@@ -1486,9 +2180,11 @@ function MainApp() {
     }
     if (runChallenges.noEvolution) pokemon = applyNoEvolutionBuff(pokemon)
     if (runChallenges.fixedLevel) pokemon = { ...pokemon, level: 50 }
+    if (difficulty === 'hard') pokemon = { ...pokemon, holdItem: null }
     if (team.length >= maxTeamSize) {
       setPcStorage((prev) => [...prev, pokemon])
       registerInPokedex(pokemon)
+      setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
       setBattleLog((prev) => [
         `🎲 ¡PokeRand: ${pokemon.name} se envió al PC (equipo lleno)!`,
         ...prev
@@ -1496,6 +2192,7 @@ function MainApp() {
     } else {
       setTeam((prev) => [...prev, pokemon])
       registerInPokedex(pokemon)
+      setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
       setBattleLog((prev) => [
         `🎲 ¡PokeRand: ${pokemon.name} se unió a tu equipo!`,
         ...prev
@@ -1560,6 +2257,7 @@ function MainApp() {
 
     setMoney((prev) => prev - finalPrice)
     setInventory((prev) => [...prev, itemName])
+    setRunStats(prev => ({ ...prev, moneySpent: prev.moneySpent + finalPrice }))
     setBattleLog((prev) => [`Compraste ${itemName} por $${finalPrice}.`, ...prev].slice(0, 15))
   }
 
@@ -1577,6 +2275,7 @@ function MainApp() {
 
     setMoney((prev) => prev - finalPrice)
     setInventory((prev) => [...prev, itemName])
+    setRunStats(prev => ({ ...prev, moneySpent: prev.moneySpent + finalPrice }))
     setBattleLog((prev) => [`Compraste ${itemName} por $${finalPrice}.`, ...prev].slice(0, 15))
   }
 
@@ -1607,6 +2306,17 @@ function MainApp() {
       return [...prev.slice(0, idx), ...prev.slice(idx + 1)]
     })
     setBattleLog((prev) => [`Equipaste ${itemName} a ${pokemon.name}.`, ...prev].slice(0, 15))
+
+    const syn = SYNERGIES.find(s => s.items.includes(itemName))
+    if (syn) {
+      const otherItem = syn.items.find(i => i !== itemName)
+      const hasOtherInTeam = team.some((p, i) => i !== pokemonIndex && p.holdItem === otherItem)
+      if (hasOtherInTeam) {
+        setSynergyActive(syn.name)
+        setBattleLog((prev) => [`🔗 ¡SINERGIA: ${syn.name}! ${syn.desc}`, ...prev].slice(0, 15))
+        unlockAchievement('synergy_master')
+      }
+    }
   }
 
   function unequipItem(pokemonIndex: number) {
@@ -1662,12 +2372,101 @@ function MainApp() {
     setBattleLog((prev) => [`Restauraste la salud de tu equipo activo por $${healCost}.`, ...prev].slice(0, 15))
   }
 
+  function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boolean; log: string[] } {
+    if (!p.status) return { updatedPokemon: p, skipTurn: false, log: [] }
+
+    const logs: string[] = []
+    let updated = { ...p }
+    let skipTurn = false
+
+    switch (p.status.type) {
+      case 'burn': {
+        const burnDmg = Math.max(1, Math.floor(p.maxHp / 16))
+        updated = { ...updated, hp: Math.max(0, updated.hp - burnDmg) }
+        logs.push(`🔥 ${updated.name} sufre daño por quemadura (${burnDmg}).`)
+        break
+      }
+      case 'poison': {
+        const poisonDmg = Math.max(1, Math.floor(p.maxHp / 8))
+        updated = { ...updated, hp: Math.max(0, updated.hp - poisonDmg) }
+        logs.push(`☠️ ${updated.name} sufre daño por veneno (${poisonDmg}).`)
+        break
+      }
+      case 'paralysis': {
+        if (Math.random() < 0.25) {
+          skipTurn = true
+          logs.push(`⚡ ${updated.name} está paralizado y no puede moverse.`)
+        }
+        break
+      }
+      case 'freeze': {
+        if (Math.random() < 0.20) {
+          updated = { ...updated, status: undefined }
+          logs.push(`🧊 ${updated.name} se descongeló.`)
+        } else {
+          skipTurn = true
+          logs.push(`🧊 ${updated.name} está congelado y no puede moverse.`)
+        }
+        break
+      }
+      case 'sleep': {
+        const remaining = (p.status.turns ?? 2) - 1
+        if (remaining <= 0) {
+          updated = { ...updated, status: undefined }
+          logs.push(`💤 ${updated.name} se despertó.`)
+        } else {
+          updated = { ...updated, status: { ...updated.status!, turns: remaining } }
+          skipTurn = true
+          logs.push(`💤 ${updated.name} está dormido y no puede moverse.`)
+        }
+        break
+      }
+      case 'confusion': {
+        const remaining = (p.status.turns ?? 3) - 1
+        if (remaining <= 0) {
+          updated = { ...updated, status: undefined }
+          logs.push(`💫 ${updated.name} se desconfundió.`)
+        } else {
+          updated = { ...updated, status: { ...updated.status!, turns: remaining } }
+        }
+        break
+      }
+    }
+
+    if (updated.hp <= 0) {
+      updated = { ...updated, hp: 0 }
+      logs.push(`💀 ${updated.name} fue debilitado por su estado.`)
+    }
+
+    return { updatedPokemon: updated, skipTurn, log: logs }
+  }
+
+  function applyAilmentToTarget(target: Pokemon, move: Move): Pokemon {
+    if (!move.ailment || !move.ailmentChance) return target
+    if (target.status) return target
+    if (Math.random() >= move.ailmentChance) return target
+
+    const ailmentTurns: Record<StatusType, number> = {
+      burn: 999,
+      poison: 999,
+      paralysis: 999,
+      freeze: 999,
+      sleep: Math.floor(Math.random() * 2) + 2,
+      confusion: Math.floor(Math.random() * 3) + 2,
+    }
+
+    return {
+      ...target,
+      status: { type: move.ailment, turns: ailmentTurns[move.ailment] },
+    }
+  }
+
   function performHit(
     attacker: Pokemon,
     defender: Pokemon,
     move: Move,
     isEnemyHit: boolean
-  ): { updatedDefender: Pokemon; line: string; attackerHeal: number; recoilDamage: number } {
+  ): { updatedDefender: Pokemon; updatedAttacker: Pokemon; lines: string[]; attackerHeal: number } {
     const enemyBoost = isEnemyHit ? modifier?.enemyAttackDelta ?? 0 : 0
 
     const attackerItem = attacker.holdItem ? HOLDABLE_ITEMS[attacker.holdItem] : null
@@ -1679,9 +2478,12 @@ function MainApp() {
     const enemyDefDelta = !isEnemyHit ? (modifier?.enemyDefenseDelta ?? 0) : 0
     const enemySpdDelta = isEnemyHit ? (modifier?.enemySpeedDelta ?? 0) : 0
 
+    // Burn halves attacker's physical attack
+    const burnNerf = attacker.status?.type === 'burn' ? 0.5 : 1
+
     const effectiveAttacker: Pokemon = {
       ...attacker,
-      attack: Math.round(attacker.attack * (1 + (attackerItem?.attackMod ?? 0) + playerAtkMod)),
+      attack: Math.round(attacker.attack * (1 + (attackerItem?.attackMod ?? 0) + playerAtkMod) * burnNerf),
       speed: Math.round(attacker.speed * (1 + (attackerItem?.speedMod ?? 0) + playerSpdMod) + enemySpdDelta)
     }
     const effectiveDefender: Pokemon = {
@@ -1698,56 +2500,106 @@ function MainApp() {
     const secondaryType = defTypes[1] || undefined
 
     const { effectiveness, message } = getTypeEffectiveness(effectiveMove.type, primaryType, secondaryType)
-    const result = applyDamage(effectiveAttacker, effectiveDefender, effectiveMove, enemyBoost)
 
-    let finalDamage = Math.floor(result.damage * effectiveness)
-    if (attackerItem?.damageBoost) {
-      finalDamage = Math.floor(finalDamage * (1 + attackerItem.damageBoost))
-    }
-    if (attackerItem?.lowHpBonus && attacker.hp < attacker.maxHp * 0.3) {
-      finalDamage = Math.floor(finalDamage * (1 + attackerItem.lowHpBonus))
-    }
-    if (attackerItem?.firstStrikeBonus && attacker.hp === attacker.maxHp) {
-      finalDamage = Math.floor(finalDamage * (1 + attackerItem.firstStrikeBonus))
-    }
-    if (defenderItem?.damageReduction) {
-      finalDamage = Math.floor(finalDamage * (1 - defenderItem.damageReduction))
+    // --- Accuracy check ---
+    if (move.accuracy !== null && move.accuracy < 100) {
+      const accRoll = Math.random() * 100
+      if (accRoll >= move.accuracy) {
+        return {
+          updatedDefender: defender,
+          updatedAttacker: attacker,
+          lines: [`${attacker.name} usó ${effectiveMove.name} pero falló.`],
+          attackerHeal: 0,
+        }
+      }
     }
 
-    const modCrit = !isEnemyHit ? (modifier?.playerCritChance ?? 0) : 0
-    const totalCrit = (attackerItem?.critChance ?? 0) + modCrit
-    const isCrit = !runChallenges.noCrits && totalCrit > 0 && Math.random() < totalCrit
-    if (isCrit) {
-      finalDamage = Math.floor(finalDamage * 1.5)
+    // --- Multi-hit ---
+    let totalHits = 1
+    if (move.minHits && move.maxHits) {
+      totalHits = Math.floor(Math.random() * (move.maxHits - move.minHits + 1)) + move.minHits
     }
 
-    const newHp = Math.max(0, defender.hp - finalDamage)
+    let currentDefender = effectiveDefender
+    const lines: string[] = []
+    let totalDamage = 0
 
-    const updatedDefender: Pokemon = {
-      ...defender,
-      hp: newHp
+    for (let hit = 0; hit < totalHits; hit++) {
+      const result = applyDamage(effectiveAttacker, currentDefender, effectiveMove, enemyBoost)
+      let finalDamage = Math.floor(result.damage * effectiveness)
+      if (attackerItem?.damageBoost) {
+        finalDamage = Math.floor(finalDamage * (1 + attackerItem.damageBoost))
+      }
+      if (attackerItem?.lowHpBonus && attacker.hp < attacker.maxHp * 0.3) {
+        finalDamage = Math.floor(finalDamage * (1 + attackerItem.lowHpBonus))
+      }
+      if (attackerItem?.firstStrikeBonus && attacker.hp === attacker.maxHp) {
+        finalDamage = Math.floor(finalDamage * (1 + attackerItem.firstStrikeBonus))
+      }
+      if (defenderItem?.damageReduction) {
+        finalDamage = Math.floor(finalDamage * (1 - defenderItem.damageReduction))
+      }
+
+      const modCrit = !isEnemyHit ? (modifier?.playerCritChance ?? 0) : 0
+      const totalCrit = (attackerItem?.critChance ?? 0) + modCrit
+      const isCrit = !runChallenges.noCrits && totalCrit > 0 && Math.random() < totalCrit
+      if (isCrit) {
+        finalDamage = Math.floor(finalDamage * 1.5)
+      }
+
+      const newHp = Math.max(0, currentDefender.hp - finalDamage)
+      currentDefender = { ...currentDefender, hp: newHp }
+      totalDamage += finalDamage
+
+      let hitLine = totalHits > 1
+        ? `${attacker.name} usa ${effectiveMove.name}${runChallenges.typeRandomizer && effectiveMove.type !== move.type ? ` [${effectiveMove.type}]` : ''} (${hit + 1}/${totalHits}): ${finalDamage} de daño.`
+        : `${attacker.name} usa ${effectiveMove.name}${runChallenges.typeRandomizer && effectiveMove.type !== move.type ? ` [${effectiveMove.type}]` : ''}: ${finalDamage} de daño.`
+      if (isCrit) hitLine += ' ¡Golpe crítico!'
+      if (message) hitLine += ` (${message})`
+      lines.push(hitLine)
+
+      if (currentDefender.hp <= 0) break
     }
 
+    // --- Ailment application on first hit only ---
+    if (totalHits > 0 && currentDefender.hp > 0) {
+      const ailmentedDefender = applyAilmentToTarget(currentDefender, move)
+      if (ailmentedDefender.status && ailmentedDefender.status.type !== currentDefender.status?.type) {
+        currentDefender = ailmentedDefender
+        const ailmentLabel = STATUS_LABELS[ailmentedDefender.status.type]
+        lines.push(`${currentDefender.name} fue ${ailmentLabel.split(' ')[1]} ${ailmentLabel.split(' ')[0]}.`)
+      }
+    }
+
+    // --- Recoil damage ---
+    let recoilDamage = 0
+    let updatedAttacker = { ...attacker }
+    if (move.recoilPercent && move.recoilPercent > 0 && totalDamage > 0) {
+      recoilDamage = Math.floor(totalDamage * move.recoilPercent)
+      updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - recoilDamage) }
+      lines.push(`${attacker.name} sufre recoil (${recoilDamage}).`)
+    }
+
+    // --- Drain (Absorb, Megaagotar, etc.) ---
+    if (move.drainPercent && move.drainPercent > 0 && totalDamage > 0 && updatedAttacker.hp > 0) {
+      const drainHeal = Math.floor(totalDamage * move.drainPercent)
+      updatedAttacker = { ...updatedAttacker, hp: Math.min(updatedAttacker.maxHp, updatedAttacker.hp + drainHeal) }
+      lines.push(`${attacker.name} drena ${drainHeal} HP.`)
+    }
+
+    // --- Lifesteal ---
     const modLifesteal = !isEnemyHit ? (modifier?.playerLifesteal ?? 0) : 0
     const totalLifesteal = (attackerItem?.lifesteal ?? 0) + modLifesteal
     let attackerHeal = 0
-    if (totalLifesteal > 0 && finalDamage > 0) {
-      attackerHeal = Math.floor(finalDamage * totalLifesteal)
-    }
-
-    let recoilDamage = 0
-
-    let line = `${attacker.name} usa ${effectiveMove.name}${runChallenges.typeRandomizer && effectiveMove.type !== move.type ? ` [${effectiveMove.type}]` : ''}: ${finalDamage} de daño.`
-    if (isCrit) line += ' ¡Golpe crítico!'
-    if (message) {
-      line += ` (${message})`
+    if (totalLifesteal > 0 && totalDamage > 0) {
+      attackerHeal = Math.floor(totalDamage * totalLifesteal)
     }
 
     return {
-      updatedDefender,
-      line,
+      updatedDefender: currentDefender,
+      updatedAttacker,
+      lines,
       attackerHeal,
-      recoilDamage
     }
   }
 
@@ -1764,67 +2616,126 @@ function MainApp() {
     let nextEnemy = { ...enemy }
     const logs: string[] = []
 
+    // --- Status ticks at start of turn ---
+    const playerTick = processStatusTick(nextPlayer)
+    nextPlayer = playerTick.updatedPokemon
+    logs.push(...playerTick.log)
+
+    const enemyTick = processStatusTick(nextEnemy)
+    nextEnemy = enemyTick.updatedPokemon
+    logs.push(...enemyTick.log)
+
+    // Check if status killed either side
+    if (nextPlayer.hp <= 0) {
+      nextTeam[activeIndex] = nextPlayer
+      const nextAliveIndex = getFirstHealthyIndex(nextTeam, activeIndex)
+      if (nextAliveIndex === -1) {
+        const fullLogs = ['¡Todo tu equipo ha sido debilitado!', ...logs, ...battleLog]
+        if (speedrunTimerRef.current) clearInterval(speedrunTimerRef.current)
+        setTeam(nextTeam)
+        setBattleLog(fullLogs)
+        setDefeatSummary({ finalTeam: nextTeam, battleLog: fullLogs, enemy: nextEnemy, lastNodeLabel: currentNode?.label })
+        const losses = record.losses + 1
+        persistRecord(record.wins, losses)
+        setWinStreak(0)
+        localStorage.setItem('pokerand_streak', '0')
+        setMetaProgression(prev => {
+          const updated = { ...prev, totalRuns: prev.totalRuns + 1 }
+          localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+          return updated
+        })
+        checkAchievements()
+        awardPokeCoins(5, 'Partida completada (derrota)')
+        if (isDailyRunRef.current) { setDailyPlayed(true); localStorage.setItem('pokerand_daily', dailySeed) }
+        setScreen('defeat')
+        playDefeatMusic()
+        return
+      }
+      if (runChallenges.nuzlocke) {
+        const nuzlockeTeam = nextTeam.filter((_, idx) => idx !== activeIndex)
+        setTeam(nuzlockeTeam)
+        setActiveIndex(Math.max(0, Math.min(activeIndex, nuzlockeTeam.length - 1)))
+        setBattleLog((prev) => [`💀 Nuzlocke: ${nextPlayer.name} fue debilitado por su estado y liberado.`, ...logs, ...prev].slice(0, 15))
+      } else {
+        setTeam(nextTeam)
+        setActiveIndex(nextAliveIndex)
+        setBattleLog((prev) => [`${nextPlayer.name} fue debilitado por su estado.`, ...logs, ...prev].slice(0, 15))
+      }
+      if (isTeamRocketBattle) setTeamRocketFainted(true)
+      setEnemy(nextEnemy)
+      return
+    }
+    if (nextEnemy.hp <= 0) {
+      // Enemy died from status — treat as victory (reuses enemy defeat logic below)
+      logs.push(`💀 ${nextEnemy.name} fue debilitado por su estado.`)
+      // Fall through to the enemy.hp <= 0 block at the end of this function
+    }
+
+    // --- Skip turn checks ---
+    const playerSkipped = playerTick.skipTurn
+    const enemySkipped = enemyTick.skipTurn
+
+    // --- Confusion self-hit check ---
+    let playerConfusedSelfHit = false
+    let enemyConfusedSelfHit = false
+    if (nextPlayer.status?.type === 'confusion' && !playerSkipped && Math.random() < 1 / 3) {
+      playerConfusedSelfHit = true
+      const confusionDmg = Math.max(1, Math.floor((40 * nextPlayer.attack * 0.5) / Math.max(1, nextPlayer.defense) * 0.45 + 2))
+      nextPlayer = { ...nextPlayer, hp: Math.max(0, nextPlayer.hp - confusionDmg) }
+      logs.push(`💫 ¡${nextPlayer.name} se golpeó a sí mismo! (${confusionDmg})`)
+    }
+    if (nextEnemy.status?.type === 'confusion' && !enemySkipped && Math.random() < 1 / 3) {
+      enemyConfusedSelfHit = true
+      const confusionDmg = Math.max(1, Math.floor((40 * nextEnemy.attack * 0.5) / Math.max(1, nextEnemy.defense) * 0.45 + 2))
+      nextEnemy = { ...nextEnemy, hp: Math.max(0, nextEnemy.hp - confusionDmg) }
+      logs.push(`💫 ¡${nextEnemy.name} se golpeó a sí mismo! (${confusionDmg})`)
+    }
+
     const playerItem = nextPlayer.holdItem ? HOLDABLE_ITEMS[nextPlayer.holdItem] : null
     const enemyItem = nextEnemy.holdItem ? HOLDABLE_ITEMS[nextEnemy.holdItem] : null
     const playerEffectiveSpeed = Math.round(nextPlayer.speed * (1 + (playerItem?.speedMod ?? 0)))
     const enemyEffectiveSpeed = Math.round(nextEnemy.speed * (1 + (enemyItem?.speedMod ?? 0)))
-
     const playerStarts = playerEffectiveSpeed >= enemyEffectiveSpeed
 
-    if (playerStarts) {
+    const doPlayerAttack = async () => {
+      if (nextPlayer.hp <= 0 || nextEnemy.hp <= 0 || playerSkipped || playerConfusedSelfHit) return
       const playerHit = performHit(nextPlayer, nextEnemy, move, false)
       nextEnemy = playerHit.updatedDefender
+      nextPlayer = playerHit.updatedAttacker
       if (playerHit.attackerHeal > 0) {
         const healed = Math.min(nextPlayer.maxHp, nextPlayer.hp + playerHit.attackerHeal)
         nextPlayer = { ...nextPlayer, hp: healed }
-        logs.push(`${nextPlayer.name} recupera ${playerHit.attackerHeal} HP por ${nextPlayer.holdItem ?? 'Vampirismo'}.`)
+        logs.push(`${nextPlayer.name} recupera ${playerHit.attackerHeal} HP por vampirismo.`)
       }
-      logs.push(playerHit.line)
+      logs.push(...playerHit.lines)
 
       if (runChallenges.firstStrike && nextEnemy.hp > 0) {
         const recoil = Math.floor(nextPlayer.maxHp * 0.08)
         nextPlayer = { ...nextPlayer, hp: Math.max(1, nextPlayer.hp - recoil) }
         logs.push(`⚡ ¡Recoil por Primer Golpe! ${nextPlayer.name} pierde ${recoil} HP.`)
       }
+    }
 
-      if (nextEnemy.hp > 0) {
-        const enemyMove = nextEnemy.moves[Math.floor(Math.random() * nextEnemy.moves.length)]
-        const enemyHit = performHit(nextEnemy, nextPlayer, enemyMove, true)
-        nextPlayer = enemyHit.updatedDefender
-        if (enemyHit.attackerHeal > 0) {
-          const healed = Math.min(nextEnemy.maxHp, nextEnemy.hp + enemyHit.attackerHeal)
-          nextEnemy = { ...nextEnemy, hp: healed }
-          logs.push(`${nextEnemy.name} recupera ${enemyHit.attackerHeal} HP por ${nextEnemy.holdItem ?? 'Vampirismo'}.`)
-        }
-        logs.push(enemyHit.line)
-      }
-    } else {
+    const doEnemyAttack = async () => {
+      if (nextEnemy.hp <= 0 || nextPlayer.hp <= 0 || enemySkipped || enemyConfusedSelfHit) return
       const enemyMove = nextEnemy.moves[Math.floor(Math.random() * nextEnemy.moves.length)]
       const enemyHit = performHit(nextEnemy, nextPlayer, enemyMove, true)
       nextPlayer = enemyHit.updatedDefender
+      nextEnemy = enemyHit.updatedAttacker
       if (enemyHit.attackerHeal > 0) {
         const healed = Math.min(nextEnemy.maxHp, nextEnemy.hp + enemyHit.attackerHeal)
         nextEnemy = { ...nextEnemy, hp: healed }
-        logs.push(`${nextEnemy.name} recupera ${enemyHit.attackerHeal} HP por ${nextEnemy.holdItem}.`)
+        logs.push(`${nextEnemy.name} recupera ${enemyHit.attackerHeal} HP por vampirismo.`)
       }
-      logs.push(enemyHit.line)
+      logs.push(...enemyHit.lines)
+    }
 
-      if (nextPlayer.hp > 0) {
-        const playerHit = performHit(nextPlayer, nextEnemy, move, false)
-        nextEnemy = playerHit.updatedDefender
-        if (playerHit.attackerHeal > 0) {
-          const healed = Math.min(nextPlayer.maxHp, nextPlayer.hp + playerHit.attackerHeal)
-          nextPlayer = { ...nextPlayer, hp: healed }
-          logs.push(`${nextPlayer.name} recupera ${playerHit.attackerHeal} HP por ${nextPlayer.holdItem ?? 'Vampirismo'}.`)
-        }
-        logs.push(playerHit.line)
-
-        if (runChallenges.firstStrike && nextEnemy.hp > 0) {
-          const recoil = Math.floor(nextPlayer.maxHp * 0.08)
-          nextPlayer = { ...nextPlayer, hp: Math.max(1, nextPlayer.hp - recoil) }
-          logs.push(`⚡ ¡Recoil por Primer Golpe! ${nextPlayer.name} pierde ${recoil} HP.`)
-        }
-      }
+    if (playerStarts) {
+      await doPlayerAttack()
+      await doEnemyAttack()
+    } else {
+      await doEnemyAttack()
+      await doPlayerAttack()
     }
 
     // --- Efectos pasivos por turno ---
@@ -1850,6 +2761,19 @@ function MainApp() {
     nextPlayer = applyTurnEffects(nextPlayer)
     nextEnemy = applyTurnEffects(nextEnemy)
 
+    // --- Track run stats ---
+    setRunStats(prev => {
+      const playerDmg = Math.max(0, activePokemon.hp - nextPlayer.hp)
+      const enemyDmg = Math.max(0, enemy.hp - nextEnemy.hp)
+      return {
+        ...prev,
+        totalDamageDealt: prev.totalDamageDealt + enemyDmg,
+        totalDamageTaken: prev.totalDamageTaken + playerDmg,
+        totalTurns: prev.totalTurns + 1,
+        lowestHPEver: Math.min(prev.lowestHPEver, nextPlayer.hp),
+      }
+    })
+
     // --- Jugador debilitado ---
     if (nextPlayer.hp <= 0) {
       nextTeam[activeIndex] = nextPlayer
@@ -1868,6 +2792,19 @@ function MainApp() {
         })
         const losses = record.losses + 1
         persistRecord(record.wins, losses)
+        setWinStreak(0)
+        localStorage.setItem('pokerand_streak', '0')
+        setMetaProgression(prev => {
+          const updated = { ...prev, totalRuns: prev.totalRuns + 1 }
+          localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+          return updated
+        })
+        checkAchievements()
+        awardPokeCoins(5, 'Partida completada (derrota)')
+        if (isDailyRunRef.current) {
+          setDailyPlayed(true)
+          localStorage.setItem('pokerand_daily', dailySeed)
+        }
         setScreen('defeat')
         playDefeatMusic()
         return
@@ -1921,8 +2858,7 @@ function MainApp() {
         }
 
         if (levelsGained > 0) {
-          const { updatedPokemon: learnedPkmn } = await checkAndLearnNewMove(updatedPokemon, oldLevel, newLevel, difficulty)
-          updatedPokemon = learnedPkmn
+          updatedPokemon = { ...updatedPokemon, level: newLevel }
         }
 
         return updatedPokemon
@@ -1935,6 +2871,14 @@ function MainApp() {
       const hardMoneyPenalty = difficulty === 'hard' ? 0.6 : difficulty === 'infinite' ? 0.5 : 1
       const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoneyReward * (modifier?.moneyMultiplier ?? 1) * hardMoneyPenalty)
       if (!runChallenges.noMoney) setMoney((prev) => prev + moneyReward)
+
+      setRunStats(prev => ({
+        ...prev,
+        battlesWon: prev.battlesWon + 1,
+        moneyEarned: prev.moneyEarned + moneyReward,
+        pokemonUsed: Array.from(new Set([...prev.pokemonUsed, ...newTeam.filter(p => p.hp > 0).map(p => p.name)])),
+        teamSizeMax: Math.max(prev.teamSizeMax, newTeam.filter(p => p.hp > 0).length),
+      }))
 
       // Egglocke: hatch eggs after battle
       if (runChallenges.egglocke && eggInventory.length > 0) {
@@ -2020,6 +2964,10 @@ function MainApp() {
                     })
                     const losses = record.losses + 1
                     persistRecord(record.wins, losses)
+                    if (isDailyRunRef.current) {
+                      setDailyPlayed(true)
+                      localStorage.setItem('pokerand_daily', dailySeed)
+                    }
                     setScreen('defeat')
                     playDefeatMusic()
                   }, 3000)
@@ -2116,7 +3064,7 @@ function MainApp() {
       return
     }
 
-    if (runChallenges.noHealing && (itemName.includes('Potion') || itemName.includes('Berry') || itemName === 'Full Restore' || itemName === 'Full Heal')) {
+    if (runChallenges.noHealing && (itemName.includes('Potion') || itemName.includes('Berry') || itemName === 'Full Restore' || itemName === 'Full Heal' || itemName === 'Elixir' || itemName === 'Super Elixir' || itemName === 'Full Elixir')) {
       setBattleLog((prev) => ['🚫 Desafío Sin Curación: No puedes usar items de curación.', ...prev].slice(0, 15))
       return
     }
@@ -2141,20 +3089,32 @@ function MainApp() {
       updatedPokemon = healPokemon(activePokemon, 50)
     } else if (itemName === 'Hyper Potion' && activePokemon.hp < activePokemon.maxHp) {
       updatedPokemon = healPokemon(activePokemon, 120)
-    } else if (itemName === 'Full Restore' && activePokemon.hp < activePokemon.maxHp) {
-      updatedPokemon = { ...activePokemon, hp: activePokemon.maxHp }
+    } else if (itemName === 'Full Restore' && (activePokemon.hp < activePokemon.maxHp || activePokemon.status)) {
+      updatedPokemon = { ...activePokemon, hp: activePokemon.maxHp, status: undefined }
     } else if (itemName === 'Oran Berry' && activePokemon.hp < activePokemon.maxHp) {
       updatedPokemon = healPokemon(activePokemon, 15)
-    } else if (itemName === 'Lum Berry' && activePokemon.hp < activePokemon.maxHp) {
-      updatedPokemon = healPokemon(activePokemon, 30)
-    } else if (itemName === 'Full Heal' && activePokemon.hp < activePokemon.maxHp) {
-      updatedPokemon = healPokemon(activePokemon, 40)
+    } else if (itemName === 'Lum Berry' && (activePokemon.hp < activePokemon.maxHp || activePokemon.status)) {
+      updatedPokemon = { ...healPokemon(activePokemon, 30), status: undefined }
+    } else if (itemName === 'Full Heal' && (activePokemon.hp < activePokemon.maxHp || activePokemon.status)) {
+      updatedPokemon = { ...healPokemon(activePokemon, 40), status: undefined }
     } else if (itemName === 'X Attack') {
       updatedPokemon = { ...activePokemon, attack: activePokemon.attack + 5 }
     } else if (itemName === 'X Defense') {
       updatedPokemon = { ...activePokemon, defense: activePokemon.defense + 5 }
     } else if (itemName === 'X Speed') {
       updatedPokemon = { ...activePokemon, speed: activePokemon.speed + 5 }
+    } else if (itemName === 'Elixir' && activePokemon.hp < activePokemon.maxHp) {
+      updatedPokemon = healPokemon(activePokemon, 80)
+    } else if (itemName === 'Super Elixir' && activePokemon.hp < activePokemon.maxHp) {
+      updatedPokemon = healPokemon(activePokemon, 200)
+    } else if (itemName === 'Full Elixir') {
+      updatedPokemon = { ...activePokemon, hp: activePokemon.maxHp, status: undefined }
+    } else if (itemName === 'X Attack 2') {
+      updatedPokemon = { ...activePokemon, attack: activePokemon.attack + 10 }
+    } else if (itemName === 'X Defense 2') {
+      updatedPokemon = { ...activePokemon, defense: activePokemon.defense + 10 }
+    } else if (itemName === 'X Speed 2') {
+      updatedPokemon = { ...activePokemon, speed: activePokemon.speed + 10 }
     }
 
     if (!updatedPokemon) return
@@ -2195,10 +3155,11 @@ function MainApp() {
     }
 
     const hpBonus = modifier?.playerMaxHpBonus ?? 0
-    let captured = { ...restEncounter, maxHp: restEncounter.maxHp + hpBonus, hp: restEncounter.hp + hpBonus }
+    let captured = { ...restEncounter, maxHp: restEncounter.maxHp + hpBonus, hp: restEncounter.hp + hpBonus, holdItem: difficulty === 'hard' ? null : restEncounter.holdItem }
     if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
     if (runChallenges.fixedLevel) captured = { ...captured, level: 50 }
     registerInPokedex(captured)
+    setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
     if (team.length >= maxTeamSize) {
       setPcStorage((prev) => [...prev, captured])
       setBattleLog((prev) => [`Capturaste a ${captured.name} y se envió al PC (equipo lleno).`, ...prev].slice(0, 15))
@@ -2236,6 +3197,8 @@ function MainApp() {
     setDefeatSummary(null)
     setVictoryUnlocks(null)
     setIsTrainerBattle(false)
+    isDailyRunRef.current = false
+    setIsDailyRun(false)
     setTrainerTeam([])
     setTrainerPokemonIndex(0)
     setTrainerName('')
@@ -2266,6 +3229,8 @@ function MainApp() {
   }
 
   const pokedexList = Object.values(pokedex)
+  const pokedexSeen = pokedexList.filter(p => p.seen).length
+  const pokedexCaught = pokedexList.filter(p => p.caught).length
   const filteredPokedex = pokedexList.filter((pkmn) => {
     const term = pokedexSearch.toLowerCase().trim()
     if (!term) return true
@@ -2278,10 +3243,13 @@ function MainApp() {
       <header className="topbar">
         <div className="left-toolbar">
           <button className="tiny-btn" type="button" onClick={() => setShowPokedex(true)}>
-            📖 Pokédex ({pokedexList.length})
+            📖 Pokédex ({pokedexCaught}/{pokedexSeen})
           </button>
           <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowOptions(!showOptions) }}>
             ⚙️ Opciones
+          </button>
+          <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowAchievements(!showAchievements) }}>
+            🏅 Logros
           </button>
           <button className="tiny-btn" type="button" onClick={onRestartRun}>
             Restart
@@ -2289,7 +3257,9 @@ function MainApp() {
         </div>
         <h1>PokeRand</h1>
         <div className="record-box">
-          <span style={{ color: '#facc15', fontWeight: 'bold' }}>💵 ${money}</span>
+          {winStreak >= 2 && <span style={{ color: '#f97316', fontWeight: 'bold', marginRight: '0.5rem' }}>🔥 {winStreak}</span>}
+          <span style={{ color: '#facc15', fontWeight: 'bold' }}>🪙 {metaProgression.pokeCoins}</span>
+          <span style={{ color: '#facc15', fontWeight: 'bold', marginLeft: '0.5rem' }}>💵 ${money}</span>
           <span style={{ color: '#10b981', fontWeight: 'bold' }}>W {record.wins}</span>
           <span style={{ color: '#ef4444', fontWeight: 'bold' }}>L {record.losses}</span>
         </div>
@@ -2580,7 +3550,7 @@ function MainApp() {
                   <div className="modal-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <h2 style={{ fontSize: '1.2rem', color: '#38bdf8', margin: 0 }}>
-                        Pokédex ({pokedexList.length})
+                        Pokédex ({pokedexSeen} vistos · {pokedexCaught} capturados)
                       </h2>
                     </div>
 
@@ -2640,12 +3610,13 @@ function MainApp() {
                         <div
                           key={pkmn.id}
                           className="pokedex-card clickable"
-                          onClick={() => handleSelectPokedexPokemon(pkmn.id)}
+                          onClick={() => pkmn.caught ? handleSelectPokedexPokemon(pkmn.id) : undefined}
+                          style={!pkmn.caught ? { opacity: 0.6 } : undefined}
                         >
                           <span className="pokedex-id">#{String(pkmn.id).padStart(3, '0')}</span>
-                          <img src={pkmn.id >= 1 && pkmn.id <= 649 ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pkmn.id}.gif` : pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '60px', height: '60px' }} />
+                          <img src={pkmn.id >= 1 && pkmn.id <= 649 ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pkmn.id}.gif` : pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '60px', height: '60px', filter: pkmn.caught ? 'none' : 'brightness(0) invert(0)', imageRendering: pkmn.caught ? undefined : 'auto' }} />
                           <strong style={{ textTransform: 'capitalize', display: 'block', fontSize: '0.85rem' }}>
-                            {pkmn.name}
+                            {pkmn.caught ? pkmn.name : '???'}
                           </strong>
                         </div>
                       ))}
@@ -2725,8 +3696,26 @@ function MainApp() {
                     />
                     <span style={{ fontSize: '0.8rem', color: '#94a3b8', minWidth: '32px', textAlign: 'right' }}>{sfxVol}%</span>
                   </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+                <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
+                  🎨 Tema Visual
+                </strong>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {THEMES.filter(t => metaProgression.ownedThemes.includes(t.id)).map(theme => (
+                    <button key={theme.id} type="button"
+                      onClick={() => { playClick(); setTheme(theme.id) }}
+                      style={{
+                        padding: '6px 12px', borderRadius: '8px', border: `2px solid ${metaProgression.activeTheme === theme.id ? '#facc15' : '#475569'}`,
+                        background: theme.colors.bg, color: theme.colors.text, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold',
+                      }}>
+                      {theme.name}
+                    </button>
+                  ))}
                 </div>
               </div>
+            </div>
             </div>
 
             <div className="pokedex-controls">
@@ -2796,7 +3785,12 @@ function MainApp() {
 
       {screen === 'setup' && (
         <section className="panel setup-panel">
-          <h2>1. Selecciona la Generación</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h2 style={{ margin: 0 }}>1. Selecciona la Generación</h2>
+            <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowMetaShop(true) }} style={{ fontSize: '0.8rem' }}>
+              🪙 Tienda Meta ({metaProgression.pokeCoins} 🪙)
+            </button>
+          </div>
           <div className="generation-grid">
             {generations.map((gen) => {
               const unlocked = isGenUnlocked(gen)
@@ -2954,6 +3948,46 @@ function MainApp() {
             })()}
           </div>
 
+          <h2 style={{ marginTop: '1.5rem' }}>🎲 Desafío Diario</h2>
+          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
+            {(() => {
+              const unlockedGens = generations.filter(g => isGenUnlocked(g))
+              const dailyConfig = unlockedGens.length > 0 ? getDailyConfig(dailySeed, unlockedGens) : null
+              const diffLabel = dailyConfig?.difficulty === 'easy' ? 'Fácil' : dailyConfig?.difficulty === 'hard' ? 'Difícil' : 'Medio'
+              const genLabel = dailyConfig ? `${generationRegions[dailyConfig.generation]}` : ''
+              const modName = dailyConfig ? RUN_MODIFIERS.find(m => m.id === dailyConfig.modifierId)?.name ?? '' : ''
+              return (
+            <button
+              className="gen-tile"
+              onClick={() => {
+                if (!dailyConfig) return
+                playClick()
+                isDailyRunRef.current = true
+                setIsDailyRun(true)
+                startNewRun()
+              }}
+              onMouseEnter={playHover}
+              type="button"
+              disabled={isLoading || dailyPlayed || !dailyConfig}
+              style={{
+                borderColor: dailyPlayed ? '#475569' : '#22c55e',
+                background: dailyPlayed ? 'rgba(15,23,42,0.6)' : 'rgba(34,197,94,0.1)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '12px',
+                opacity: dailyPlayed ? 0.65 : 1, cursor: dailyPlayed ? 'not-allowed' : 'pointer',
+                border: `1px solid ${dailyPlayed ? '#475569' : '#22c55e'}`, borderRadius: '12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.2rem', color: dailyPlayed ? '#64748b' : '#22c55e' }}>📅 {dailyPlayed ? 'Completado hoy ✅' : 'Desafío del Día'}</span>
+              </div>
+              <strong style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                {dailyPlayed ? 'Vuelve mañana para uno nuevo' : `Gen ${dailyConfig?.generation} (${genLabel}) — ${diffLabel} — ${modName}`}
+              </strong>
+            </button>
+              )
+            })()}
+          </div>
+
           <h2 style={{ marginTop: '1.5rem' }}>3. Desafíos de Run <span className="muted" style={{ fontSize: '0.75rem', fontWeight: 'normal' }}>(opcional)</span></h2>
           {(() => {
             const challengesUnlocked = generation === 0
@@ -3096,7 +4130,14 @@ function MainApp() {
           <article className="panel trainer-panel">
             <p className="muted small-tag">Trainer</p>
             <img className="sprite trainer-sprite" src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
-            <h2>{activePokemon.name}{activePokemon.shiny ? ' ✨' : ''}</h2>
+            <h2>
+              {activePokemon.name}{activePokemon.shiny ? ' ✨' : ''}
+              {activePokemon.status && (
+                <span style={{ fontSize: '0.75rem', color: STATUS_COLORS[activePokemon.status.type], marginLeft: '6px' }}>
+                  {STATUS_LABELS[activePokemon.status.type]}
+                </span>
+              )}
+            </h2>
             <p className="muted">
               {generation === 0 ? 'Random All-Stars' : `Gen ${generation}`} · Nv.{activePokemon.level}
             </p>
@@ -3716,6 +4757,11 @@ function MainApp() {
 
                 <p style={{ margin: '0 0 4px 0' }}>
                   <strong style={{ textTransform: 'capitalize' }}>{enemy.name}{enemy.shiny ? ' ✨' : ''}</strong>
+                  {enemy.status && (
+                    <span style={{ fontSize: '0.7rem', color: STATUS_COLORS[enemy.status.type], marginLeft: '4px' }}>
+                      {STATUS_LABELS[enemy.status.type]}
+                    </span>
+                  )}
                   {' · '}Nv.&nbsp;{enemy.level}
                 </p>
                 <img className="sprite enemy-sprite" src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} />
@@ -3736,8 +4782,9 @@ function MainApp() {
                       type="button"
                       disabled={isLoading || (runChallenges.speedrun && speedrunSeconds <= 0)}
                       title={moveTooltip(move)}
+                      style={move.ailment ? { borderColor: STATUS_COLORS[move.ailment] } : undefined}
                     >
-                      {move.name} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''})
+                      {move.name} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''}){move.minHits ? ` x${move.minHits}-${move.maxHits}` : ''}{move.ailment ? ` ${STATUS_LABELS[move.ailment].split(' ')[0]}` : ''}
                     </button>
                   ))}
                 </div>
@@ -3922,6 +4969,242 @@ function MainApp() {
           </button>
         </section>
       )}
+
+      {/* Achievement Popup */}
+      {newAchievement && (
+        <div style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 9999, background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', border: '2px solid #facc15', borderRadius: '16px', padding: '1rem 1.5rem', boxShadow: '0 0 30px rgba(250,204,21,0.3)', animation: 'slideInRight 0.5s ease', maxWidth: '300px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span style={{ fontSize: '2rem' }}>{newAchievement.icon}</span>
+          <div>
+            <div style={{ color: '#facc15', fontWeight: 'bold', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>¡Logro Desbloqueado!</div>
+            <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '1rem' }}>{newAchievement.name}</div>
+            <div style={{ color: '#94a3b8', fontSize: '0.8rem' }}>{newAchievement.desc}</div>
+          </div>
+        </div>
+        <button onClick={handleAchievementDismiss} style={{ position: 'absolute', top: '4px', right: '8px', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+      </div>
+      )}
+
+      {/* Random Event Modal */}
+      {activeRandomEvent && (
+        <div className="modal-backdrop" onClick={() => { playClick(); handleRandomEventChoice() }}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', padding: '2rem' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>{activeRandomEvent.icon}</div>
+            <h3 style={{ color: '#facc15', margin: '0.5rem 0' }}>{activeRandomEvent.title}</h3>
+            <p style={{ color: '#cbd5e1', marginBottom: '1.5rem' }}>{activeRandomEvent.desc}</p>
+            <button className="cta" onClick={() => { playClick(); handleRandomEventChoice() }} style={{ background: '#facc15', color: '#000' }}>¡Continuar!</button>
+          </div>
+        </div>
+      )}
+
+      {/* Trader Modal */}
+      {traderModal && (
+        <div className="modal-backdrop" onClick={() => setTraderModal(false)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
+            <h3 style={{ color: '#facc15', textAlign: 'center', marginBottom: '0.5rem' }}>🎭 Comerciante Misterioso</h3>
+            <p style={{ color: '#94a3b8', textAlign: 'center', marginBottom: '1rem', fontSize: '0.85rem' }}>Elige un Pokémon para intercambiar por uno nuevo de la misma generación.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {team.map((p, i) => (
+                <button key={i} onClick={() => { playClick(); handleTraderChoice(i) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: i === activeIndex ? 'rgba(56,189,248,0.15)' : 'rgba(30,41,59,0.6)', border: `1px solid ${i === activeIndex ? '#38bdf8' : '#334155'}`, borderRadius: '12px', cursor: 'pointer', textAlign: 'left', color: '#e2e8f0' }}>
+                  <img src={p.sprite} alt={p.name} style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{p.name} {p.shiny ? '✨' : ''}</div>
+                    <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Nv.{p.level} — HP:{p.hp}/{p.maxHp} — ATK:{p.attack} DEF:{p.defense} SPD:{p.speed}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <button className="cta" onClick={() => { playClick(); setTraderModal(false); setBattleLog(prev => [`🎭 Rechazaste el intercambio.`, ...prev].slice(0, 15)) }} style={{ marginTop: '1rem', background: '#64748b', width: '100%' }}>Rechazar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Achievements Modal */}
+      {showAchievements && (
+        <div className="modal-backdrop" onClick={() => setShowAchievements(false)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
+            <h2 style={{ color: '#38bdf8', textAlign: 'center', marginBottom: '1rem' }}>🏅 Logros ({Object.values(achievements).filter(a => a.unlocked).length}/{ACHIEVEMENTS.length})</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              {ACHIEVEMENTS.map(a => {
+                const unlocked = achievements[a.id]?.unlocked
+                return (
+                  <div key={a.id} style={{ background: unlocked ? 'rgba(250,204,21,0.1)' : 'rgba(30,41,59,0.5)', border: `1px solid ${unlocked ? '#facc15' : '#334155'}`, borderRadius: '12px', padding: '0.75rem', opacity: !unlocked && a.hidden ? 0.4 : 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '1.5rem' }}>{!unlocked && a.hidden ? '🔒' : a.icon}</span>
+                      <div>
+                        <div style={{ color: unlocked ? '#facc15' : '#94a3b8', fontWeight: 'bold', fontSize: '0.85rem' }}>{!unlocked && a.hidden ? '???' : a.name}</div>
+                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{!unlocked && a.hidden ? 'Oculto' : a.desc}</div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+              <button className="cta" onClick={() => setShowAchievements(false)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Run Stats on Victory */}
+      {screen === 'victory' && (
+        <div className="panel" style={{ maxWidth: '400px', margin: '0 auto', padding: '1rem', background: 'rgba(30,41,59,0.6)', borderRadius: '12px', border: '1px solid #334155' }}>
+          <h3 style={{ color: '#38bdf8', textAlign: 'center', marginBottom: '0.75rem' }}>📊 Estadísticas de la Run</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem' }}>
+            <div style={{ color: '#94a3b8' }}>⚔️ Batallas ganadas:</div><div style={{ color: '#22c55e', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
+            <div style={{ color: '#94a3b8' }}>💥 Daño total infligido:</div><div style={{ color: '#f87171', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
+            <div style={{ color: '#94a3b8' }}>🛡️ Daño total recibido:</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>
+            <div style={{ color: '#94a3b8' }}>🎯 Golpes críticos:</div><div style={{ color: '#facc15', fontWeight: 'bold' }}>{runStats.critsLanded}</div>
+            <div style={{ color: '#94a3b8' }}>🔄 Turnos jugados:</div><div style={{ color: '#cbd5e1', fontWeight: 'bold' }}>{runStats.totalTurns}</div>
+            <div style={{ color: '#94a3b8' }}>📦 Capturas:</div><div style={{ color: '#22d3ee', fontWeight: 'bold' }}>{runStats.captures}</div>
+            <div style={{ color: '#94a3b8' }}>💰 Dinero ganado:</div><div style={{ color: '#facc15', fontWeight: 'bold' }}>${runStats.moneyEarned}</div>
+            <div style={{ color: '#94a3b8' }}>💸 Dinero gastado:</div><div style={{ color: '#f87171', fontWeight: 'bold' }}>${runStats.moneySpent}</div>
+            <div style={{ color: '#94a3b8' }}>🪙 PokéCoins ganadas:</div><div style={{ color: '#facc15', fontWeight: 'bold' }}>+{(() => { const b = difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15; const c = Object.entries(runChallenges).some(([k, v]) => v && k !== 'allShiny') ? 15 : 0; return b + c + (team.length <= 1 ? 5 : 0) })()}</div>
+            {winStreak >= 2 && <><div style={{ color: '#94a3b8' }}>🔥 Racha:</div><div style={{ color: '#f97316', fontWeight: 'bold' }}>{winStreak} seguidas</div></>}
+          </div>
+        </div>
+      )}
+
+      {/* Run Stats on Defeat */}
+      {screen === 'defeat' && (
+        <div className="panel" style={{ maxWidth: '400px', margin: '0 auto', padding: '1rem', background: 'rgba(30,41,59,0.6)', borderRadius: '12px', border: '1px solid #334155' }}>
+          <h3 style={{ color: '#ef4444', textAlign: 'center', marginBottom: '0.75rem' }}>📊 Estadísticas de la Run</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem' }}>
+            <div style={{ color: '#94a3b8' }}>⚔️ Batallas ganadas:</div><div style={{ color: '#22c55e', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
+            <div style={{ color: '#94a3b8' }}>💀 Batallas perdidas:</div><div style={{ color: '#ef4444', fontWeight: 'bold' }}>{runStats.battlesLost}</div>
+            <div style={{ color: '#94a3b8' }}>💥 Daño total infligido:</div><div style={{ color: '#f87171', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
+            <div style={{ color: '#94a3b8' }}>🛡️ Daño total recibido:</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>
+            <div style={{ color: '#94a3b8' }}>🔄 Turnos jugados:</div><div style={{ color: '#cbd5e1', fontWeight: 'bold' }}>{runStats.totalTurns}</div>
+            <div style={{ color: '#94a3b8' }}>📦 Capturas:</div><div style={{ color: '#22d3ee', fontWeight: 'bold' }}>{runStats.captures}</div>
+            <div style={{ color: '#94a3b8' }}>🪙 PokéCoins ganadas:</div><div style={{ color: '#facc15', fontWeight: 'bold' }}>+5</div>
+          </div>
+        </div>
+      )}
+
+      {/* Meta Shop Modal */}
+      {showMetaShop && (
+        <div className="modal-backdrop" onClick={() => setShowMetaShop(false)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
+            <h2 style={{ color: '#facc15', textAlign: 'center', marginBottom: '0.5rem' }}>🪙 PokéShop</h2>
+            <p style={{ textAlign: 'center', color: '#94a3b8', marginBottom: '1rem' }}>Tus PokéCoins: <strong style={{ color: '#facc15' }}>{metaProgression.pokeCoins}</strong></p>
+
+            <h3 style={{ color: '#38bdf8', marginBottom: '0.5rem' }}>🎨 Temas Visuales</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {THEMES.map(theme => {
+                const owned = metaProgression.ownedThemes.includes(theme.id)
+                const active = metaProgression.activeTheme === theme.id
+                return (
+                  <div key={theme.id} style={{ background: theme.colors.bg, border: `2px solid ${active ? '#facc15' : theme.colors.border}`, borderRadius: '12px', padding: '0.75rem', cursor: owned ? 'pointer' : 'default', opacity: owned ? 1 : 0.7 }}
+                    onClick={() => owned ? setTheme(theme.id) : undefined}>
+                    <div style={{ display: 'flex', gap: '4px', marginBottom: '0.5rem' }}>
+                      {[theme.colors.bg, theme.colors.surface, theme.colors.accent, theme.colors.text].map((c, i) => (
+                        <div key={i} style={{ width: '16px', height: '16px', borderRadius: '4px', background: c, border: '1px solid rgba(255,255,255,0.2)' }} />
+                      ))}
+                    </div>
+                    <div style={{ color: theme.colors.text, fontWeight: 'bold', fontSize: '0.85rem' }}>{theme.name}</div>
+                    <div style={{ color: theme.colors.muted, fontSize: '0.75rem' }}>{theme.desc}</div>
+                    {owned ? (
+                      active ? <div style={{ color: '#facc15', fontSize: '0.75rem', marginTop: '4px' }}>✅ Activo</div> : <div style={{ color: theme.colors.muted, fontSize: '0.75rem', marginTop: '4px' }}>Tocado para activar</div>
+                    ) : (
+                      <button className="cta" onClick={(e) => { e.stopPropagation(); buyMetaItem({ ...theme, id: theme.id, category: 'theme' as const }) }}
+                        disabled={metaProgression.pokeCoins < theme.price}
+                        style={{ marginTop: '0.5rem', fontSize: '0.75rem', padding: '4px 12px', background: metaProgression.pokeCoins >= theme.price ? '#facc15' : '#475569', color: '#000' }}>
+                        🪙 {theme.price}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <h3 style={{ color: '#f97316', marginBottom: '0.5rem' }}>🧪 Items Curativos</h3>
+            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Al comprar un item, empezará a aparecer en tiendas y drops durante las partidas.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {META_SHOP_ITEMS.filter(item => item.category === 'consumable').map(item => {
+                const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                return (
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#22c55e' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      {ITEM_SPRITES[item.spriteKey]
+                        ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
+                        : <span style={{ fontSize: '1.5rem' }}>📦</span>
+                      }
+                      <div>
+                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f97316', fontSize: '0.7rem' }}>Consumible</div>
+                      </div>
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    {owned ? (
+                      <div style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                    ) : (
+                      <button className="cta" onClick={() => buyMetaItem(item)}
+                        disabled={metaProgression.pokeCoins < item.price}
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#facc15' : '#475569', color: '#000' }}>
+                        🪙 {item.price}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <h3 style={{ color: '#a855f7', marginBottom: '0.5rem' }}>⚔️ Objetos Pasivos</h3>
+            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Se equipan a un Pokémon y otorgan efectos permanentes durante la batalla.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem' }}>
+              {META_SHOP_ITEMS.filter(item => item.category === 'holdable').map(item => {
+                const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                return (
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#22c55e' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      {ITEM_SPRITES[item.spriteKey]
+                        ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
+                        : <span style={{ fontSize: '1.5rem' }}>📦</span>
+                      }
+                      <div>
+                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#a855f7', fontSize: '0.7rem' }}>Objeto Pasivo</div>
+                      </div>
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    {owned ? (
+                      <div style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                    ) : (
+                      <button className="cta" onClick={() => buyMetaItem(item)}
+                        disabled={metaProgression.pokeCoins < item.price}
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#facc15' : '#475569', color: '#000' }}>
+                        🪙 {item.price}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+              <button className="cta" onClick={() => setShowMetaShop(false)}>Cerrar Tienda</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unlock Animation Popup */}
+      {unlockPopup && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10000, background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', border: '3px solid #facc15', borderRadius: '20px', padding: '2rem 3rem', textAlign: 'center', boxShadow: '0 0 60px rgba(250,204,21,0.4)', animation: 'slideInRight 0.5s ease' }}>
+          <div style={{ marginBottom: '0.5rem', animation: 'pulseGlow 1s infinite' }}>
+            {ITEM_SPRITES[unlockPopup.spriteKey]
+              ? <img src={ITEM_SPRITES[unlockPopup.spriteKey]} alt={unlockPopup.name} style={{ width: '80px', height: '80px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
+              : <span style={{ fontSize: '4rem' }}>📦</span>
+            }
+          </div>
+          <div style={{ color: '#facc15', fontWeight: 'bold', fontSize: '1.1rem', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.25rem' }}>¡Item Desbloqueado!</div>
+          <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '1.4rem', marginBottom: '0.5rem' }}>{unlockPopup.name}</div>
+          <div style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Ahora puede aparecer en las aventuras</div>
+        </div>
+      )}
+
     </main>
   )
 }

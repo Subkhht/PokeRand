@@ -1,4 +1,4 @@
-import type { Move, Pokemon, RawLevelUpMove } from './types'
+import type { Move, Pokemon, RawLevelUpMove, StatusType } from './types'
 
 const API_BASE = 'https://pokeapi.co/api/v2'
 
@@ -151,6 +151,15 @@ async function getSpeciesIdsByGeneration(generation: number): Promise<number[]> 
 }
 
 // 1. Obtiene detalles del movimiento y descarta los de estado/sin daño
+const AILMENT_MAP: Record<string, StatusType> = {
+  'burn': 'burn',
+  'poison': 'poison',
+  'paralysis': 'paralysis',
+  'freeze': 'freeze',
+  'sleep': 'sleep',
+  'confusion': 'confusion',
+}
+
 export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
   try {
     const res = await fetch(moveUrl)
@@ -168,6 +177,18 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
     const esName = data.names?.find((n: any) => n.language?.name === 'es')?.name
     const moveName = esName || capitalize(data.name.replace(/-/g, ' '))
 
+    const ailmentRaw = data.ailment?.name
+    const ailment: StatusType | undefined = ailmentRaw && AILMENT_MAP[ailmentRaw] ? AILMENT_MAP[ailmentRaw] : undefined
+    const ailmentChance = (data.meta?.ailment_chance ?? 0) > 0 ? data.meta.ailment_chance / 100 : undefined
+
+    const minHits = data.meta?.min_hits ?? undefined
+    const maxHits = data.meta?.max_hits ?? undefined
+
+    const recoilCategory = data.meta?.category?.name === 'recoil' || data.meta?.category?.name === 'damage+recoil' || data.meta?.category?.name === 'recoil-percent'
+    const rawDrain = data.meta?.drain ?? 0
+    const recoilPercent = recoilCategory && rawDrain < 0 ? Math.abs(rawDrain) / 100 : undefined
+    const drainPercent = rawDrain > 0 ? rawDrain / 100 : undefined
+
     return {
       name: moveName,
       type: data.type.name,
@@ -176,7 +197,13 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
       description: data.effect_entries.find((e: any) => e.language.name === 'es')?.short_effect
         || data.effect_entries.find((e: any) => e.language.name === 'en')?.short_effect
         || 'Ataque de daño directo.',
-      url: moveUrl
+      url: moveUrl,
+      ailment,
+      ailmentChance,
+      minHits,
+      maxHits,
+      recoilPercent,
+      drainPercent,
     }
   } catch {
     return null

@@ -4,14 +4,14 @@
 
 :root {
   --bg-dark: #0f172a;
-  --panel-bg: #1e293b;
-  --panel-border: #334155;
+  --panel-bg: var(--surface, #1e293b);
+  --panel-border: var(--border, #334155);
   --accent-red: #ef4444;
-  --accent-blue: #38bdf8;
+  --accent-blue: var(--accent, #38bdf8);
   --accent-yellow: #facc15;
   --accent-green: #22c55e;
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
+  --text-main: var(--text, #f8fafc);
+  --text-muted: var(--muted, #94a3b8);
 }
 
 body {
@@ -1352,4 +1352,14 @@ button {
 
 .node-move.current {
   box-shadow: 0 0 8px rgba(226, 232, 240, 0.5) !important;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(120%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 10px rgba(250, 204, 21, 0.3); }
+  50% { box-shadow: 0 0 25px rgba(250, 204, 21, 0.6); }
 }
