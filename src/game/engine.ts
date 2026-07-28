@@ -43,7 +43,7 @@ export function healPokemon(pokemon: Pokemon, amount: number): Pokemon {
   }
 }
 
-export function scalePokemonForNode(base: Pokemon, node: RouteNode, stepIndex: number, levelDelta = 0, difficulty: string = 'medium'): Pokemon {
+export function scalePokemonForNode(base: Pokemon, _node: RouteNode, _stepIndex: number, levelDelta = 0, difficulty: string = 'medium'): Pokemon {
   const hpMultiplier = difficulty === 'infinite' ? 6 : difficulty === 'hard' ? 5 : 4
   const statMultiplier = difficulty === 'infinite' ? 3 : difficulty === 'hard' ? 2.5 : 2
 
