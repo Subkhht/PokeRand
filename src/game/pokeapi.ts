@@ -619,7 +619,8 @@ export async function evolvePokemon(currentPokemon: Pokemon): Promise<Pokemon | 
             .map(d => d.evolved_form?.name)
             .filter((n): n is string => !!n)
           if (validForms.length > 0) {
-            return randomFrom(validForms)
+            const regularForm = validForms.find(f => !f.includes('-'))
+            return regularForm ?? validForms[0]
           }
           return randomEvo.species.name
         }
