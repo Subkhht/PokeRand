@@ -14,7 +14,7 @@ import {
   type PokemonDetails
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
-import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType, StatusCondition } from './game/types'
+import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 
 type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'victory' | 'defeat'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite'
@@ -767,18 +767,16 @@ function MainApp() {
   const [showAchievements, setShowAchievements] = useState<boolean>(false)
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null)
   const [shinyNextEncounter, setShinyNextEncounter] = useState<boolean>(false)
-  const [dailySeed, setDailySeed] = useState<string>(() => {
+  const dailySeed = (() => {
     const d = new Date()
     return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
-  })
+  })()
   const dailySeedRef = useRef(dailySeed)
   const [dailyPlayed, setDailyPlayed] = useState<boolean>(() => {
     try { return localStorage.getItem('pokerand_daily') === dailySeedRef.current } catch { return false }
   })
-  const [isDailyRun, setIsDailyRun] = useState<boolean>(false)
   const isDailyRunRef = useRef(false)
 
-  const [synergyActive, setSynergyActive] = useState<string | null>(null)
   const [activeRandomEvent, setActiveRandomEvent] = useState<{ id: string; icon: string; title: string; desc: string } | null>(null)
   const [traderModal, setTraderModal] = useState<boolean>(false)
   const [randomEventUsed, setRandomEventUsed] = useState<Set<string>>(new Set())
@@ -1065,18 +1063,6 @@ function MainApp() {
       return updated
     })
     setBattleLog(prev => [`🪙 +${amount} PokéCoins (${reason})`, ...prev])
-  }
-
-  function detectSynergy(pkmn: Pokemon): string | null {
-    if (!pkmn.holdItem) return null
-    for (const syn of SYNERGIES) {
-      if (syn.items.includes(pkmn.holdItem)) {
-        const otherItem = syn.items.find(i => i !== pkmn.holdItem)
-        const hasOther = team.some(t => t.holdItem === otherItem && t.name !== pkmn.name)
-        if (hasOther) return syn.name
-      }
-    }
-    return null
   }
 
   function triggerRandomEvent(routeProgress: number): void {
@@ -1475,7 +1461,6 @@ function MainApp() {
       })
       setRandomEventUsed(new Set())
       setShinyNextEncounter(false)
-      setSynergyActive(null)
       setActiveRandomEvent(null)
 
       setScreen('route')
@@ -1617,7 +1602,7 @@ function MainApp() {
       completeCurrentNode()
       return
     }
-    let captured = { ...pokemon, hp: Math.floor(pokemon.maxHp / 2), holdItem: difficulty === 'hard' ? null : pokemon.holdItem }
+    let captured: Pokemon = { ...pokemon, hp: Math.floor(pokemon.maxHp / 2), holdItem: difficulty === 'hard' ? null : pokemon.holdItem }
     if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
     if (runChallenges.fixedLevel) captured = { ...captured, level: 50 }
     registerInPokedex(captured)
@@ -2312,7 +2297,6 @@ function MainApp() {
       const otherItem = syn.items.find(i => i !== itemName)
       const hasOtherInTeam = team.some((p, i) => i !== pokemonIndex && p.holdItem === otherItem)
       if (hasOtherInTeam) {
-        setSynergyActive(syn.name)
         setBattleLog((prev) => [`🔗 ¡SINERGIA: ${syn.name}! ${syn.desc}`, ...prev].slice(0, 15))
         unlockAchievement('synergy_master')
       }
@@ -3155,7 +3139,7 @@ function MainApp() {
     }
 
     const hpBonus = modifier?.playerMaxHpBonus ?? 0
-    let captured = { ...restEncounter, maxHp: restEncounter.maxHp + hpBonus, hp: restEncounter.hp + hpBonus, holdItem: difficulty === 'hard' ? null : restEncounter.holdItem }
+    let captured: Pokemon = { ...restEncounter, maxHp: restEncounter.maxHp + hpBonus, hp: restEncounter.hp + hpBonus, holdItem: difficulty === 'hard' ? null : restEncounter.holdItem }
     if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
     if (runChallenges.fixedLevel) captured = { ...captured, level: 50 }
     registerInPokedex(captured)
@@ -3198,7 +3182,6 @@ function MainApp() {
     setVictoryUnlocks(null)
     setIsTrainerBattle(false)
     isDailyRunRef.current = false
-    setIsDailyRun(false)
     setTrainerTeam([])
     setTrainerPokemonIndex(0)
     setTrainerName('')
@@ -3963,7 +3946,6 @@ function MainApp() {
                 if (!dailyConfig) return
                 playClick()
                 isDailyRunRef.current = true
-                setIsDailyRun(true)
                 startNewRun()
               }}
               onMouseEnter={playHover}
@@ -5108,7 +5090,7 @@ function MainApp() {
                     {owned ? (
                       active ? <div style={{ color: '#facc15', fontSize: '0.75rem', marginTop: '4px' }}>✅ Activo</div> : <div style={{ color: theme.colors.muted, fontSize: '0.75rem', marginTop: '4px' }}>Tocado para activar</div>
                     ) : (
-                      <button className="cta" onClick={(e) => { e.stopPropagation(); buyMetaItem({ ...theme, id: theme.id, category: 'theme' as const }) }}
+                      <button className="cta" onClick={(e) => { e.stopPropagation(); buyMetaItem({ ...theme, id: theme.id, category: 'theme' as const, spriteKey: theme.id }) }}
                         disabled={metaProgression.pokeCoins < theme.price}
                         style={{ marginTop: '0.5rem', fontSize: '0.75rem', padding: '4px 12px', background: metaProgression.pokeCoins >= theme.price ? '#facc15' : '#475569', color: '#000' }}>
                         🪙 {theme.price}

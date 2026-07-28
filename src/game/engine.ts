@@ -20,7 +20,7 @@ export function getDailyConfig(seed: string, unlockedGens: number[]): { generati
   const difficulties: Array<'easy' | 'medium' | 'hard'> = ['easy', 'medium', 'hard']
   const difficulty = difficulties[Math.floor(rng() * difficulties.length)]
   const modifierIdx = Math.floor(rng() * RUN_MODIFIERS.length)
-  return { generation: gen, difficulty, modifierId: RUN_MODIFIERS[modifierIdx].id }
+  return { generation: gen, difficulty, modifierId: RUN_MODIFIERS[modifierIdx].id ?? 'none' }
 }
 
 export function applyDamage(
