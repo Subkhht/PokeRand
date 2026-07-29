@@ -1717,7 +1717,7 @@ function MainApp() {
       setRunStats({
         battlesWon: 0, battlesLost: 0, totalDamageDealt: 0, totalDamageTaken: 0,
         critsLanded: 0, superEffectiveHits: 0, koFirstTurn: 0, captures: 0,
-        itemsUsed: 0, moneySpent: 0, moneyEarned: 0, nodesCleared: 0,
+        itemsUsed: 0, moneySpent: 0, moneyEarned: 0, nodesCleared: 0, evolutions: 0,
         teamSizeMax: 1, lowestHPEver: starterWithBonus.hp, totalTurns: 0,
         pokemonUsed: [starterWithBonus.name], challengesActive: activeChallengeNames,
       })
@@ -1844,11 +1844,7 @@ function MainApp() {
 
       const hasActiveChallenge = activeChallengeCount > 0
       const baseCoins = difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15
-
-      const newTotalWins = metaProgression.totalWins + 1
-      const newTotalRuns = metaProgression.totalRuns + 1
       let coinAward = baseCoins + (hasActiveChallenge ? 15 : 0) + (team.length <= 1 ? 5 : 0)
-      const newPokeCoins = metaProgression.pokeCoins + coinAward
 
       setMetaProgression(prev => {
         const coins = baseCoins + (hasActiveChallenge ? 15 : 0)
