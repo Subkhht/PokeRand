@@ -1844,7 +1844,6 @@ function MainApp() {
 
       const hasActiveChallenge = activeChallengeCount > 0
       const baseCoins = difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15
-      let coinAward = baseCoins + (hasActiveChallenge ? 15 : 0) + (team.length <= 1 ? 5 : 0)
 
       setMetaProgression(prev => {
         const coins = baseCoins + (hasActiveChallenge ? 15 : 0)
