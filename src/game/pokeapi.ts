@@ -400,8 +400,7 @@ export async function buildPokemonFromApi(
     sprite: (() => {
       const id = data.id
       const gen5Animated = data.sprites.versions?.['generation-v']?.['black-white']?.animated?.front_default
-      const showdown = data.sprites.other?.showdown?.front_default
-      const baseSprite = gen5Animated ?? showdown ?? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+      const baseSprite = gen5Animated ?? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
       return shiny ? makeShinySprite(baseSprite, id) : baseSprite
     })(),
     shiny: shiny || undefined,
