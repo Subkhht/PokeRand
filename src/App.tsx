@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef, Component, type ReactNode } from 'react'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
-import { playHover, playClick, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume } from './game/sound'
+import { playHover, playClick, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -504,7 +504,7 @@ interface MetaShopItem {
   desc: string
   price: number
   spriteKey: string
-  category: 'consumable' | 'holdable' | 'theme'
+  category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music'
 }
 
 const META_SHOP_ITEMS: MetaShopItem[] = [
@@ -546,6 +546,10 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_iron_ball', name: 'Iron Ball', desc: '+25% DEF, -10% Vel.', price: 50, spriteKey: 'Iron Ball', category: 'holdable' },
   { id: 'unlock_vampire_fang', name: 'Vampire Fang', desc: '15% Lifesteal.', price: 70, spriteKey: 'Vampire Fang', category: 'holdable' },
   { id: 'unlock_cursed_blade', name: 'Cursed Blade', desc: '+35% ATK, -5 HP/turno.', price: 90, spriteKey: 'Cursed Blade', category: 'holdable' },
+  { id: 'unlock_mega_node', name: 'Nodo Mega', desc: 'Desbloquea nodos de Mega Piedra en Hard/Infinite.', price: 150, spriteKey: 'Mega Stone', category: 'upgrade' },
+  { id: 'unlock_gmax_node', name: 'Nodo G-MAX', desc: 'Desbloquea nodos G-MAX en Hard/Infinite.', price: 200, spriteKey: 'Dynamax Band', category: 'upgrade' },
+  { id: 'music_menu_chill', name: 'Menú Relax', desc: 'Música de menú relajante y ambiental.', price: 40, spriteKey: 'Potion', category: 'music' },
+  { id: 'music_battle_epic', name: 'Batalla Épica', desc: 'Música de batalla más intensa y rápida.', price: 60, spriteKey: 'Potion', category: 'music' },
 ]
 
 function fallbackSprite(e: React.SyntheticEvent<HTMLImageElement>) {
@@ -873,6 +877,7 @@ function MainApp() {
 
   // Opciones / Volumen
   const [showOptions, setShowOptions] = useState<boolean>(false)
+  const optionsBeganInBattle = useRef(false)
   const [volume, setVolumeState] = useState<number>(() => Math.round(getVolume() * 100))
   const [sfxVol, setSfxVolState] = useState<number>(() => Math.round(getSfxVolume() * 100))
 
@@ -925,9 +930,15 @@ function MainApp() {
   const [metaProgression, setMetaProgression] = useState<MetaProgression>(() => {
     try {
       const saved = localStorage.getItem('pokerand_meta')
-      if (saved) return JSON.parse(saved)
+      if (saved) {
+        const data = JSON.parse(saved) as MetaProgression
+        if (!data.ownedMusic) data.ownedMusic = []
+        if (!data.activeMenuMusic) data.activeMenuMusic = 'default'
+        if (!data.activeBattleMusic) data.activeBattleMusic = 'default'
+        return data
+      }
     } catch {}
-    return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark' }
+    return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark', ownedMusic: [], activeMenuMusic: 'default', activeBattleMusic: 'default' }
   })
   const [showAchievements, setShowAchievements] = useState<boolean>(false)
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null)
@@ -1015,11 +1026,20 @@ function MainApp() {
     document.body.style.color = theme.colors.text
   }, [metaProgression.activeTheme])
 
-  function buyMetaItem(item: MetaShopItem & { category: 'consumable' | 'holdable' | 'theme' }): void {
+  function buyMetaItem(item: MetaShopItem & { category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' }): void {
     if (metaProgression.pokeCoins < item.price) return
     if (item.category === 'theme') {
       if (metaProgression.ownedThemes.includes(item.id)) return
       const updated = { ...metaProgression, pokeCoins: metaProgression.pokeCoins - item.price, ownedThemes: [...metaProgression.ownedThemes, item.id] }
+      setMetaProgression(updated)
+      localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+      setUnlockPopup({ name: item.name, spriteKey: 'Potion' })
+      setTimeout(() => setUnlockPopup(null), 3000)
+      return
+    }
+    if (item.category === 'music') {
+      if (metaProgression.ownedMusic.includes(item.id)) return
+      const updated = { ...metaProgression, pokeCoins: metaProgression.pokeCoins - item.price, ownedMusic: [...metaProgression.ownedMusic, item.id] }
       setMetaProgression(updated)
       localStorage.setItem('pokerand_meta', JSON.stringify(updated))
       setUnlockPopup({ name: item.name, spriteKey: 'Potion' })
@@ -1457,9 +1477,9 @@ function MainApp() {
           type = 'pokeRand'
         } else if (rand < 0.48) {
           type = 'move'
-        } else if (rand < 0.54) {
+        } else if (rand < 0.54 && metaProgression.permanentlyUnlockedItems.includes('unlock_mega_node')) {
           type = 'mega'
-        } else if (rand < 0.60) {
+        } else if (rand < 0.60 && metaProgression.permanentlyUnlockedItems.includes('unlock_gmax_node')) {
           type = 'gmax'
         }
       } else {
@@ -1596,13 +1616,13 @@ function MainApp() {
               movePositions.push(available[idx])
               available.splice(idx, 1)
             }
-            if (available.length > 0) {
+            if (available.length > 0 && metaProgression.permanentlyUnlockedItems.includes('unlock_mega_node')) {
               const idx = Math.floor(rr() * available.length)
               megaPosition = available[idx]
               available.splice(idx, 1)
               megaNodeSpawnedRef.current = true
             }
-            if (available.length > 0) {
+            if (available.length > 0 && metaProgression.permanentlyUnlockedItems.includes('unlock_gmax_node')) {
               const idx = Math.floor(rr() * available.length)
               gmaxPosition = available[idx]
               available.splice(idx, 1)
@@ -3435,7 +3455,7 @@ function MainApp() {
               setInventory(prev => [...prev, 'Dynamax Band'])
               logs.push(`⚡ ¡Has obtenido la Banda Dynamax! Equípala para gigamaximar en combate.`)
             } else {
-              const price = 200
+              const price = 100
               setMetaProgression(prev => ({ ...prev, pokeCoins: prev.pokeCoins + price }))
               logs.push(`⚡ Ya tienes una Banda Dynamax. Recibes ${price} PokéCoins en su lugar.`)
             }
@@ -3471,7 +3491,7 @@ function MainApp() {
           setInventory(prev => [...prev, 'Dynamax Band'])
           logs.push(`⚡ ¡Has obtenido la Banda Dynamax! Equípala para gigamaximar en combate.`)
         } else {
-          const price = 200
+          const price = 100
           setMetaProgression(prev => ({ ...prev, pokeCoins: prev.pokeCoins + price }))
           logs.push(`⚡ Ya tienes una Banda Dynamax. Recibes ${price} PokéCoins en su lugar.`)
         }
@@ -3800,6 +3820,18 @@ function MainApp() {
     }
   }
 
+  function closeOptions(): void {
+    const wasInBattle = optionsBeganInBattle.current
+    optionsBeganInBattle.current = false
+    setShowOptions(false)
+    if (wasInBattle) {
+      startBattleMusic(true)
+    } else {
+      stopMusic()
+      setTimeout(startMenuMusic, 350)
+    }
+  }
+
   const pokedexList = Object.values(pokedex)
   const pokedexSeen = pokedexList.filter(p => p.seen).length
   const pokedexCaught = pokedexList.filter(p => p.caught).length
@@ -3817,7 +3849,7 @@ function MainApp() {
           <button className="tiny-btn" type="button" onClick={() => setShowPokedex(true)}>
             📖 Pokédex ({pokedexCaught}/{pokedexSeen})
           </button>
-          <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowOptions(!showOptions) }}>
+          <button className="tiny-btn" type="button" onClick={() => { playClick(); optionsBeganInBattle.current = screen === 'battle'; setShowOptions(!showOptions) }}>
             ⚙️ Opciones
           </button>
           <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowAchievements(!showAchievements) }}>
@@ -4213,7 +4245,7 @@ function MainApp() {
 
       {/* Modal Opciones */}
       {showOptions && (
-        <div className="modal-backdrop" onClick={() => setShowOptions(false)}>
+        <div className="modal-backdrop" onClick={closeOptions}>
           <div className="pokedex-frame" style={{ maxWidth: '380px' }} onClick={(e) => e.stopPropagation()}>
             <div className="pokedex-top-bar">
               <div className="big-blue-sensor"></div>
@@ -4287,6 +4319,86 @@ function MainApp() {
                   ))}
                 </div>
               </div>
+
+              {/* Music selectors */}
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+                <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.75rem' }}>
+                  🎵 Música
+                </strong>
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Menú:</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {[
+                      { id: 'default', name: 'Menú Clásico', always: true },
+                      { id: 'chill', name: 'Menú Relax', always: false },
+                    ].map(track => {
+                      const unlocked = track.always || metaProgression.ownedMusic.includes('music_menu_chill')
+                      const active = metaProgression.activeMenuMusic === track.id
+                      return (
+                        <button key={track.id} type="button"
+                          onClick={() => {
+                            if (!unlocked) return
+                            playClick()
+                            const updated = { ...metaProgression, activeMenuMusic: track.id }
+                            setMetaProgression(updated)
+                            localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+                            setMenuMusicTrack(track.id)
+                            stopMusic()
+                            setTimeout(startMenuMusic, 350)
+                          }}
+                          disabled={!unlocked}
+                          style={{
+                            padding: '6px 12px', borderRadius: '8px',
+                            border: `2px solid ${active ? '#facc15' : '#475569'}`,
+                            background: unlocked ? '#1e293b' : '#0f172a',
+                            color: unlocked ? '#e2e8f0' : '#475569',
+                            cursor: unlocked ? 'pointer' : 'not-allowed',
+                            fontSize: '0.75rem', fontWeight: 'bold',
+                            opacity: unlocked ? 1 : 0.5,
+                          }}>
+                          {track.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Batalla:</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {[
+                      { id: 'default', name: 'Batalla Clásica', always: true },
+                      { id: 'epic', name: 'Batalla Épica', always: false },
+                    ].map(track => {
+                      const unlocked = track.always || metaProgression.ownedMusic.includes('music_battle_epic')
+                      const active = metaProgression.activeBattleMusic === track.id
+                      return (
+                        <button key={track.id} type="button"
+                          onClick={() => {
+                            if (!unlocked) return
+                            playClick()
+                            const updated = { ...metaProgression, activeBattleMusic: track.id }
+                            setMetaProgression(updated)
+                            localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+                            setBattleMusicTrack(track.id)
+                            startBattleMusic(true)
+                          }}
+                          disabled={!unlocked}
+                          style={{
+                            padding: '6px 12px', borderRadius: '8px',
+                            border: `2px solid ${active ? '#facc15' : '#475569'}`,
+                            background: unlocked ? '#1e293b' : '#0f172a',
+                            color: unlocked ? '#e2e8f0' : '#475569',
+                            cursor: unlocked ? 'pointer' : 'not-allowed',
+                            fontSize: '0.75rem', fontWeight: 'bold',
+                            opacity: unlocked ? 1 : 0.5,
+                          }}>
+                          {track.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
             </div>
 
@@ -4294,7 +4406,7 @@ function MainApp() {
               <div className="d-pad" title="D-Pad Options"></div>
               <button
                 className="pokedex-close-btn"
-                onClick={() => setShowOptions(false)}
+                onClick={closeOptions}
               >
                 CERRAR
               </button>
@@ -5026,6 +5138,54 @@ function MainApp() {
                     )
                   })()}
                 </div>
+
+                <details style={{ marginTop: '1rem', borderTop: '1px solid #334155', paddingTop: '0.75rem' }}>
+                  <summary style={{ cursor: 'pointer', color: '#f87171', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                    🏷️ Vender Objetos (50% del precio)
+                  </summary>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto' }}>
+                    {inventory.filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band').length === 0 ? (
+                      <p style={{ color: '#64748b', fontSize: '0.8rem' }}>No tienes objetos para vender.</p>
+                    ) : (
+                      inventory.filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band').map((itemName) => {
+                        const consumable = ALL_SHOP_ITEMS[itemName]
+                        const holdable = HOLDABLE_ITEMS[itemName]
+                        if (!consumable && !holdable) return null
+                        const data = consumable ?? holdable!
+                        const sellPrice = Math.floor(data.price * 0.5)
+                        const itemIcon = ITEM_SPRITES[itemName]
+                        return (
+                          <div key={itemName}
+                            style={{
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              background: 'rgba(248, 113, 113, 0.08)', padding: '6px 10px', borderRadius: '6px',
+                              border: '1px solid rgba(248, 113, 113, 0.2)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {itemIcon && <img src={itemIcon} alt={itemName} style={{ width: '24px', height: '24px', imageRendering: 'pixelated' }} />}
+                              <span style={{ color: '#e2e8f0', fontSize: '0.85rem' }}>{itemName}</span>
+                            </div>
+                            <button className="tiny-btn" type="button"
+                              onClick={() => {
+                                setInventory(prev => {
+                                  const idx = prev.indexOf(itemName)
+                                  if (idx === -1) return prev
+                                  return [...prev.slice(0, idx), ...prev.slice(idx + 1)]
+                                })
+                                setMoney(prev => prev + sellPrice)
+                                setBattleLog(prev => [`💰 Vendiste ${itemName} por $${sellPrice}.`, ...prev].slice(0, 15))
+                              }}
+                              style={{ background: '#ef4444', minWidth: '60px', color: '#0f172a', fontWeight: 'bold' }}
+                            >
+                              ${sellPrice}
+                            </button>
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+                </details>
 
                 <button className="cta" onClick={completeCurrentNode} type="button" style={{ width: '100%' }}>
                   Salir de la Tienda
@@ -5773,6 +5933,64 @@ function MainApp() {
                       <div>
                         <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
                         <div style={{ color: '#f97316', fontSize: '0.7rem' }}>Consumible</div>
+                      </div>
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    {owned ? (
+                      <div style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                    ) : (
+                      <button className="cta" onClick={() => buyMetaItem(item)}
+                        disabled={metaProgression.pokeCoins < item.price}
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#facc15' : '#475569', color: '#000' }}>
+                        🪙 {item.price}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <h3 style={{ color: '#22d3ee', marginBottom: '0.5rem' }}>⚙️ Mejoras</h3>
+            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea nodos especiales en las rutas Hard/Infinite.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {META_SHOP_ITEMS.filter(item => item.category === 'upgrade').map(item => {
+                const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                return (
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#22c55e' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '1.5rem' }}>⚙️</span>
+                      <div>
+                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#22d3ee', fontSize: '0.7rem' }}>Mejora</div>
+                      </div>
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    {owned ? (
+                      <div style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                    ) : (
+                      <button className="cta" onClick={() => buyMetaItem(item)}
+                        disabled={metaProgression.pokeCoins < item.price}
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#facc15' : '#475569', color: '#000' }}>
+                        🪙 {item.price}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <h3 style={{ color: '#f472b6', marginBottom: '0.5rem' }}>🎵 Música</h3>
+            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Nuevas pistas musicales para el menú y los combates.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {META_SHOP_ITEMS.filter(item => item.category === 'music').map(item => {
+                const owned = metaProgression.ownedMusic.includes(item.id)
+                return (
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#22c55e' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '1.5rem' }}>🎵</span>
+                      <div>
+                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f472b6', fontSize: '0.7rem' }}>Música</div>
                       </div>
                     </div>
                     <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>

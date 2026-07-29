@@ -5,6 +5,8 @@ let musicTimeoutId: ReturnType<typeof setTimeout> | null = null
 let currentTrack: string = 'none'
 let masterVolume = 0.5
 let sfxVolume = 0.5
+let activeMenuMusic = 'default'
+let activeBattleMusic = 'default'
 
 function getCtx(): AudioContext {
   if (!ctx) ctx = new AudioContext()
@@ -99,6 +101,24 @@ export function playClick(): void {
   } catch { /* silent */ }
 }
 
+export function setMenuMusicTrack(id: string): void {
+  activeMenuMusic = id
+}
+export function setBattleMusicTrack(id: string): void {
+  activeBattleMusic = id
+}
+export function getMenuMusicTrack(): string { return activeMenuMusic }
+export function getBattleMusicTrack(): string { return activeBattleMusic }
+export function isBattleMusicPlaying(): boolean { return currentTrack === 'battle' && musicPlaying }
+export function getAvailableMusicTracks(): Array<{ id: string; name: string; type: 'menu' | 'battle' }> {
+  return [
+    { id: 'menu_default', name: 'Menú Clásico', type: 'menu' },
+    { id: 'menu_chill', name: 'Menú Relax', type: 'menu' },
+    { id: 'battle_default', name: 'Batalla Clásica', type: 'battle' },
+    { id: 'battle_epic', name: 'Batalla Épica', type: 'battle' },
+  ]
+}
+
 // ─── MENU MUSIC (Route theme) ───
 
 const MENU_MELODY: Array<[number, number, OscillatorType]> = [
@@ -129,6 +149,36 @@ function scheduleMenuLoop() {
   musicTimeoutId = setTimeout(scheduleMenuLoop, Math.max(t, bt) * 1000 - 100)
 }
 
+// ─── MENU CHILL ───
+
+const MENU_CHILL_MELODY: Array<[number, number, OscillatorType]> = [
+  [262, 0.6, 'triangle'], [294, 0.6, 'triangle'], [330, 0.6, 'triangle'], [349, 0.6, 'triangle'],
+  [392, 1.2, 'triangle'], [330, 0.6, 'triangle'], [392, 2.0, 'triangle'],
+  [440, 0.6, 'triangle'], [392, 0.6, 'triangle'], [330, 0.6, 'triangle'], [294, 0.6, 'triangle'],
+  [262, 1.2, 'triangle'], [220, 0.6, 'triangle'], [262, 2.0, 'triangle'],
+  [294, 0.6, 'triangle'], [262, 0.6, 'triangle'], [220, 0.6, 'triangle'], [196, 0.6, 'triangle'],
+  [220, 1.2, 'triangle'], [262, 0.6, 'triangle'], [220, 2.0, 'triangle'],
+  [196, 0.6, 'triangle'], [175, 0.6, 'triangle'], [196, 0.6, 'triangle'], [220, 0.6, 'triangle'],
+  [262, 1.2, 'triangle'], [220, 0.6, 'triangle'], [196, 2.0, 'triangle'],
+]
+
+const MENU_CHILL_BASS: Array<[number, number]> = [
+  [65, 3], [82, 3], [98, 3], [82, 3], [65, 3], [55, 3],
+  [65, 3], [73, 3], [65, 3], [55, 3], [49, 3], [55, 3], [65, 3], [55, 3],
+]
+
+function scheduleMenuChillLoop() {
+  if (!musicPlaying || !ctx || !musicGain || currentTrack !== 'menu') return
+  const ac = ctx
+  const now = ac.currentTime + 0.05
+  const dest = musicGain
+  let t = 0
+  for (const [f, d, w] of MENU_CHILL_MELODY) { note(ac, dest, f, now + t, d * 0.5, w, 0.045); t += d * (60 / 100) }
+  let bt = 0
+  for (const [f, d] of MENU_CHILL_BASS) { note(ac, dest, f, now + bt, d * (60 / 100) * 0.6, 'triangle', 0.04); bt += d * (60 / 100) }
+  musicTimeoutId = setTimeout(scheduleMenuChillLoop, Math.max(t, bt) * 1000 - 100)
+}
+
 export function startMenuMusic(): void {
   if (currentTrack === 'menu' && musicPlaying) return
   stopScheduling()
@@ -136,7 +186,8 @@ export function startMenuMusic(): void {
   currentTrack = 'menu'
   musicPlaying = true
   createMusicChain()
-  scheduleMenuLoop()
+  if (activeMenuMusic === 'chill') scheduleMenuChillLoop()
+  else scheduleMenuLoop()
 }
 
 // ─── BATTLE MUSIC (GBA-style) ───
@@ -192,14 +243,82 @@ function scheduleBattleLoop() {
   musicTimeoutId = setTimeout(scheduleBattleLoop, Math.max(t, bt) * 1000 - 80)
 }
 
-export function startBattleMusic(): void {
-  if (currentTrack === 'battle' && musicPlaying) return
+// ─── BATTLE EPIC ───
+
+const BATTLE_EPIC_MELODY: Array<[number, number, OscillatorType]> = [
+  [392, 0.3, 'triangle'], [494, 0.3, 'triangle'], [587, 0.3, 'triangle'], [494, 0.3, 'triangle'],
+  [587, 0.4, 'triangle'], [659, 0.2, 'triangle'], [587, 0.2, 'triangle'], [494, 0.4, 'triangle'],
+  [440, 0.3, 'triangle'], [587, 0.3, 'triangle'], [494, 0.3, 'triangle'], [440, 0.3, 'triangle'],
+  [392, 0.4, 'triangle'], [440, 0.2, 'triangle'], [494, 0.2, 'triangle'], [587, 0.4, 'triangle'],
+  [494, 0.3, 'square'], [587, 0.3, 'square'], [659, 0.3, 'square'], [587, 0.3, 'square'],
+  [494, 0.4, 'square'], [587, 0.2, 'square'], [659, 0.6, 'square'],
+  [784, 0.3, 'square'], [659, 0.3, 'square'], [587, 0.3, 'square'], [494, 0.3, 'square'],
+  [587, 0.4, 'square'], [659, 0.2, 'square'], [587, 0.2, 'square'], [494, 0.4, 'square'],
+  [587, 0.3, 'triangle'], [494, 0.3, 'triangle'], [440, 0.3, 'triangle'], [392, 0.3, 'triangle'],
+  [330, 0.4, 'triangle'], [392, 0.2, 'triangle'], [440, 0.2, 'triangle'], [494, 0.4, 'triangle'],
+  [523, 0.3, 'square'], [587, 0.3, 'square'], [659, 0.3, 'square'], [784, 0.3, 'square'],
+  [880, 0.4, 'square'], [784, 0.2, 'square'], [659, 0.2, 'square'], [587, 0.4, 'square'],
+  [494, 0.3, 'square'], [587, 0.3, 'square'], [659, 0.4, 'square'],
+  [494, 0.3, 'square'], [440, 0.3, 'square'], [392, 0.6, 'triangle'],
+  [392, 0.2, 'triangle'], [494, 0.2, 'triangle'], [587, 0.4, 'triangle'],
+  [659, 0.3, 'triangle'], [784, 0.3, 'triangle'], [880, 0.4, 'triangle'],
+  [784, 0.3, 'triangle'], [659, 0.3, 'triangle'], [587, 0.3, 'triangle'], [494, 0.3, 'triangle'],
+  [523, 0.4, 'square'], [494, 0.2, 'square'], [440, 0.2, 'square'],
+  [392, 0.8, 'square'],
+]
+
+const BATTLE_EPIC_BASS: Array<[number, number]> = [
+  [196, 0.25], [196, 0.25], [196, 0.25], [196, 0.25],
+  [175, 0.25], [175, 0.25], [175, 0.25], [175, 0.25],
+  [165, 0.25], [165, 0.25], [165, 0.25], [165, 0.25],
+  [147, 0.25], [147, 0.25], [147, 0.25], [147, 0.25],
+  [131, 0.25], [131, 0.25], [131, 0.25], [131, 0.25],
+  [147, 0.25], [147, 0.25], [147, 0.25], [147, 0.25],
+  [165, 0.25], [165, 0.25], [165, 0.25], [165, 0.25],
+  [175, 0.25], [175, 0.25], [175, 0.25], [175, 0.25],
+  [196, 0.25], [196, 0.25], [196, 0.25], [196, 0.25],
+  [220, 0.25], [220, 0.25], [220, 0.25], [220, 0.25],
+  [247, 0.25], [247, 0.25], [247, 0.25], [247, 0.25],
+  [262, 0.25], [262, 0.25], [262, 0.25], [262, 0.25],
+  [294, 0.25], [294, 0.25], [294, 0.25], [294, 0.25],
+  [262, 0.25], [262, 0.25], [262, 0.25], [262, 0.25],
+  [247, 0.25], [247, 0.25], [247, 0.25], [247, 0.25],
+  [220, 0.25], [220, 0.25], [220, 0.25], [220, 0.25],
+  [196, 0.50], [165, 0.25], [175, 0.25],
+  [196, 0.25], [196, 0.25], [196, 0.25], [196, 0.25],
+  [196, 0.25], [196, 0.25], [196, 0.25], [196, 0.25],
+  [196, 0.25], [196, 0.25], [196, 0.25], [196, 0.25],
+]
+
+function scheduleBattleEpicLoop() {
+  if (!musicPlaying || !ctx || !musicGain || currentTrack !== 'battle') return
+  const ac = ctx
+  const now = ac.currentTime + 0.05
+  const dest = musicGain
+  let t = 0
+  for (const [f, d, w] of BATTLE_EPIC_MELODY) { note(ac, dest, f, now + t, d * B * 0.8, w, 0.055); t += d * B }
+  let bt = 0
+  for (const [f, d] of BATTLE_EPIC_BASS) {
+    note(ac, dest, f, now + bt, d * B * 0.6, 'sawtooth', 0.04)
+    bt += d * B
+  }
+  let ht = 0
+  for (const [, d] of BATTLE_EPIC_BASS) {
+    noise(ac, dest, now + ht, B * 0.08, 0.015)
+    ht += d * B
+  }
+  musicTimeoutId = setTimeout(scheduleBattleEpicLoop, Math.max(t, bt) * 1000 - 80)
+}
+
+export function startBattleMusic(force = false): void {
+  if (!force && currentTrack === 'battle' && musicPlaying) return
   stopScheduling()
   fadeOutMusic(200)
   currentTrack = 'battle'
   musicPlaying = true
   createMusicChain()
-  scheduleBattleLoop()
+  if (activeBattleMusic === 'epic') scheduleBattleEpicLoop()
+  else scheduleBattleLoop()
 }
 
 // ─── VICTORY FANFARE ───

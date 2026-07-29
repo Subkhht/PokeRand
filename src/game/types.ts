@@ -170,4 +170,7 @@ export interface MetaProgression {
   permanentlyUnlockedItems: string[]
   ownedThemes: string[]
   activeTheme: string
+  ownedMusic: string[]
+  activeMenuMusic: string
+  activeBattleMusic: string
 }
