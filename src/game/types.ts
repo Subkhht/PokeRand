@@ -45,12 +45,14 @@ export interface Pokemon {
   holdItem?: string | null
   shiny?: boolean
   megaEvolved?: boolean
+  gmaxEvolved?: boolean
+  gmaxTurnsLeft?: number
   status?: StatusCondition
 }
 
 export interface RouteNode {
   id: number
-  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket' | 'spin' | 'pokeRand' | 'move' | 'mega'
+  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax'
   label: string
   done: boolean
 }

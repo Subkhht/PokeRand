@@ -17,7 +17,7 @@ import {
 import { getTypeEffectiveness } from './game/typesChart'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'victory' | 'defeat'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'victory' | 'defeat'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite'
 
 const STATUS_LABELS: Record<StatusType, string> = {
@@ -162,6 +162,7 @@ const ITEM_SPRITES: Record<string, string> = {
   'Vampire Fang': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/float-stone.png',
   'Cursed Blade': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/razor-claw.png',
   'Mega Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/key-stone.png',
+  'Dynamax Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png',
 }
 
 interface HoldableItem {
@@ -180,6 +181,7 @@ interface HoldableItem {
   lowHpBonus?: number
   firstStrikeBonus?: number
   isMegaStone?: boolean
+  isGmaxBand?: boolean
 }
 
 const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
@@ -212,6 +214,7 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Vampire Fang': { name: 'Vampire Fang', desc: '15% Robo de Vida', price: 350, lifesteal: 0.15 },
   'Cursed Blade': { name: 'Cursed Blade', desc: '+35% Ataque, -5 HP por turno', price: 450, attackMod: 0.35, healPerTurn: -5 },
   'Mega Stone': { name: 'Mega Stone', desc: 'Permite mega-evolucionar 1 vez por combate', price: 700, isMegaStone: true },
+  'Dynamax Band': { name: 'Dynamax Band', desc: 'Permite gigamaximar 1 vez por combate (3 turnos)', price: 0, isGmaxBand: true },
 }
 
 const HOLDABLE_ITEM_NAMES = Object.keys(HOLDABLE_ITEMS)
@@ -249,6 +252,22 @@ const MEGA_FORM_IDS: Record<number, number | number[]> = {
   807: 10319,
   870: 10303, 952: 10320, 970: 10321, 978: [10322, 10323, 10324],
   998: 10325,
+}
+
+const GMAX_CAPABLE_IDS = new Set([
+  3, 6, 9, 12, 25, 52, 68, 94, 99, 131, 133, 143, 569, 809,
+  812, 815, 818, 823, 826, 834, 839, 841, 842, 844, 849, 851,
+  858, 861, 869, 879, 884, 892,
+])
+
+const GMAX_FORM_IDS: Record<number, number | number[]> = {
+  3: 10195, 6: 10196, 9: 10197, 12: 10198, 25: 10199, 52: 10200,
+  68: 10201, 94: 10202, 99: 10203, 131: 10204, 133: 10205, 143: 10206,
+  569: 10207, 809: 10208, 812: 10209, 815: 10210, 818: 10211,
+  823: 10212, 826: 10213, 834: 10214, 839: 10215, 841: 10216,
+  842: 10217, 844: 10218, 849: [10219, 10228], 851: 10220,
+  858: 10221, 861: 10222, 869: 10223, 879: 10224, 884: 10225,
+  892: [10226, 10227],
 }
 
 const ACHIEVEMENTS: Achievement[] = [
@@ -646,6 +665,8 @@ function nodeTypeLabel(node: RouteNode): string {
       return 'Move'
     case 'mega':
       return 'Mega'
+    case 'gmax':
+      return 'G-MAX'
     default:
       return node.type
   }
@@ -841,6 +862,7 @@ function MainApp() {
   const speedrunTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const megaNodeSpawnedRef = useRef(false)
   const [battleMegaUsed, setBattleMegaUsed] = useState(false)
+  const [battleGmaxUsed, setBattleGmaxUsed] = useState(false)
   const originalPokemonDataRef = useRef<Record<number, { sprite: string; attack: number; defense: number; speed: number }>>({})
 
   // Pokédex
@@ -932,17 +954,17 @@ function MainApp() {
 
   useEffect(() => { startMenuMusic() }, [])
 
-  // Reset mega state when battle ends
+  // Reset mega/gmax state when battle ends
   useEffect(() => {
     if (screen === 'defeat' || screen === 'victory') {
       setTeam(prev => prev.map((p, i) => {
         const orig = originalPokemonDataRef.current[i]
-        if (orig) return { ...p, megaEvolved: false, ...orig }
-        if (p.megaEvolved) return { ...p, megaEvolved: false }
-        return p
+        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined, ...orig }
+        return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined }
       }))
       originalPokemonDataRef.current = {}
       setBattleMegaUsed(false)
+      setBattleGmaxUsed(false)
     }
   }, [screen])
 
@@ -1437,6 +1459,8 @@ function MainApp() {
           type = 'move'
         } else if (rand < 0.54) {
           type = 'mega'
+        } else if (rand < 0.60) {
+          type = 'gmax'
         }
       } else {
         if (rand < 0.15 && !runChallenges.noShops) {
@@ -1451,7 +1475,7 @@ function MainApp() {
     return {
       id,
       type,
-      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : type === 'mega' ? `Mega #${id}` : `Ruta ${id}`,
+      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : type === 'mega' ? `Mega #${id}` : type === 'gmax' ? `G-MAX #${id}` : `Ruta ${id}`,
       done: false
     }
   }
@@ -1553,6 +1577,7 @@ function MainApp() {
         const pokeRandPositions: number[] = []
         const movePositions: number[] = []
         let megaPosition: number | null = null
+        let gmaxPosition: number | null = null
         if (!activeChallenges.allTeamRocket) {
           if (effectiveDifficulty === 'hard') {
             const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
@@ -1576,6 +1601,11 @@ function MainApp() {
               megaPosition = available[idx]
               available.splice(idx, 1)
               megaNodeSpawnedRef.current = true
+            }
+            if (available.length > 0) {
+              const idx = Math.floor(rr() * available.length)
+              gmaxPosition = available[idx]
+              available.splice(idx, 1)
             }
           } else if (effectiveDifficulty === 'medium') {
             const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
@@ -1601,6 +1631,8 @@ function MainApp() {
             type = 'move'
           } else if (megaPosition !== null && i === megaPosition) {
             type = 'mega'
+          } else if (gmaxPosition !== null && i === gmaxPosition) {
+            type = 'gmax'
           } else if (activeChallenges.bossRush) {
             type = 'battle'
           } else if (activeChallenges.allTeamRocket) {
@@ -1619,7 +1651,7 @@ function MainApp() {
           customRoute.push({
             id: i,
             type,
-            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : type === 'mega' ? `Mega #${i}` : `Ruta ${i}`,
+            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : type === 'mega' ? `Mega #${i}` : type === 'gmax' ? `G-MAX #${i}` : `Ruta ${i}`,
             done: false
           })
         }
@@ -1745,11 +1777,11 @@ function MainApp() {
     setSpeedrunSeconds(0)
     setTeam(prev => prev.map((p, i) => {
       const orig = originalPokemonDataRef.current[i]
-      if (orig) return { ...p, megaEvolved: false, ...orig }
-      if (p.megaEvolved) return { ...p, megaEvolved: false }
-      return p
+      if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined, ...orig }
+      return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined }
     }))
     originalPokemonDataRef.current = {}
+    setBattleGmaxUsed(false)
     setRoute((previous) =>
       previous.map((node, index) => (index === routeIndex ? { ...node, done: true } : node))
     )
@@ -2055,7 +2087,7 @@ function MainApp() {
 
     if (currentNode.type === 'shop') {
       const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(isConsumableUnlocked)
-      const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone')
+      const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band')
       const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
       const shuffledHoldables = [...allHoldableKeys].sort(() => 0.5 - Math.random())
       const selectedConsumables = shuffledConsumables.slice(0, 2)
@@ -2081,7 +2113,7 @@ function MainApp() {
 
     if (currentNode.type === 'spin') {
       const healingPool = Object.keys(ALL_SHOP_ITEMS).filter(isConsumableUnlocked)
-      const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone')
+      const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band')
       const shuffledH = [...healingPool].sort(() => 0.5 - Math.random())
       const shuffledP = [...passivePool].sort(() => 0.5 - Math.random())
       const items = [...shuffledH.slice(0, 4), ...shuffledP.slice(0, 2)].sort(() => 0.5 - Math.random())
@@ -2145,6 +2177,51 @@ function MainApp() {
         setScreen('move')
       } catch {
         setApiError('No se pudieron cargar los movimientos. Reintenta.')
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
+    if (currentNode.type === 'gmax') {
+      setIsLoading(true)
+      setApiError('')
+      try {
+        const targetGen = getEffectiveGen()
+        const gmaxId = Array.from(GMAX_CAPABLE_IDS)[Math.floor(Math.random() * GMAX_CAPABLE_IDS.size)]
+        const base = await buildPokemonFromApi(gmaxId, targetGen, 1, false, difficulty)
+        let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0), difficulty)
+        if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
+        if (runChallenges.totalRandomizer) {
+          scaled = {
+            ...scaled,
+            attack: scaled.attack + Math.floor(Math.random() * 20) - 10,
+            defense: scaled.defense + Math.floor(Math.random() * 20) - 10,
+            speed: scaled.speed + Math.floor(Math.random() * 20) - 10,
+          }
+        }
+        const formId = GMAX_FORM_IDS[scaled.id]
+        const gmaxFormId = Array.isArray(formId) ? formId[Math.floor(Math.random() * formId.length)] : formId
+        const gmaxSprite = gmaxFormId
+          ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${gmaxFormId}.png`
+          : scaled.sprite
+        const gmaxEnemy: Pokemon = {
+          ...scaled,
+          gmaxEvolved: true,
+          gmaxTurnsLeft: 3,
+          sprite: gmaxSprite,
+          attack: Math.floor(scaled.attack * 1.15),
+          defense: Math.floor(scaled.defense * 1.15),
+          speed: Math.floor(scaled.speed * 1.15),
+        }
+        seenInPokedex({ ...gmaxEnemy, id: gmaxFormId ?? gmaxEnemy.id, sprite: gmaxSprite })
+        setIsTrainerBattle(false)
+        setEnemy(gmaxEnemy)
+        setBattleLog(prev => [`⚡ ¡Un Pokémon Gigamax aparece! ${gmaxEnemy.name} está listo para el combate.`, ...prev].slice(0, 15))
+        startBattleMusic()
+        setScreen('battle')
+      } catch {
+        setApiError('Error al generar el Pokémon G-MAX.')
       } finally {
         setIsLoading(false)
       }
@@ -2329,18 +2406,37 @@ function MainApp() {
         }
 
         setIsTrainerBattle(true)
-        setTrainerTeam(newTrainerTeam)
+        const megaTeam = newTrainerTeam.map(p => {
+          if (isBoss && (difficulty === 'hard' || difficulty === 'infinite') && Math.random() < 0.15 && MEGA_CAPABLE_IDS.has(p.id)) {
+            const formId = MEGA_FORM_IDS[p.id]
+            if (formId) {
+              const megaFormId = Array.isArray(formId) ? formId[Math.floor(Math.random() * formId.length)] : formId
+              const megaSprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${megaFormId}.png`
+              seenInPokedex({ ...p, id: megaFormId, sprite: megaSprite })
+              return {
+                ...p,
+                id: megaFormId,
+                sprite: megaSprite,
+                attack: Math.floor(p.attack * 1.15),
+                defense: Math.floor(p.defense * 1.15),
+                speed: Math.floor(p.speed * 1.15),
+              }
+            }
+          }
+          return p
+        })
+        setTrainerTeam(megaTeam)
         newTrainerTeam.forEach(p => seenInPokedex(p))
         setTrainerPokemonIndex(0)
         setTrainerName(chosenName)
         setTrainerSprite(chosenSprite)
         setTrainerBadge(chosenBadge)
-        setEnemy(newTrainerTeam[0])
+        setEnemy(megaTeam[0])
         setBattleLog((prev) => [
           isBoss
             ? `🏆 ¡El Líder ${chosenName} quiere combatir! (${chosenBadge})`
             : `⚔️ ¡${chosenName} quiere combatir! Tiene ${teamSize} Pokémon.`,
-          `Envía a ${newTrainerTeam[0].name} Nv.${newTrainerTeam[0].level}.`,
+          `Envía a ${megaTeam[0].name} Nv.${megaTeam[0].level}.`,
           ...prev
         ])
       } else {
@@ -2372,8 +2468,9 @@ function MainApp() {
       }
       }
 
-      setTeam(prev => prev.map(p => ({ ...p, megaEvolved: false })))
+      setTeam(prev => prev.map(p => ({ ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined })))
       setBattleMegaUsed(false)
+      setBattleGmaxUsed(false)
       originalPokemonDataRef.current = {}
       battleStartHPRef.current = activePokemon.hp
       setScreen('battle')
@@ -2617,7 +2714,7 @@ function MainApp() {
 
   function unequipItem(pokemonIndex: number) {
     const pokemon = team[pokemonIndex]
-    if (!pokemon || !pokemon.holdItem || pokemon.hp <= 0) return
+    if (!pokemon || !pokemon.holdItem) return
 
     const itemName = pokemon.holdItem
     const stats = HOLDABLE_ITEMS[itemName]
@@ -3085,6 +3182,21 @@ function MainApp() {
     nextPlayer = applyTurnEffects(nextPlayer)
     nextEnemy = applyTurnEffects(nextEnemy)
 
+    // --- G-MAX turn counter decrement ---
+    if (nextPlayer.gmaxEvolved && nextPlayer.gmaxTurnsLeft) {
+      const newTurns = nextPlayer.gmaxTurnsLeft - 1
+      nextPlayer = { ...nextPlayer, gmaxTurnsLeft: newTurns }
+      if (newTurns <= 0) {
+        const orig = originalPokemonDataRef.current[activeIndex]
+        if (orig) {
+          nextPlayer = { ...nextPlayer, gmaxEvolved: false, ...orig }
+        } else {
+          nextPlayer = { ...nextPlayer, gmaxEvolved: false }
+        }
+        logs.push(`⏳ ${nextPlayer.name} volvió a su tamaño normal.`)
+      }
+    }
+
     // --- Track run stats ---
     setRunStats(prev => {
       const playerDmg = Math.max(0, activePokemon.hp - nextPlayer.hp)
@@ -3317,6 +3429,17 @@ function MainApp() {
             }
           }
 
+          if (currentNode.type === 'gmax') {
+            const alreadyHas = inventory.includes('Dynamax Band') || team.some(p => p.holdItem === 'Dynamax Band')
+            if (!alreadyHas) {
+              setInventory(prev => [...prev, 'Dynamax Band'])
+              logs.push(`⚡ ¡Has obtenido la Banda Dynamax! Equípala para gigamaximar en combate.`)
+            } else {
+              const price = 200
+              setMetaProgression(prev => ({ ...prev, pokeCoins: prev.pokeCoins + price }))
+              logs.push(`⚡ Ya tienes una Banda Dynamax. Recibes ${price} PokéCoins en su lugar.`)
+            }
+          }
           setBattleLog((prev) => [
             `🏆 ¡Derrotaste al entrenador ${trainerName}! +$${totalReward + moneyReward}`,
             logMsg,
@@ -3341,6 +3464,19 @@ function MainApp() {
         return
       }
 
+      // --- G-MAX miniboss reward ---
+      if (currentNode.type === 'gmax') {
+        const alreadyHas = inventory.includes('Dynamax Band') || team.some(p => p.holdItem === 'Dynamax Band')
+        if (!alreadyHas) {
+          setInventory(prev => [...prev, 'Dynamax Band'])
+          logs.push(`⚡ ¡Has obtenido la Banda Dynamax! Equípala para gigamaximar en combate.`)
+        } else {
+          const price = 200
+          setMetaProgression(prev => ({ ...prev, pokeCoins: prev.pokeCoins + price }))
+          logs.push(`⚡ Ya tienes una Banda Dynamax. Recibes ${price} PokéCoins en su lugar.`)
+        }
+      }
+
       // --- Batalla salvaje → victoria directa ---
       if (nextPlayer.hp >= battleStartHPRef.current) {
         unlockAchievement('perfect_battle')
@@ -3360,7 +3496,7 @@ function MainApp() {
   }
 
   function megaEvolveActive(): void {
-    if (!activePokemon || activePokemon.holdItem !== 'Mega Stone' || battleMegaUsed || !MEGA_CAPABLE_IDS.has(activePokemon.id)) return
+    if (!activePokemon || activePokemon.holdItem !== 'Mega Stone' || battleMegaUsed || activePokemon.gmaxEvolved || !MEGA_CAPABLE_IDS.has(activePokemon.id)) return
     const formId = MEGA_FORM_IDS[activePokemon.id]
     const megaFormId = Array.isArray(formId) ? formId[Math.floor(Math.random() * formId.length)] : formId
     const megaSprite = megaFormId
@@ -3374,6 +3510,9 @@ function MainApp() {
       defense: Math.floor(p.defense * 1.15),
       speed: Math.floor(p.speed * 1.15),
     } : p))
+    if (megaFormId) {
+      registerInPokedex({ ...activePokemon, id: megaFormId, sprite: megaSprite ?? activePokemon.sprite })
+    }
     originalPokemonDataRef.current[activeIndex] = {
       sprite: activePokemon.sprite,
       attack: activePokemon.attack,
@@ -3384,12 +3523,43 @@ function MainApp() {
     setBattleLog(prev => [`💥 ¡${activePokemon.name} ha mega-evolucionado! Stats aumentados un 15%.`, ...prev].slice(0, 15))
   }
 
+  function gmaxEvolveActive(): void {
+    if (!activePokemon || activePokemon.holdItem !== 'Dynamax Band' || battleGmaxUsed || activePokemon.gmaxEvolved || !GMAX_CAPABLE_IDS.has(activePokemon.id)) return
+    const formId = GMAX_FORM_IDS[activePokemon.id]
+    const gmaxFormId = Array.isArray(formId) ? formId[Math.floor(Math.random() * formId.length)] : formId
+    const gmaxSprite = gmaxFormId
+      ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${gmaxFormId}.png`
+      : null
+    setTeam(prev => prev.map((p, i) => i === activeIndex ? {
+      ...p,
+      gmaxEvolved: true,
+      gmaxTurnsLeft: 3,
+      sprite: gmaxSprite ?? p.sprite,
+      attack: Math.floor(p.attack * 1.15),
+      defense: Math.floor(p.defense * 1.15),
+      speed: Math.floor(p.speed * 1.15),
+    } : p))
+    if (gmaxFormId) {
+      registerInPokedex({ ...activePokemon, id: gmaxFormId, sprite: gmaxSprite ?? activePokemon.sprite })
+    }
+    if (!originalPokemonDataRef.current[activeIndex]) {
+      originalPokemonDataRef.current[activeIndex] = {
+        sprite: activePokemon.sprite,
+        attack: activePokemon.attack,
+        defense: activePokemon.defense,
+        speed: activePokemon.speed,
+      }
+    }
+    setBattleGmaxUsed(true)
+    setBattleLog(prev => [`⚡ ¡${activePokemon.name} ha gigamaximado! Stats aumentados un 15% por 3 turnos.`, ...prev].slice(0, 15))
+  }
+
   function switchActive(index: number): void {
     const target = team[index]
     if (!target || target.hp <= 0 || index === activeIndex) return
     const orig = originalPokemonDataRef.current[activeIndex]
     setTeam(prev => prev.map((p, i) => {
-      if (i === activeIndex && orig) return { ...p, megaEvolved: false, ...orig }
+      if (i === activeIndex && orig) return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined, ...orig }
       return p
     }))
     setActiveIndex(index)
@@ -3625,7 +3795,7 @@ function MainApp() {
   }
 
   function onRestartRun(): void {
-    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega') {
+    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax') {
       resetToSetup()
     }
   }
@@ -4525,11 +4695,11 @@ function MainApp() {
         </section>
       )}
 
-      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega') && activePokemon && (
+      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax') && activePokemon && (
         <section className="roulette-layout">
           <article className="panel trainer-panel">
             <p className="muted small-tag">Trainer</p>
-            <img className={`sprite trainer-sprite${activePokemon.megaEvolved ? ' mega-active' : ''}`} src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
+            <img className={`sprite trainer-sprite${activePokemon.megaEvolved ? ' mega-active' : ''}${activePokemon.gmaxEvolved ? ' gmax-active' : ''}`} src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
             <h2>
               {activePokemon.name}{activePokemon.shiny ? ' ✨' : ''}
               {activePokemon.status && (
@@ -4727,6 +4897,7 @@ function MainApp() {
                 const pokeRandClass = node.type === 'pokeRand' ? ' node-pokerand' : ''
                 const moveClass = node.type === 'move' ? ' node-move' : ''
                 const megaClass = node.type === 'mega' ? ' node-mega' : ''
+                const gmaxClass = node.type === 'gmax' ? ' node-gmax' : ''
                 if (isBlindHidden) {
                   return (
                     <div key={node.id} className={`node pending`} style={{ opacity: 0.4 }}>
@@ -4736,7 +4907,7 @@ function MainApp() {
                   )
                 }
                 return (
-                  <div key={node.id} className={`node ${stateClass}${rocketClass}${spinClass}${pokeRandClass}${moveClass}${megaClass}`}>
+                  <div key={node.id} className={`node ${stateClass}${rocketClass}${spinClass}${pokeRandClass}${moveClass}${megaClass}${gmaxClass}`}>
                     <span>#{node.id}</span>
                     <strong>{nodeTypeLabel(node)}</strong>
                   </div>
@@ -5120,7 +5291,7 @@ function MainApp() {
                   Next node: <strong>{currentNode.label}</strong> ({nodeTypeLabel(currentNode)})
                 </p>
                 <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={enterNode} type="button" disabled={isLoading}>
-                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : currentNode.type === 'mega' ? '💎 ¡Recoger Mega Piedra!' : 'Enter node'}
+                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : currentNode.type === 'mega' ? '💎 ¡Recoger Mega Piedra!' : currentNode.type === 'gmax' ? '⚡ ¡Enfrentar G-MAX!' : 'Enter node'}
                 </button>
               </div>
             )}
@@ -5213,7 +5384,7 @@ function MainApp() {
                   )}
                   {' · '}Nv.&nbsp;{enemy.level}
                 </p>
-                <img className="sprite enemy-sprite" src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} />
+                <img className={`sprite enemy-sprite${enemy.gmaxEvolved ? ' gmax-active' : ''}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} />
                 <div className="hp-line">
                   <span>HP rival</span>
                   <strong>{enemy.hp}/{enemy.maxHp}</strong>
@@ -5237,7 +5408,7 @@ function MainApp() {
                     </button>
                   ))}
                 </div>
-                {activePokemon.holdItem === 'Mega Stone' && !battleMegaUsed && MEGA_CAPABLE_IDS.has(activePokemon.id) && (
+                {activePokemon.holdItem === 'Mega Stone' && !battleMegaUsed && !activePokemon.gmaxEvolved && MEGA_CAPABLE_IDS.has(activePokemon.id) && (
                   <button
                     className="cta"
                     onClick={megaEvolveActive}
@@ -5245,6 +5416,16 @@ function MainApp() {
                     style={{ marginTop: '8px', width: '100%', background: 'linear-gradient(135deg, #f472b6, #c084fc)' }}
                   >
                     💥 ¡Mega Evolucionar!
+                  </button>
+                )}
+                {activePokemon.holdItem === 'Dynamax Band' && !battleGmaxUsed && !activePokemon.gmaxEvolved && !activePokemon.megaEvolved && GMAX_CAPABLE_IDS.has(activePokemon.id) && (
+                  <button
+                    className="cta"
+                    onClick={gmaxEvolveActive}
+                    type="button"
+                    style={{ marginTop: '8px', width: '100%', background: 'linear-gradient(135deg, #60a5fa, #a78bfa)' }}
+                  >
+                    ⚡ ¡Gigamaximar!
                   </button>
                 )}
               </div>

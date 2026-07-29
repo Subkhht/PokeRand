@@ -1378,6 +1378,24 @@ button {
   animation: megaGlow 1.5s ease-in-out infinite;
 }
 
+.node-gmax {
+  border-color: #f9a8d4 !important;
+  background: rgba(249, 168, 212, 0.15) !important;
+}
+
+.node-gmax.current {
+  box-shadow: 0 0 8px rgba(249, 168, 212, 0.5) !important;
+}
+
+@keyframes gmaxGlow {
+  0%, 100% { filter: drop-shadow(0 0 6px #f9a8d4) drop-shadow(0 0 12px #f472b6); }
+  50% { filter: drop-shadow(0 0 12px #f9a8d4) drop-shadow(0 0 24px #f472b6); }
+}
+
+.gmax-active {
+  animation: gmaxGlow 1.5s ease-in-out infinite;
+}
+
 @keyframes slideInRight {
   from { transform: translateX(120%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
