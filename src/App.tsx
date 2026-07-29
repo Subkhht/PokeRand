@@ -368,6 +368,12 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: 'first_try', name: 'Novato con Suerte', desc: 'Gana tu primera partida', icon: '🍀', hidden: false },
   { id: 'hoarder_15', name: 'Acaparador', desc: 'Ten 15 objetos en el inventario', icon: '📦', hidden: false },
   { id: 'evolution_master', name: 'Evolucionador', desc: 'Evoluciona 5 Pokémon en una partida', icon: '🌀', hidden: false },
+  { id: 'first_mega', name: 'Mega Evolución', desc: 'Mega-evoluciona un Pokémon por primera vez', icon: '💎', hidden: false },
+  { id: 'mega_win', name: 'Poder Mega', desc: 'Gana una partida usando megaevolución', icon: '💎', hidden: false },
+  { id: 'mega_master', name: 'Maestro Mega', desc: 'Mega-evoluciona 10 Pokémon en total', icon: '🔮', hidden: false },
+  { id: 'first_gmax', name: 'Gigamax', desc: 'Gigamaxima un Pokémon por primera vez', icon: '⚡', hidden: false },
+  { id: 'gmax_win', name: 'Poder Gigamax', desc: 'Gana una partida usando Gigamax', icon: '⚡', hidden: false },
+  { id: 'gmax_master', name: 'Maestro Gigamax', desc: 'Gigamaxima 10 Pokémon en total', icon: '🌟', hidden: false },
 ]
 
 const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (pokemon: Pokemon) => Partial<Pokemon> }> = [
@@ -935,10 +941,12 @@ function MainApp() {
         if (!data.ownedMusic) data.ownedMusic = []
         if (!data.activeMenuMusic) data.activeMenuMusic = 'default'
         if (!data.activeBattleMusic) data.activeBattleMusic = 'default'
+        if (typeof data.totalMegas !== 'number') data.totalMegas = 0
+        if (typeof data.totalGmax !== 'number') data.totalGmax = 0
         return data
       }
     } catch {}
-    return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark', ownedMusic: [], activeMenuMusic: 'default', activeBattleMusic: 'default' }
+    return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark', ownedMusic: [], activeMenuMusic: 'default', activeBattleMusic: 'default', totalMegas: 0, totalGmax: 0 }
   })
   const [showAchievements, setShowAchievements] = useState<boolean>(false)
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null)
@@ -1315,6 +1323,14 @@ function MainApp() {
     if (metaProgression.totalRuns >= 25) unlockAchievement('total_runs_25')
     if (metaProgression.totalRuns >= 50) unlockAchievement('total_runs_50')
   }, [metaProgression.totalWins, metaProgression.totalRuns])
+
+  useEffect(() => {
+    if (metaProgression.totalMegas >= 10) unlockAchievement('mega_master')
+  }, [metaProgression.totalMegas])
+
+  useEffect(() => {
+    if (metaProgression.totalGmax >= 10) unlockAchievement('gmax_master')
+  }, [metaProgression.totalGmax])
 
   useEffect(() => {
     if (winStreak >= 3) unlockAchievement('streak_3')
@@ -1893,6 +1909,8 @@ function MainApp() {
       const activeChallengeCount = Object.entries(runChallenges).filter(([k, v]) => v && k !== 'allShiny').length
       if (activeChallengeCount >= 3) unlockAchievement('triple_challenge')
       if (activeChallengeCount >= 5) unlockAchievement('challenge_mania')
+      if (battleMegaUsed) unlockAchievement('mega_win')
+      if (battleGmaxUsed) unlockAchievement('gmax_win')
 
       const hasActiveChallenge = activeChallengeCount > 0
       const baseCoins = difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15
@@ -3540,6 +3558,13 @@ function MainApp() {
       speed: activePokemon.speed,
     }
     setBattleMegaUsed(true)
+    setMetaProgression(prev => {
+      const totalMegas = prev.totalMegas + 1
+      const updated = { ...prev, totalMegas }
+      localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+      return updated
+    })
+    unlockAchievement('first_mega')
     setBattleLog(prev => [`💥 ¡${activePokemon.name} ha mega-evolucionado! Stats aumentados un 15%.`, ...prev].slice(0, 15))
   }
 
@@ -3571,6 +3596,14 @@ function MainApp() {
       }
     }
     setBattleGmaxUsed(true)
+    setMetaProgression(prev => {
+      const totalGmax = prev.totalGmax + 1
+      const updated = { ...prev, totalGmax }
+      localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+      return updated
+    })
+    unlockAchievement('first_gmax')
+    unlockAchievement('gmax_master')
     setBattleLog(prev => [`⚡ ¡${activePokemon.name} ha gigamaximado! Stats aumentados un 15% por 3 turnos.`, ...prev].slice(0, 15))
   }
 

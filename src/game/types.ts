@@ -166,11 +166,13 @@ export interface MetaProgression {
   totalRuns: number
   totalWins: number
   bestStreak: number
-  unlockedStarters: string[]
+  unlockedStarters: number[]
   permanentlyUnlockedItems: string[]
   ownedThemes: string[]
   activeTheme: string
   ownedMusic: string[]
   activeMenuMusic: string
   activeBattleMusic: string
+  totalMegas: number
+  totalGmax: number
 }
