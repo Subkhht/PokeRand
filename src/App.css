@@ -1360,6 +1360,24 @@ button {
   box-shadow: 0 0 8px rgba(226, 232, 240, 0.5) !important;
 }
 
+.node-mega {
+  border-color: #b45309 !important;
+  background: rgba(180, 83, 9, 0.15) !important;
+}
+
+.node-mega.current {
+  box-shadow: 0 0 8px rgba(180, 83, 9, 0.5) !important;
+}
+
+@keyframes megaGlow {
+  0%, 100% { filter: drop-shadow(0 0 6px #f472b6) drop-shadow(0 0 12px #c084fc); }
+  50% { filter: drop-shadow(0 0 12px #f472b6) drop-shadow(0 0 24px #c084fc); }
+}
+
+.mega-active {
+  animation: megaGlow 1.5s ease-in-out infinite;
+}
+
 @keyframes slideInRight {
   from { transform: translateX(120%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }

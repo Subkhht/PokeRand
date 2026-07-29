@@ -17,7 +17,7 @@ import {
 import { getTypeEffectiveness } from './game/typesChart'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'victory' | 'defeat'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'victory' | 'defeat'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite'
 
 const STATUS_LABELS: Record<StatusType, string> = {
@@ -161,6 +161,7 @@ const ITEM_SPRITES: Record<string, string> = {
   'Iron Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/iron-ball.png',
   'Vampire Fang': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/float-stone.png',
   'Cursed Blade': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/razor-claw.png',
+  'Mega Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/key-stone.png',
 }
 
 interface HoldableItem {
@@ -178,6 +179,7 @@ interface HoldableItem {
   lifesteal?: number
   lowHpBonus?: number
   firstStrikeBonus?: number
+  isMegaStone?: boolean
 }
 
 const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
@@ -209,9 +211,45 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Iron Ball': { name: 'Iron Ball', desc: '+25% Defensa, -10% Velocidad', price: 250, defenseMod: 0.25, speedMod: -0.10 },
   'Vampire Fang': { name: 'Vampire Fang', desc: '15% Robo de Vida', price: 350, lifesteal: 0.15 },
   'Cursed Blade': { name: 'Cursed Blade', desc: '+35% Ataque, -5 HP por turno', price: 450, attackMod: 0.35, healPerTurn: -5 },
+  'Mega Stone': { name: 'Mega Stone', desc: 'Permite mega-evolucionar 1 vez por combate', price: 700, isMegaStone: true },
 }
 
 const HOLDABLE_ITEM_NAMES = Object.keys(HOLDABLE_ITEMS)
+
+const MEGA_CAPABLE_IDS = new Set([
+  3, 6, 9, 15, 18, 26, 36, 65, 71, 80, 94, 115, 121, 127, 130, 142, 149, 150,
+  154, 160, 181, 208, 212, 214, 227, 229, 248,
+  254, 257, 260, 282, 302, 303, 306, 308,   310, 319, 323, 334, 354, 358, 359, 362, 373, 376, 380, 381, 384, 398,
+  428, 445, 448, 460, 475, 478, 485, 491,
+  500, 530, 531, 545, 560, 604, 609, 623,
+  652, 655, 658, 668, 670, 678, 687, 689, 691, 701, 718, 719,
+  740, 768, 780, 801, 807,
+  870, 952, 970, 978, 998,
+])
+
+const MEGA_FORM_IDS: Record<number, number | number[]> = {
+  3: 10033, 6: [10034, 10035], 9: 10036, 15: 10090, 18: 10073,
+  26: [10304, 10305], 36: 10278, 65: 10037, 71: 10279, 80: 10071,
+  94: 10038, 115: 10039, 121: 10280, 127: 10040, 130: 10041,
+  142: 10042, 149: 10281, 150: [10043, 10044],
+  154: 10282, 160: 10283, 181: 10045, 208: 10072, 212: 10046,
+  214: 10047, 227: 10284, 229: 10048, 248: 10049,
+  254: 10065, 257: 10050, 260: 10064, 282: 10051, 302: 10066,
+  303: 10052, 306: 10053, 308: 10054,   310: 10055, 319: 10070, 323: 10087, 334: 10067, 354: 10056,
+  358: 10306, 359: [10057, 10307], 362: 10074, 373: 10089, 376: 10076,
+  380: 10062, 381: 10063, 384: 10079, 398: 10308,
+  428: 10088, 445: [10058, 10309], 448: [10059, 10310],
+  460: 10060, 475: 10068, 478: 10285, 485: 10311, 491: 10312,
+  500: 10286, 530: 10287, 531: 10069, 545: 10288, 560: 10289,
+  604: 10290, 609: 10291, 623: 10313,
+  652: 10292, 655: 10293, 658: 10294, 668: 10295, 670: 10296,
+  678: [10314, 10326], 687: 10297, 689: 10298, 691: 10299,
+  701: 10300, 718: 10301, 719: 10075,
+  740: 10315, 768: 10316, 780: 10302, 801: [10317, 10318],
+  807: 10319,
+  870: 10303, 952: 10320, 970: 10321, 978: [10322, 10323, 10324],
+  998: 10325,
+}
 
 const ACHIEVEMENTS: Achievement[] = [
   { id: 'first_win', name: 'Primera Victoria', desc: 'Gana tu primera partida', icon: '🏆', hidden: false },
@@ -223,23 +261,94 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: 'speedrun_win', name: 'Relámpago', desc: 'Gana una partida con Speedrun activo', icon: '⚡', hidden: false },
   { id: 'no_item_win', name: 'Purista', desc: 'Gana sin usar items', icon: '🚫', hidden: false },
   { id: 'ironman_win', name: 'Invencible', desc: 'Gana una partida Ironman', icon: '🛡️', hidden: false },
-  { id: 'perfect_battle', name: 'Flawless', desc: 'Gana un combate sin recibir daño', icon: '✨', hidden: true },
-  { id: 'one_shot', name: 'Golpe Definitivo', desc: 'Derrota a un Pokémon enemigo en 1 golpe', icon: '💥', hidden: true },
-  { id: 'comeback', name: 'Resurgir', desc: 'Gana un combate con solo 1 Pokémon con ≤10% HP', icon: '❤️‍🔥', hidden: true },
+  { id: 'perfect_battle', name: 'Flawless', desc: 'Gana un combate sin recibir daño', icon: '✨', hidden: false },
+  { id: 'one_shot', name: 'Golpe Definitivo', desc: 'Derrota a un Pokémon enemigo en 1 golpe', icon: '💥', hidden: false },
+  { id: 'comeback', name: 'Resurgir', desc: 'Gana un combate con solo 1 Pokémon con ≤10% HP', icon: '❤️‍🔥', hidden: false },
   { id: 'collector_10', name: 'Coleccionista', desc: 'Captura 10 Pokémon en una partida', icon: '📦', hidden: false },
   { id: 'collector_25', name: 'Maestro Pokédex', desc: 'Captura 25 Pokémon en una partida', icon: '📖', hidden: false },
-  { id: 'rich', name: 'Magnate', desc: 'Acumula $999 en una partida', icon: '💰', hidden: true },
-  { id: 'crit_master', name: 'Crítico Nato', desc: 'Lanza 5 golpes críticos en una partida', icon: '🎯', hidden: true },
+  { id: 'rich', name: 'Magnate', desc: 'Acumula $999 en una partida', icon: '💰', hidden: false },
+  { id: 'crit_master', name: 'Crítico Nato', desc: 'Lanza 5 golpes críticos en una partida', icon: '🎯', hidden: false },
   { id: 'all_gens', name: 'Viajero Multiversal', desc: 'Gana al menos 1 partida en cada generación', icon: '🌍', hidden: false },
   { id: 'infinite_20', name: 'Infinito y Más Allá', desc: 'Llega al nodo 20 en modo Infinite', icon: '🚀', hidden: false },
-  { id: 'shiny_catch', name: 'Afortunado', desc: 'Captura un Pokémon shiny', icon: '✨', hidden: true },
-  { id: 'legendary_catch', name: 'Cazador de Leyendas', desc: 'Captura un Pokémon con BST ≥ 600', icon: '🐉', hidden: true },
-  { id: 'daily_3', name: 'Habitual', desc: 'Juega  desafíos diarios', icon: '📅', hidden: false },
+  { id: 'shiny_catch', name: 'Afortunado', desc: 'Captura un Pokémon shiny', icon: '✨', hidden: false },
+  { id: 'legendary_catch', name: 'Cazador de Leyendas', desc: 'Captura un Pokémon con BST ≥ 600', icon: '🐉', hidden: false },
+  { id: 'daily_3', name: 'Habitual', desc: 'Juega desafíos diarios', icon: '📅', hidden: false },
   { id: 'meta_100', name: 'Inversor', desc: 'Acumula 100 PokéCoins', icon: '🪙', hidden: false },
   { id: 'boss_rush_win', name: 'Rush Total', desc: 'Gana una partida Boss Rush', icon: '🏆', hidden: false },
   { id: 'hard_win', name: 'Veterano', desc: 'Gana una partida en dificultad Hard', icon: '🎖️', hidden: false },
   { id: 'gauntlet_win', name: 'Gauntlet Master', desc: 'Gana una partida Challenge Gauntlet', icon: '🎯', hidden: false },
-  { id: 'synergy_master', name: 'Maestro de Sinergias', desc: 'Activa una sinergia de items', icon: '🔗', hidden: true },
+  { id: 'synergy_master', name: 'Maestro de Sinergias', desc: 'Activa una sinergia de items', icon: '🔗', hidden: false },
+  { id: 'super_effective_10', name: 'Tierra de Nadie', desc: 'Landa 10 golpes supereficaces en una partida', icon: '🌿', hidden: false },
+  { id: 'big_spender', name: 'Derrochador', desc: 'Gasta $500 en tiendas en una partida', icon: '💸', hidden: false },
+  { id: 'rookie', name: 'Novato', desc: 'Gana una partida en dificultad Fácil', icon: '🐣', hidden: false },
+  { id: 'infinite_50', name: 'Sin Límites', desc: 'Llega al nodo 50 en modo Infinite', icon: '🌌', hidden: false },
+  { id: 'full_team', name: 'Equipo Completo', desc: 'Gana con 6 Pokémon en el equipo', icon: '🤝', hidden: false },
+  { id: 'battle_20', name: 'Veterano de Guerra', desc: 'Gana 20 combates en una partida', icon: '⚔️', hidden: false },
+  { id: 'item_user_10', name: 'Experimentado', desc: 'Usa 10 objetos en una partida', icon: '🧪', hidden: false },
+  { id: 'gambler', name: 'Jugador', desc: 'Gana un nodo Spin', icon: '🎰', hidden: false },
+  { id: 'pokeRand_master', name: 'Maestro Aleatorio', desc: 'Gana un nodo PokeRand', icon: '🎲', hidden: false },
+  { id: 'streak_15', name: 'Racha Imparable', desc: 'Gana 15 partidas seguidas', icon: '🔥', hidden: false },
+  { id: 'streak_20', name: 'Leyenda de Racha', desc: 'Gana 20 partidas seguidas', icon: '🔥', hidden: false },
+  { id: 'streak_25', name: 'Dios de la Racha', desc: 'Gana 25 partidas seguidas', icon: '🔥', hidden: false },
+  { id: 'battle_50', name: 'Comandante', desc: 'Gana 50 combates en una partida', icon: '⚔️', hidden: false },
+  { id: 'battle_100', name: 'General', desc: 'Gana 100 combates en una partida', icon: '⚔️', hidden: false },
+  { id: 'battle_200', name: 'Estratega', desc: 'Gana 200 combates en una partida', icon: '⚔️', hidden: false },
+  { id: 'battle_500', name: 'Conquistador', desc: 'Gana 500 combates en una partida', icon: '⚔️', hidden: false },
+  { id: 'damage_1000', name: 'Aprendiz de Daño', desc: 'Inflige 1000 de daño en una partida', icon: '💥', hidden: false },
+  { id: 'damage_5000', name: 'Especialista en Daño', desc: 'Inflige 5000 de daño en una partida', icon: '💥', hidden: false },
+  { id: 'damage_10000', name: 'Maestro del Daño', desc: 'Inflige 10000 de daño en una partida', icon: '💥', hidden: false },
+  { id: 'damage_50000', name: 'Dios del Daño', desc: 'Inflige 50000 de daño en una partida', icon: '💥', hidden: false },
+  { id: 'tank_500', name: 'Escudo Humano', desc: 'Recibe 500 de daño en una partida', icon: '🛡️', hidden: false },
+  { id: 'tank_1000', name: 'Muro Viviente', desc: 'Recibe 1000 de daño en una partida', icon: '🛡️', hidden: false },
+  { id: 'crit_10', name: 'Crítico Frecuente', desc: 'Lanza 10 golpes críticos en una partida', icon: '🎯', hidden: false },
+  { id: 'crit_20', name: 'Crítico Experto', desc: 'Lanza 20 golpes críticos en una partida', icon: '🎯', hidden: false },
+  { id: 'crit_50', name: 'Crítico Legendario', desc: 'Lanza 50 golpes críticos en una partida', icon: '🎯', hidden: false },
+  { id: 'super_effective_25', name: 'Eficaz Mejorado', desc: 'Acierta 25 golpes supereficaces', icon: '🌿', hidden: false },
+  { id: 'super_effective_50', name: 'Súper Eficaz', desc: 'Acierta 50 golpes supereficaces', icon: '🌿', hidden: false },
+  { id: 'super_effective_100', name: 'Maestro de Tipos', desc: 'Acierta 100 golpes supereficaces', icon: '🌿', hidden: false },
+  { id: 'one_shot_5', name: 'Fulminante', desc: 'Derrota 5 Pokémon de 1 golpe', icon: '💥', hidden: false },
+  { id: 'one_shot_10', name: 'Aniquilador', desc: 'Derrota 10 Pokémon de 1 golpe', icon: '💥', hidden: false },
+  { id: 'collector_50', name: 'Acumulador', desc: 'Captura 50 Pokémon en una partida', icon: '📦', hidden: false },
+  { id: 'item_user_25', name: 'Dependiente', desc: 'Usa 25 objetos en una partida', icon: '🧪', hidden: false },
+  { id: 'item_user_50', name: 'Farmacéutico', desc: 'Usa 50 objetos en una partida', icon: '🧪', hidden: false },
+  { id: 'rich_5000', name: 'Millonario', desc: 'Acumula $5000 en una partida', icon: '💰', hidden: false },
+  { id: 'rich_10000', name: 'Magnate Global', desc: 'Acumula $10000 en una partida', icon: '💰', hidden: false },
+  { id: 'rich_50000', name: 'Croesus', desc: 'Acumula $50000 en una partida', icon: '💰', hidden: false },
+  { id: 'spender_1000', name: 'Gastador', desc: 'Gasta $1000 en tiendas en una partida', icon: '💸', hidden: false },
+  { id: 'spender_5000', name: 'Derrochador Élite', desc: 'Gasta $5000 en tiendas en una partida', icon: '💸', hidden: false },
+  { id: 'nodes_30', name: 'Explorador', desc: 'Limpia 30 nodos en una partida', icon: '🚶', hidden: false },
+  { id: 'nodes_50', name: 'Aventurero', desc: 'Limpia 50 nodos en una partida', icon: '🚶', hidden: false },
+  { id: 'nodes_100', name: 'Leyenda del Camino', desc: 'Limpia 100 nodos en una partida', icon: '🚶', hidden: false },
+  { id: 'infinite_100', name: 'Infinito Profundo', desc: 'Llega al nodo 100 en modo Infinite', icon: '🌌', hidden: false },
+  { id: 'total_wins_5', name: 'Victorioso', desc: 'Gana 5 partidas en total', icon: '🏆', hidden: false },
+  { id: 'total_wins_10', name: 'Campeón Recurrente', desc: 'Gana 10 partidas en total', icon: '🏆', hidden: false },
+  { id: 'total_wins_25', name: 'Leyenda Viva', desc: 'Gana 25 partidas en total', icon: '🏆', hidden: false },
+  { id: 'total_wins_50', name: 'Inmortal', desc: 'Gana 50 partidas en total', icon: '🏆', hidden: false },
+  { id: 'total_runs_10', name: 'Jugador Dedicado', desc: 'Juega 10 partidas en total', icon: '🎮', hidden: false },
+  { id: 'total_runs_25', name: 'Veterano', desc: 'Juega 25 partidas en total', icon: '🎮', hidden: false },
+  { id: 'total_runs_50', name: 'Adicto', desc: 'Juega 50 partidas en total', icon: '🎮', hidden: false },
+  { id: 'meta_500', name: 'Coleccionista de Monedas', desc: 'Acumula 500 PokéCoins', icon: '🪙', hidden: false },
+  { id: 'meta_1000', name: 'Inversor Mayorista', desc: 'Acumula 1000 PokéCoins', icon: '🪙', hidden: false },
+  { id: 'meta_5000', name: 'Tiburón Financiero', desc: 'Acumula 5000 PokéCoins', icon: '🪙', hidden: false },
+  { id: 'medium_win', name: 'Competente', desc: 'Gana en dificultad Media', icon: '🥈', hidden: false },
+  { id: 'noShops_win', name: 'Ermitaño', desc: 'Gana con el desafío Sin Tiendas', icon: '🏪', hidden: false },
+  { id: 'noRests_win', name: 'Insomne', desc: 'Gana con el desafío Sin Descanso', icon: '🛌', hidden: false },
+  { id: 'allShiny_win', name: 'Brillante', desc: 'Gana con el desafío Todos Shiny', icon: '✨', hidden: false },
+  { id: 'noMoney_win', name: 'Pobreza', desc: 'Gana con el desafío Sin Dinero', icon: '💸', hidden: false },
+  { id: 'egglocke_win', name: 'Criador', desc: 'Gana con el desafío Egglocke', icon: '🥚', hidden: false },
+  { id: 'nuzlockeHC_win', name: 'Superviviente Extremo', desc: 'Gana con Nuzlocke Hardcore', icon: '💀', hidden: false },
+  { id: 'noHeal_win', name: 'Autosuficiente', desc: 'Gana con el desafío Sin Curación', icon: '🚑', hidden: false },
+  { id: 'allTeamRocket_win', name: 'Team Rocket Forever', desc: 'Gana con el desafío Todo Team Rocket', icon: '🔴', hidden: false },
+  { id: 'triple_challenge', name: 'Tres Retos', desc: 'Gana con 3 desafíos activos', icon: '🎯', hidden: false },
+  { id: 'challenge_mania', name: 'Manía de Retos', desc: 'Gana con 5+ desafíos activos', icon: '🎯', hidden: false },
+  { id: 'team_diversity_10', name: 'Versátil', desc: 'Usa 10 Pokémon diferentes en una partida', icon: '🔄', hidden: false },
+  { id: 'team_diversity_20', name: 'Polivalente', desc: 'Usa 20 Pokémon diferentes en una partida', icon: '🔄', hidden: false },
+  { id: 'total_turns_500', name: 'Paciente', desc: 'Juega 500 turnos en una partida', icon: '⌛', hidden: false },
+  { id: 'total_turns_1000', name: 'Táctico', desc: 'Juega 1000 turnos en una partida', icon: '⌛', hidden: false },
+  { id: 'back_from_brink', name: 'Al Límite', desc: 'Gana un combate con 1 HP restante', icon: '❤️‍🔥', hidden: false },
+  { id: 'first_try', name: 'Novato con Suerte', desc: 'Gana tu primera partida', icon: '🍀', hidden: false },
+  { id: 'hoarder_15', name: 'Acaparador', desc: 'Ten 15 objetos en el inventario', icon: '📦', hidden: false },
+  { id: 'evolution_master', name: 'Evolucionador', desc: 'Evoluciona 5 Pokémon en una partida', icon: '🌀', hidden: false },
 ]
 
 const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (pokemon: Pokemon) => Partial<Pokemon> }> = [
@@ -422,9 +531,24 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
 
 function fallbackSprite(e: React.SyntheticEvent<HTMLImageElement>) {
   const img = e.currentTarget
-  if (img.dataset.fallback) return
-  img.dataset.fallback = '1'
-  img.src = img.src.replace(/\/animated\/(\d+)\.gif/, '/$1.png')
+  const src = img.src
+
+  if (src.includes('/other/showdown/')) {
+    img.src = src
+      .replace(/\/other\/showdown\/shiny\/(\d+)\.gif/, '/shiny/$1.png')
+      .replace(/\/other\/showdown\/(\d+)\.gif/, '/$1.png')
+    img.onerror = null
+    return
+  }
+
+  if (src.includes('/animated/')) {
+    img.src = src
+      .replace(/\/animated\/shiny\/(\d+)\.gif/, '/other/showdown/shiny/$1.gif')
+      .replace(/\/animated\/(\d+)\.gif/, '/other/showdown/$1.gif')
+    return
+  }
+
+  img.onerror = null
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -520,6 +644,8 @@ function nodeTypeLabel(node: RouteNode): string {
       return 'PokeRand'
     case 'move':
       return 'Move'
+    case 'mega':
+      return 'Mega'
     default:
       return node.type
   }
@@ -668,6 +794,7 @@ function MainApp() {
   const [apiError, setApiError] = useState<string>('')
   const [restEncounter, setRestEncounter] = useState<Pokemon | null>(null)
   const [restRewardItem, setRestRewardItem] = useState<string>('')
+  const [legendaryEncounter, setLegendaryEncounter] = useState<Pokemon | null>(null)
 
   // Resumen de derrota
   const [defeatSummary, setDefeatSummary] = useState<DefeatSummary | null>(null)
@@ -675,6 +802,8 @@ function MainApp() {
   // Modal de selección de objetivo para Revive
   const [reviveModal, setReviveModal] = useState<{ itemName: string; itemIndex: number } | null>(null)
   const [equipModal, setEquipModal] = useState<{ itemName: string; itemIndex: number } | null>(null)
+
+  const battleStartHPRef = useRef<number>(0)
 
   // Team Rocket
   const [isTeamRocketBattle, setIsTeamRocketBattle] = useState<boolean>(false)
@@ -710,6 +839,9 @@ function MainApp() {
   // Speedrun timer
   const [speedrunSeconds, setSpeedrunSeconds] = useState<number>(0)
   const speedrunTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const megaNodeSpawnedRef = useRef(false)
+  const [battleMegaUsed, setBattleMegaUsed] = useState(false)
+  const originalPokemonDataRef = useRef<Record<number, { sprite: string; attack: number; defense: number; speed: number }>>({})
 
   // Pokédex
   const [showPokedex, setShowPokedex] = useState<boolean>(false)
@@ -730,8 +862,13 @@ function MainApp() {
       const migrated: Record<number, PokedexEntry> = {}
       for (const [key, val] of Object.entries(parsed) as [string, any][]) {
         const id = Number(key)
+        let name: string = val.name ?? ''
+        if (name.startsWith('legendary-')) {
+          name = name.replace('legendary-', '')
+        }
         migrated[id] = {
           ...val,
+          name,
           seen: val.seen ?? true,
           caught: val.caught ?? true
         }
@@ -755,7 +892,7 @@ function MainApp() {
     critsLanded: 0, superEffectiveHits: 0, koFirstTurn: 0, captures: 0,
     itemsUsed: 0, moneySpent: 0, moneyEarned: 0, nodesCleared: 0,
     teamSizeMax: 1, lowestHPEver: 999, totalTurns: 0, pokemonUsed: [],
-    challengesActive: []
+    challengesActive: [], evolutions: 0
   })
   const [achievements, setAchievements] = useState<AchievementState>(() => {
     try {
@@ -794,6 +931,20 @@ function MainApp() {
   const inventoryEntries = useMemo(() => groupInventory(inventory), [inventory])
 
   useEffect(() => { startMenuMusic() }, [])
+
+  // Reset mega state when battle ends
+  useEffect(() => {
+    if (screen === 'defeat' || screen === 'victory') {
+      setTeam(prev => prev.map((p, i) => {
+        const orig = originalPokemonDataRef.current[i]
+        if (orig) return { ...p, megaEvolved: false, ...orig }
+        if (p.megaEvolved) return { ...p, megaEvolved: false }
+        return p
+      }))
+      originalPokemonDataRef.current = {}
+      setBattleMegaUsed(false)
+    }
+  }, [screen])
 
   // Speedrun: auto-defeat when timer reaches 0
   useEffect(() => {
@@ -1053,14 +1204,99 @@ function MainApp() {
     })
   }
 
-  function checkAchievements(): void {
+  useEffect(() => {
     if (runStats.captures >= 10) unlockAchievement('collector_10')
     if (runStats.captures >= 25) unlockAchievement('collector_25')
+    if (runStats.captures >= 50) unlockAchievement('collector_50')
     if (runStats.moneyEarned >= 999) unlockAchievement('rich')
+    if (runStats.moneyEarned >= 5000) unlockAchievement('rich_5000')
+    if (runStats.moneyEarned >= 10000) unlockAchievement('rich_10000')
+    if (runStats.moneyEarned >= 50000) unlockAchievement('rich_50000')
     if (runStats.critsLanded >= 5) unlockAchievement('crit_master')
+    if (runStats.critsLanded >= 10) unlockAchievement('crit_10')
+    if (runStats.critsLanded >= 20) unlockAchievement('crit_20')
+    if (runStats.critsLanded >= 50) unlockAchievement('crit_50')
     if (runStats.koFirstTurn >= 1) unlockAchievement('one_shot')
+    if (runStats.koFirstTurn >= 5) unlockAchievement('one_shot_5')
+    if (runStats.koFirstTurn >= 10) unlockAchievement('one_shot_10')
+    if (runStats.superEffectiveHits >= 10) unlockAchievement('super_effective_10')
+    if (runStats.superEffectiveHits >= 25) unlockAchievement('super_effective_25')
+    if (runStats.superEffectiveHits >= 50) unlockAchievement('super_effective_50')
+    if (runStats.superEffectiveHits >= 100) unlockAchievement('super_effective_100')
+    if (runStats.moneySpent >= 500) unlockAchievement('big_spender')
+    if (runStats.moneySpent >= 1000) unlockAchievement('spender_1000')
+    if (runStats.moneySpent >= 5000) unlockAchievement('spender_5000')
+    if (runStats.battlesWon >= 20) unlockAchievement('battle_20')
+    if (runStats.battlesWon >= 50) unlockAchievement('battle_50')
+    if (runStats.battlesWon >= 100) unlockAchievement('battle_100')
+    if (runStats.battlesWon >= 200) unlockAchievement('battle_200')
+    if (runStats.battlesWon >= 500) unlockAchievement('battle_500')
+    if (runStats.itemsUsed >= 10) unlockAchievement('item_user_10')
+    if (runStats.itemsUsed >= 25) unlockAchievement('item_user_25')
+    if (runStats.itemsUsed >= 50) unlockAchievement('item_user_50')
+    if (runStats.totalDamageDealt >= 1000) unlockAchievement('damage_1000')
+    if (runStats.totalDamageDealt >= 5000) unlockAchievement('damage_5000')
+    if (runStats.totalDamageDealt >= 10000) unlockAchievement('damage_10000')
+    if (runStats.totalDamageDealt >= 50000) unlockAchievement('damage_50000')
+    if (runStats.totalDamageTaken >= 500) unlockAchievement('tank_500')
+    if (runStats.totalDamageTaken >= 1000) unlockAchievement('tank_1000')
+    if (runStats.nodesCleared >= 30) unlockAchievement('nodes_30')
+    if (runStats.nodesCleared >= 50) unlockAchievement('nodes_50')
+    if (runStats.nodesCleared >= 100) unlockAchievement('nodes_100')
+    if (runStats.totalTurns >= 500) unlockAchievement('total_turns_500')
+    if (runStats.totalTurns >= 1000) unlockAchievement('total_turns_1000')
+    if (runStats.pokemonUsed.length >= 10) unlockAchievement('team_diversity_10')
+    if (runStats.pokemonUsed.length >= 20) unlockAchievement('team_diversity_20')
+    if (runStats.evolutions >= 5) unlockAchievement('evolution_master')
+    if (runStats.lowestHPEver > 0 && team.some(p => p.hp > 0 && p.hp <= p.maxHp * 0.1)) unlockAchievement('comeback')
+    if (runStats.lowestHPEver === 1) unlockAchievement('back_from_brink')
     if (metaProgression.pokeCoins >= 100) unlockAchievement('meta_100')
-  }
+    if (metaProgression.pokeCoins >= 500) unlockAchievement('meta_500')
+    if (metaProgression.pokeCoins >= 1000) unlockAchievement('meta_1000')
+    if (metaProgression.pokeCoins >= 5000) unlockAchievement('meta_5000')
+  }, [runStats, team, metaProgression.pokeCoins])
+
+  useEffect(() => {
+    if (team.length >= 6) unlockAchievement('full_team')
+  }, [team])
+
+  useEffect(() => {
+    if (inventory.length >= 15) unlockAchievement('hoarder_15')
+  }, [inventory])
+
+  useEffect(() => {
+    if (metaProgression.totalWins >= 5) unlockAchievement('total_wins_5')
+    if (metaProgression.totalWins >= 10) unlockAchievement('total_wins_10')
+    if (metaProgression.totalWins >= 25) unlockAchievement('total_wins_25')
+    if (metaProgression.totalWins >= 50) unlockAchievement('total_wins_50')
+    if (metaProgression.totalRuns >= 10) unlockAchievement('total_runs_10')
+    if (metaProgression.totalRuns >= 25) unlockAchievement('total_runs_25')
+    if (metaProgression.totalRuns >= 50) unlockAchievement('total_runs_50')
+  }, [metaProgression.totalWins, metaProgression.totalRuns])
+
+  useEffect(() => {
+    if (winStreak >= 3) unlockAchievement('streak_3')
+    if (winStreak >= 5) unlockAchievement('streak_5')
+    if (winStreak >= 10) unlockAchievement('streak_10')
+    if (winStreak >= 15) unlockAchievement('streak_15')
+    if (winStreak >= 20) unlockAchievement('streak_20')
+    if (winStreak >= 25) unlockAchievement('streak_25')
+  }, [winStreak])
+
+  useEffect(() => {
+    const legendaryIds = Object.entries(pokedex).filter(([,e]) => e.name.startsWith('legendary-')).map(([id]) => Number(id))
+    if (legendaryIds.length === 0) return
+    legendaryIds.forEach(id => {
+      fetchPokemonDetails(id).then(details => {
+        setPokedex(prev => {
+          if (!prev[id]?.name.startsWith('legendary-')) return prev
+          const updated = { ...prev, [id]: { ...prev[id], name: details.name } }
+          localStorage.setItem('pokerand_pokedex', JSON.stringify(updated))
+          return updated
+        })
+      }).catch(() => {})
+    })
+  }, [])
 
   function awardPokeCoins(amount: number, reason: string): void {
     setMetaProgression(prev => {
@@ -1087,7 +1323,7 @@ function MainApp() {
     }
   }
 
-  function handleRandomEventChoice(): void {
+  async function handleRandomEventChoice(): Promise<void> {
     if (!activeRandomEvent) return
     const event = activeRandomEvent
     setActiveRandomEvent(null)
@@ -1097,17 +1333,21 @@ function MainApp() {
     switch (event.id) {
       case 'legendary_appears': {
         const legendaryIds = [144,145,146,150,151,243,244,245,249,250,251,377,378,379,380,381,382,383,384,385,480,481,482,483,484,485,486,487,488,491,492,493,494,638,639,640,641,642,643,644,645,646,647,648,649]
-          const id = legendaryIds[Math.floor(Math.random() * legendaryIds.length)]
-          const sprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
-          const legendary: Pokemon = {
-            id, name: `legendary-${id}`, sprite,
-            level: current.level + 5, hp: current.maxHp + 40, maxHp: current.maxHp + 40,
-            attack: current.attack + 20, defense: current.defense + 10, speed: current.speed + 10,
-            moves: [...current.moves], types: ['normal']
-          }
-          setBattleLog(prev => [`🐉 ¡Un Pokémon legendario apareció!`, ...prev])
-          setEnemy(legendary)
-          setScreen('battle')
+        const id = legendaryIds[Math.floor(Math.random() * legendaryIds.length)]
+        const legendaryData = await buildPokemonFromApi(id, 1, current.level + 5)
+        const legendary: Pokemon = {
+          ...legendaryData,
+          level: current.level + 5,
+          hp: current.maxHp + 40,
+          maxHp: current.maxHp + 40,
+          attack: current.attack + 20,
+          defense: current.defense + 10,
+          speed: current.speed + 10,
+        }
+        setTeam(prev => prev.map(p => p.hp <= 0 ? p : { ...p, hp: p.maxHp }))
+        setBattleLog(prev => [`🐉 ¡Un Pokémon legendario apareció! Fue un encuentro de descanso. Todo el equipo vivo se ha curado.`, ...prev])
+        setLegendaryEncounter(legendary)
+        setScreen('route')
         break
       }
       case 'mysterious_trader': {
@@ -1193,8 +1433,10 @@ function MainApp() {
           type = 'spin'
         } else if (rand < 0.42) {
           type = 'pokeRand'
-        } else if (rand < 0.52) {
+        } else if (rand < 0.48) {
           type = 'move'
+        } else if (rand < 0.54) {
+          type = 'mega'
         }
       } else {
         if (rand < 0.15 && !runChallenges.noShops) {
@@ -1209,29 +1451,32 @@ function MainApp() {
     return {
       id,
       type,
-      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : `Ruta ${id}`,
+      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : type === 'mega' ? `Mega #${id}` : `Ruta ${id}`,
       done: false
     }
   }
 
   async function startNewRun(): Promise<void> {
-    const unlockedGens = generations.filter(g => isGenUnlocked(g))
-    const dailyCfg = isDailyRunRef.current && unlockedGens.length > 0 ? getDailyConfig(dailySeed, unlockedGens) : null
+    const dailyCfg = isDailyRunRef.current ? getDailyConfig(dailySeed, [1,2,3,4,5,6,7,8,9]) : null
     const effectiveGen = dailyCfg ? dailyCfg.generation : generation
     const effectiveDifficulty = dailyCfg ? dailyCfg.difficulty : difficulty
 
-    if (!isGenUnlocked(effectiveGen)) {
-      setApiError('Esta generación aún está bloqueada.')
-      return
+    if (!dailyCfg) {
+      if (!isGenUnlocked(effectiveGen)) {
+        setApiError('Esta generación aún está bloqueada.')
+        return
+      }
+      if (effectiveDifficulty === 'hard' && !isHardUnlocked(effectiveGen)) {
+        setApiError('El modo difícil para esta generación aún está bloqueado.')
+        return
+      }
+      if (effectiveDifficulty === 'infinite' && !isInfiniteUnlocked(effectiveGen)) {
+        setApiError('El modo Infinite se desbloquea completando Difícil en esta generación.')
+        return
+      }
     }
-    if (effectiveDifficulty === 'hard' && !isHardUnlocked(effectiveGen)) {
-      setApiError('El modo difícil para esta generación aún está bloqueado.')
-      return
-    }
-    if (effectiveDifficulty === 'infinite' && !isInfiniteUnlocked(effectiveGen)) {
-      setApiError('El modo Infinite se desbloquea completando Difícil en esta generación.')
-      return
-    }
+
+    megaNodeSpawnedRef.current = false
 
     setIsLoading(true)
     setApiError('')
@@ -1307,6 +1552,7 @@ function MainApp() {
         const spinPositions: number[] = []
         const pokeRandPositions: number[] = []
         const movePositions: number[] = []
+        let megaPosition: number | null = null
         if (!activeChallenges.allTeamRocket) {
           if (effectiveDifficulty === 'hard') {
             const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
@@ -1324,6 +1570,12 @@ function MainApp() {
               const idx = Math.floor(rr() * available.length)
               movePositions.push(available[idx])
               available.splice(idx, 1)
+            }
+            if (available.length > 0) {
+              const idx = Math.floor(rr() * available.length)
+              megaPosition = available[idx]
+              available.splice(idx, 1)
+              megaNodeSpawnedRef.current = true
             }
           } else if (effectiveDifficulty === 'medium') {
             const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
@@ -1347,6 +1599,8 @@ function MainApp() {
             type = 'pokeRand'
           } else if (movePositions.includes(i)) {
             type = 'move'
+          } else if (megaPosition !== null && i === megaPosition) {
+            type = 'mega'
           } else if (activeChallenges.bossRush) {
             type = 'battle'
           } else if (activeChallenges.allTeamRocket) {
@@ -1365,7 +1619,7 @@ function MainApp() {
           customRoute.push({
             id: i,
             type,
-            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : `Ruta ${i}`,
+            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : type === 'mega' ? `Mega #${i}` : `Ruta ${i}`,
             done: false
           })
         }
@@ -1483,17 +1737,28 @@ function MainApp() {
   function completeCurrentNode(): void {
     setRestEncounter(null)
     setRestRewardItem('')
+    setLegendaryEncounter(null)
     if (speedrunTimerRef.current) {
       clearInterval(speedrunTimerRef.current)
       speedrunTimerRef.current = null
     }
     setSpeedrunSeconds(0)
+    setTeam(prev => prev.map((p, i) => {
+      const orig = originalPokemonDataRef.current[i]
+      if (orig) return { ...p, megaEvolved: false, ...orig }
+      if (p.megaEvolved) return { ...p, megaEvolved: false }
+      return p
+    }))
+    originalPokemonDataRef.current = {}
     setRoute((previous) =>
       previous.map((node, index) => (index === routeIndex ? { ...node, done: true } : node))
     )
 
     if (routeIndex >= route.length - 1) {
       if (difficulty === 'infinite') {
+        if (routeIndex >= 19) unlockAchievement('infinite_20')
+        if (routeIndex >= 49) unlockAchievement('infinite_50')
+        if (routeIndex >= 99) unlockAchievement('infinite_100')
         const nextId = route.length + 1
         const batch = Array.from({ length: 5 }, (_, k) => generateRandomNodeType(nextId + k))
         setRoute((previous) => [...previous, ...batch])
@@ -1549,23 +1814,41 @@ function MainApp() {
         setBestStreak(newStreak)
         localStorage.setItem('pokerand_best_streak', String(newStreak))
       }
-      if (newStreak >= 3) unlockAchievement('streak_3')
-      if (newStreak >= 5) unlockAchievement('streak_5')
-      if (newStreak >= 10) unlockAchievement('streak_10')
       unlockAchievement('first_win')
       if (runChallenges.nuzlocke || runChallenges.nuzlockeHardcore) unlockAchievement('nuzlocke_win')
       if (team.length <= 1) unlockAchievement('solo_win')
       if (runChallenges.speedrun) unlockAchievement('speedrun_win')
       if (runChallenges.noItems) unlockAchievement('no_item_win')
       if (runChallenges.ironman) unlockAchievement('ironman_win')
-      if (runStats.lowestHPEver > 0 && team.some(p => p.hp > 0 && p.hp <= p.maxHp * 0.1)) unlockAchievement('comeback')
       if (difficulty === 'hard') unlockAchievement('hard_win')
+      if (difficulty === 'easy') unlockAchievement('rookie')
       if (runChallenges.bossRush) unlockAchievement('boss_rush_win')
       if (runChallenges.challengeGauntlet) unlockAchievement('gauntlet_win')
-      checkAchievements()
+      if (nextCompletedAny.length >= 9) unlockAchievement('all_gens')
 
-      const hasActiveChallenge = Object.entries(runChallenges).some(([k, v]) => v && k !== 'allShiny')
+      if (difficulty === 'medium') unlockAchievement('medium_win')
+      if (metaProgression.totalWins === 0) unlockAchievement('first_try')
+
+      if (runChallenges.noShops) unlockAchievement('noShops_win')
+      if (runChallenges.noRests) unlockAchievement('noRests_win')
+      if (runChallenges.allShiny) unlockAchievement('allShiny_win')
+      if (runChallenges.noMoney) unlockAchievement('noMoney_win')
+      if (runChallenges.egglocke) unlockAchievement('egglocke_win')
+      if (runChallenges.nuzlockeHardcore) unlockAchievement('nuzlockeHC_win')
+      if (runChallenges.noHealing) unlockAchievement('noHeal_win')
+      if (runChallenges.allTeamRocket) unlockAchievement('allTeamRocket_win')
+
+      const activeChallengeCount = Object.entries(runChallenges).filter(([k, v]) => v && k !== 'allShiny').length
+      if (activeChallengeCount >= 3) unlockAchievement('triple_challenge')
+      if (activeChallengeCount >= 5) unlockAchievement('challenge_mania')
+
+      const hasActiveChallenge = activeChallengeCount > 0
       const baseCoins = difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15
+
+      const newTotalWins = metaProgression.totalWins + 1
+      const newTotalRuns = metaProgression.totalRuns + 1
+      let coinAward = baseCoins + (hasActiveChallenge ? 15 : 0) + (team.length <= 1 ? 5 : 0)
+      const newPokeCoins = metaProgression.pokeCoins + coinAward
 
       setMetaProgression(prev => {
         const coins = baseCoins + (hasActiveChallenge ? 15 : 0)
@@ -1614,6 +1897,8 @@ function MainApp() {
     if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
     if (runChallenges.fixedLevel) captured = { ...captured, level: 50 }
     registerInPokedex(captured)
+    if (captured.shiny) unlockAchievement('shiny_catch')
+    if ((captured.attack + captured.defense + captured.speed + captured.maxHp) >= 600) unlockAchievement('legendary_catch')
     if (team.length >= 6) {
       const faintedIndex = team.findIndex((p) => p.hp <= 0)
       if (faintedIndex !== -1) {
@@ -1755,6 +2040,8 @@ function MainApp() {
         prevTeam.map((p, i) => (i === index ? finalEvolved : p))
       )
 
+      setRunStats(prev => ({ ...prev, evolutions: prev.evolutions + 1 }))
+
       setBattleLog((prev) => [
         `✨ ¡${targetPokemon.name} evolucionó en ${finalEvolved.name}! (Nv.${finalEvolved.level} + Stats boosted)`,
         ...prev
@@ -1773,7 +2060,7 @@ function MainApp() {
 
     if (currentNode.type === 'shop') {
       const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(isConsumableUnlocked)
-      const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked)
+      const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone')
       const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
       const shuffledHoldables = [...allHoldableKeys].sort(() => 0.5 - Math.random())
       const selectedConsumables = shuffledConsumables.slice(0, 2)
@@ -1799,7 +2086,7 @@ function MainApp() {
 
     if (currentNode.type === 'spin') {
       const healingPool = Object.keys(ALL_SHOP_ITEMS).filter(isConsumableUnlocked)
-      const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked)
+      const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone')
       const shuffledH = [...healingPool].sort(() => 0.5 - Math.random())
       const shuffledP = [...passivePool].sort(() => 0.5 - Math.random())
       const items = [...shuffledH.slice(0, 4), ...shuffledP.slice(0, 2)].sort(() => 0.5 - Math.random())
@@ -1866,6 +2153,20 @@ function MainApp() {
       } finally {
         setIsLoading(false)
       }
+      return
+    }
+
+    if (currentNode.type === 'mega') {
+      const alreadyHas = inventory.includes('Mega Stone') || team.some(p => p.holdItem === 'Mega Stone')
+      if (!alreadyHas) {
+        setInventory(prev => [...prev, 'Mega Stone'])
+        setBattleLog(prev => [`💎 ¡Recibes una Mega Piedra! Un Pokémon puede equiparla para mega-evolucionar en combate.`, ...prev].slice(0, 15))
+      } else {
+        const price = 200
+        setMetaProgression(prev => ({ ...prev, pokeCoins: prev.pokeCoins + price }))
+        setBattleLog(prev => [`💎 Ya tienes una Mega Piedra. Recibes ${price} PokéCoins en su lugar.`, ...prev].slice(0, 15))
+      }
+      setScreen('mega')
       return
     }
 
@@ -2076,6 +2377,10 @@ function MainApp() {
       }
       }
 
+      setTeam(prev => prev.map(p => ({ ...p, megaEvolved: false })))
+      setBattleMegaUsed(false)
+      originalPokemonDataRef.current = {}
+      battleStartHPRef.current = activePokemon.hp
       setScreen('battle')
 
       if (runChallenges.speedrun) {
@@ -2134,6 +2439,7 @@ function MainApp() {
       `🎰 ¡Giraste la Ruleta y obtuviste ${item}!`,
       ...prev
     ].slice(0, 15))
+    unlockAchievement('gambler')
     completeCurrentNode()
     setScreen('route')
   }
@@ -2176,18 +2482,19 @@ function MainApp() {
     if (runChallenges.noEvolution) pokemon = applyNoEvolutionBuff(pokemon)
     if (runChallenges.fixedLevel) pokemon = { ...pokemon, level: 50 }
     if (difficulty === 'hard') pokemon = { ...pokemon, holdItem: null }
+    registerInPokedex(pokemon)
+    setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
+    if (pokemon.shiny) unlockAchievement('shiny_catch')
+    if ((pokemon.attack + pokemon.defense + pokemon.speed + pokemon.maxHp) >= 600) unlockAchievement('legendary_catch')
+    unlockAchievement('pokeRand_master')
     if (team.length >= maxTeamSize) {
       setPcStorage((prev) => [...prev, pokemon])
-      registerInPokedex(pokemon)
-      setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
       setBattleLog((prev) => [
         `🎲 ¡PokeRand: ${pokemon.name} se envió al PC (equipo lleno)!`,
         ...prev
       ].slice(0, 15))
     } else {
       setTeam((prev) => [...prev, pokemon])
-      registerInPokedex(pokemon)
-      setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
       setBattleLog((prev) => [
         `🎲 ¡PokeRand: ${pokemon.name} se unió a tu equipo!`,
         ...prev
@@ -2315,7 +2622,7 @@ function MainApp() {
 
   function unequipItem(pokemonIndex: number) {
     const pokemon = team[pokemonIndex]
-    if (!pokemon || !pokemon.holdItem) return
+    if (!pokemon || !pokemon.holdItem || pokemon.hp <= 0) return
 
     const itemName = pokemon.holdItem
     const stats = HOLDABLE_ITEMS[itemName]
@@ -2467,7 +2774,7 @@ function MainApp() {
     defender: Pokemon,
     move: Move,
     isEnemyHit: boolean
-  ): { updatedDefender: Pokemon; updatedAttacker: Pokemon; lines: string[]; attackerHeal: number } {
+  ): { updatedDefender: Pokemon; updatedAttacker: Pokemon; lines: string[]; attackerHeal: number; crits: number } {
     const enemyBoost = isEnemyHit ? modifier?.enemyAttackDelta ?? 0 : 0
 
     const attackerItem = attacker.holdItem ? HOLDABLE_ITEMS[attacker.holdItem] : null
@@ -2516,6 +2823,7 @@ function MainApp() {
           updatedAttacker: attacker,
           lines: [`${attacker.name} usó ${effectiveMove.name} pero falló.`],
           attackerHeal: 0,
+          crits: 0,
         }
       }
     }
@@ -2529,6 +2837,7 @@ function MainApp() {
     let currentDefender = effectiveDefender
     const lines: string[] = []
     let totalDamage = 0
+    let totalCrits = 0
 
     for (let hit = 0; hit < totalHits; hit++) {
       const result = applyDamage(effectiveAttacker, currentDefender, effectiveMove, enemyBoost)
@@ -2554,6 +2863,7 @@ function MainApp() {
       const isCrit = !runChallenges.noCrits && totalCrit > 0 && Math.random() < totalCrit
       if (isCrit) {
         finalDamage = Math.floor(finalDamage * 1.5)
+        totalCrits++
       }
 
       const newHp = Math.max(0, currentDefender.hp - finalDamage)
@@ -2615,6 +2925,7 @@ function MainApp() {
       updatedAttacker,
       lines,
       attackerHeal,
+      crits: totalCrits,
     }
   }
 
@@ -2659,7 +2970,6 @@ function MainApp() {
           localStorage.setItem('pokerand_meta', JSON.stringify(updated))
           return updated
         })
-        checkAchievements()
         awardPokeCoins(5, 'Partida completada (derrota)')
         if (isDailyRunRef.current) { setDailyPlayed(true); localStorage.setItem('pokerand_daily', dailySeed) }
         setScreen('defeat')
@@ -2714,11 +3024,13 @@ function MainApp() {
     const enemyEffectiveSpeed = Math.round(nextEnemy.speed * (1 + (enemyItem?.speedMod ?? 0)) * enemyParalysisNerf)
     const playerStarts = playerEffectiveSpeed >= enemyEffectiveSpeed
 
+    let playerCrits = 0
     const doPlayerAttack = async () => {
       if (nextPlayer.hp <= 0 || nextEnemy.hp <= 0 || playerSkipped || playerConfusedSelfHit) return
       const playerHit = performHit(nextPlayer, nextEnemy, move, false)
       nextEnemy = playerHit.updatedDefender
       nextPlayer = playerHit.updatedAttacker
+      playerCrits = playerHit.crits
       if (playerHit.attackerHeal > 0) {
         const healed = Math.min(nextPlayer.maxHp, nextPlayer.hp + playerHit.attackerHeal)
         nextPlayer = { ...nextPlayer, hp: healed }
@@ -2788,6 +3100,7 @@ function MainApp() {
         totalDamageTaken: prev.totalDamageTaken + playerDmg,
         totalTurns: prev.totalTurns + 1,
         lowestHPEver: Math.min(prev.lowestHPEver, nextPlayer.hp),
+        critsLanded: prev.critsLanded + playerCrits,
       }
     })
 
@@ -2816,7 +3129,6 @@ function MainApp() {
           localStorage.setItem('pokerand_meta', JSON.stringify(updated))
           return updated
         })
-        checkAchievements()
         awardPokeCoins(5, 'Partida completada (derrota)')
         if (isDailyRunRef.current) {
           setDailyPlayed(true)
@@ -3035,6 +3347,9 @@ function MainApp() {
       }
 
       // --- Batalla salvaje → victoria directa ---
+      if (nextPlayer.hp >= battleStartHPRef.current) {
+        unlockAchievement('perfect_battle')
+      }
       logMsg = `🌿 Derrotaste al ${nextEnemy.name} salvaje y ganaste $${moneyReward}. ¡Equipo fortalecido!`
       setTeam(newTeam)
       setEnemy(nextEnemy)
@@ -3049,9 +3364,39 @@ function MainApp() {
     setBattleLog((prev) => [...logs, ...prev].slice(0, 15))
   }
 
+  function megaEvolveActive(): void {
+    if (!activePokemon || activePokemon.holdItem !== 'Mega Stone' || battleMegaUsed || !MEGA_CAPABLE_IDS.has(activePokemon.id)) return
+    const formId = MEGA_FORM_IDS[activePokemon.id]
+    const megaFormId = Array.isArray(formId) ? formId[Math.floor(Math.random() * formId.length)] : formId
+    const megaSprite = megaFormId
+      ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${megaFormId}.png`
+      : null
+    setTeam(prev => prev.map((p, i) => i === activeIndex ? {
+      ...p,
+      megaEvolved: true,
+      sprite: megaSprite ?? p.sprite,
+      attack: Math.floor(p.attack * 1.15),
+      defense: Math.floor(p.defense * 1.15),
+      speed: Math.floor(p.speed * 1.15),
+    } : p))
+    originalPokemonDataRef.current[activeIndex] = {
+      sprite: activePokemon.sprite,
+      attack: activePokemon.attack,
+      defense: activePokemon.defense,
+      speed: activePokemon.speed,
+    }
+    setBattleMegaUsed(true)
+    setBattleLog(prev => [`💥 ¡${activePokemon.name} ha mega-evolucionado! Stats aumentados un 15%.`, ...prev].slice(0, 15))
+  }
+
   function switchActive(index: number): void {
     const target = team[index]
     if (!target || target.hp <= 0 || index === activeIndex) return
+    const orig = originalPokemonDataRef.current[activeIndex]
+    setTeam(prev => prev.map((p, i) => {
+      if (i === activeIndex && orig) return { ...p, megaEvolved: false, ...orig }
+      return p
+    }))
     setActiveIndex(index)
     if (screen === 'move') {
       setSelectedNewMove(null)
@@ -3181,6 +3526,8 @@ function MainApp() {
     if (runChallenges.fixedLevel) captured = { ...captured, level: 50 }
     registerInPokedex(captured)
     setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
+    if (captured.shiny) unlockAchievement('shiny_catch')
+    if ((captured.attack + captured.defense + captured.speed + captured.maxHp) >= 600) unlockAchievement('legendary_catch')
     if (team.length >= maxTeamSize) {
       setPcStorage((prev) => [...prev, captured])
       setBattleLog((prev) => [`Capturaste a ${captured.name} y se envió al PC (equipo lleno).`, ...prev].slice(0, 15))
@@ -3196,6 +3543,44 @@ function MainApp() {
 
     setBattleLog((prev) => [`Dejaste ir a ${restEncounter.name}.`, ...prev].slice(0, 15))
     completeCurrentNode()
+  }
+
+  function captureLegendaryPokemon(): void {
+    if (!legendaryEncounter) return
+
+    if (runChallenges.soloStarter) {
+      setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
+      return
+    }
+
+    if (runChallenges.fixedTeam) {
+      setBattleLog((prev) => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
+      return
+    }
+
+    const hpBonus = modifier?.playerMaxHpBonus ?? 0
+    let captured: Pokemon = { ...legendaryEncounter, maxHp: legendaryEncounter.maxHp + hpBonus, hp: legendaryEncounter.hp + hpBonus, holdItem: difficulty === 'hard' ? null : legendaryEncounter.holdItem }
+    if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
+    if (runChallenges.fixedLevel) captured = { ...captured, level: 50 }
+    registerInPokedex(captured)
+    setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
+    if (captured.shiny) unlockAchievement('shiny_catch')
+    if ((captured.attack + captured.defense + captured.speed + captured.maxHp) >= 600) unlockAchievement('legendary_catch')
+    if (team.length >= maxTeamSize) {
+      setPcStorage((prev) => [...prev, captured])
+      setBattleLog((prev) => [`🐉 ¡Capturaste al legendario ${captured.name} y se envió al PC (equipo lleno)!`, ...prev].slice(0, 15))
+    } else {
+      setTeam((previous) => [...previous, captured])
+      setBattleLog((prev) => [`🐉 ¡Capturaste al legendario ${captured.name}!`, ...prev].slice(0, 15))
+    }
+    setLegendaryEncounter(null)
+  }
+
+  function skipLegendaryCapture(): void {
+    if (!legendaryEncounter) return
+
+    setBattleLog((prev) => [`Dejaste ir al legendario ${legendaryEncounter.name}.`, ...prev].slice(0, 15))
+    setLegendaryEncounter(null)
   }
 
   function resetToSetup(): void {
@@ -3215,6 +3600,7 @@ function MainApp() {
     setApiError('')
     setRestEncounter(null)
     setRestRewardItem('')
+    setLegendaryEncounter(null)
     setDefeatSummary(null)
     setVictoryUnlocks(null)
     setIsTrainerBattle(false)
@@ -3236,6 +3622,7 @@ function MainApp() {
     setEggInventory([])
     setPcStorage([])
     setSpeedrunSeconds(0)
+    battleStartHPRef.current = 0
     if (speedrunTimerRef.current) {
       clearInterval(speedrunTimerRef.current)
       speedrunTimerRef.current = null
@@ -3243,7 +3630,7 @@ function MainApp() {
   }
 
   function onRestartRun(): void {
-    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move') {
+    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega') {
       resetToSetup()
     }
   }
@@ -3634,7 +4021,7 @@ function MainApp() {
                           style={!pkmn.caught ? { opacity: 0.6 } : undefined}
                         >
                           <span className="pokedex-id">#{String(pkmn.id).padStart(3, '0')}</span>
-                          <img src={pkmn.id >= 1 && pkmn.id <= 649 ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pkmn.id}.gif` : pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '60px', height: '60px', filter: pkmn.caught ? 'none' : 'brightness(0) invert(0)', imageRendering: pkmn.caught ? undefined : 'auto' }} />
+                          <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pkmn.id}.gif`} alt={pkmn.name} onError={fallbackSprite} style={{ width: '60px', height: '60px', filter: pkmn.caught ? 'none' : 'brightness(0) invert(0)', imageRendering: pkmn.caught ? undefined : 'auto' }} />
                           <strong style={{ textTransform: 'capitalize', display: 'block', fontSize: '0.85rem' }}>
                             {pkmn.caught ? pkmn.name : '???'}
                           </strong>
@@ -3971,8 +4358,7 @@ function MainApp() {
           <h2 style={{ marginTop: '1.5rem' }}>🎲 Desafío Diario</h2>
           <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
             {(() => {
-              const unlockedGens = generations.filter(g => isGenUnlocked(g))
-              const dailyConfig = unlockedGens.length > 0 ? getDailyConfig(dailySeed, unlockedGens) : null
+              const dailyConfig = getDailyConfig(dailySeed, [1,2,3,4,5,6,7,8,9])
               const diffLabel = dailyConfig?.difficulty === 'easy' ? 'Fácil' : dailyConfig?.difficulty === 'hard' ? 'Difícil' : 'Medio'
               const genLabel = dailyConfig ? `${generationRegions[dailyConfig.generation]}` : ''
               const modName = dailyConfig ? RUN_MODIFIERS.find(m => m.id === dailyConfig.modifierId)?.name ?? '' : ''
@@ -4144,11 +4530,11 @@ function MainApp() {
         </section>
       )}
 
-      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move') && activePokemon && (
+      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega') && activePokemon && (
         <section className="roulette-layout">
           <article className="panel trainer-panel">
             <p className="muted small-tag">Trainer</p>
-            <img className="sprite trainer-sprite" src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
+            <img className={`sprite trainer-sprite${activePokemon.megaEvolved ? ' mega-active' : ''}`} src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
             <h2>
               {activePokemon.name}{activePokemon.shiny ? ' ✨' : ''}
               {activePokemon.status && (
@@ -4345,6 +4731,7 @@ function MainApp() {
                 const spinClass = node.type === 'spin' ? ' node-spin' : ''
                 const pokeRandClass = node.type === 'pokeRand' ? ' node-pokerand' : ''
                 const moveClass = node.type === 'move' ? ' node-move' : ''
+                const megaClass = node.type === 'mega' ? ' node-mega' : ''
                 if (isBlindHidden) {
                   return (
                     <div key={node.id} className={`node pending`} style={{ opacity: 0.4 }}>
@@ -4354,7 +4741,7 @@ function MainApp() {
                   )
                 }
                 return (
-                  <div key={node.id} className={`node ${stateClass}${rocketClass}${spinClass}${pokeRandClass}${moveClass}`}>
+                  <div key={node.id} className={`node ${stateClass}${rocketClass}${spinClass}${pokeRandClass}${moveClass}${megaClass}`}>
                     <span>#{node.id}</span>
                     <strong>{nodeTypeLabel(node)}</strong>
                   </div>
@@ -4650,7 +5037,32 @@ function MainApp() {
               </div>
             )}
 
-            {screen === 'route' && currentNode && currentNode.type === 'rest' && restEncounter && (
+            {screen === 'mega' && (
+              <div className="action-block" style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>💎</div>
+                <h3 style={{ margin: '0 0 0.5rem', color: '#f472b6' }}>¡Mega Piedra!</h3>
+                {inventory.includes('Mega Stone') || team.some(p => p.holdItem === 'Mega Stone') ? (
+                  <>
+                    <p style={{ margin: '0 0 0.25rem' }}>Has recibido una <strong>Mega Piedra</strong>.</p>
+                    <p className="muted" style={{ fontSize: '0.85rem', margin: '0 0 1rem' }}>
+                      Equípala a un Pokémon y durante el combate podrás mega-evolucionar una vez.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ margin: '0 0 0.25rem' }}>Ya tenías una Mega Piedra.</p>
+                    <p className="muted" style={{ fontSize: '0.85rem', margin: '0 0 1rem' }}>
+                      Recibiste PokéCoins como compensación.
+                    </p>
+                  </>
+                )}
+                <button className="cta" onClick={() => { completeCurrentNode(); setScreen('route') }} type="button" style={{ background: '#f472b6' }}>
+                  Continuar
+                </button>
+              </div>
+            )}
+
+            {screen === 'route' && currentNode && currentNode.type === 'rest' && restEncounter && !legendaryEncounter && (
               <div className="action-block">
                 <p>
                   Rest stop: <strong>{restEncounter.name}{restEncounter.shiny ? ' ✨' : ''}</strong> is waiting to be captured.
@@ -4687,18 +5099,38 @@ function MainApp() {
               </div>
             )}
 
-            {screen === 'route' && currentNode && currentNode.type !== 'rest' && (
+            {screen === 'route' && legendaryEncounter && (
+              <div className="action-block">
+                <p>
+                  🐉 ¡Un Pokémon Legendario apareció! <strong>{legendaryEncounter.name}</strong> está esperando ser capturado.
+                </p>
+                <p style={{ color: '#fbbf24', fontSize: '0.85rem' }}>✨ El equipo se ha curado por completo.</p>
+                <div className="capture-card" style={{ border: '2px solid #fbbf24', boxShadow: '0 0 12px rgba(251,191,36,0.4)' }}>
+                  <img className="sprite" src={legendaryEncounter.sprite} alt={legendaryEncounter.name} onError={fallbackSprite} />
+                </div>
+                <div className="moves-grid" style={{ marginBottom: '1rem' }}>
+                  <button className="cta" onClick={captureLegendaryPokemon} type="button" style={{ background: '#d97706' }}>
+                    {team.length >= maxTeamSize ? `Capturar → PC (${pcStorage.length} en PC)` : '¡Capturar Legendario!'}
+                  </button>
+                  <button className="secondary" onClick={skipLegendaryCapture} type="button">
+                    Skip
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {screen === 'route' && currentNode && currentNode.type !== 'rest' && !legendaryEncounter && (
               <div className="action-block">
                 <p>
                   Next node: <strong>{currentNode.label}</strong> ({nodeTypeLabel(currentNode)})
                 </p>
                 <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={enterNode} type="button" disabled={isLoading}>
-                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : 'Enter node'}
+                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : currentNode.type === 'mega' ? '💎 ¡Recoger Mega Piedra!' : 'Enter node'}
                 </button>
               </div>
             )}
 
-            {screen === 'route' && currentNode && currentNode.type === 'rest' && !restEncounter && (
+            {screen === 'route' && currentNode && currentNode.type === 'rest' && !restEncounter && !legendaryEncounter && (
               <div className="action-block">
                 <p>
                   Rest stop: <strong>{currentNode.label}</strong>.
@@ -4810,6 +5242,16 @@ function MainApp() {
                     </button>
                   ))}
                 </div>
+                {activePokemon.holdItem === 'Mega Stone' && !battleMegaUsed && MEGA_CAPABLE_IDS.has(activePokemon.id) && (
+                  <button
+                    className="cta"
+                    onClick={megaEvolveActive}
+                    type="button"
+                    style={{ marginTop: '8px', width: '100%', background: 'linear-gradient(135deg, #f472b6, #c084fc)' }}
+                  >
+                    💥 ¡Mega Evolucionar!
+                  </button>
+                )}
               </div>
             )}
 
@@ -5051,12 +5493,12 @@ function MainApp() {
               {ACHIEVEMENTS.map(a => {
                 const unlocked = achievements[a.id]?.unlocked
                 return (
-                  <div key={a.id} style={{ background: unlocked ? 'rgba(250,204,21,0.1)' : 'rgba(30,41,59,0.5)', border: `1px solid ${unlocked ? '#facc15' : '#334155'}`, borderRadius: '12px', padding: '0.75rem', opacity: !unlocked && a.hidden ? 0.4 : 1 }}>
+                  <div key={a.id} style={{ background: unlocked ? 'rgba(250,204,21,0.1)' : 'rgba(30,41,59,0.5)', border: `1px solid ${unlocked ? '#facc15' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '1.5rem' }}>{!unlocked && a.hidden ? '🔒' : a.icon}</span>
+                      <span style={{ fontSize: '1.5rem' }}>{a.icon}</span>
                       <div>
-                        <div style={{ color: unlocked ? '#facc15' : '#94a3b8', fontWeight: 'bold', fontSize: '0.85rem' }}>{!unlocked && a.hidden ? '???' : a.name}</div>
-                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{!unlocked && a.hidden ? 'Oculto' : a.desc}</div>
+                        <div style={{ color: unlocked ? '#facc15' : '#94a3b8', fontWeight: 'bold', fontSize: '0.85rem' }}>{a.name}</div>
+                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{a.desc}</div>
                       </div>
                     </div>
                   </div>
@@ -5095,7 +5537,6 @@ function MainApp() {
           <h3 style={{ color: '#ef4444', textAlign: 'center', marginBottom: '0.75rem' }}>📊 Estadísticas de la Run</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem' }}>
             <div style={{ color: '#94a3b8' }}>⚔️ Batallas ganadas:</div><div style={{ color: '#22c55e', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
-            <div style={{ color: '#94a3b8' }}>💀 Batallas perdidas:</div><div style={{ color: '#ef4444', fontWeight: 'bold' }}>{runStats.battlesLost}</div>
             <div style={{ color: '#94a3b8' }}>💥 Daño total infligido:</div><div style={{ color: '#f87171', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
             <div style={{ color: '#94a3b8' }}>🛡️ Daño total recibido:</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>
             <div style={{ color: '#94a3b8' }}>🔄 Turnos jugados:</div><div style={{ color: '#cbd5e1', fontWeight: 'bold' }}>{runStats.totalTurns}</div>

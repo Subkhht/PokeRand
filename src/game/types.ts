@@ -44,12 +44,13 @@ export interface Pokemon {
   rawLevelUpMoves?: RawLevelUpMove[]
   holdItem?: string | null
   shiny?: boolean
+  megaEvolved?: boolean
   status?: StatusCondition
 }
 
 export interface RouteNode {
   id: number
-  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket' | 'spin' | 'pokeRand' | 'move'
+  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket' | 'spin' | 'pokeRand' | 'move' | 'mega'
   label: string
   done: boolean
 }
@@ -143,6 +144,7 @@ export interface RunStats {
   totalTurns: number
   pokemonUsed: string[]
   challengesActive: string[]
+  evolutions: number
 }
 
 export interface Achievement {

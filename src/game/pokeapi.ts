@@ -4,6 +4,7 @@ const API_BASE = 'https://pokeapi.co/api/v2'
 
 const generationSpeciesCache = new Map<number, number[]>()
 const pokemonCache = new Map<string | number, Pokemon>()
+let allFormIdsPromise: Promise<number[]> | null = null
 
 interface PokeApiNamedResource {
   name: string
@@ -15,6 +16,20 @@ interface PokeApiPokemon {
   name: string
   sprites: {
     front_default: string | null
+    other?: {
+      showdown?: {
+        front_default: string | null
+      }
+    }
+    versions?: {
+      'generation-v'?: {
+        'black-white'?: {
+          animated?: {
+            front_default: string | null
+          }
+        }
+      }
+    }
   }
   stats: Array<{
     base_stat: number
@@ -65,18 +80,21 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
   const resPokemon = await fetch(`${API_BASE}/pokemon/${id}`)
   const dataPokemon = await resPokemon.json()
 
-  const resSpecies = await fetch(`${API_BASE}/pokemon-species/${id}`)
-  const dataSpecies = await resSpecies.json()
-
-  const flavorEntry = dataSpecies.flavor_text_entries.find(
-    (entry: any) => entry.language.name === 'es'
-  ) ?? dataSpecies.flavor_text_entries.find(
-    (entry: any) => entry.language.name === 'en'
-  )
-
-  const description = flavorEntry 
-    ? flavorEntry.flavor_text.replace(/[\n\f]/g, ' ') 
-    : 'Sin descripción disponible.'
+  let description = 'Sin descripción disponible.'
+  try {
+    const resSpecies = await fetch(`${API_BASE}/pokemon-species/${id}`)
+    if (resSpecies.ok) {
+      const dataSpecies = await resSpecies.json()
+      const flavorEntry = dataSpecies.flavor_text_entries.find(
+        (entry: any) => entry.language.name === 'es'
+      ) ?? dataSpecies.flavor_text_entries.find(
+        (entry: any) => entry.language.name === 'en'
+      )
+      if (flavorEntry) {
+        description = flavorEntry.flavor_text.replace(/[\n\f]/g, ' ')
+      }
+    }
+  } catch {}
 
   const highResImage = dataPokemon.sprites.other?.['official-artwork']?.front_default 
     || dataPokemon.sprites.front_default
@@ -123,6 +141,9 @@ function capitalize(value: string): string {
 }
 
 export function makeShinySprite(sprite: string, id: number): string {
+  if (sprite.includes('/showdown/') && !sprite.includes('/animated/')) {
+    return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/${id}.gif`
+  }
   if (sprite.includes('/animated/')) {
     return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/shiny/${id}.gif`
   }
@@ -135,6 +156,30 @@ async function fetchJson<T>(url: string): Promise<T> {
     throw new Error(`Fallo al pedir ${url}: ${response.status}`)
   }
   return (await response.json()) as T
+}
+
+const REGIONAL_FORM_RANGES = [
+  [10001, 10032],
+  [10080, 10086],
+  [10091, 10116],
+  [10118, 10157],
+  [10160, 10194],
+  [10229, 10263],
+  [10272, 10277],
+]
+
+async function getAllFormIds(): Promise<number[]> {
+  if (allFormIdsPromise) return allFormIdsPromise
+
+  allFormIdsPromise = (async () => {
+    const data = await fetchJson<{ results: PokeApiNamedResource[] }>(
+      `${API_BASE}/pokemon?limit=1351&offset=0`
+    )
+    const allIds = data.results.map(r => extractIdFromResourceUrl(r.url))
+    return allIds.filter(id => REGIONAL_FORM_RANGES.some(([lo, hi]) => id >= lo && id <= hi))
+  })()
+
+  return allFormIdsPromise
 }
 
 async function getSpeciesIdsByGeneration(generation: number): Promise<number[]> {
@@ -354,9 +399,9 @@ export async function buildPokemonFromApi(
     baseStatTotal,
     sprite: (() => {
       const id = data.id
-      const baseSprite = id >= 1 && id <= 649
-        ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${id}.gif`
-        : data.sprites.front_default ?? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+      const gen5Animated = data.sprites.versions?.['generation-v']?.['black-white']?.animated?.front_default
+      const showdown = data.sprites.other?.showdown?.front_default
+      const baseSprite = gen5Animated ?? showdown ?? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
       return shiny ? makeShinySprite(baseSprite, id) : baseSprite
     })(),
     shiny: shiny || undefined,
@@ -539,6 +584,17 @@ export async function getBalancedPokemonByGeneration(
     }
   }
 
+  if (Math.random() < 0.02) {
+    const formIds = await getAllFormIds()
+    if (formIds.length > 0) {
+      const randomId = formIds[Math.floor(Math.random() * formIds.length)]
+      return applyHardHeldItem(
+        await buildPokemonFromApi(randomId, generation, scaledLevel, shiny, difficulty),
+        difficulty, isBoss
+      )
+    }
+  }
+
   const shuffledCandidates = [...candidateIds].sort(() => 0.5 - Math.random())
   const attempts = Math.min(7, shuffledCandidates.length)
 
@@ -573,6 +629,13 @@ export async function getBalancedPokemonByGeneration(
 }
 
 export async function getRandomPokemonByGeneration(generation: number): Promise<Pokemon> {
+  if (Math.random() < 0.02) {
+    const formIds = await getAllFormIds()
+    if (formIds.length > 0) {
+      const randomId = formIds[Math.floor(Math.random() * formIds.length)]
+      return buildPokemonFromApi(randomId, generation)
+    }
+  }
   const ids = await getSpeciesIdsByGeneration(generation)
   const randomId = randomFrom(ids)
   return buildPokemonFromApi(randomId, generation)
@@ -611,18 +674,21 @@ export async function evolvePokemon(currentPokemon: Pokemon): Promise<Pokemon | 
 
     const currentSpeciesName = speciesData.name.toLowerCase()
 
+    function stripRegional(name: string): string {
+      const regional = ['-hisui', '-alola', '-galar', '-paldea', '-mega', '-gmax']
+      for (const suffix of regional) {
+        if (name.includes(suffix)) return name.split(suffix)[0]
+      }
+      return name
+    }
+
     function findNextEvolution(chainNode: EvolutionChainNode): string | null {
       if (chainNode.species.name.toLowerCase() === currentSpeciesName) {
         if (chainNode.evolves_to && chainNode.evolves_to.length > 0) {
-          const randomEvo = randomFrom(chainNode.evolves_to)
-          const validForms = (randomEvo.evolution_details ?? [])
-            .map(d => d.evolved_form?.name)
-            .filter((n): n is string => !!n)
-          if (validForms.length > 0) {
-            const regularForm = validForms.find(f => !f.includes('-'))
-            return regularForm ?? validForms[0]
-          }
-          return randomEvo.species.name
+          const eligible = chainNode.evolves_to.map(e => e.species.name)
+          const nonRegional = eligible.filter(n => !n.includes('-'))
+          const chosen = nonRegional.length > 0 ? randomFrom(nonRegional) : stripRegional(randomFrom(eligible))
+          return chosen
         }
         return null
       }
