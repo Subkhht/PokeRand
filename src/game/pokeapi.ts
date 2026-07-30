@@ -49,12 +49,16 @@ interface EvolutionChainNode {
   evolves_to: EvolutionChainNode[]
   evolution_details?: Array<{
     evolved_form?: PokeApiNamedResource | null
+    min_level?: number | null
+    trigger?: { name: string } | null
+    item?: { name: string } | null
+    held_item?: { name: string } | null
   }>
 }
 
 // IDs oficiales de los starters por generación
 export const startersByGen: Record<number, number[]> = {
-  1: [1, 4, 7],       // Bulbasaur, Charmander, Squirtle
+  1: [1, 4, 7, 25, 133], // Bulbasaur, Charmander, Squirtle, Pikachu, Eevee
   2: [152, 155, 158], // Chikorita, Cyndaquil, Totodile
   3: [252, 255, 258], // Treecko, Torchic, Mudkip
   4: [387, 390, 393], // Turtwig, Chimchar, Piplup
@@ -74,6 +78,38 @@ export interface PokemonDetails {
   weight: number
   types: string[]
   stats: Array<{ name: string; value: number }>
+  evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string }>
+}
+
+function extractEvolutionLine(chainNode: EvolutionChainNode, targetId: number): Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string }> {
+  const allNodes: Array<{ id: number; name: string; level: number | null; trigger: string; speciesUrl: string }> = []
+
+  function walk(node: EvolutionChainNode, parentLevel: number | null, parentTrigger: string) {
+    const match = node.species.url.match(/\/pokemon-species\/(\d+)\//)
+    const id = match ? parseInt(match[1], 10) : 0
+    allNodes.push({ id, name: node.species.name, level: parentLevel, trigger: parentTrigger, speciesUrl: node.species.url })
+    for (const evo of node.evolves_to) {
+      const details = evo.evolution_details?.[0]
+      const evoLevel = details?.min_level ?? null
+      const evoTrigger = details?.trigger?.name ?? 'level-up'
+      walk(evo, evoLevel, evoTrigger)
+    }
+  }
+
+  walk(chainNode, null, 'level-up')
+
+  const targetIdx = allNodes.findIndex(n => n.id === targetId)
+  if (targetIdx === -1) return []
+
+  const result = allNodes.map(n => ({
+    id: n.id,
+    name: n.name,
+    sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${n.id}.png`,
+    level: n.level,
+    trigger: n.trigger,
+  }))
+
+  return result
 }
 
 export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
@@ -108,6 +144,21 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
     'speed': 'Velocidad'
   }
 
+  let evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string }> = []
+  try {
+    const resSpecies = await fetch(`${API_BASE}/pokemon-species/${id}`)
+    if (resSpecies.ok) {
+      const dataSpecies = await resSpecies.json()
+      if (dataSpecies.evolution_chain?.url) {
+        const evoRes = await fetch(dataSpecies.evolution_chain.url)
+        if (evoRes.ok) {
+          const evoData = await evoRes.json()
+          evolutions = extractEvolutionLine(evoData.chain, id)
+        }
+      }
+    }
+  } catch {}
+
   return {
     id: dataPokemon.id,
     name: dataPokemon.name,
@@ -119,8 +170,28 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
     stats: dataPokemon.stats.map((s: any) => ({
       name: STAT_NAMES[s.stat.name] || s.stat.name.toUpperCase(),
       value: s.base_stat
-    }))
+    })),
+    evolutions,
   }
+}
+
+const EVOLUTION_ITEM_REVERSE: Record<string, string> = {
+  'metal-coat': 'Metal Coat',
+  'king-s-rock': "King's Rock",
+  'dragon-scale': 'Dragon Scale',
+  'up-grade': 'Up-Grade',
+  'dubious-disc': 'Dubious Disc',
+  'reaper-cloth': 'Reaper Cloth',
+  'protector': 'Protector',
+  'electirizer': 'Electirizer',
+  'magmarizer': 'Magmarizer',
+  'prism-scale': 'Prism Scale',
+  'sachet': 'Sachet',
+  'whipped-dream': 'Whipped Dream',
+}
+
+export function getEvolutionItemDisplayName(pokeApiName: string): string {
+  return EVOLUTION_ITEM_REVERSE[pokeApiName] ?? pokeApiName
 }
 
 function randomFrom<T>(items: T[]): T {
@@ -434,7 +505,15 @@ export async function buildPokemonFromApi(
     shiny: shiny || undefined,
     moves: parsedMoves,
     rawLevelUpMoves,
-    captureRate
+    captureRate,
+    evolutionLevel: undefined,
+    evolutionChainId: data.id
+  }
+
+  const evoInfo = await getEvolutionInfo(data.id)
+  if (evoInfo.nextName) {
+    pokemon.evolutionLevel = evoInfo.evolutionLevel ?? undefined
+    pokemon.heldItemRequired = evoInfo.heldItem ?? undefined
   }
 
   pokemonCache.set(cacheKey, pokemon)
@@ -674,70 +753,58 @@ export async function getRandomStarterByGeneration(generation: number, shiny: bo
   const randomStarterId = randomFrom(starters)
   return buildPokemonFromApi(randomStarterId, generation, 10, shiny)
 }
+function findEvolutionForSpecies(chainNode: EvolutionChainNode, speciesName: string): { speciesName: string; level: number; trigger: string; heldItem: string | null } | null {
+  for (const evo of chainNode.evolves_to || []) {
+    const sub = findEvolutionForSpecies(evo, speciesName)
+    if (sub) return sub
+  }
+  if (chainNode.species.name.toLowerCase() === speciesName.toLowerCase()) {
+    if (chainNode.evolves_to?.length) {
+      const details = chainNode.evolves_to[0].evolution_details?.[0]
+      const minLevel = details?.min_level ?? null
+      const trigger = details?.trigger?.name ?? 'level-up'
+      const evoLevel = minLevel ?? (trigger === 'trade' ? 35 : 45)
+      const heldItem = details?.held_item?.name ?? null
+      return { speciesName: chainNode.evolves_to[0].species.name, level: evoLevel, trigger, heldItem }
+    }
+  }
+  return null
+}
+
+export async function getEvolutionInfo(pokemonId: number): Promise<{ nextName: string | null; evolutionLevel: number | null; heldItem: string | null }> {
+  try {
+    const speciesRes = await fetch(`${API_BASE}/pokemon-species/${pokemonId}`)
+    if (!speciesRes.ok) return { nextName: null, evolutionLevel: null, heldItem: null }
+    const speciesData = await speciesRes.json()
+    if (!speciesData.evolution_chain?.url) return { nextName: null, evolutionLevel: null, heldItem: null }
+    const evoRes = await fetch(speciesData.evolution_chain.url)
+    if (!evoRes.ok) return { nextName: null, evolutionLevel: null, heldItem: null }
+    const evoData = await evoRes.json()
+    const found = findEvolutionForSpecies(evoData.chain, speciesData.name)
+    if (found) {
+      return { nextName: found.speciesName, evolutionLevel: found.trigger === 'use-item' ? null : found.level, heldItem: found.heldItem ? getEvolutionItemDisplayName(found.heldItem) : null }
+    }
+    return { nextName: null, evolutionLevel: null, heldItem: null }
+  } catch {
+    return { nextName: null, evolutionLevel: null, heldItem: null }
+  }
+}
+
+export function stripRegional(name: string): string {
+  const regional = ['-hisui', '-alola', '-galar', '-paldea', '-mega', '-gmax']
+  for (const suffix of regional) {
+    if (name.includes(suffix)) return name.split(suffix)[0]
+  }
+  return name
+}
 
 export async function evolvePokemon(currentPokemon: Pokemon): Promise<Pokemon | null> {
   try {
-    let identifier: string | number = currentPokemon.id
-
-    if (!identifier || Number.isNaN(Number(identifier))) {
-      const match = currentPokemon.sprite?.match(/\/(\d+)\.(png|gif)/)
-      if (match) {
-        identifier = parseInt(match[1], 10)
-      } else {
-        identifier = currentPokemon.name.toLowerCase().split('-')[0]
-      }
-    }
-
-    const speciesRes = await fetch(`${API_BASE}/pokemon-species/${identifier}`)
-    if (!speciesRes.ok) {
-      console.warn(`No se encontró la especie en PokeAPI para: ${identifier}`)
-      return null
-    }
-    const speciesData = await speciesRes.json()
-
-    if (!speciesData.evolution_chain?.url) return null
-    const evoRes = await fetch(speciesData.evolution_chain.url)
-    if (!evoRes.ok) return null
-    const evoData = await evoRes.json()
-
-    const currentSpeciesName = speciesData.name.toLowerCase()
-
-    function stripRegional(name: string): string {
-      const regional = ['-hisui', '-alola', '-galar', '-paldea', '-mega', '-gmax']
-      for (const suffix of regional) {
-        if (name.includes(suffix)) return name.split(suffix)[0]
-      }
-      return name
-    }
-
-    function findNextEvolution(chainNode: EvolutionChainNode): string | null {
-      if (chainNode.species.name.toLowerCase() === currentSpeciesName) {
-        if (chainNode.evolves_to && chainNode.evolves_to.length > 0) {
-          const eligible = chainNode.evolves_to.map(e => e.species.name)
-          const nonRegional = eligible.filter(n => !n.includes('-'))
-          const chosen = nonRegional.length > 0 ? randomFrom(nonRegional) : stripRegional(randomFrom(eligible))
-          return chosen
-        }
-        return null
-      }
-
-      for (const child of chainNode.evolves_to || []) {
-        const found = findNextEvolution(child)
-        if (found) return found
-      }
-
-      return null
-    }
-
-    const nextEvoName = findNextEvolution(evoData.chain)
-
-    if (!nextEvoName) {
-      return null 
-    }
-
-    const newBasePokemon = await buildPokemonFromApi(nextEvoName, 1, currentPokemon.level, currentPokemon.shiny ?? false)
-
-    const evolvedPokemon: Pokemon = {
+    const info = await getEvolutionInfo(currentPokemon.id)
+    if (!info.nextName) return null
+    const nextName = info.nextName.includes('-') ? stripRegional(info.nextName) : info.nextName
+    const newBasePokemon = await buildPokemonFromApi(nextName, 1, currentPokemon.level, currentPokemon.shiny ?? false)
+    return {
       ...newBasePokemon,
       level: currentPokemon.level,
       maxHp: newBasePokemon.maxHp + 15,
@@ -747,10 +814,43 @@ export async function evolvePokemon(currentPokemon: Pokemon): Promise<Pokemon | 
       speed: newBasePokemon.speed + 3,
       holdItem: currentPokemon.holdItem,
     }
-
-    return evolvedPokemon
   } catch (error) {
     console.error("Error al intentar evolucionar el Pokémon:", error)
     return null
+  }
+}
+
+function findStoneEvolution(chainNode: EvolutionChainNode, speciesName: string, stoneItemName: string): { speciesName: string; level: number | null; trigger: string } | null {
+  if (chainNode.species.name.toLowerCase() === speciesName.toLowerCase()) {
+    for (const evo of chainNode.evolves_to || []) {
+      const details = evo.evolution_details?.[0]
+      if (details?.trigger?.name === 'use-item' && details?.item?.name === stoneItemName) {
+        return { speciesName: evo.species.name, level: null, trigger: 'use-item' }
+      }
+    }
+  }
+  for (const evo of chainNode.evolves_to || []) {
+    const found = findStoneEvolution(evo, speciesName, stoneItemName)
+    if (found) return found
+  }
+  return null
+}
+
+export async function canEvolveWithStone(pokemonId: number, stoneItemName: string): Promise<{ canEvolve: boolean; evolvedName: string | null }> {
+  try {
+    const speciesRes = await fetch(`${API_BASE}/pokemon-species/${pokemonId}`)
+    if (!speciesRes.ok) return { canEvolve: false, evolvedName: null }
+    const speciesData = await speciesRes.json()
+    if (!speciesData.evolution_chain?.url) return { canEvolve: false, evolvedName: null }
+    const evoRes = await fetch(speciesData.evolution_chain.url)
+    if (!evoRes.ok) return { canEvolve: false, evolvedName: null }
+    const evoData = await evoRes.json()
+    const found = findStoneEvolution(evoData.chain, speciesData.name, stoneItemName)
+    if (found) {
+      return { canEvolve: true, evolvedName: found.speciesName }
+    }
+    return { canEvolve: false, evolvedName: null }
+  } catch {
+    return { canEvolve: false, evolvedName: null }
   }
 }

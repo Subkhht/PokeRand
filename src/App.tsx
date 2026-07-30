@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef, Component, type ReactNode } from 'react'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
-import { playHover, playClick, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic } from './game/sound'
+import { playHover, playClick, playHit, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -12,6 +12,8 @@ import {
   getMoveDetails,
   buildPokemonFromApi,
   makeShinySprite,
+  canEvolveWithStone,
+  stripRegional,
   type PokemonDetails
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
@@ -48,9 +50,9 @@ const difficultyNodeCounts: Record<Difficulty, number> = {
 }
 
 const difficultyLabels: Record<Difficulty, { title: string; desc: string }> = {
-  easy: { title: 'Fácil', desc: '5 rutas (Aventura corta)' },
-  medium: { title: 'Intermedia', desc: '10 rutas (Aventura estándar)' },
-  hard: { title: 'Difícil', desc: '25 rutas (Desafío extremo)' },
+  easy: { title: 'Fácil', desc: '3 insignias · 5 rutas por etapa' },
+  medium: { title: 'Intermedia', desc: '3 insignias · 10 rutas por etapa' },
+  hard: { title: 'Difícil', desc: '3 insignias · 25 rutas por etapa' },
   infinite: { title: 'Infinite', desc: 'Sin límite (Aventura infinita)' }
 }
 
@@ -103,6 +105,59 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'Love Ball': { price: 60, desc: 'Más efectiva si es de la misma familia evolutiva.' },
   'Friend Ball': { price: 60, desc: 'Una ball especial amistosa.' },
   'Heavy Ball': { price: 60, desc: 'Más efectiva contra Pokémon pesados.' },
+  'Fire Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
+  'Water Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
+  'Thunder Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
+  'Leaf Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
+  'Moon Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
+  'Sun Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
+  'Shiny Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
+  'Dusk Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
+  'Dawn Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
+  'Ice Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
+}
+
+const EVOLUTION_STONES = ['Fire Stone', 'Water Stone', 'Thunder Stone', 'Leaf Stone', 'Moon Stone', 'Sun Stone', 'Shiny Stone', 'Dusk Stone', 'Dawn Stone', 'Ice Stone'] as const
+
+const EVOLUTION_STONE_UNLOCK_IDS: Record<string, string> = {
+  'Fire Stone': 'unlock_fire_stone',
+  'Water Stone': 'unlock_water_stone',
+  'Thunder Stone': 'unlock_thunder_stone',
+  'Leaf Stone': 'unlock_leaf_stone',
+  'Moon Stone': 'unlock_moon_stone',
+  'Sun Stone': 'unlock_sun_stone',
+  'Shiny Stone': 'unlock_shiny_stone',
+  'Dusk Stone': 'unlock_dusk_stone',
+  'Dawn Stone': 'unlock_dawn_stone',
+  'Ice Stone': 'unlock_ice_stone',
+}
+
+const EVOLUTION_STONE_ITEM_NAMES: Record<string, string> = {
+  'Fire Stone': 'fire-stone',
+  'Water Stone': 'water-stone',
+  'Thunder Stone': 'thunder-stone',
+  'Leaf Stone': 'leaf-stone',
+  'Moon Stone': 'moon-stone',
+  'Sun Stone': 'sun-stone',
+  'Shiny Stone': 'shiny-stone',
+  'Dusk Stone': 'dusk-stone',
+  'Dawn Stone': 'dawn-stone',
+  'Ice Stone': 'ice-stone',
+}
+
+const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
+  'Metal Coat': 'unlock_metal_coat',
+  "King's Rock": 'unlock_kings_rock',
+  'Dragon Scale': 'unlock_dragon_scale',
+  'Up-Grade': 'unlock_up_grade',
+  'Dubious Disc': 'unlock_dubious_disc',
+  'Reaper Cloth': 'unlock_reaper_cloth',
+  'Protector': 'unlock_protector',
+  'Electirizer': 'unlock_electirizer',
+  'Magmarizer': 'unlock_magmarizer',
+  'Prism Scale': 'unlock_prism_scale',
+  'Sachet': 'unlock_sachet',
+  'Whipped Dream': 'unlock_whipped_dream',
 }
 
 const itemDescriptions: Record<string, string> = {
@@ -202,6 +257,27 @@ const ITEM_SPRITES: Record<string, string> = {
   'Love Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/love-ball.png',
   'Friend Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/friend-ball.png',
   'Heavy Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/heavy-ball.png',
+  'Fire Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fire-stone.png',
+  'Water Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/water-stone.png',
+  'Thunder Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/thunder-stone.png',
+  'Leaf Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/leaf-stone.png',
+  'Moon Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/moon-stone.png',
+  'Sun Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sun-stone.png',
+  'Shiny Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shiny-stone.png',
+  'Dusk Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dusk-stone.png',
+  'Dawn Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dawn-stone.png',
+  'Ice Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ice-stone.png',
+  'Metal Coat': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/metal-coat.png',
+  'Dragon Scale': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dragon-scale.png',
+  'Up-Grade': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/up-grade.png',
+  'Dubious Disc': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dubious-disc.png',
+  'Reaper Cloth': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/reaper-cloth.png',
+  'Protector': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/protector.png',
+  'Electirizer': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/electirizer.png',
+  'Magmarizer': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/magmarizer.png',
+  'Prism Scale': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/prism-scale.png',
+  'Sachet': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sachet.png',
+  'Whipped Dream': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/whipped-dream.png',
 }
 
 interface HoldableItem {
@@ -254,6 +330,18 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Cursed Blade': { name: 'Cursed Blade', desc: '+35% Ataque, -5 HP por turno', price: 450, attackMod: 0.35, healPerTurn: -5 },
   'Mega Stone': { name: 'Mega Stone', desc: 'Permite mega-evolucionar 1 vez por combate', price: 700, isMegaStone: true },
   'Dynamax Band': { name: 'Dynamax Band', desc: 'Permite gigamaximar 1 vez por combate (3 turnos)', price: 0, isGmaxBand: true },
+  'Metal Coat': { name: 'Metal Coat', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  "King's Rock": { name: "King's Rock", desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Dragon Scale': { name: 'Dragon Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Up-Grade': { name: 'Up-Grade', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Dubious Disc': { name: 'Dubious Disc', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Reaper Cloth': { name: 'Reaper Cloth', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Protector': { name: 'Protector', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Electirizer': { name: 'Electirizer', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Magmarizer': { name: 'Magmarizer', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Prism Scale': { name: 'Prism Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Sachet': { name: 'Sachet', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Whipped Dream': { name: 'Whipped Dream', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
 }
 
 const HOLDABLE_ITEM_NAMES = Object.keys(HOLDABLE_ITEMS)
@@ -315,6 +403,41 @@ function getPokeBallRate(ballName: string, target: Pokemon, turns: number, alrea
   if (def.rateFn) return def.rateFn(target, turns, alreadyCaught, playerLevel)
   return def.rate
 }
+
+const GYM_BADGES = [
+  { id: 'boulder', name: 'Boulder Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/1.png' },
+  { id: 'cascade', name: 'Cascade Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/2.png' },
+  { id: 'thunder', name: 'Thunder Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/3.png' },
+  { id: 'rainbow', name: 'Rainbow Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/4.png' },
+  { id: 'soul', name: 'Soul Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/5.png' },
+  { id: 'marsh', name: 'Marsh Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/6.png' },
+  { id: 'volcano', name: 'Volcano Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/7.png' },
+  { id: 'earth', name: 'Earth Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/8.png' },
+  { id: 'zephyr', name: 'Zephyr Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/9.png' },
+  { id: 'hive', name: 'Hive Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/10.png' },
+  { id: 'plain', name: 'Plain Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/11.png' },
+  { id: 'fog', name: 'Fog Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/12.png' },
+  { id: 'storm', name: 'Storm Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/13.png' },
+  { id: 'mineral', name: 'Mineral Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/14.png' },
+  { id: 'glacier', name: 'Glacier Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/15.png' },
+  { id: 'rising', name: 'Rising Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/16.png' },
+  { id: 'stone', name: 'Stone Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/17.png' },
+  { id: 'knuckle', name: 'Knuckle Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/18.png' },
+  { id: 'dynamo', name: 'Dynamo Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/19.png' },
+  { id: 'heat', name: 'Heat Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/20.png' },
+  { id: 'balance', name: 'Balance Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/21.png' },
+  { id: 'feather', name: 'Feather Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/22.png' },
+  { id: 'mind', name: 'Mind Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/23.png' },
+  { id: 'rain', name: 'Rain Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/24.png' },
+  { id: 'coal', name: 'Coal Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/25.png' },
+  { id: 'forest', name: 'Forest Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/26.png' },
+  { id: 'cobble', name: 'Cobble Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/27.png' },
+  { id: 'fen', name: 'Fen Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/28.png' },
+  { id: 'relic', name: 'Relic Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/29.png' },
+  { id: 'mine', name: 'Mine Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/30.png' },
+  { id: 'icicle', name: 'Icicle Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/31.png' },
+  { id: 'beacon', name: 'Beacon Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/32.png' },
+]
 
 const MEGA_CAPABLE_IDS = new Set([
   3, 6, 9, 15, 18, 26, 36, 65, 71, 80, 94, 115, 121, 127, 130, 142, 149, 150,
@@ -582,14 +705,6 @@ const RANDOM_EVENTS = [
     minRouteProgress: 0.0,
   },
   {
-    id: 'shiny_spot',
-    weight: 2,
-    icon: '✨',
-    title: 'Zona Brillante',
-    desc: 'El suelo brilla. Tu próximo encuentro de descanso será shiny.',
-    minRouteProgress: 0.4,
-  },
-  {
     id: 'mysterious_help',
     weight: 6,
     icon: '🩺',
@@ -598,12 +713,12 @@ const RANDOM_EVENTS = [
     minRouteProgress: 0.0,
   },
   {
-    id: 'scammer',
-    weight: 5,
-    icon: '💸',
-    title: 'Estafador',
-    desc: 'Un tipo sospechoso te ofrece un objeto raro a un precio especial.',
-    minRouteProgress: 0.1,
+    id: 'shiny_spot',
+    weight: 2,
+    icon: '✨',
+    title: 'Zona Brillante',
+    desc: 'Un destello brillante te hace sentir que algo especial se acerca.',
+    minRouteProgress: 0.4,
   },
 ]
 
@@ -623,7 +738,7 @@ interface MetaShopItem {
   desc: string
   price: number
   spriteKey: string
-  category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' | 'pokeball'
+  category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' | 'pokeball' | 'evolution_stone' | 'evolution_item'
 }
 
 const META_SHOP_ITEMS: MetaShopItem[] = [
@@ -679,6 +794,28 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_great_ball', name: 'Great Ball', desc: 'x1.5 de captura. Aparece en tiendas y descansos.', price: 25, spriteKey: 'Great Ball', category: 'pokeball' },
   { id: 'unlock_ultra_ball', name: 'Ultra Ball', desc: 'x2 de captura. Aparece en tiendas y descansos.', price: 50, spriteKey: 'Ultra Ball', category: 'pokeball' },
   { id: 'unlock_master_ball', name: 'Master Ball', desc: 'Captura cualquier Pokémon sin fallo. Aparece raramente en tiendas.', price: 100, spriteKey: 'Master Ball', category: 'pokeball' },
+  { id: 'unlock_fire_stone', name: 'Fire Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Fire Stone', category: 'evolution_stone' },
+  { id: 'unlock_water_stone', name: 'Water Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Water Stone', category: 'evolution_stone' },
+  { id: 'unlock_thunder_stone', name: 'Thunder Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Thunder Stone', category: 'evolution_stone' },
+  { id: 'unlock_leaf_stone', name: 'Leaf Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Leaf Stone', category: 'evolution_stone' },
+  { id: 'unlock_moon_stone', name: 'Moon Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Moon Stone', category: 'evolution_stone' },
+  { id: 'unlock_sun_stone', name: 'Sun Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Sun Stone', category: 'evolution_stone' },
+  { id: 'unlock_shiny_stone', name: 'Shiny Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Shiny Stone', category: 'evolution_stone' },
+  { id: 'unlock_dusk_stone', name: 'Dusk Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Dusk Stone', category: 'evolution_stone' },
+  { id: 'unlock_dawn_stone', name: 'Dawn Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Dawn Stone', category: 'evolution_stone' },
+  { id: 'unlock_ice_stone', name: 'Ice Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Ice Stone', category: 'evolution_stone' },
+  { id: 'unlock_metal_coat', name: 'Metal Coat', desc: 'Evoluciona a Steelix y Scizor. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Metal Coat', category: 'evolution_item' },
+  { id: 'unlock_kings_rock', name: "King's Rock", desc: 'Evoluciona a Politoed y Slowking. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: "King's Rock", category: 'evolution_item' },
+  { id: 'unlock_dragon_scale', name: 'Dragon Scale', desc: 'Evoluciona a Kingdra. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Dragon Scale', category: 'evolution_item' },
+  { id: 'unlock_up_grade', name: 'Up-Grade', desc: 'Evoluciona a Porygon2. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Up-Grade', category: 'evolution_item' },
+  { id: 'unlock_dubious_disc', name: 'Dubious Disc', desc: 'Evoluciona a Porygon-Z. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Dubious Disc', category: 'evolution_item' },
+  { id: 'unlock_reaper_cloth', name: 'Reaper Cloth', desc: 'Evoluciona a Dusknoir. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Reaper Cloth', category: 'evolution_item' },
+  { id: 'unlock_protector', name: 'Protector', desc: 'Evoluciona a Rhyperior. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Protector', category: 'evolution_item' },
+  { id: 'unlock_electirizer', name: 'Electirizer', desc: 'Evoluciona a Electivire. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Electirizer', category: 'evolution_item' },
+  { id: 'unlock_magmarizer', name: 'Magmarizer', desc: 'Evoluciona a Magmortar. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Magmarizer', category: 'evolution_item' },
+  { id: 'unlock_prism_scale', name: 'Prism Scale', desc: 'Evoluciona a Milotic. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Prism Scale', category: 'evolution_item' },
+  { id: 'unlock_sachet', name: 'Sachet', desc: 'Evoluciona a Aromatisse. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Sachet', category: 'evolution_item' },
+  { id: 'unlock_whipped_dream', name: 'Whipped Dream', desc: 'Evoluciona a Slurpuff. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Whipped Dream', category: 'evolution_item' },
   { id: 'music_menu_chill', name: 'Menú Relax', desc: 'Música de menú relajante y ambiental.', price: 40, spriteKey: 'Potion', category: 'music' },
   { id: 'music_battle_epic', name: 'Batalla Épica', desc: 'Música de batalla más intensa y rápida.', price: 60, spriteKey: 'Potion', category: 'music' },
 ]
@@ -967,11 +1104,14 @@ function MainApp() {
   // Modal de selección de objetivo para Revive
   const [reviveModal, setReviveModal] = useState<{ itemName: string; itemIndex: number } | null>(null)
   const [equipModal, setEquipModal] = useState<{ itemName: string; itemIndex: number } | null>(null)
+  const [stoneEvoModal, setStoneEvoModal] = useState<{ stoneName: string; stoneIndex: number } | null>(null)
+  const [stoneEvoTargets, setStoneEvoTargets] = useState<Pokemon[]>([])
 
   // Captura de Pokémon salvaje
   const [captureModal, setCaptureModal] = useState(false)
   const [captureMessage, setCaptureMessage] = useState<string | null>(null)
   const [battleTurns, setBattleTurns] = useState(0)
+  const [enemyHitFlash, setEnemyHitFlash] = useState(false)
 
   const battleStartHPRef = useRef<number>(0)
 
@@ -1102,11 +1242,12 @@ function MainApp() {
 
   const [activeRandomEvent, setActiveRandomEvent] = useState<{ id: string; icon: string; title: string; desc: string } | null>(null)
   const [traderModal, setTraderModal] = useState<boolean>(false)
-  const [scammerModal, setScammerModal] = useState<boolean>(false)
-  const [scammerOffer, setScammerOffer] = useState<{ itemName: string; price: number } | null>(null)
+  const [evolutionTraderItems, setEvolutionTraderItems] = useState<string[] | null>(null)
   const [randomEventUsed, setRandomEventUsed] = useState<Set<string>>(new Set())
   const [showMetaShop, setShowMetaShop] = useState<boolean>(false)
   const [unlockPopup, setUnlockPopup] = useState<{ name: string; spriteKey: string } | null>(null)
+  const [badges, setBadges] = useState<Array<{ id: string; name: string; sprite: string }>>([])
+  const [currentStage, setCurrentStage] = useState<number>(1)
 
   const currentNode = useMemo(() => route[routeIndex] ?? null, [route, routeIndex])
   const activePokemon = useMemo(() => team[activeIndex] ?? null, [team, activeIndex])
@@ -1258,10 +1399,20 @@ function MainApp() {
   for (const [ballName, unlockId] of Object.entries(POKEBALL_UNLOCK_IDS)) {
     LOCKED_POKEBALL_MAP[unlockId] = ballName
   }
+  const LOCKED_EVOLUTION_STONE_MAP: Record<string, string> = {}
+  for (const [stoneName, unlockId] of Object.entries(EVOLUTION_STONE_UNLOCK_IDS)) {
+    LOCKED_EVOLUTION_STONE_MAP[unlockId] = stoneName
+  }
+  const LOCKED_EVOLUTION_ITEM_MAP: Record<string, string> = {}
+  for (const [itemName, unlockId] of Object.entries(EVOLUTION_ITEM_UNLOCK_IDS)) {
+    LOCKED_EVOLUTION_ITEM_MAP[unlockId] = itemName
+  }
 
   const isConsumableUnlocked = (name: string) => !Object.values(LOCKED_CONSUMABLE_MAP).includes(name) || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_CONSUMABLE_MAP[k] === name)
   const isHoldableUnlocked = (name: string) => !Object.values(LOCKED_HOLDABLE_MAP).includes(name) || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_HOLDABLE_MAP[k] === name)
   const isPokeballUnlocked = (name: string) => name === 'Poké Ball' || !POKEBALL_UNLOCK_IDS[name] || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_POKEBALL_MAP[k] === name)
+  const isEvolutionStoneUnlocked = (name: string) => !EVOLUTION_STONE_UNLOCK_IDS[name] || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_EVOLUTION_STONE_MAP[k] === name)
+  const isEvolutionItemUnlocked = (name: string) => !EVOLUTION_ITEM_UNLOCK_IDS[name] || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_EVOLUTION_ITEM_MAP[k] === name)
 
   function isGenUnlocked(gen: number): boolean {
     if (gen === 1) return true
@@ -1558,7 +1709,12 @@ function MainApp() {
         break
       }
       case 'mysterious_trader': {
-        setTraderModal(true)
+        const unlockedEvoItems = Object.keys(EVOLUTION_ITEM_UNLOCK_IDS).filter(n => isEvolutionItemUnlocked(n))
+        if (unlockedEvoItems.length > 0) {
+          setEvolutionTraderItems(unlockedEvoItems)
+        } else {
+          setBattleLog(prev => [`🎭 El comerciante misterioso no tiene objetos para vender hoy...`, ...prev].slice(0, 15))
+        }
         break
       }
       case 'trap': {
@@ -1597,14 +1753,6 @@ function MainApp() {
         }
         break
       }
-      case 'scammer': {
-        const rareItems = HOLDABLE_ITEM_NAMES.filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band')
-        const itemName = rareItems[Math.floor(Math.random() * rareItems.length)]
-        const price = 80 + Math.floor(Math.random() * 120)
-        setScammerOffer({ itemName, price })
-        setScammerModal(true)
-        break
-      }
     }
   }
 
@@ -1636,23 +1784,6 @@ function MainApp() {
     }
   }
 
-  function handleScammerChoice(accept: boolean): void {
-    setScammerModal(false)
-    if (!scammerOffer) return
-    if (accept) {
-      if (money >= scammerOffer.price) {
-        setMoney(prev => prev - scammerOffer.price)
-        setInventory(prev => [...prev, scammerOffer.itemName])
-        setBattleLog(prev => [`💸 Compraste ${scammerOffer.itemName} por $${scammerOffer.price}.`, ...prev].slice(0, 15))
-      } else {
-        setBattleLog(prev => [`💸 No tienes suficiente dinero para el ${scammerOffer.itemName} ($${scammerOffer.price}).`, ...prev].slice(0, 15))
-      }
-    } else {
-      setBattleLog(prev => [`💸 Rechazaste la oferta del estafador.`, ...prev].slice(0, 15))
-    }
-    setScammerOffer(null)
-  }
-
   function handleAchievementDismiss(): void {
     setNewAchievement(null)
   }
@@ -1682,6 +1813,16 @@ function MainApp() {
           type = 'mega'
         } else if (rand < 0.60 && metaProgression.permanentlyUnlockedItems.includes('unlock_gmax_node')) {
           type = 'gmax'
+        }
+      } else if (difficulty === 'medium') {
+        if (rand < 0.15 && !runChallenges.noShops) {
+          type = 'shop'
+        } else if (rand < 0.35 && !runChallenges.noRests) {
+          type = 'rest'
+        } else if (rand < 0.47) {
+          type = 'teamRocket'
+        } else if (rand < 0.57) {
+          type = 'spin'
         }
       } else {
         if (rand < 0.15 && !runChallenges.noShops) {
@@ -1831,12 +1972,17 @@ function MainApp() {
           } else if (effectiveDifficulty === 'medium') {
             const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
             const idx = Math.floor(rr() * available.length)
-            pokeRandPositions.push(available[idx])
+            spinPositions.push(available[idx])
             available.splice(idx, 1)
             if (available.length > 0) {
               const idx2 = Math.floor(rr() * available.length)
-              movePositions.push(available[idx2])
+              pokeRandPositions.push(available[idx2])
               available.splice(idx2, 1)
+            }
+            if (available.length > 0) {
+              const idx3 = Math.floor(rr() * available.length)
+              movePositions.push(available[idx3])
+              available.splice(idx3, 1)
             }
           }
         }
@@ -1912,7 +2058,6 @@ function MainApp() {
       setTrainerSprite('')
       setTrainerBadge('')
       setRestEncounter(null)
-      setRestRewardItem('')
       setDefeatSummary(null)
       setVictoryUnlocks(null)
       setEggInventory([])
@@ -1954,7 +2099,7 @@ function MainApp() {
       setBattleLog([
         `Tu inicial es ${starter.name}${starter.shiny ? ' ✨' : ''}.`,
         `Modo: ${effectiveGen === 0 ? 'Random All-Stars' : `Gen ${effectiveGen}`}.`,
-        `Dificultad: ${difficultyLabels[effectiveDifficulty].title}${effectiveDifficulty === 'infinite' ? ' (Sin límite)' : ` (${totalNodes} rutas)`}.`,
+        `Dificultad: ${difficultyLabels[effectiveDifficulty].title}${effectiveDifficulty === 'infinite' ? ' (Sin límite)' : ` (3 etapas de ${totalNodes} rutas)`}.`,
         `Recibes $${activeChallenges.noMoney ? '0' : '100'} de inicio e item: ${run.item}.`,
         ...challengeDescriptions,
       ])
@@ -2023,6 +2168,34 @@ function MainApp() {
         setRouteIndex((previous) => previous + 1)
         setScreen('route')
         return
+      }
+
+      // Sistema de insignias: al derrotar un jefe, obtienes una insignia
+      if (currentNode?.type === 'boss') {
+        const availableBadges = GYM_BADGES.filter(b => !badges.some(h => h.id === b.id))
+        if (availableBadges.length > 0) {
+          const newBadge = availableBadges[Math.floor(Math.random() * availableBadges.length)]
+          const updatedBadges = [...badges, newBadge]
+          setBadges(updatedBadges)
+          setCurrentStage(updatedBadges.length + 1)
+          setBattleLog((prev) => [`🏅 ¡Obtuviste la ${newBadge.name}! (${updatedBadges.length}/3)`, ...prev].slice(0, 15))
+        }
+        if (badges.length < 2) {
+          // Generar nueva ruta para la siguiente etapa
+          const totalNodesPerStage = difficultyNodeCounts[difficulty]
+          const newRoute: RouteNode[] = []
+          const startId = route.length + 1
+          for (let i = 0; i < totalNodesPerStage - 1; i++) {
+            newRoute.push(generateRandomNodeType(startId + i))
+          }
+          const finalNodeId = startId + totalNodesPerStage - 1
+          newRoute.push({ id: finalNodeId, label: `Jefe #${finalNodeId}`, type: 'boss', done: false })
+          setRoute(newRoute)
+          setRouteIndex(0)
+          setScreen('route')
+          return
+        }
+        // badges.length >= 2 → 3ª insignia ya entregada → victoria
       }
 
       const wins = record.wins + 1
@@ -2108,6 +2281,10 @@ function MainApp() {
         return updated
       })
       awardPokeCoins(baseCoins, `¡Victoria! (${difficulty === 'easy' ? 'Fácil' : difficulty === 'hard' ? 'Difícil' : 'Medio'})`)
+      if (badges.length > 0) {
+        const stageCoins = Math.floor(baseCoins / 2)
+        awardPokeCoins(stageCoins * badges.length, `Bonus por ${badges.length} etapa${badges.length > 1 ? 's' : ''} completada${badges.length > 1 ? 's' : ''}`)
+      }
       if (hasActiveChallenge) awardPokeCoins(15, 'Bonus Desafío Activo')
       if (team.length <= 1) awardPokeCoins(5, 'Bonus Solo Pokémon')
 
@@ -2240,78 +2417,12 @@ function MainApp() {
     setBattleLog((prev) => [`📦 ${pokemon.name} fue depositado en el PC.`, ...prev].slice(0, 15))
   }
 
-  async function handleEvolveTarget(index: number): Promise<void> {
-    const targetPokemon = team[index]
-    if (!targetPokemon) return
-
-    if (runChallenges.noEvolution) {
-      setBattleLog((prev) => ['🚫 Desafío Sin Evolución: No puedes evolucionar Pokémon.', ...prev].slice(0, 15))
-      return
-    }
-
-    setIsLoading(true)
-    setApiError('')
-
-    try {
-      const evolvedBase = await evolvePokemon(targetPokemon)
-
-      if (!evolvedBase) {
-        setApiError(`${targetPokemon.name} no puede evolucionar más.`)
-        return
-      }
-
-      // BONUS POR EVOLUCIÓN: +2 Nivel extra y mejora de estadísticas + cura completa
-      const extraLevels = 2
-      const bonusHp = 15
-      const newLevel = evolvedBase.level + extraLevels
-      const newMaxHp = evolvedBase.maxHp + bonusHp
-      const hpRatio = targetPokemon.maxHp > 0 ? targetPokemon.hp / targetPokemon.maxHp : 1
-
-      const evolvedPlusBoost: Pokemon = {
-        ...evolvedBase,
-        level: runChallenges.fixedLevel ? 50 : newLevel,
-        maxHp: newMaxHp,
-        hp: runChallenges.noHealing ? Math.max(1, Math.floor(newMaxHp * hpRatio)) : newMaxHp,
-        attack: Math.round(evolvedBase.attack * 1.15), // +15% Ataque
-        defense: Math.round(evolvedBase.defense * 1.15), // +15% Defensa
-        speed: Math.round(evolvedBase.speed * 1.10)   // +10% Velocidad
-      }
-
-      // Comprobar si al subir este nivel aprende un ataque nuevo
-      const { updatedPokemon: finalEvolved } = await checkAndLearnNewMove(
-        evolvedPlusBoost,
-        targetPokemon.level,
-        runChallenges.fixedLevel ? 50 : newLevel,
-        difficulty
-      )
-
-      registerInPokedex(finalEvolved)
-
-      setTeam((prevTeam) =>
-        prevTeam.map((p, i) => (i === index ? finalEvolved : p))
-      )
-
-      setRunStats(prev => ({ ...prev, evolutions: prev.evolutions + 1 }))
-
-      setBattleLog((prev) => [
-        `✨ ¡${targetPokemon.name} evolucionó en ${finalEvolved.name}! (Nv.${finalEvolved.level} + Stats boosted)`,
-        ...prev
-      ].slice(0, 15))
-
-      completeCurrentNode()
-    } catch {
-      setApiError('No se pudo procesar la evolución. Reintenta.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   async function enterNode(): Promise<void> {
     if (!activePokemon || !currentNode) return
 
     if (currentNode.type === 'shop') {
-      const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i))
-      const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band')
+      const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i])
+      const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
       const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
       const shuffledHoldables = [...allHoldableKeys].sort(() => 0.5 - Math.random())
       const selectedConsumables = shuffledConsumables.slice(0, 2)
@@ -2322,7 +2433,9 @@ function MainApp() {
         : ['Poké Ball']
       const shuffledBalls = [...ballPool].sort(() => 0.5 - Math.random())
       const selectedBalls = shuffledBalls.slice(0, 2)
-      setShopStock([...selectedConsumables, ...selectedHoldables, ...selectedBalls])
+      const unlockedStones = EVOLUTION_STONES.filter(s => isEvolutionStoneUnlocked(s))
+      const selectedStone = unlockedStones.length > 0 ? [unlockedStones[Math.floor(Math.random() * unlockedStones.length)]] : []
+      setShopStock([...selectedConsumables, ...selectedHoldables, ...selectedBalls, ...selectedStone])
       if (runChallenges.noPurchasing) {
         setBattleLog((prev) => [
           `🚫 Desafío Sin Compras: No puedes comprar nada en la tienda.`,
@@ -2342,11 +2455,13 @@ function MainApp() {
     }
 
     if (currentNode.type === 'spin') {
-      const healingPool = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && (POKEBALL_NAMES.includes(i) ? isPokeballUnlocked(i) : true))
-      const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band')
+      const healingPool = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i])
+      const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
+      const unlockedStones = EVOLUTION_STONES.filter(s => isEvolutionStoneUnlocked(s))
+      const selectedStone = unlockedStones.length > 0 ? [unlockedStones[Math.floor(Math.random() * unlockedStones.length)]] : []
       const shuffledH = [...healingPool].sort(() => 0.5 - Math.random())
       const shuffledP = [...passivePool].sort(() => 0.5 - Math.random())
-      const items = [...shuffledH.slice(0, 4), ...shuffledP.slice(0, 2)].sort(() => 0.5 - Math.random())
+      const items = [...shuffledH.slice(0, 3), ...shuffledP.slice(0, 2), ...selectedStone].sort(() => 0.5 - Math.random())
       setSpinItems(items)
       setSpinWinnerIndex(null)
       setSpinRevealed(false)
@@ -2490,66 +2605,66 @@ function MainApp() {
     }
 
     try {
-      const targetGen = getEffectiveGen()
+      if (runChallenges.egglocke) {
+        const targetGen = getEffectiveGen()
         const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
-
-        if (runChallenges.egglocke) {
-          const eggId = Math.floor(Math.random() * 900) + 1
-          const eggEntry = {
-            name: restPokemonBase.name,
-            sprite: restPokemonBase.sprite,
-            types: (restPokemonBase as any).types ?? ['normal'],
-            hatchIn: 2 + Math.floor(Math.random() * 2),
-            id: eggId
-          }
-          setEggInventory(prev => [...prev, eggEntry])
-          const unlockedBalls = POKEBALL_NAMES.filter(b => isPokeballUnlocked(b) && b !== 'Master Ball')
-          const ballReward = Math.random() < 0.35 ? randomFrom(unlockedBalls) : null
-          const rewardItem = ballReward ?? (runChallenges.noHealing
-            ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
-            : randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry']))
-          setRestRewardItem(rewardItem)
-          setInventory((previous) => [...previous, rewardItem])
-          setBattleLog((prev) => [
-            `${currentNode.label}: ¡Obtuviste un Huevo de ${eggEntry.name}! (Eclosiona en ${eggEntry.hatchIn} battles)`,
-            `También obtienes ${rewardItem}.`,
-            ...prev
-          ].slice(0, 15))
-          completeCurrentNode()
-          setScreen('route')
-          return
+        const eggId = Math.floor(Math.random() * 900) + 1
+        const eggEntry = {
+          name: restPokemonBase.name,
+          sprite: restPokemonBase.sprite,
+          types: (restPokemonBase as any).types ?? ['normal'],
+          hatchIn: 2 + Math.floor(Math.random() * 2),
+          id: eggId
         }
-
-        const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty)
-        if (!runChallenges.allShiny && Math.random() < 0.02) {
-          generatedEncounter.shiny = true
-          generatedEncounter.sprite = makeShinySprite(generatedEncounter.sprite, generatedEncounter.id)
-        }
-        if (shinyNextEncounter) {
-          generatedEncounter.shiny = true
-          generatedEncounter.sprite = makeShinySprite(generatedEncounter.sprite, generatedEncounter.id)
-          setShinyNextEncounter(false)
-        }
+        setEggInventory(prev => [...prev, eggEntry])
         const unlockedBalls = POKEBALL_NAMES.filter(b => isPokeballUnlocked(b) && b !== 'Master Ball')
         const ballReward = Math.random() < 0.35 ? randomFrom(unlockedBalls) : null
         const rewardItem = ballReward ?? (runChallenges.noHealing
           ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
           : randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry']))
-
-        setRestEncounter(generatedEncounter)
-        seenInPokedex(generatedEncounter)
         setRestRewardItem(rewardItem)
         setInventory((previous) => [...previous, rewardItem])
         setBattleLog((prev) => [
-          `${currentNode.label}: encuentras a ${generatedEncounter.name} y obtienes ${rewardItem}.`,
+          `${currentNode.label}: ¡Obtuviste un Huevo de ${eggEntry.name}! (Eclosiona en ${eggEntry.hatchIn} battles)`,
+          `También obtienes ${rewardItem}.`,
           ...prev
-        ])
-      } catch {
-        setApiError('No se pudo generar el encuentro de descanso. Reintenta.')
-      } finally {
-        setIsLoading(false)
+        ].slice(0, 15))
+        completeCurrentNode()
+        setScreen('route')
+        return
       }
-      return
+
+      const targetGen = getEffectiveGen()
+      const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
+      const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty)
+      if (shinyNextEncounter) {
+        generatedEncounter.shiny = true
+        generatedEncounter.sprite = makeShinySprite(generatedEncounter.sprite, generatedEncounter.id)
+        setShinyNextEncounter(false)
+      } else if (!runChallenges.allShiny && Math.random() < 0.02) {
+        generatedEncounter.shiny = true
+        generatedEncounter.sprite = makeShinySprite(generatedEncounter.sprite, generatedEncounter.id)
+      }
+      const unlockedBalls = POKEBALL_NAMES.filter(b => isPokeballUnlocked(b) && b !== 'Master Ball')
+      const ballReward = Math.random() < 0.35 ? randomFrom(unlockedBalls) : null
+      const rewardItem = ballReward ?? (runChallenges.noHealing
+        ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
+        : randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry']))
+
+      setRestEncounter(generatedEncounter)
+      seenInPokedex(generatedEncounter)
+      setRestRewardItem(rewardItem)
+      setInventory((previous) => [...previous, rewardItem])
+      setBattleLog((prev) => [
+        `${currentNode.label}: encuentras a ${generatedEncounter.name} y obtienes ${rewardItem}.`,
+        ...prev
+      ])
+    } catch {
+      setApiError('No se pudo generar el encuentro de descanso. Reintenta.')
+    } finally {
+      setIsLoading(false)
+    }
+    return
     }
 
     setIsLoading(true)
@@ -2565,11 +2680,15 @@ function MainApp() {
       if (isTeamRocket) {
         const progress = routeIndex / Math.max(1, route.length - 1)
         const teamSize = Math.max(2, Math.min(4, 2 + Math.floor(progress * 3)))
+        const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
+        const trainerLevelOffset = Math.floor(Math.random() * 3) - 1 // TeamR: -1, 0, or +1
 
         const fetches = Array.from({ length: teamSize }, () =>
           getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
             .then((base) => {
-              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + extraEnemyLevels , difficulty)
+              const targetLevel = avgPlayerLevel + trainerLevelOffset
+              const levelDiff = targetLevel - base.level
+              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
               if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
               if (runChallenges.totalRandomizer) {
                 scaled = {
@@ -2609,11 +2728,17 @@ function MainApp() {
         const progress = routeIndex / Math.max(1, route.length - 1)
         const maxSize = isBoss ? 6 : Math.max(1, Math.min(6, Math.floor(progress * 6) + 1))
         const teamSize = isBoss ? maxSize : Math.max(1, Math.min(maxSize, 1 + Math.floor(Math.random() * maxSize)))
+        const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
+        const trainerLevelOffset = isBoss
+          ? Math.floor(Math.random() * 3) // boss: 0, 1, or 2 levels above player
+          : Math.floor(Math.random() * 3) - 1 // trainer/TeamR: -1, 0, or +1
 
         const fetches = Array.from({ length: teamSize }, () =>
           getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny, difficulty)
             .then((base) => {
-              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + extraEnemyLevels , difficulty)
+              const targetLevel = avgPlayerLevel + trainerLevelOffset
+              const levelDiff = targetLevel - base.level
+              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
               if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
               if (runChallenges.totalRandomizer) {
                 scaled = {
@@ -2679,7 +2804,11 @@ function MainApp() {
         ])
       } else {
         const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
-        let generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + extraEnemyLevels , difficulty)
+        const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
+        const wildLevelOffset = Math.floor(Math.random() * 3) - 1
+        const targetLevel = avgPlayerLevel + wildLevelOffset
+        const levelDiff = targetLevel - enemyBase.level
+        let generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
         if (runChallenges.fixedLevel) generatedEnemy = { ...generatedEnemy, level: 50 }
         if (runChallenges.totalRandomizer) {
           generatedEnemy = {
@@ -2971,37 +3100,6 @@ function MainApp() {
     )
     setInventory((prev) => [...prev, itemName])
     setBattleLog((prev) => [`Desequipaste ${itemName} de ${pokemon.name}.`, ...prev].slice(0, 15))
-  }
-
-  function healTeamAtShop() {
-    if (runChallenges.noHealing) {
-      setBattleLog((prev) => ['🚫 Desafío Sin Curación: No puedes curar en tienda.', ...prev].slice(0, 15))
-      return
-    }
-    if (runChallenges.noPurchasing) {
-      setBattleLog((prev) => ['🚫 Desafío Sin Compras: No puedes comprar curación.', ...prev].slice(0, 15))
-      return
-    }
-    const baseHealCost = 100
-    const hardMarkup = difficulty === 'hard' ? 1.4 : difficulty === 'infinite' ? 1.5 : 1
-    const healCost = Math.floor(baseHealCost * (1 - (modifier?.shopDiscount ?? 0)) * hardMarkup)
-    const needsHealing = team.some((pkmn) => pkmn.hp > 0 && pkmn.hp < pkmn.maxHp)
-
-    if (!needsHealing || money < healCost) return
-
-    const healReduction = modifier?.healReduction ?? 0
-    const healBonus = modifier?.healBonus ?? 0
-
-    setMoney((prev) => prev - healCost)
-    setTeam((prevTeam) =>
-      prevTeam.map((pkmn) => {
-        if (pkmn.hp <= 0) return pkmn
-        const missing = pkmn.maxHp - pkmn.hp
-        const healed = Math.floor(missing * (1 - healReduction)) + healBonus
-        return { ...pkmn, hp: Math.min(pkmn.maxHp, pkmn.hp + Math.max(0, healed)) }
-      })
-    )
-    setBattleLog((prev) => [`Restauraste la salud de tu equipo activo por $${healCost}.`, ...prev].slice(0, 15))
   }
 
   function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boolean; log: string[] } {
@@ -3312,7 +3410,7 @@ function MainApp() {
     }
 
     return {
-      updatedDefender: currentDefender,
+      updatedDefender: { ...currentDefender, defense: defender.defense },
       updatedAttacker,
       lines,
       attackerHeal,
@@ -3435,8 +3533,14 @@ function MainApp() {
       if (nextPlayer.hp <= 0 || nextEnemy.hp <= 0 || playerSkipped || playerConfusedSelfHit) return
       if (move.name !== 'Furia') nextPlayer = { ...nextPlayer, furiaActive: false }
       const playerHit = performHit(nextPlayer, nextEnemy, move, false)
+      const prevEnemyHp = nextEnemy.hp
       nextEnemy = playerHit.updatedDefender
       nextPlayer = playerHit.updatedAttacker
+      if (nextEnemy.hp < prevEnemyHp) {
+        setEnemyHitFlash(true)
+        playHit()
+        setTimeout(() => setEnemyHitFlash(false), 400)
+      }
       playerCrits = playerHit.crits
       if (playerHit.attackerHeal > 0) {
         const healed = Math.min(nextPlayer.maxHp, nextPlayer.hp + playerHit.attackerHeal)
@@ -3578,18 +3682,16 @@ function MainApp() {
       return
     }
 
-    // --- Enemigo derrotado (EXP SHARE PARA TODO EL EQUIPO) ---
+    // --- Enemigo derrotado ---
     if (nextEnemy.hp <= 0) {
-      const levelDiff = nextEnemy.level - nextPlayer.level
-      let baseLevelsGained = 1
-      if (levelDiff > 0) baseLevelsGained = 1 + levelDiff
-      else if (levelDiff < -2) baseLevelsGained = 1
+      // --- Batalla de entrenador: verificar si hay más Pokémon ---
+      const baseLevelsGained = runChallenges.fixedLevel ? 0 : 1
 
       // Subida de nivel para TODOS los miembros vivos del equipo
       const updatedTeamPromises = nextTeam.map(async (pokemon) => {
         if (pokemon.hp <= 0) return pokemon
 
-        const levelsGained = runChallenges.fixedLevel ? 0 : baseLevelsGained
+        const levelsGained = baseLevelsGained
 
         const hpGain = levelsGained * 3
         const atkGain = levelsGained * 2
@@ -3611,6 +3713,28 @@ function MainApp() {
 
         if (levelsGained > 0) {
           updatedPokemon = { ...updatedPokemon, level: newLevel }
+        }
+
+        // Auto-evolución al alcanzar el nivel de evolución
+        if (!runChallenges.noEvolution && updatedPokemon.evolutionLevel && updatedPokemon.level >= updatedPokemon.evolutionLevel) {
+          const itemOk = !updatedPokemon.heldItemRequired || updatedPokemon.holdItem === updatedPokemon.heldItemRequired
+          if (itemOk) {
+            try {
+              const evolved = await evolvePokemon(updatedPokemon)
+              if (evolved) {
+                const consumedItem = updatedPokemon.holdItem
+                const { updatedPokemon: finalEvolved } = await checkAndLearnNewMove(evolved, oldLevel, updatedPokemon.level, difficulty)
+                registerInPokedex(finalEvolved)
+                updatedPokemon = finalEvolved
+                if (consumedItem && updatedPokemon.heldItemRequired) {
+                  updatedPokemon = { ...updatedPokemon, holdItem: undefined }
+                  logs.push(`✅ ${consumedItem} fue consumido en la evolución.`)
+                }
+                setRunStats(prev => ({ ...prev, evolutions: prev.evolutions + 1 }))
+                logs.push(`✨ ¡${updatedPokemon.name} evolucionó en ${finalEvolved.name}!`)
+              }
+            } catch {}
+          }
         }
 
         return updatedPokemon
@@ -4003,11 +4127,65 @@ function MainApp() {
     }
   }
 
+  async function handleStoneEvolution(teamIndex: number): Promise<void> {
+    if (!stoneEvoModal) return
+    const targetPokemon = team[teamIndex]
+    if (!targetPokemon) return
+    const stoneItemName = EVOLUTION_STONE_ITEM_NAMES[stoneEvoModal.stoneName]
+    if (!stoneItemName) return
+
+    setIsLoading(true)
+    try {
+      const result = await canEvolveWithStone(targetPokemon.id, stoneItemName)
+      if (!result.canEvolve || !result.evolvedName) {
+        setBattleLog((prev) => [`${stoneEvoModal.stoneName} no tiene efecto en ${targetPokemon.name}.`, ...prev].slice(0, 15))
+        setStoneEvoModal(null)
+        setStoneEvoTargets([])
+        return
+      }
+
+      const evolvedName = result.evolvedName.includes('-') ? stripRegional(result.evolvedName) : result.evolvedName
+      const newBase = await buildPokemonFromApi(evolvedName, 1, targetPokemon.level, targetPokemon.shiny ?? false)
+      const evolved: Pokemon = {
+        ...newBase,
+        level: targetPokemon.level,
+        maxHp: newBase.maxHp + 15,
+        hp: newBase.maxHp + 15,
+        attack: newBase.attack + 5,
+        defense: newBase.defense + 5,
+        speed: newBase.speed + 3,
+        holdItem: targetPokemon.holdItem,
+      }
+      registerInPokedex(evolved)
+      setTeam(prev => prev.map((p, i) => i === teamIndex ? evolved : p))
+      setRunStats(prev => ({ ...prev, evolutions: prev.evolutions + 1 }))
+      setInventory(prev => prev.filter((_, i) => i !== stoneEvoModal.stoneIndex))
+      setBattleLog((prev) => [`✨ ¡${targetPokemon.name} evolucionó en ${evolved.name} con ${stoneEvoModal.stoneName}!`, ...prev].slice(0, 15))
+    } catch {
+      setApiError('Error al procesar la evolución.')
+    } finally {
+      setIsLoading(false)
+      setStoneEvoModal(null)
+      setStoneEvoTargets([])
+    }
+  }
+
   function useInventoryItem(itemName: string): void {
     const itemIndex = inventory.indexOf(itemName)
     if (itemIndex === -1) return
     if (HOLDABLE_ITEMS[itemName]) return
     if (POKEBALL_NAMES.includes(itemName)) return
+
+    if (EVOLUTION_STONE_UNLOCK_IDS[itemName]) {
+      const candidates = team.filter(p => p.hp > 0)
+      if (candidates.length === 0) {
+        setBattleLog((prev) => ['No tienes Pokémon en pie para usar la piedra.', ...prev].slice(0, 15))
+        return
+      }
+      setStoneEvoTargets(candidates)
+      setStoneEvoModal({ stoneName: itemName, stoneIndex: itemIndex })
+      return
+    }
 
     if (runChallenges.noItems) {
       setBattleLog((prev) => ['🚫 Desafío Sin Objetos: No puedes usar items en batalla.', ...prev].slice(0, 15))
@@ -4096,11 +4274,13 @@ function MainApp() {
 
     if (runChallenges.soloStarter) {
       setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
+      completeCurrentNode()
       return
     }
 
     if (runChallenges.fixedTeam) {
       setBattleLog((prev) => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
+      completeCurrentNode()
       return
     }
 
@@ -4482,6 +4662,31 @@ function MainApp() {
         </div>
       )}
 
+      {/* Stone Evolution Modal */}
+      {stoneEvoModal && (
+        <div className="modal-backdrop" onClick={() => { setStoneEvoModal(null); setStoneEvoTargets([]) }}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', padding: '1.5rem' }}>
+            <h3 style={{ margin: '0 0 0.75rem', color: '#38bdf8' }}>Evolucionar con {stoneEvoModal.stoneName}</h3>
+            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1rem' }}>Selecciona un Pokémon para evolucionar:</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {stoneEvoTargets.map((pkmn, idx) => {
+                const realIdx = team.indexOf(pkmn)
+                return (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(30,41,59,0.6)', border: '1px solid #334155', cursor: 'pointer' }}
+                    onClick={() => handleStoneEvolution(realIdx)}>
+                    <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '40px', height: '40px' }} />
+                    <div>
+                      <strong style={{ textTransform: 'capitalize', color: '#e2e8f0' }}>{pkmn.name}</strong>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: '8px' }}>Nv.{pkmn.level}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Capture Modal */}
       {captureModal && enemy && (
         <div className="modal-backdrop" onClick={() => setCaptureModal(false)}>
@@ -4630,6 +4835,49 @@ function MainApp() {
                       <strong>{selectedPokemonDetail.weight} kg</strong>
                     </div>
                   </div>
+
+                  {selectedPokemonDetail.evolutions.length > 0 && (
+                    <>
+                      <h3 style={{ fontSize: '0.9rem', color: '#94a3b8', marginTop: '12px' }}>Cadena Evolutiva</h3>
+                      <div className="evolution-chain" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', padding: '8px 0' }}>
+                        {selectedPokemonDetail.evolutions.map((evo, idx) => {
+                          const entry = pokedex[evo.id]
+                          const known = !!entry?.caught
+                          return (
+                            <div key={evo.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {idx > 0 && <span style={{ color: '#64748b', fontSize: '1.2rem' }}>→</span>}
+                              <div
+                                className="pokedex-card"
+                                style={{
+                                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                                  padding: '6px', borderRadius: '8px', background: 'rgba(15,23,42,0.6)',
+                                  border: evo.id === selectedPokemonDetail.id ? '2px solid #38bdf8' : '1px solid #334155',
+                                  minWidth: '80px', opacity: known ? 1 : 0.5, cursor: known ? 'pointer' : 'default'
+                                }}
+                                onClick={() => known && handleSelectPokedexPokemon(evo.id)}
+                              >
+                                <img
+                                  src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${evo.id}.gif`}
+                                  alt={evo.name}
+                                  onError={(e) => { (e.target as HTMLImageElement).src = evo.sprite }}
+                                  style={{ width: '56px', height: '56px', imageRendering: 'pixelated', filter: known ? 'none' : 'brightness(0) invert(0)' }}
+                                />
+                                <strong style={{ textTransform: 'capitalize', fontSize: '0.75rem', color: evo.id === selectedPokemonDetail.id ? '#38bdf8' : '#e2e8f0', textAlign: 'center' }}>
+                                  {known ? evo.name : '???'}
+                                </strong>
+                                {evo.level && (
+                                  <span style={{ fontSize: '0.65rem', color: '#a855f7' }}>Nv. {evo.level}</span>
+                                )}
+                                {!evo.level && evo.trigger && evo.trigger !== 'level-up' && (
+                                  <span style={{ fontSize: '0.65rem', color: '#facc15' }}>{evo.trigger}</span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
 
                   <h3 style={{ fontSize: '0.9rem', color: '#94a3b8', marginTop: '8px' }}>Estadísticas Base</h3>
                   <div className="stats-grid">
@@ -5083,7 +5331,7 @@ function MainApp() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>{difficultyLabels[diff].title} {isLocked ? '🔒' : ''}</span>
                   </div>
-                  <strong>{difficultyNodeCounts[diff]} rutas</strong>
+                  <strong>{difficultyNodeCounts[diff]} rutas/etapa ({difficultyNodeCounts[diff] * 3} total)</strong>
                   {isLocked && (
                     <span className="lock-text">
                       🔒 Completa {generationRegions[generation]} 1 vez
@@ -5507,6 +5755,32 @@ function MainApp() {
                 </span>
               )}
             </h2>
+            {difficulty !== 'infinite' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', padding: '6px 10px', background: 'rgba(250,204,21,0.08)', borderRadius: '8px', border: '1px solid rgba(250,204,21,0.2)' }}>
+                <span style={{ fontSize: '0.85rem', color: '#facc15', fontWeight: 'bold' }}>Etapa {currentStage}/3</span>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {[0, 1, 2].map(i => {
+                    const badge = badges[i]
+                    return (
+                      <div key={i} style={{
+                        width: '28px', height: '28px', borderRadius: '50%',
+                        background: badge ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.05)',
+                        border: badge ? '2px solid #facc15' : '2px dashed #475569',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        overflow: 'hidden', transition: 'all 0.3s'
+                      }}>
+                        {badge ? (
+                          <img src={badge.sprite} alt={badge.name} style={{ width: '24px', height: '24px', imageRendering: 'pixelated' }}
+                            title={badge.name} />
+                        ) : (
+                          <span style={{ fontSize: '0.65rem', color: '#475569' }}>?</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
             {runChallenges.egglocke && eggInventory.length > 0 && (
               <div style={{ fontSize: '0.8rem', color: '#fbbf24', marginBottom: '0.5rem' }}>
                 🥚 Huevos: {eggInventory.length} {eggInventory.map(e => `(${e.name}: ${e.hatchIn})`).join(' ')}
@@ -5611,49 +5885,7 @@ function MainApp() {
                     )
                   })}
 
-                  {(() => {
-                    const needsHealing = team.some((pkmn) => pkmn.hp > 0 && pkmn.hp < pkmn.maxHp)
-                    const healCost = Math.floor(100 * (1 - (modifier?.shopDiscount ?? 0)) * (difficulty === 'hard' ? 1.4 : difficulty === 'infinite' ? 1.5 : 1))
-                    const canAffordAndNeeds = money >= healCost && needsHealing
 
-                    return (
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          background: 'rgba(239, 68, 68, 0.15)',
-                          padding: '8px 12px',
-                          borderRadius: '6px',
-                          border: '1px solid rgba(239, 68, 68, 0.3)'
-                        }}
-                      >
-                        <div>
-                          <strong style={{ color: '#f87171' }}>💊 Curación Completa</strong>
-                          <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8' }}>
-                            {needsHealing
-                              ? 'Restaura el HP de todos los Pokémon vivos.'
-                              : 'Tu equipo activo ya tiene la salud al máximo.'}
-                          </p>
-                        </div>
-                        <button
-                          className="tiny-btn"
-                          type="button"
-                          onClick={healTeamAtShop}
-                          disabled={!canAffordAndNeeds}
-                          style={{
-                            background: canAffordAndNeeds ? '#ef4444' : '#475569',
-                            minWidth: '70px',
-                            color: canAffordAndNeeds ? '#0f172a' : '#cbd5e1',
-                            fontWeight: 'bold',
-                            cursor: canAffordAndNeeds ? 'pointer' : 'not-allowed'
-                          }}
-                        >
-                          ${healCost}
-                        </button>
-                      </div>
-                    )
-                  })()}
                 </div>
 
                 <details style={{ marginTop: '1rem', borderTop: '1px solid #334155', paddingTop: '0.75rem' }}>
@@ -5905,43 +6137,6 @@ function MainApp() {
               </div>
             )}
 
-            {screen === 'route' && currentNode && currentNode.type === 'rest' && restEncounter && !legendaryEncounter && (
-              <div className="action-block">
-                <p>
-                  Rest stop: <strong>{restEncounter.name}{restEncounter.shiny ? ' ✨' : ''}</strong> is waiting to be captured.
-                </p>
-                <p className="muted">Reward item added: {restRewardItem}</p>
-                <div className="capture-card" style={restEncounter.shiny ? { border: '2px solid #facc15', boxShadow: '0 0 12px rgba(250,204,21,0.4)' } : undefined}>
-                  <img className="sprite" src={restEncounter.sprite} alt={restEncounter.name} onError={fallbackSprite} />
-                </div>
-                <div className="moves-grid" style={{ marginBottom: '1rem' }}>
-                  <button className="cta" onClick={captureRestPokemon} type="button">
-                    {team.length >= maxTeamSize ? `Capturar → PC (${pcStorage.length} en PC)` : 'Capture'}
-                  </button>
-                  <button className="secondary" onClick={skipRestCapture} type="button">
-                    Skip
-                  </button>
-                </div>
-
-                <div className="evolve-section" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
-                  <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>O evoluciona a un integrante:</p>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {team.map((pokemon, idx) => (
-                      <button
-                        key={`evo-${pokemon.id}-${idx}`}
-                        className="tiny-btn"
-                        type="button"
-                        onClick={() => handleEvolveTarget(idx)}
-                        disabled={isLoading || pokemon.hp <= 0}
-                      >
-                        Evolucionar {pokemon.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
             {screen === 'route' && legendaryEncounter && (
               <div className="action-block">
                 <p>
@@ -5970,6 +6165,32 @@ function MainApp() {
                 <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={enterNode} type="button" disabled={isLoading}>
                   {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : currentNode.type === 'mega' ? '💎 ¡Recoger Mega Piedra!' : currentNode.type === 'gmax' ? '⚡ ¡Enfrentar G-MAX!' : 'Enter node'}
                 </button>
+              </div>
+            )}
+
+            {screen === 'route' && currentNode && currentNode.type === 'rest' && restEncounter && !legendaryEncounter && (
+              <div className="action-block">
+                <p>
+                  Rest stop: <strong>{restEncounter.name}{restEncounter.shiny ? ' ✨' : ''}</strong> is waiting.
+                </p>
+                <p className="muted">Reward item added: {restRewardItem}</p>
+                <div className="capture-card" style={restEncounter.shiny ? { border: '2px solid #facc15', boxShadow: '0 0 12px rgba(250,204,21,0.4)' } : undefined}>
+                  <img className="sprite" src={restEncounter.sprite} alt={restEncounter.name} onError={fallbackSprite} />
+                </div>
+                <div className="moves-grid" style={{ marginBottom: '1rem' }}>
+                  <button className="cta" onClick={captureRestPokemon} type="button">
+                    {team.length >= maxTeamSize ? `Capturar → PC (${pcStorage.length} en PC)` : 'Capturar'}
+                  </button>
+                  <button className="secondary" onClick={skipRestCapture} type="button">
+                    Skip
+                  </button>
+                </div>
+                <div className="evolve-section" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+                  <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>Descansa para recuperar energía:</p>
+                  <button className="cta" onClick={() => { if (runChallenges.noHealing) { setBattleLog(prev => ['🚫 Desafío Sin Curación: No puedes curar en descanso.', ...prev].slice(0, 15)); completeCurrentNode(); return } setTeam(prev => prev.map(p => p.hp <= 0 ? { ...p, hp: Math.max(1, Math.floor(p.maxHp * 0.5)) } : { ...p, hp: p.maxHp })); setBattleLog(prev => ['💊 ¡Equipo restaurado completamente en el descanso!', ...prev].slice(0, 15)); completeCurrentNode() }} type="button" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', width: '100%' }}>
+                    💊 Curar Equipo
+                  </button>
+                </div>
               </div>
             )}
 
@@ -6061,7 +6282,7 @@ function MainApp() {
                   )}
                   {' · '}Nv.&nbsp;{enemy.level}
                 </p>
-                <img className={`sprite enemy-sprite${enemy.gmaxEvolved ? ' gmax-active' : ''}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} />
+                <img className={`sprite enemy-sprite${enemy.gmaxEvolved ? ' gmax-active' : ''}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={enemyHitFlash ? { filter: 'brightness(1.5) sepia(1) hue-rotate(-40deg) saturate(5)', transition: 'filter 0.05s' } : { transition: 'filter 0.3s' }} />
                 <div className="hp-line">
                   <span>HP rival</span>
                   <strong>{enemy.hp}/{enemy.maxHp}</strong>
@@ -6348,45 +6569,33 @@ function MainApp() {
         </div>
       )}
 
-      {/* Scammer Modal */}
-      {scammerModal && scammerOffer && (
-        <div className="modal-backdrop" onClick={() => handleScammerChoice(false)}>
-          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', padding: '2rem' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>💸</div>
-            <h3 style={{ color: '#facc15', margin: '0.5rem 0' }}>¡Estafador!</h3>
-            <p style={{ color: '#cbd5e1', marginBottom: '0.5rem' }}>Un tipo sospechoso se acerca y te muestra un objeto.</p>
-            <div style={{
-              background: 'rgba(30,41,59,0.6)', border: '1px solid #334155', borderRadius: '12px',
-              padding: '1rem', margin: '1rem 0', display: 'flex', alignItems: 'center', gap: '12px'
-            }}>
-              {ITEM_SPRITES[scammerOffer.itemName] && (
-                <img src={ITEM_SPRITES[scammerOffer.itemName]} alt={scammerOffer.itemName}
-                  style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
-              )}
-              <div style={{ textAlign: 'left' }}>
-                <strong style={{ color: '#e2e8f0' }}>{scammerOffer.itemName}</strong>
-                <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                  {HOLDABLE_ITEMS[scammerOffer.itemName]?.desc ?? ''}
-                </div>
-              </div>
+      {/* Evolution Trader Modal */}
+      {evolutionTraderItems && (
+        <div className="modal-backdrop" onClick={() => setEvolutionTraderItems(null)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', padding: '1.5rem' }}>
+            <h3 style={{ color: '#facc15', margin: '0 0 0.5rem' }}>🎒 Comerciante Misterioso</h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1rem' }}>El comerciante te ofrece objetos evolutivos:</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {evolutionTraderItems.map(itemName => {
+                const price = 80 + Math.floor(Math.random() * 40)
+                const canBuy = money >= price
+                return (
+                  <div key={itemName} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', background: 'rgba(30,41,59,0.6)', border: '1px solid #334155' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {ITEM_SPRITES[itemName] && <img src={ITEM_SPRITES[itemName]} alt={itemName} style={{ width: '32px', height: '32px' }} onError={fallbackSprite} />}
+                      <div>
+                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{itemName}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>🪙 ${price}</div>
+                      </div>
+                    </div>
+                    <button className="cta" onClick={() => { if (money >= price) { setMoney(prev => prev - price); setInventory(prev => [...prev, itemName]); setBattleLog(prev => [`🎭 Compraste ${itemName} por $${price}.`, ...prev].slice(0, 15)) } }} disabled={!canBuy} style={{ fontSize: '0.8rem', padding: '4px 14px', background: canBuy ? '#facc15' : '#475569', color: '#000' }}>
+                      {canBuy ? 'Comprar' : 'No alcanza'}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
-            <p style={{ color: '#facc15', fontWeight: 'bold', marginBottom: '1.5rem' }}>
-              Precio: 🪙 ${scammerOffer.price}
-              <span style={{ color: '#94a3b8', fontWeight: 'normal', marginLeft: '8px' }}>
-                (Tienes: ${money})
-              </span>
-            </p>
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
-              <button className="cta" onClick={() => handleScammerChoice(true)}
-                disabled={money < scammerOffer.price}
-                style={{ background: money >= scammerOffer.price ? '#22c55e' : '#475569', color: '#000' }}>
-                {money >= scammerOffer.price ? '¡Comprar!' : 'No alcanza'}
-              </button>
-              <button className="cta" onClick={() => handleScammerChoice(false)}
-                style={{ background: '#64748b', color: '#fff' }}>
-                Rechazar
-              </button>
-            </div>
+            <button className="cta" onClick={() => setEvolutionTraderItems(null)} style={{ marginTop: '1rem', background: '#64748b', width: '100%' }}>Salir</button>
           </div>
         </div>
       )}
@@ -6536,6 +6745,70 @@ function MainApp() {
                       <div>
                         <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
                         <div style={{ color: '#ef4444', fontSize: '0.7rem' }}>Poké Ball</div>
+                      </div>
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    {owned ? (
+                      <div style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                    ) : (
+                      <button className="cta" onClick={() => buyMetaItem(item)}
+                        disabled={metaProgression.pokeCoins < item.price}
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#facc15' : '#475569', color: '#000' }}>
+                        🪙 {item.price}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <h3 style={{ color: '#a855f7', marginBottom: '0.5rem' }}>💎 Piedras Evolutivas</h3>
+            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea piedras evolutivas para evolucionar ciertos Pokémon. Aparecen en tiendas y Spin.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {META_SHOP_ITEMS.filter(item => item.category === 'evolution_stone').map(item => {
+                const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                return (
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#22c55e' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      {ITEM_SPRITES[item.spriteKey]
+                        ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
+                        : <span style={{ fontSize: '1.5rem' }}>💎</span>
+                      }
+                      <div>
+                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#a855f7', fontSize: '0.7rem' }}>Piedra Evolutiva</div>
+                      </div>
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    {owned ? (
+                      <div style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                    ) : (
+                      <button className="cta" onClick={() => buyMetaItem(item)}
+                        disabled={metaProgression.pokeCoins < item.price}
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#facc15' : '#475569', color: '#000' }}>
+                        🪙 {item.price}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <h3 style={{ color: '#f97316', marginBottom: '0.5rem' }}>🔧 Objetos Evolutivos</h3>
+            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Objetos para evolucionar Pokémon por intercambio. Aparecen con el Comerciante Misterioso.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {META_SHOP_ITEMS.filter(item => item.category === 'evolution_item').map(item => {
+                const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                return (
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#22c55e' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      {ITEM_SPRITES[item.spriteKey]
+                        ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
+                        : <span style={{ fontSize: '1.5rem' }}>🔧</span>
+                      }
+                      <div>
+                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f97316', fontSize: '0.7rem' }}>Objeto Evolutivo</div>
                       </div>
                     </div>
                     <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>

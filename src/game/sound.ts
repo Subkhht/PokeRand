@@ -101,6 +101,22 @@ export function playClick(): void {
   } catch { /* silent */ }
 }
 
+export function playHit(): void {
+  try {
+    const ac = getCtx()
+    const osc = ac.createOscillator()
+    const g = ac.createGain()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(200, ac.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(60, ac.currentTime + 0.12)
+    g.gain.setValueAtTime(0.5 * sfxVolume, ac.currentTime)
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.15)
+    osc.connect(g).connect(ac.destination)
+    osc.start(ac.currentTime)
+    osc.stop(ac.currentTime + 0.15)
+  } catch { /* silent */ }
+}
+
 export function setMenuMusicTrack(id: string): void {
   activeMenuMusic = id
 }
