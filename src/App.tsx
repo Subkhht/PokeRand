@@ -6469,7 +6469,7 @@ function MainApp() {
                       {STATUS_LABELS[enemy.status.type]}
                     </span>
                   )}
-                  {' · '}Nv.&nbsp;{enemy.level}
+                  {' · '}Nv. {enemy.level}
                   {enemy.status && (
                     <span style={{ fontSize: '0.7rem', color: STATUS_COLORS[enemy.status.type], marginLeft: '4px' }}>
                       {STATUS_LABELS[enemy.status.type]}
