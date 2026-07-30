@@ -515,6 +515,20 @@ export async function buildPokemonFromApi(
     pokemon.evolutionLevel = evoInfo.evolutionLevel ?? undefined
     pokemon.heldItemRequired = evoInfo.heldItem ?? undefined
   }
+  pokemon.minAppearLevel = evoInfo.minAppearLevel ?? undefined
+
+  if (pokemon.minAppearLevel && targetLevel < pokemon.minAppearLevel) {
+    const diff = pokemon.minAppearLevel - targetLevel
+    pokemon.level = pokemon.minAppearLevel
+    pokemon.maxHp += diff * 4
+    pokemon.hp += diff * 4
+    pokemon.attack += diff * 2
+    pokemon.defense += diff * 2
+    pokemon.speed += diff * 2
+    if (pokemon.evolutionLevel && pokemon.level >= pokemon.evolutionLevel) {
+      pokemon.evolutionLevel = undefined
+    }
+  }
 
   pokemonCache.set(cacheKey, pokemon)
   return pokemon
@@ -573,18 +587,23 @@ export async function checkAndLearnNewMove(
 function filterSpeciesIdsForProgress(
   ids: number[],
   progressRatio: number,
-  isBoss: boolean
+  isBoss: boolean,
+  bossStage: number = -1
 ): number[] {
   if (ids.length <= 10) return ids
 
   const total = ids.length
-  // Los Pokémon legendarios y míticos suelen estar al final del listado de la generación (último 12%)
   const legendaryCutoff = Math.floor(total * 0.88)
   const nonLegendaryIds = ids.slice(0, legendaryCutoff)
   const legendaryIds = ids.slice(legendaryCutoff)
 
   if (isBoss) {
-    // El jefe final tiene un 40% de probabilidad de ser legendario/mítico y 60% de ser un Pokémon potente no-legendario
+    if (bossStage === 0) {
+      return nonLegendaryIds.slice(0, Math.floor(nonLegendaryIds.length * 0.5))
+    }
+    if (bossStage === 1) {
+      return nonLegendaryIds.slice(Math.floor(nonLegendaryIds.length * 0.3))
+    }
     if (Math.random() < 0.4 && legendaryIds.length > 0) {
       return legendaryIds
     }
@@ -631,12 +650,13 @@ export async function getBalancedPokemonByGeneration(
   totalNodes: number,
   isBoss: boolean = false,
   shiny: boolean = false,
-  difficulty: string = 'medium'
+  difficulty: string = 'medium',
+  bossStage: number = -1
 ): Promise<Pokemon> {
   const allIds = await getSpeciesIdsByGeneration(generation)
   const progressRatio = stepIndex / Math.max(1, totalNodes - 1)
 
-  const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss)
+  const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss, bossStage)
 
   const levelMult = difficulty === 'infinite' ? 2.5 : difficulty === 'hard' ? 2.0 : 1.5
   const scaledLevel = 10 + Math.floor(stepIndex * levelMult) + (isBoss ? 2 : 0)
@@ -644,7 +664,15 @@ export async function getBalancedPokemonByGeneration(
   let minBst = 150
   let maxBst = 999
 
-  if (difficulty === 'infinite') {
+  if (isBoss) {
+    if (bossStage === 0) {
+      minBst = 350; maxBst = 500
+    } else if (bossStage === 1) {
+      minBst = 450; maxBst = 600
+    } else {
+      minBst = 580; maxBst = 999
+    }
+  } else if (difficulty === 'infinite') {
     if (isBoss) {
       minBst = 580
       maxBst = 999
@@ -714,6 +742,8 @@ export async function getBalancedPokemonByGeneration(
       const pokemon = await buildPokemonFromApi(candidateId, generation, scaledLevel, shiny, difficulty)
       const bst = pokemon.baseStatTotal ?? 350
 
+      if (pokemon.minAppearLevel && scaledLevel < pokemon.minAppearLevel) continue
+
       if (bst >= minBst && bst <= maxBst) {
         return applyHardHeldItem(pokemon, difficulty, isBoss)
       }
@@ -753,46 +783,90 @@ export async function getRandomStarterByGeneration(generation: number, shiny: bo
   const randomStarterId = randomFrom(starters)
   return buildPokemonFromApi(randomStarterId, generation, 10, shiny)
 }
+const REGIONAL_SUFFIXES = ['-alola', '-galar', '-hisui', '-paldea']
+
+function getBaseName(name: string): string {
+  for (const suffix of REGIONAL_SUFFIXES) {
+    if (name.endsWith(suffix)) return name.slice(0, -suffix.length)
+  }
+  return name
+}
+
+function getRegionalSuffix(name: string): string {
+  for (const suffix of REGIONAL_SUFFIXES) {
+    if (name.endsWith(suffix)) return suffix
+  }
+  return ''
+}
+
 function findEvolutionForSpecies(chainNode: EvolutionChainNode, speciesName: string): { speciesName: string; level: number; trigger: string; heldItem: string | null } | null {
+  const baseName = getBaseName(speciesName)
+  const matchName = (name: string) => name.toLowerCase() === speciesName.toLowerCase() || name.toLowerCase() === baseName.toLowerCase()
+  const regionalSuffix = getRegionalSuffix(speciesName)
+
   for (const evo of chainNode.evolves_to || []) {
     const sub = findEvolutionForSpecies(evo, speciesName)
     if (sub) return sub
   }
-  if (chainNode.species.name.toLowerCase() === speciesName.toLowerCase()) {
+  if (matchName(chainNode.species.name)) {
     if (chainNode.evolves_to?.length) {
       const details = chainNode.evolves_to[0].evolution_details?.[0]
       const minLevel = details?.min_level ?? null
       const trigger = details?.trigger?.name ?? 'level-up'
       const evoLevel = minLevel ?? (trigger === 'trade' ? 35 : 45)
       const heldItem = details?.held_item?.name ?? null
-      return { speciesName: chainNode.evolves_to[0].species.name, level: evoLevel, trigger, heldItem }
+      const evolvedName = regionalSuffix ? chainNode.evolves_to[0].species.name + regionalSuffix : chainNode.evolves_to[0].species.name
+      return { speciesName: evolvedName, level: evoLevel, trigger, heldItem }
     }
   }
   return null
 }
 
-export async function getEvolutionInfo(pokemonId: number): Promise<{ nextName: string | null; evolutionLevel: number | null; heldItem: string | null }> {
+function findPreEvolutionLevel(chainNode: EvolutionChainNode, speciesName: string): number | null {
+  const baseName = getBaseName(speciesName)
+  const matchName = (name: string) => name.toLowerCase() === speciesName.toLowerCase() || name.toLowerCase() === baseName.toLowerCase()
+
+  if (matchName(chainNode.species.name)) return null
+
+  for (const evo of chainNode.evolves_to || []) {
+    const subName = getBaseName(evo.species.name)
+    const evoMatch = (name: string) => name.toLowerCase() === speciesName.toLowerCase() || name.toLowerCase() === subName.toLowerCase()
+    if (evoMatch(evo.species.name)) {
+      const details = evo.evolution_details?.[0]
+      const minLevel = details?.min_level ?? null
+      const trigger = details?.trigger?.name ?? 'level-up'
+      if (trigger === 'level-up' && minLevel) return minLevel
+      return null
+    }
+    const found = findPreEvolutionLevel(evo, speciesName)
+    if (found) return found
+  }
+  return null
+}
+
+export async function getEvolutionInfo(pokemonId: number): Promise<{ nextName: string | null; evolutionLevel: number | null; heldItem: string | null; minAppearLevel: number | null }> {
   try {
     const speciesRes = await fetch(`${API_BASE}/pokemon-species/${pokemonId}`)
-    if (!speciesRes.ok) return { nextName: null, evolutionLevel: null, heldItem: null }
+    if (!speciesRes.ok) return { nextName: null, evolutionLevel: null, heldItem: null, minAppearLevel: null }
     const speciesData = await speciesRes.json()
-    if (!speciesData.evolution_chain?.url) return { nextName: null, evolutionLevel: null, heldItem: null }
+    if (!speciesData.evolution_chain?.url) return { nextName: null, evolutionLevel: null, heldItem: null, minAppearLevel: null }
     const evoRes = await fetch(speciesData.evolution_chain.url)
-    if (!evoRes.ok) return { nextName: null, evolutionLevel: null, heldItem: null }
+    if (!evoRes.ok) return { nextName: null, evolutionLevel: null, heldItem: null, minAppearLevel: null }
     const evoData = await evoRes.json()
     const found = findEvolutionForSpecies(evoData.chain, speciesData.name)
+    const minLevel = findPreEvolutionLevel(evoData.chain, speciesData.name)
     if (found) {
-      return { nextName: found.speciesName, evolutionLevel: found.trigger === 'use-item' ? null : found.level, heldItem: found.heldItem ? getEvolutionItemDisplayName(found.heldItem) : null }
+      return { nextName: found.speciesName, evolutionLevel: found.trigger === 'use-item' ? null : found.level, heldItem: found.heldItem ? getEvolutionItemDisplayName(found.heldItem) : null, minAppearLevel: minLevel }
     }
-    return { nextName: null, evolutionLevel: null, heldItem: null }
+    return { nextName: null, evolutionLevel: null, heldItem: null, minAppearLevel: minLevel }
   } catch {
-    return { nextName: null, evolutionLevel: null, heldItem: null }
+    return { nextName: null, evolutionLevel: null, heldItem: null, minAppearLevel: null }
   }
 }
 
 export function stripRegional(name: string): string {
-  const regional = ['-hisui', '-alola', '-galar', '-paldea', '-mega', '-gmax']
-  for (const suffix of regional) {
+  const battleForms = ['-mega', '-gmax']
+  for (const suffix of battleForms) {
     if (name.includes(suffix)) return name.split(suffix)[0]
   }
   return name
@@ -821,11 +895,18 @@ export async function evolvePokemon(currentPokemon: Pokemon): Promise<Pokemon | 
 }
 
 function findStoneEvolution(chainNode: EvolutionChainNode, speciesName: string, stoneItemName: string): { speciesName: string; level: number | null; trigger: string } | null {
-  if (chainNode.species.name.toLowerCase() === speciesName.toLowerCase()) {
+  const baseName = getBaseName(speciesName)
+  const matchName = (name: string) => name.toLowerCase() === speciesName.toLowerCase() || name.toLowerCase() === baseName.toLowerCase()
+  const regionalSuffix = getRegionalSuffix(speciesName)
+
+  if (matchName(chainNode.species.name)) {
     for (const evo of chainNode.evolves_to || []) {
-      const details = evo.evolution_details?.[0]
-      if (details?.trigger?.name === 'use-item' && details?.item?.name === stoneItemName) {
-        return { speciesName: evo.species.name, level: null, trigger: 'use-item' }
+      const allDetails = evo.evolution_details || []
+      for (const details of allDetails) {
+        if (details?.trigger?.name === 'use-item' && details?.item?.name === stoneItemName) {
+          const evolvedName = regionalSuffix ? evo.species.name + regionalSuffix : evo.species.name
+          return { speciesName: evolvedName, level: null, trigger: 'use-item' }
+        }
       }
     }
   }
@@ -837,6 +918,21 @@ function findStoneEvolution(chainNode: EvolutionChainNode, speciesName: string, 
 }
 
 export async function canEvolveWithStone(pokemonId: number, stoneItemName: string): Promise<{ canEvolve: boolean; evolvedName: string | null }> {
+  // Hardcoded Eevee evolutions (all 7 eeveelutions with stones)
+  if (pokemonId === 133) {
+    const eeveeMap: Record<string, string> = {
+      'fire-stone': 'flareon',
+      'water-stone': 'vaporeon',
+      'thunder-stone': 'jolteon',
+      'leaf-stone': 'leafeon',
+      'ice-stone': 'glaceon',
+      'sun-stone': 'espeon',
+      'moon-stone': 'umbreon',
+    }
+    const evolved = eeveeMap[stoneItemName]
+    if (evolved) return { canEvolve: true, evolvedName: evolved }
+  }
+
   try {
     const speciesRes = await fetch(`${API_BASE}/pokemon-species/${pokemonId}`)
     if (!speciesRes.ok) return { canEvolve: false, evolvedName: null }

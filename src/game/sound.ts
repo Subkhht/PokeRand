@@ -117,6 +117,26 @@ export function playHit(): void {
   } catch { /* silent */ }
 }
 
+export function playEvolution(): void {
+  try {
+    const ac = getCtx()
+    const notes = [523, 659, 784, 1047]
+    notes.forEach((freq, i) => {
+      const osc = ac.createOscillator()
+      const g = ac.createGain()
+      osc.type = 'square'
+      const t = ac.currentTime + i * 0.12
+      osc.frequency.setValueAtTime(freq, t)
+      g.gain.setValueAtTime(0.2 * sfxVolume, t)
+      g.gain.setValueAtTime(0.15 * sfxVolume, t + 0.08)
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.15)
+      osc.connect(g).connect(ac.destination)
+      osc.start(t)
+      osc.stop(t + 0.15)
+    })
+  } catch { /* silent */ }
+}
+
 export function setMenuMusicTrack(id: string): void {
   activeMenuMusic = id
 }

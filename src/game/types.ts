@@ -54,6 +54,7 @@ export interface Pokemon {
   captureRate?: number
   evolutionLevel?: number
   evolutionChainId?: number
+  minAppearLevel?: number
   heldItemRequired?: string | null
   rawLevelUpMoves?: RawLevelUpMove[]
   holdItem?: string | null

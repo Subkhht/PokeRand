@@ -47,7 +47,12 @@ export function scalePokemonForNode(base: Pokemon, _node: RouteNode, _stepIndex:
   const hpMultiplier = difficulty === 'infinite' ? 6 : difficulty === 'hard' ? 5 : 4
   const statMultiplier = difficulty === 'infinite' ? 3 : difficulty === 'hard' ? 2.5 : 2
 
-  const targetLevel = base.level + levelDelta
+  let targetLevel = base.level + levelDelta
+  if (base.minAppearLevel && targetLevel < base.minAppearLevel) {
+    const extra = base.minAppearLevel - targetLevel
+    targetLevel = base.minAppearLevel
+    levelDelta += extra
+  }
 
   const hpBonus = levelDelta * hpMultiplier
   const statBonus = levelDelta * statMultiplier

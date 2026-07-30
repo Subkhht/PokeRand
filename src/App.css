@@ -1406,6 +1406,25 @@ button {
   50% { box-shadow: 0 0 25px rgba(250, 204, 21, 0.6); }
 }
 
+@keyframes evoFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes evoFlash {
+  0% { filter: brightness(1); transform: scale(1); }
+  25% { filter: brightness(3) sepia(1) hue-rotate(0deg); transform: scale(1.15); }
+  50% { filter: brightness(1) sepia(0.5) hue-rotate(30deg); transform: scale(1.1); }
+  75% { filter: brightness(2) sepia(0.3) hue-rotate(60deg); transform: scale(1.05); }
+  100% { filter: brightness(1); transform: scale(1); }
+}
+
+@keyframes evoAppear {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 /* ============================================================
    RESPONSIVE MOBILE — Tablets pequeñas y teléfonos
    ============================================================ */

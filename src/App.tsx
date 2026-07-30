@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef, Component, type ReactNode } from 'react'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
-import { playHover, playClick, playHit, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic } from './game/sound'
+import { playHover, playClick, playHit, playEvolution, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -681,6 +681,14 @@ const RANDOM_EVENTS = [
     minRouteProgress: 0.3,
   },
   {
+    id: 'evolution_merchant',
+    weight: 4,
+    icon: '🧳',
+    title: 'Mercader Misterioso',
+    desc: 'Un misterioso mercader vende objetos evolutivos.',
+    minRouteProgress: 0.2,
+  },
+  {
     id: 'trap',
     weight: 6,
     icon: '⚠️',
@@ -1110,6 +1118,7 @@ function MainApp() {
   // Captura de Pokémon salvaje
   const [captureModal, setCaptureModal] = useState(false)
   const [captureMessage, setCaptureMessage] = useState<string | null>(null)
+  const [evoPopup, setEvoPopup] = useState<{ oldSprite: string; newSprite: string; oldName: string; newName: string } | null>(null)
   const [battleTurns, setBattleTurns] = useState(0)
   const [enemyHitFlash, setEnemyHitFlash] = useState(false)
 
@@ -1242,7 +1251,7 @@ function MainApp() {
 
   const [activeRandomEvent, setActiveRandomEvent] = useState<{ id: string; icon: string; title: string; desc: string } | null>(null)
   const [traderModal, setTraderModal] = useState<boolean>(false)
-  const [evolutionTraderItems, setEvolutionTraderItems] = useState<string[] | null>(null)
+  const [merchantItems, setMerchantItems] = useState<Array<{ name: string; price: number }> | null>(null)
   const [randomEventUsed, setRandomEventUsed] = useState<Set<string>>(new Set())
   const [showMetaShop, setShowMetaShop] = useState<boolean>(false)
   const [unlockPopup, setUnlockPopup] = useState<{ name: string; spriteKey: string } | null>(null)
@@ -1709,11 +1718,17 @@ function MainApp() {
         break
       }
       case 'mysterious_trader': {
-        const unlockedEvoItems = Object.keys(EVOLUTION_ITEM_UNLOCK_IDS).filter(n => isEvolutionItemUnlocked(n))
-        if (unlockedEvoItems.length > 0) {
-          setEvolutionTraderItems(unlockedEvoItems)
+        setTraderModal(true)
+        break
+      }
+      case 'evolution_merchant': {
+        const unlockedItems = Object.keys(EVOLUTION_ITEM_UNLOCK_IDS).filter(n => isEvolutionItemUnlocked(n))
+        if (unlockedItems.length > 0) {
+          const shuffled = [...unlockedItems].sort(() => 0.5 - Math.random())
+          const selected = shuffled.slice(0, 5).map(name => ({ name, price: 60 + Math.floor(Math.random() * 60) }))
+          setMerchantItems(selected)
         } else {
-          setBattleLog(prev => [`🎭 El comerciante misterioso no tiene objetos para vender hoy...`, ...prev].slice(0, 15))
+          setBattleLog(prev => ['🧳 El mercader misterioso se fue... no tenía objetos para ti.', ...prev].slice(0, 15))
         }
         break
       }
@@ -2734,7 +2749,7 @@ function MainApp() {
           : Math.floor(Math.random() * 3) - 1 // trainer/TeamR: -1, 0, or +1
 
         const fetches = Array.from({ length: teamSize }, () =>
-          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny, difficulty)
+          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? badges.length : -1)
             .then((base) => {
               const targetLevel = avgPlayerLevel + trainerLevelOffset
               const levelDiff = targetLevel - base.level
@@ -3725,6 +3740,9 @@ function MainApp() {
                 const consumedItem = updatedPokemon.holdItem
                 const { updatedPokemon: finalEvolved } = await checkAndLearnNewMove(evolved, oldLevel, updatedPokemon.level, difficulty)
                 registerInPokedex(finalEvolved)
+                playEvolution()
+                setEvoPopup({ oldSprite: updatedPokemon.sprite, newSprite: finalEvolved.sprite, oldName: updatedPokemon.name, newName: finalEvolved.name })
+                setTimeout(() => setEvoPopup(null), 2000)
                 updatedPokemon = finalEvolved
                 if (consumedItem && updatedPokemon.heldItemRequired) {
                   updatedPokemon = { ...updatedPokemon, holdItem: undefined }
@@ -4157,6 +4175,9 @@ function MainApp() {
         holdItem: targetPokemon.holdItem,
       }
       registerInPokedex(evolved)
+      playEvolution()
+      setEvoPopup({ oldSprite: targetPokemon.sprite, newSprite: evolved.sprite, oldName: targetPokemon.name, newName: evolved.name })
+      setTimeout(() => setEvoPopup(null), 2000)
       setTeam(prev => prev.map((p, i) => i === teamIndex ? evolved : p))
       setRunStats(prev => ({ ...prev, evolutions: prev.evolutions + 1 }))
       setInventory(prev => prev.filter((_, i) => i !== stoneEvoModal.stoneIndex))
@@ -4767,6 +4788,29 @@ function MainApp() {
             >
               Cancelar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Evolution popup */}
+      {evoPopup && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, background: 'rgba(0,0,0,0.6)', animation: 'evoFadeIn 0.3s' }}>
+          <div style={{ textAlign: 'center', padding: '2rem', borderRadius: '16px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', border: '2px solid #38bdf8', boxShadow: '0 0 40px rgba(56,189,248,0.3)' }}>
+            <p style={{ color: '#facc15', fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '1rem' }}>✨ ¡Evolución!</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'center' }}>
+              <div style={{ animation: 'evoFlash 0.6s' }}>
+                <img src={evoPopup.oldSprite} alt="" style={{ width: '80px', height: '80px', imageRendering: 'pixelated', filter: 'brightness(2) sepia(0.5)' }} />
+              </div>
+              <span style={{ color: '#94a3b8', fontSize: '1.5rem' }}>→</span>
+              <div style={{ animation: 'evoAppear 0.6s' }}>
+                <img src={evoPopup.newSprite} alt="" style={{ width: '80px', height: '80px', imageRendering: 'pixelated' }} />
+              </div>
+            </div>
+            <p style={{ color: '#e2e8f0', marginTop: '0.75rem' }}>
+              <span style={{ textTransform: 'capitalize' }}>{evoPopup.oldName}</span>
+              {' '}evolucionó en{' '}
+              <strong style={{ color: '#38bdf8', textTransform: 'capitalize' }}>{evoPopup.newName}</strong>
+            </p>
           </div>
         </div>
       )}
@@ -6569,33 +6613,32 @@ function MainApp() {
         </div>
       )}
 
-      {/* Evolution Trader Modal */}
-      {evolutionTraderItems && (
-        <div className="modal-backdrop" onClick={() => setEvolutionTraderItems(null)}>
+      {/* Mercader Misterioso Modal */}
+      {merchantItems && (
+        <div className="modal-backdrop" onClick={() => setMerchantItems(null)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', padding: '1.5rem' }}>
-            <h3 style={{ color: '#facc15', margin: '0 0 0.5rem' }}>🎒 Comerciante Misterioso</h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1rem' }}>El comerciante te ofrece objetos evolutivos:</p>
+            <h3 style={{ color: '#facc15', margin: '0 0 0.5rem' }}>🧳 Mercader Misterioso</h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1rem' }}>El mercader te ofrece objetos evolutivos:</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {evolutionTraderItems.map(itemName => {
-                const price = 80 + Math.floor(Math.random() * 40)
-                const canBuy = money >= price
+              {merchantItems.map(item => {
+                const canBuy = money >= item.price
                 return (
-                  <div key={itemName} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', background: 'rgba(30,41,59,0.6)', border: '1px solid #334155' }}>
+                  <div key={item.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', background: 'rgba(30,41,59,0.6)', border: '1px solid #334155' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      {ITEM_SPRITES[itemName] && <img src={ITEM_SPRITES[itemName]} alt={itemName} style={{ width: '32px', height: '32px' }} onError={fallbackSprite} />}
+                      {ITEM_SPRITES[item.name] && <img src={ITEM_SPRITES[item.name]} alt={item.name} style={{ width: '32px', height: '32px' }} onError={fallbackSprite} />}
                       <div>
-                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{itemName}</div>
-                        <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>🪙 ${price}</div>
+                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>🪙 ${item.price}</div>
                       </div>
                     </div>
-                    <button className="cta" onClick={() => { if (money >= price) { setMoney(prev => prev - price); setInventory(prev => [...prev, itemName]); setBattleLog(prev => [`🎭 Compraste ${itemName} por $${price}.`, ...prev].slice(0, 15)) } }} disabled={!canBuy} style={{ fontSize: '0.8rem', padding: '4px 14px', background: canBuy ? '#facc15' : '#475569', color: '#000' }}>
+                    <button className="cta" onClick={() => { if (money >= item.price) { setMoney(prev => prev - item.price); setInventory(prev => [...prev, item.name]); setBattleLog(prev => [`🧳 Compraste ${item.name} por $${item.price}.`, ...prev].slice(0, 15)) } }} disabled={!canBuy} style={{ fontSize: '0.8rem', padding: '4px 14px', background: canBuy ? '#facc15' : '#475569', color: '#000' }}>
                       {canBuy ? 'Comprar' : 'No alcanza'}
                     </button>
                   </div>
                 )
               })}
             </div>
-            <button className="cta" onClick={() => setEvolutionTraderItems(null)} style={{ marginTop: '1rem', background: '#64748b', width: '100%' }}>Salir</button>
+            <button className="cta" onClick={() => setMerchantItems(null)} style={{ marginTop: '1rem', background: '#64748b', width: '100%' }}>Salir</button>
           </div>
         </div>
       )}
