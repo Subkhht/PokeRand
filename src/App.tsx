@@ -5414,15 +5414,18 @@ function MainApp() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>Gen {gen} {unlocked ? '' : '🔒'}</span>
-                    {completedColiseum ? (
-                      <span className="badge-medium" title="Completado en COLISEUM">👑</span>
-                    ) : completedHard ? (
-                      <span className="badge-medium" title="Completado en Difícil">🏆🏆</span>
-                    ) : completedMed ? (
-                      <span className="badge-medium" title="Completado en Intermedio">🏆</span>
-                    ) : completedAny ? (
-                      <span className="badge-easy" title="Completado en Fácil">⭐</span>
-                    ) : null}
+                    <span>
+                      {completedHard ? (
+                        <span className="badge-medium" title="Completado en Difícil">🏆🏆</span>
+                      ) : completedMed ? (
+                        <span className="badge-medium" title="Completado en Intermedio">🏆</span>
+                      ) : completedAny ? (
+                        <span className="badge-easy" title="Completado en Fácil">⭐</span>
+                      ) : null}
+                      {completedColiseum && (
+                        <span className="badge-medium" title="Completado en COLISEUM" style={{ marginLeft: '4px' }}>👑</span>
+                      )}
+                    </span>
                   </div>
                   <strong>{generationRegions[gen]}</strong>
 
