@@ -3109,7 +3109,8 @@ function MainApp() {
     if (!item) return
     const discount = modifier?.shopDiscount ?? 0
     const hardMarkup = difficulty === 'hard' ? 1.4 : difficulty === 'infinite' ? 1.5 : 1
-    const finalPrice = Math.floor(item.price * (1 - discount) * hardMarkup)
+    const stageMarkup = 1 + badges.length * 0.15
+    const finalPrice = Math.floor(item.price * (1 - discount) * hardMarkup * stageMarkup)
     if (money < finalPrice) return
 
     setMoney((prev) => prev - finalPrice)
@@ -3123,11 +3124,19 @@ function MainApp() {
       setBattleLog((prev) => ['🚫 Desafío Sin Compras: No puedes comprar nada.', ...prev].slice(0, 15))
       return
     }
+    if (HOLDABLE_ITEM_NAMES.includes(itemName)) {
+      const holdableIdx = inventory.indexOf(itemName)
+      if (holdableIdx !== -1) {
+        setEquipModal({ itemName, itemIndex: holdableIdx })
+        return
+      }
+    }
     const item = HOLDABLE_ITEMS[itemName]
     if (!item) return
     const discount = modifier?.shopDiscount ?? 0
     const hardMarkup = difficulty === 'hard' ? 1.4 : difficulty === 'infinite' ? 1.5 : 1
-    const finalPrice = Math.floor(item.price * (1 - discount) * hardMarkup)
+    const stageMarkup = 1 + badges.length * 0.15
+    const finalPrice = Math.floor(item.price * (1 - discount) * hardMarkup * stageMarkup)
     if (money < finalPrice) return
 
     setMoney((prev) => prev - finalPrice)
@@ -6055,7 +6064,8 @@ function MainApp() {
                     const itemIcon = ITEM_SPRITES[itemName]
                     const isHoldable = !!holdable
                     const hardMarkup = difficulty === 'hard' ? 1.4 : difficulty === 'infinite' ? 1.5 : 1
-                    const finalPrice = Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0)) * hardMarkup)
+                    const stageMarkup = 1 + badges.length * 0.15
+                    const finalPrice = Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0)) * hardMarkup * stageMarkup)
                     const canBuy = money >= finalPrice
 
                     return (
@@ -6855,12 +6865,14 @@ function MainApp() {
             {tempLeagueTeam.length === 6 && (
               <button className="cta" onClick={async () => {
                 setLeagueTeamSelection(false)
-                const avgLevel = Math.round(tempLeagueTeam.reduce((s, p) => s + p.level, 0) / tempLeagueTeam.length) + 2
+                const healed = tempLeagueTeam.map(p => ({ ...p, hp: p.maxHp, status: undefined }))
+                const avgLevel = Math.round(healed.reduce((s, p) => s + p.level, 0) / healed.length) + 2
                 const leagueRoute: RouteNode[] = []
                 for (let i = 0; i < 4; i++) {
                   leagueRoute.push({ id: 1000 + i, type: 'boss', label: `Liga #${i + 1}`, done: false })
                 }
-                setTeam(tempLeagueTeam)
+                setTeam(healed)
+                setPcStorage([])
                 setRoute(leagueRoute)
                 setRouteIndex(0)
                 setScreen('route')
