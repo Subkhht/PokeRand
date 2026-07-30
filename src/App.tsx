@@ -1057,6 +1057,7 @@ function MainApp() {
 
   const [team, setTeam] = useState<Pokemon[]>([])
   const [coliseumTempTeam, setColiseumTempTeam] = useState<Pokemon[]>([])
+  const [coliseumSeed, setColiseumSeed] = useState(0)
   const [activeIndex, setActiveIndex] = useState<number>(0)
   const [enemy, setEnemy] = useState<Pokemon | null>(null)
   const [route, setRoute] = useState<RouteNode[]>([])
@@ -1945,6 +1946,7 @@ function MainApp() {
         setRandomEventUsed(new Set())
         setActiveRandomEvent(null)
         setColiseumTempTeam([])
+        setColiseumSeed(Math.floor(Math.random() * 1000000))
         setScreen('coliseum_select')
         return
       }
@@ -3785,7 +3787,7 @@ function MainApp() {
           ...pokemon,
           level: runChallenges.fixedLevel ? 50 : newLevel,
           maxHp: newMaxHp,
-          hp: Math.min(newMaxHp, pokemon.hp + Math.round(newMaxHp * 0.10) + hpGain),
+          hp: Math.min(newMaxHp, pokemon.hp + (difficulty === 'coliseum' ? 0 : Math.round(newMaxHp * 0.10)) + hpGain),
           attack: pokemon.attack + atkGain,
           defense: pokemon.defense + defGain,
           speed: pokemon.speed + spdGain
@@ -5334,7 +5336,7 @@ function MainApp() {
               <button className="cta" onClick={async () => {
                 setIsLoading(true)
                 try {
-                  const built = await Promise.all(coliseumTempTeam.map(p => buildPokemonFromApi(p.id, 1, 50, false, 'coliseum')))
+                  const built = await Promise.all(coliseumTempTeam.map(p => buildPokemonFromApi(p.id, 1, 50, false, 'coliseum_' + coliseumSeed)))
                   setTeam(built)
                   built.forEach(p => registerInPokedex(p))
                   setBattleLog(['👑 ¡COLISEUM! Enfrenta 8 jefes a nivel 50.', ...battleLog])
@@ -6508,7 +6510,7 @@ function MainApp() {
                     </button>
                   ))}
                 </div>
-                {!isTrainerBattle && (
+                {!isTrainerBattle && currentNode?.type !== 'gmax' && (
                   <button
                     className="cta"
                     onClick={openCaptureMenu}

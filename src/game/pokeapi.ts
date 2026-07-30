@@ -350,6 +350,7 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
 
 // Límite realista de potencia de movimiento según el nivel del Pokémon
 export function getMaxMovePowerForLevel(level: number, difficulty: string = 'medium'): number {
+  if (difficulty.startsWith('coliseum')) return 150
   if (difficulty === 'infinite') {
     if (level <= 14) return 100
     if (level <= 22) return 130
@@ -398,6 +399,29 @@ export async function fetchPokemonMoves(
 
   const eligibleLevelUp = rawLevelUpMoves.filter((m) => m.level <= level)
   const candidatePool = eligibleLevelUp.length >= 4 ? eligibleLevelUp : rawLevelUpMoves.slice(0, 10)
+
+  if (difficulty.startsWith('coliseum')) {
+    const movesByPower: Array<{ entry: typeof rawLevelUpMoves[0]; power: number }> = []
+    for (const entry of candidatePool) {
+      const move = await getMoveDetails(entry.url)
+      if (move && move.power > 0) {
+        movesByPower.push({ entry, power: move.power })
+      }
+    }
+    movesByPower.sort((a, b) => b.power - a.power)
+    const topPool = movesByPower.slice(0, Math.min(10, movesByPower.length))
+    const shuffled = [...topPool].sort(() => 0.5 - Math.random())
+    const selected = shuffled.slice(0, 4)
+    const moves: Move[] = []
+    const seenNames = new Set<string>()
+    for (const { entry } of selected) {
+      if (seenNames.has(entry.name)) continue
+      seenNames.add(entry.name)
+      const move = await getMoveDetails(entry.url)
+      if (move) moves.push(move)
+    }
+    return { moves, rawLevelUpMoves }
+  }
 
   const shuffledCandidates = [...candidatePool].sort(() => 0.5 - Math.random())
   const validMoves: Move[] = []
@@ -457,7 +481,7 @@ export async function buildPokemonFromApi(
   shiny: boolean = false,
   difficulty: string = 'medium'
 ): Promise<Pokemon> {
-  const cacheKey = `${identifier}_lvl${targetLevel}`
+  const cacheKey = `${identifier}_lvl${targetLevel}_${difficulty}`
   const cached = pokemonCache.get(cacheKey)
   if (cached) {
     const result = { ...cached, hp: cached.maxHp }
