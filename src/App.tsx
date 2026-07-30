@@ -1412,16 +1412,11 @@ function MainApp() {
   for (const [stoneName, unlockId] of Object.entries(EVOLUTION_STONE_UNLOCK_IDS)) {
     LOCKED_EVOLUTION_STONE_MAP[unlockId] = stoneName
   }
-  const LOCKED_EVOLUTION_ITEM_MAP: Record<string, string> = {}
-  for (const [itemName, unlockId] of Object.entries(EVOLUTION_ITEM_UNLOCK_IDS)) {
-    LOCKED_EVOLUTION_ITEM_MAP[unlockId] = itemName
-  }
 
   const isConsumableUnlocked = (name: string) => !Object.values(LOCKED_CONSUMABLE_MAP).includes(name) || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_CONSUMABLE_MAP[k] === name)
   const isHoldableUnlocked = (name: string) => !Object.values(LOCKED_HOLDABLE_MAP).includes(name) || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_HOLDABLE_MAP[k] === name)
   const isPokeballUnlocked = (name: string) => name === 'Poké Ball' || !POKEBALL_UNLOCK_IDS[name] || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_POKEBALL_MAP[k] === name)
   const isEvolutionStoneUnlocked = (name: string) => !EVOLUTION_STONE_UNLOCK_IDS[name] || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_EVOLUTION_STONE_MAP[k] === name)
-  const isEvolutionItemUnlocked = (name: string) => !EVOLUTION_ITEM_UNLOCK_IDS[name] || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_EVOLUTION_ITEM_MAP[k] === name)
 
   function isGenUnlocked(gen: number): boolean {
     if (gen === 1) return true
@@ -1722,7 +1717,7 @@ function MainApp() {
         break
       }
       case 'evolution_merchant': {
-        const unlockedItems = Object.keys(EVOLUTION_ITEM_UNLOCK_IDS).filter(n => isEvolutionItemUnlocked(n))
+        const unlockedItems = Object.keys(EVOLUTION_ITEM_UNLOCK_IDS).filter(n => metaProgression.permanentlyUnlockedItems.includes(EVOLUTION_ITEM_UNLOCK_IDS[n]))
         if (unlockedItems.length > 0) {
           const shuffled = [...unlockedItems].sort(() => 0.5 - Math.random())
           const selected = shuffled.slice(0, 5).map(name => ({ name, price: 60 + Math.floor(Math.random() * 60) }))
@@ -2065,6 +2060,8 @@ function MainApp() {
       setModifier(run.modifier)
       setRoute(customRoute)
       setRouteIndex(0)
+      setBadges([])
+      setCurrentStage(1)
       setEnemy(null)
       setIsTrainerBattle(false)
       setTrainerTeam([])
@@ -2343,22 +2340,11 @@ function MainApp() {
     if (captured.shiny) unlockAchievement('shiny_catch')
     if ((captured.attack + captured.defense + captured.speed + captured.maxHp) >= 600) unlockAchievement('legendary_catch')
     if (team.length >= 6) {
-      const faintedIndex = team.findIndex((p) => p.hp <= 0)
-      if (faintedIndex !== -1) {
-        const newTeam = [...team]
-        newTeam[faintedIndex] = captured
-        setTeam(newTeam)
-        setBattleLog((prev) => [
-          `✅ ¡${pokemon.name} reemplazó a ${team[faintedIndex].name} (borrado)!`,
-          ...prev
-        ].slice(0, 15))
-      } else {
-        setPcStorage((prev) => [...prev, captured])
-        setBattleLog((prev) => [
-          `✅ ¡${pokemon.name} se envió al PC (equipo lleno)!`,
-          ...prev
-        ].slice(0, 15))
-      }
+      setPcStorage((prev) => [...prev, captured])
+      setBattleLog((prev) => [
+        `✅ ¡${pokemon.name} capturado! Se envió al PC (equipo lleno).`,
+        ...prev
+      ].slice(0, 15))
     } else {
       setTeam((prev) => [...prev, captured])
       setBattleLog((prev) => [
@@ -5937,10 +5923,11 @@ function MainApp() {
                     🏷️ Vender Objetos (50% del precio)
                   </summary>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto' }}>
-                    {inventory.filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band').length === 0 ? (
+                    {inventory.length === 0 ? (
                       <p style={{ color: '#64748b', fontSize: '0.8rem' }}>No tienes objetos para vender.</p>
                     ) : (
-                      inventory.filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band').map((itemName) => {
+                      inventory.map((itemName, idx) => {
+                        if (itemName === 'Mega Stone' || itemName === 'Dynamax Band') return null
                         const consumable = ALL_SHOP_ITEMS[itemName]
                         const holdable = HOLDABLE_ITEMS[itemName]
                         if (!consumable && !holdable) return null
@@ -5948,7 +5935,7 @@ function MainApp() {
                         const sellPrice = Math.floor(data.price * 0.5)
                         const itemIcon = ITEM_SPRITES[itemName]
                         return (
-                          <div key={itemName}
+                          <div key={`${itemName}-${idx}`}
                             style={{
                               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                               background: 'rgba(248, 113, 113, 0.08)', padding: '6px 10px', borderRadius: '6px',
@@ -5961,12 +5948,8 @@ function MainApp() {
                             </div>
                             <button className="tiny-btn" type="button"
                               onClick={() => {
-                                setInventory(prev => {
-                                  const idx = prev.indexOf(itemName)
-                                  if (idx === -1) return prev
-                                  return [...prev.slice(0, idx), ...prev.slice(idx + 1)]
-                                })
                                 setMoney(prev => prev + sellPrice)
+                                setInventory(prev => [...prev.slice(0, idx), ...prev.slice(idx + 1)])
                                 setBattleLog(prev => [`💰 Vendiste ${itemName} por $${sellPrice}.`, ...prev].slice(0, 15))
                               }}
                               style={{ background: '#ef4444', minWidth: '60px', color: '#0f172a', fontWeight: 'bold' }}
@@ -6325,6 +6308,11 @@ function MainApp() {
                     </span>
                   )}
                   {' · '}Nv.&nbsp;{enemy.level}
+                  {enemy.status && (
+                    <span style={{ fontSize: '0.7rem', color: STATUS_COLORS[enemy.status.type], marginLeft: '4px' }}>
+                      {STATUS_LABELS[enemy.status.type]}
+                    </span>
+                  )}
                 </p>
                 <img className={`sprite enemy-sprite${enemy.gmaxEvolved ? ' gmax-active' : ''}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={enemyHitFlash ? { filter: 'brightness(1.5) sepia(1) hue-rotate(-40deg) saturate(5)', transition: 'filter 0.05s' } : { transition: 'filter 0.3s' }} />
                 <div className="hp-line">
@@ -6628,7 +6616,7 @@ function MainApp() {
                       {ITEM_SPRITES[item.name] && <img src={ITEM_SPRITES[item.name]} alt={item.name} style={{ width: '32px', height: '32px' }} onError={fallbackSprite} />}
                       <div>
                         <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
-                        <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>🪙 ${item.price}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>${item.price}</div>
                       </div>
                     </div>
                     <button className="cta" onClick={() => { if (money >= item.price) { setMoney(prev => prev - item.price); setInventory(prev => [...prev, item.name]); setBattleLog(prev => [`🧳 Compraste ${item.name} por $${item.price}.`, ...prev].slice(0, 15)) } }} disabled={!canBuy} style={{ fontSize: '0.8rem', padding: '4px 14px', background: canBuy ? '#facc15' : '#475569', color: '#000' }}>
