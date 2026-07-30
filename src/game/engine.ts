@@ -44,8 +44,8 @@ export function healPokemon(pokemon: Pokemon, amount: number): Pokemon {
 }
 
 export function scalePokemonForNode(base: Pokemon, _node: RouteNode, _stepIndex: number, levelDelta = 0, difficulty: string = 'medium'): Pokemon {
-  const hpMultiplier = difficulty === 'infinite' ? 6 : difficulty === 'hard' ? 5 : 4
-  const statMultiplier = difficulty === 'infinite' ? 3 : difficulty === 'hard' ? 2.5 : 2
+  const hpMultiplier = difficulty === 'infinite' ? 6 : difficulty === 'hard' ? 5 : difficulty === 'coliseum' ? 5 : 4
+  const statMultiplier = difficulty === 'infinite' ? 3 : difficulty === 'hard' ? 2.5 : difficulty === 'coliseum' ? 2.5 : 2
 
   let targetLevel = base.level + levelDelta
   if (base.minAppearLevel && targetLevel < base.minAppearLevel) {

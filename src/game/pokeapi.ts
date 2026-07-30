@@ -253,7 +253,7 @@ async function getAllFormIds(): Promise<number[]> {
   return allFormIdsPromise
 }
 
-async function getSpeciesIdsByGeneration(generation: number): Promise<number[]> {
+export async function getSpeciesIdsByGeneration(generation: number): Promise<number[]> {
   const cached = generationSpeciesCache.get(generation)
   if (cached) return cached
 

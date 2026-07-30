@@ -10,6 +10,7 @@ import {
   fetchPokemonDetails,
   checkAndLearnNewMove,
   getMoveDetails,
+  getSpeciesIdsByGeneration,
   buildPokemonFromApi,
   makeShinySprite,
   canEvolveWithStone,
@@ -19,8 +20,8 @@ import {
 import { getTypeEffectiveness } from './game/typesChart'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'victory' | 'defeat'
-type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'victory' | 'defeat' | 'coliseum_select'
+type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum'
 
 const STATUS_LABELS: Record<StatusType, string> = {
   burn: '🔥 Quemado',
@@ -46,14 +47,16 @@ const difficultyNodeCounts: Record<Difficulty, number> = {
   easy: 5,
   medium: 10,
   hard: 25,
-  infinite: 0
+  infinite: 0,
+  coliseum: 8
 }
 
 const difficultyLabels: Record<Difficulty, { title: string; desc: string }> = {
   easy: { title: 'Fácil', desc: '3 insignias · 5 rutas por etapa' },
   medium: { title: 'Intermedia', desc: '3 insignias · 10 rutas por etapa' },
   hard: { title: 'Difícil', desc: '3 insignias · 25 rutas por etapa' },
-  infinite: { title: 'Infinite', desc: 'Sin límite (Aventura infinita)' }
+  infinite: { title: 'Infinite', desc: 'Sin límite (Aventura infinita)' },
+  coliseum: { title: 'COLISEUM', desc: '8 jefes a nivel 50' },
 }
 
 const generations = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -1012,6 +1015,7 @@ interface ProgressionData {
   completedMedium: number[]
   completedAny: number[]
   completedHard: number[]
+  completedColiseum: number[]
 }
 
 interface VictoryUnlocks {
@@ -1041,16 +1045,18 @@ function MainApp() {
         return {
           completedMedium: Array.isArray(parsed.completedMedium) ? parsed.completedMedium : [],
           completedAny: Array.isArray(parsed.completedAny) ? parsed.completedAny : [],
-          completedHard: Array.isArray(parsed.completedHard) ? parsed.completedHard : []
+          completedHard: Array.isArray(parsed.completedHard) ? parsed.completedHard : [],
+          completedColiseum: Array.isArray(parsed.completedColiseum) ? parsed.completedColiseum : []
         }
       }
     } catch {
       // fallback
     }
-    return { completedMedium: [], completedAny: [], completedHard: [] }
+    return { completedMedium: [], completedAny: [], completedHard: [], completedColiseum: [] }
   })
 
   const [team, setTeam] = useState<Pokemon[]>([])
+  const [coliseumTempTeam, setColiseumTempTeam] = useState<Pokemon[]>([])
   const [activeIndex, setActiveIndex] = useState<number>(0)
   const [enemy, setEnemy] = useState<Pokemon | null>(null)
   const [route, setRoute] = useState<RouteNode[]>([])
@@ -1905,7 +1911,42 @@ function MainApp() {
       // Handle nuzlockeHardcore: nuzlocke + noItems + noRests
       if (activeChallenges.nuzlockeHardcore) {
         activeChallenges = { ...activeChallenges, nuzlocke: true, noItems: true, noRests: true }
+      }
+
+      // --- COLISEUM: skip starter, go to team selection ---
+      if (effectiveDifficulty === 'coliseum') {
+        activeChallenges = { ...activeChallenges, fixedLevel: true, noEvolution: true, noMoney: true, noShops: true, noRests: true }
         setRunChallenges(activeChallenges)
+        const coliseumRoute: RouteNode[] = []
+        for (let i = 1; i <= 8; i++) {
+          coliseumRoute.push({ id: i, type: 'boss', label: `Jefe #${i}`, done: false })
+        }
+        setRoute(coliseumRoute)
+        setRouteIndex(0)
+        setMoney(0)
+        setInventory([])
+        setModifier(null)
+        setModifier2(null)
+        setBadges([])
+        setCurrentStage(1)
+        setEnemy(null)
+        setIsTrainerBattle(false)
+        setTrainerTeam([])
+        setTrainerPokemonIndex(0)
+        setTrainerName('')
+        setTrainerSprite('')
+        setTrainerBadge('')
+        setRunStats({
+          battlesWon: 0, battlesLost: 0, totalDamageDealt: 0, totalDamageTaken: 0,
+          critsLanded: 0, superEffectiveHits: 0, koFirstTurn: 0, captures: 0,
+          itemsUsed: 0, moneySpent: 0, moneyEarned: 0, nodesCleared: 0, evolutions: 0,
+          teamSizeMax: 6, lowestHPEver: 9999, totalTurns: 0, pokemonUsed: [], challengesActive: [],
+        })
+        setRandomEventUsed(new Set())
+        setActiveRandomEvent(null)
+        setColiseumTempTeam([])
+        setScreen('coliseum_select')
+        return
       }
 
       // Handle ironman: noEvolution + fixedTeam + noHealing
@@ -2145,6 +2186,11 @@ function MainApp() {
   }
 
   function completeCurrentNode(): void {
+    if (difficulty === 'coliseum') {
+      setTeam(prev => prev.map(p => ({ ...p, hp: p.maxHp, status: undefined })))
+      setBattleLog(prev => [`💊 ¡Equipo curado automáticamente!`, ...prev].slice(0, 15))
+    }
+
     setRestEncounter(null)
     setRestRewardItem('')
     setLegendaryEncounter(null)
@@ -2179,6 +2225,27 @@ function MainApp() {
         ].slice(0, 15))
         setRouteIndex((previous) => previous + 1)
         setScreen('route')
+        return
+      }
+
+      if (difficulty === 'coliseum') {
+        unlockAchievement('first_win')
+        if (difficulty === 'coliseum') unlockAchievement('hard_win')
+        setMetaProgression(prev => {
+          const updated = { ...prev, totalRuns: prev.totalRuns + 1, totalWins: prev.totalWins + 1, bestStreak: Math.max(prev.bestStreak, winStreak + 1) }
+          localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+          return updated
+        })
+        setProgression(prev => {
+          const genPlayed = currentRunGen
+          const updated = { ...prev, completedColiseum: Array.from(new Set([...prev.completedColiseum, genPlayed])) }
+          localStorage.setItem('pokerand_progression', JSON.stringify(updated))
+          return updated
+        })
+        setWinStreak(prev => prev + 1)
+        awardPokeCoins(30, '👑 Victoria en COLISEUM')
+        setScreen('victory')
+        playVictoryFanfare()
         return
       }
 
@@ -2232,7 +2299,8 @@ function MainApp() {
       const updatedProgression: ProgressionData = {
         completedAny: nextCompletedAny,
         completedMedium: nextCompletedMedium,
-        completedHard: nextCompletedHard
+        completedHard: nextCompletedHard,
+        completedColiseum: progression.completedColiseum
       }
 
       localStorage.setItem('pokerand_progression', JSON.stringify(updatedProgression))
@@ -2735,7 +2803,13 @@ function MainApp() {
           : Math.floor(Math.random() * 3) - 1 // trainer/TeamR: -1, 0, or +1
 
         const fetches = Array.from({ length: teamSize }, () =>
-          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? badges.length : -1)
+          difficulty === 'coliseum'
+            ? (async () => {
+                const randomGen = Math.floor(Math.random() * 9) + 1
+                const pokemon = await buildPokemonFromApi(randomFrom(await getSpeciesIdsByGeneration(randomGen)), randomGen, 50, false, difficulty)
+                return { ...pokemon, level: 50 }
+              })()
+            : getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? badges.length : -1)
             .then((base) => {
               const targetLevel = avgPlayerLevel + trainerLevelOffset
               const levelDiff = targetLevel - base.level
@@ -5241,6 +5315,67 @@ function MainApp() {
         </div>
       )}
 
+      {screen === 'coliseum_select' && (
+        <section className="panel setup-panel" style={{ maxWidth: '600px', margin: '0 auto' }}>
+          <h2 style={{ textAlign: 'center', color: '#facc15' }}>👑 COLISEUM</h2>
+          <p style={{ textAlign: 'center', color: '#94a3b8', marginBottom: '1rem' }}>
+            Selecciona 6 Pokémon de tu Pokédex para enfrentar 8 jefes a nivel 50.
+          </p>
+          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>
+            Elegidos: {coliseumTempTeam.length}/6
+          </p>
+          {coliseumTempTeam.length === 6 && (
+            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+              <button className="cta" onClick={async () => {
+                setIsLoading(true)
+                try {
+                  const built = await Promise.all(coliseumTempTeam.map(p => buildPokemonFromApi(p.id, 1, 50, false, 'coliseum')))
+                  setTeam(built)
+                  built.forEach(p => registerInPokedex(p))
+                  setBattleLog(['👑 ¡COLISEUM! Enfrenta 8 jefes a nivel 50.', ...battleLog])
+                  setScreen('route')
+                  startBattleMusic()
+                } catch {
+                  setApiError('Error al preparar el equipo.')
+                } finally {
+                  setIsLoading(false)
+                }
+              }} style={{ background: '#facc15', color: '#000' }} disabled={isLoading}>
+                {isLoading ? 'Preparando equipo...' : '👑 ¡Comenzar COLISEUM!'}
+              </button>
+            </div>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '0.5rem', maxHeight: '400px', overflowY: 'auto' }}>
+            {Object.values(pokedex).filter(p => p.caught).sort((a, b) => a.id - b.id).map(pkmn => {
+              const selectedIdx = coliseumTempTeam.findIndex(p => p.id === pkmn.id)
+              return (
+                <div key={pkmn.id}
+                  onClick={() => {
+                    if (selectedIdx >= 0) {
+                      setColiseumTempTeam(prev => prev.filter(p => p.id !== pkmn.id))
+                    } else if (coliseumTempTeam.length < 6) {
+                      setColiseumTempTeam(prev => [...prev, { id: pkmn.id, name: pkmn.name, sprite: pkmn.sprite, level: 1, hp: 1, maxHp: 1, attack: 1, defense: 1, speed: 1, moves: [], types: pkmn.types }])
+                    }
+                  }}
+                  style={{
+                    padding: '8px', borderRadius: '8px', textAlign: 'center', cursor: 'pointer',
+                    background: selectedIdx >= 0 ? 'rgba(250,204,21,0.2)' : 'rgba(30,41,59,0.6)',
+                    border: selectedIdx >= 0 ? '2px solid #facc15' : '1px solid #334155',
+                    opacity: selectedIdx < 0 && coliseumTempTeam.length >= 6 ? 0.4 : 1
+                  }}
+                >
+                  <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pkmn.id}.gif`}
+                    alt={pkmn.name} onError={fallbackSprite}
+                    style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} />
+                  <div style={{ fontSize: '0.75rem', textTransform: 'capitalize', color: selectedIdx >= 0 ? '#facc15' : '#e2e8f0' }}>{pkmn.name}</div>
+                  {selectedIdx >= 0 && <div style={{ fontSize: '0.65rem', color: '#facc15' }}>#{selectedIdx + 1}</div>}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
       {screen === 'setup' && (
         <section className="panel setup-panel">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -5261,6 +5396,7 @@ function MainApp() {
               const completedMed = progression.completedMedium.includes(gen)
               const completedAny = progression.completedAny.includes(gen)
               const completedHard = progression.completedHard.includes(gen)
+              const completedColiseum = progression.completedColiseum.includes(gen)
 
               return (
                 <button
@@ -5273,7 +5409,9 @@ function MainApp() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>Gen {gen} {unlocked ? '' : '🔒'}</span>
-                    {completedHard ? (
+                    {completedColiseum ? (
+                      <span className="badge-medium" title="Completado en COLISEUM">👑</span>
+                    ) : completedHard ? (
                       <span className="badge-medium" title="Completado en Difícil">🏆🏆</span>
                     ) : completedMed ? (
                       <span className="badge-medium" title="Completado en Intermedio">🏆</span>
@@ -5409,6 +5547,30 @@ function MainApp() {
                 </button>
               )
             })()}
+          </div>
+
+          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
+            <button
+              className={`gen-tile ${difficulty === 'coliseum' ? 'is-active' : ''}`}
+              onClick={() => { playClick(); handleSelectDifficulty('coliseum') }}
+              onMouseEnter={playHover}
+              type="button"
+              disabled={isLoading}
+              style={{
+                borderColor: difficulty === 'coliseum' ? '#facc15' : '#475569',
+                background: difficulty === 'coliseum' ? 'rgba(250,204,21,0.15)' : 'rgba(15,23,42,0.6)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: '4px', padding: '12px', cursor: isLoading ? 'not-allowed' : 'pointer'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.2rem', color: '#facc15' }}>👑 COLISEUM</span>
+                <strong style={{ fontSize: '1rem', color: '#facc15' }}>— 8 jefes a nivel 50 (Generaciones Aleatorias)</strong>
+              </div>
+              <span className="lock-text" style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                Elige 6 Pokémon de tu Pokédex para enfrentarlos
+              </span>
+            </button>
           </div>
 
           <h2 style={{ marginTop: '1.5rem' }}>🎲 Desafío Diario</h2>
@@ -5785,7 +5947,7 @@ function MainApp() {
                 </span>
               )}
             </h2>
-            {difficulty !== 'infinite' && (
+            {difficulty !== 'infinite' && difficulty !== 'coliseum' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', padding: '6px 10px', background: 'rgba(250,204,21,0.08)', borderRadius: '8px', border: '1px solid rgba(250,204,21,0.2)' }}>
                 <span style={{ fontSize: '0.85rem', color: '#facc15', fontWeight: 'bold' }}>Etapa {currentStage}/3</span>
                 <div style={{ display: 'flex', gap: '4px' }}>
