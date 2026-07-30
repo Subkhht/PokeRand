@@ -266,7 +266,7 @@ interface PokeBallDef {
   price: number
   spriteKey: string
   isMaster?: boolean
-  rateFn?: (target: Pokemon, turns: number, alreadyCaught: boolean) => number
+  rateFn?: (target: Pokemon, turns: number, alreadyCaught: boolean, playerLevel?: number) => number
 }
 
 const POKEBALLS: PokeBallDef[] = [
@@ -623,7 +623,7 @@ interface MetaShopItem {
   desc: string
   price: number
   spriteKey: string
-  category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music'
+  category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' | 'pokeball'
 }
 
 const META_SHOP_ITEMS: MetaShopItem[] = [
@@ -1177,7 +1177,7 @@ function MainApp() {
     document.body.style.color = theme.colors.text
   }, [metaProgression.activeTheme])
 
-  function buyMetaItem(item: MetaShopItem & { category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' }): void {
+  function buyMetaItem(item: MetaShopItem): void {
     if (metaProgression.pokeCoins < item.price) return
     if (item.category === 'theme') {
       if (metaProgression.ownedThemes.includes(item.id)) return
