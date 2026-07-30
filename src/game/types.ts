@@ -6,6 +6,12 @@ export interface StatusCondition {
   damage?: number
 }
 
+export interface StatChange {
+  stat: 'attack' | 'defense' | 'speed'
+  change: number
+  chance?: number
+}
+
 export interface Move {
   name: string
   power: number
@@ -20,6 +26,10 @@ export interface Move {
   recoilPercent?: number
   drainPercent?: number
   critRatio?: number
+  priority?: number
+  statChanges?: StatChange[]
+  statChance?: number
+  metaCategory?: string
 }
 
 export interface RawLevelUpMove {
@@ -48,6 +58,8 @@ export interface Pokemon {
   gmaxEvolved?: boolean
   gmaxTurnsLeft?: number
   status?: StatusCondition
+  statStages?: { attack: number; defense: number; speed: number }
+  furiaActive?: boolean
 }
 
 export interface RouteNode {

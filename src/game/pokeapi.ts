@@ -1,4 +1,4 @@
-import type { Move, Pokemon, RawLevelUpMove, StatusType } from './types'
+import type { Move, Pokemon, RawLevelUpMove, StatusType, StatChange } from './types'
 
 const API_BASE = 'https://pokeapi.co/api/v2'
 
@@ -237,6 +237,20 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
 
     const critRateStage: number | undefined = (data.meta?.crit_rate ?? 0) > 0 ? data.meta.crit_rate : undefined
 
+    const priority = data.priority ?? 0
+
+    const statChance = data.meta?.stat_chance ?? undefined
+
+    const statChanges: StatChange[] | undefined = data.stat_changes?.length > 0
+      ? data.stat_changes.map((sc: any) => ({
+          stat: sc.stat.name === 'attack' ? 'attack' : sc.stat.name === 'defense' ? 'defense' : sc.stat.name === 'speed' ? 'speed' : null,
+          change: sc.change,
+          chance: statChance,
+        })).filter((sc: StatChange | null) => sc !== null)
+      : undefined
+
+    const metaCategory = data.meta?.category?.name ?? undefined
+
     return {
       name: moveName,
       type: data.type.name,
@@ -253,6 +267,10 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
       recoilPercent,
       drainPercent,
       critRatio: critRateStage,
+      priority,
+      statChanges,
+      statChance,
+      metaCategory,
     }
   } catch {
     return null
@@ -278,10 +296,10 @@ export function getMaxMovePowerForLevel(level: number, difficulty: string = 'med
 
 // Lista de ataques básicos de relleno por si el Pokémon tiene menos de 4 ataques de daño válidos
 const FALLBACK_MOVES: Move[] = [
-  { name: 'Placaje', type: 'normal', power: 40, accuracy: 100, description: 'Ataque físico básico.' },
-  { name: 'Ataque Rápido', type: 'normal', power: 40, accuracy: 100, description: 'Ataque rápido de daño directo.' },
-  { name: 'Cabezazo', type: 'normal', power: 70, accuracy: 100, description: 'Golpe de cabeza potente.' },
-  { name: 'Derribo', type: 'normal', power: 90, accuracy: 85, description: 'Carga contundente de gran impacto.' }
+  { name: 'Placaje', type: 'normal', power: 40, accuracy: 100, description: 'Ataque físico básico.', priority: 0 },
+  { name: 'Ataque Rápido', type: 'normal', power: 40, accuracy: 100, description: 'Ataque rápido de daño directo.', priority: 1 },
+  { name: 'Cabezazo', type: 'normal', power: 70, accuracy: 100, description: 'Golpe de cabeza potente.', priority: 0 },
+  { name: 'Derribo', type: 'normal', power: 90, accuracy: 85, description: 'Carga contundente de gran impacto.', priority: 0 }
 ]
 
 // Procesa movimientos asignando solo aquellos acordes al nivel actual del Pokémon
@@ -349,7 +367,8 @@ export async function fetchPokemonMoves(
       type: 'normal',
       power: 40,
       accuracy: 100,
-      description: 'Ataque físico básico.'
+      description: 'Ataque físico básico.',
+      priority: 0,
     }
     validMoves.push(basicTackle)
   }

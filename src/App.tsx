@@ -705,13 +705,22 @@ function moveTooltip(move: Move): string {
   return info
 }
 
+function getStageMultiplier(stage: number): number {
+  if (stage > 0) return (2 + stage) / 2
+  if (stage < 0) return 2 / (2 - stage)
+  return 1
+}
+
 function getEffectiveStats(pokemon: Pokemon): { attack: number; defense: number; speed: number; maxHp: number } {
   const item = pokemon.holdItem ? HOLDABLE_ITEMS[pokemon.holdItem] : null
-  if (!item) return { attack: pokemon.attack, defense: pokemon.defense, speed: pokemon.speed, maxHp: pokemon.maxHp }
+  const stages = pokemon.statStages ?? { attack: 0, defense: 0, speed: 0 }
+  const atkStage = getStageMultiplier(stages.attack)
+  const defStage = getStageMultiplier(stages.defense)
+  const spdStage = getStageMultiplier(stages.speed)
   return {
-    attack: Math.round(pokemon.attack * (1 + (item.attackMod ?? 0))),
-    defense: Math.round(pokemon.defense * (1 + (item.defenseMod ?? 0))),
-    speed: Math.round(pokemon.speed * (1 + (item.speedMod ?? 0))),
+    attack: Math.round(pokemon.attack * (1 + (item?.attackMod ?? 0)) * atkStage),
+    defense: Math.round(pokemon.defense * (1 + (item?.defenseMod ?? 0)) * defStage),
+    speed: Math.round(pokemon.speed * (1 + (item?.speedMod ?? 0)) * spdStage),
     maxHp: pokemon.maxHp,
   }
 }
@@ -976,12 +985,14 @@ function MainApp() {
   // Reset mega/gmax state when battle ends
   useEffect(() => {
     if (screen === 'defeat' || screen === 'victory') {
-      setTeam(prev => prev.map((p, i) => {
-        const orig = originalPokemonDataRef.current[i]
-        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined, ...orig }
-        return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined }
-      }))
+      const capturedOrigData = { ...originalPokemonDataRef.current }
       originalPokemonDataRef.current = {}
+      setTeam(prev => prev.map((p, i) => {
+        const reset = { statStages: { attack: 0, defense: 0, speed: 0 }, furiaActive: false }
+        const orig = capturedOrigData[i]
+        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined, ...orig, ...reset }
+        return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined, ...reset }
+      }))
       setBattleMegaUsed(false)
       setBattleGmaxUsed(false)
     }
@@ -1811,12 +1822,13 @@ function MainApp() {
       speedrunTimerRef.current = null
     }
     setSpeedrunSeconds(0)
+    const restoredOrigData = { ...originalPokemonDataRef.current }
+    originalPokemonDataRef.current = {}
     setTeam(prev => prev.map((p, i) => {
-      const orig = originalPokemonDataRef.current[i]
+      const orig = restoredOrigData[i]
       if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined, ...orig }
       return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined }
     }))
-    originalPokemonDataRef.current = {}
     setBattleGmaxUsed(false)
     setRoute((previous) =>
       previous.map((node, index) => (index === routeIndex ? { ...node, done: true } : node))
@@ -2243,14 +2255,18 @@ function MainApp() {
         const gmaxSprite = gmaxFormId
           ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${gmaxFormId}.png`
           : scaled.sprite
+        const gmaxMultiplier = difficulty === 'infinite' ? 1.50 : difficulty === 'hard' ? 1.40 : 1.30
         const gmaxEnemy: Pokemon = {
           ...scaled,
           gmaxEvolved: true,
           gmaxTurnsLeft: 3,
           sprite: gmaxSprite,
-          attack: Math.floor(scaled.attack * 1.15),
-          defense: Math.floor(scaled.defense * 1.15),
-          speed: Math.floor(scaled.speed * 1.15),
+          attack: Math.floor(scaled.attack * gmaxMultiplier),
+          defense: Math.floor(scaled.defense * gmaxMultiplier),
+          speed: Math.floor(scaled.speed * gmaxMultiplier),
+          maxHp: Math.floor(scaled.maxHp * (1 + (gmaxMultiplier - 1) * 0.5)),
+          hp: Math.floor(scaled.hp * (1 + (gmaxMultiplier - 1) * 0.5)),
+          statStages: { attack: 0, defense: 0, speed: 0 },
         }
         seenInPokedex({ ...gmaxEnemy, id: gmaxFormId ?? gmaxEnemy.id, sprite: gmaxSprite })
         setIsTrainerBattle(false)
@@ -2391,10 +2407,10 @@ function MainApp() {
         setTrainerName('TeamR Grunt')
         setTrainerSprite("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='12' fill='%23111'/%3E%3Ctext x='48' y='62' font-family='Arial Black,Arial' font-size='52' font-weight='900' fill='%23ef4444' text-anchor='middle'%3ER%3C/text%3E%3Ccircle cx='48' cy='80' r='3' fill='%23ef4444'/%3E%3C/svg%3E")
         setTrainerBadge('')
-        setEnemy(rocketTeam[0])
+        setEnemy({ ...rocketTeam[0], statStages: { attack: 0, defense: 0, speed: 0 } })
         setIsTeamRocketBattle(true)
         setTeamRocketFainted(false)
-        setTeamRocketTeam(rocketTeam)
+        setTeamRocketTeam(rocketTeam.map(p => ({ ...p, statStages: p.statStages ?? { attack: 0, defense: 0, speed: 0 } })))
         setTeamRocketStealMessage('')
         setTeamRocketPickModal(false)
         setBattleLog((prev) => [
@@ -2463,13 +2479,13 @@ function MainApp() {
           }
           return p
         })
-        setTrainerTeam(megaTeam)
+        setTrainerTeam(megaTeam.map(p => ({ ...p, statStages: p.statStages ?? { attack: 0, defense: 0, speed: 0 } })))
         newTrainerTeam.forEach(p => seenInPokedex(p))
         setTrainerPokemonIndex(0)
         setTrainerName(chosenName)
         setTrainerSprite(chosenSprite)
         setTrainerBadge(chosenBadge)
-        setEnemy(megaTeam[0])
+        setEnemy({ ...megaTeam[0], statStages: { attack: 0, defense: 0, speed: 0 } })
         setBattleLog((prev) => [
           isBoss
             ? `🏆 ¡El Líder ${chosenName} quiere combatir! (${chosenBadge})`
@@ -2489,6 +2505,7 @@ function MainApp() {
             speed: generatedEnemy.speed + Math.floor(Math.random() * 20) - 10,
           }
         }
+        generatedEnemy = { ...generatedEnemy, statStages: { attack: 0, defense: 0, speed: 0 } }
         setIsTrainerBattle(false)
         setTrainerTeam([])
         setTrainerPokemonIndex(0)
@@ -2506,7 +2523,7 @@ function MainApp() {
       }
       }
 
-      setTeam(prev => prev.map(p => ({ ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined })))
+      setTeam(prev => prev.map(p => ({ ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined, statStages: { attack: 0, defense: 0, speed: 0 }, furiaActive: false })))
       setBattleMegaUsed(false)
       setBattleGmaxUsed(false)
       originalPokemonDataRef.current = {}
@@ -2764,7 +2781,7 @@ function MainApp() {
           ...p,
           holdItem: null,
           maxHp: Math.max(1, p.maxHp - (stats?.maxHpMod ?? 0)),
-          hp: Math.max(1, Math.min(p.hp, p.maxHp - (stats?.maxHpMod ?? 0))),
+          hp: p.hp <= 0 ? 0 : Math.min(p.hp, p.maxHp - (stats?.maxHpMod ?? 0)),
         }
       })
     )
@@ -2920,14 +2937,20 @@ function MainApp() {
     const burnNerf = attacker.status?.type === 'burn' ? 0.5 : 1
     const paralysisSpdNerf = attacker.status?.type === 'paralysis' ? 0.75 : 1
 
+    const atkStages = attacker.statStages ?? { attack: 0, defense: 0, speed: 0 }
+    const defStages = defender.statStages ?? { attack: 0, defense: 0, speed: 0 }
+    const atkStageMult = getStageMultiplier(atkStages.attack)
+    const spdStageMult = getStageMultiplier(atkStages.speed)
+    const defStageMult = getStageMultiplier(defStages.defense)
+
     const effectiveAttacker: Pokemon = {
       ...attacker,
-      attack: Math.round(attacker.attack * (1 + (attackerItem?.attackMod ?? 0) + playerAtkMod) * burnNerf),
-      speed: Math.round(attacker.speed * (1 + (attackerItem?.speedMod ?? 0) + playerSpdMod) * paralysisSpdNerf + enemySpdDelta)
+      attack: Math.round(attacker.attack * (1 + (attackerItem?.attackMod ?? 0) + playerAtkMod) * burnNerf * atkStageMult),
+      speed: Math.round(attacker.speed * (1 + (attackerItem?.speedMod ?? 0) + playerSpdMod) * paralysisSpdNerf * spdStageMult + enemySpdDelta)
     }
     const effectiveDefender: Pokemon = {
       ...defender,
-      defense: Math.round(defender.defense * (1 + (defenderItem?.defenseMod ?? 0) + playerDefMod) + enemyDefDelta)
+      defense: Math.round(defender.defense * (1 + (defenderItem?.defenseMod ?? 0) + playerDefMod) * defStageMult + enemyDefDelta)
     }
 
     const effectiveMove = runChallenges.typeRandomizer
@@ -3020,6 +3043,56 @@ function MainApp() {
       }
     }
 
+    // --- Stat changes ---
+    let attackerStages = effectiveAttacker.statStages ?? { attack: 0, defense: 0, speed: 0 }
+    if (effectiveMove.statChanges && effectiveMove.statChanges.length > 0) {
+      const isDamaging = (effectiveMove.power ?? 0) > 0
+      const cat = effectiveMove.metaCategory ?? ''
+      for (const sc of effectiveMove.statChanges) {
+        const rolled = sc.chance == null || Math.random() * 100 < sc.chance
+        if (!rolled) continue
+        const applyToAttacker = cat === 'net-good-stats'
+          || (isDamaging && sc.change > 0)
+        const applyToDefender = cat === 'net-bad-stats'
+          || (isDamaging && sc.change < 0)
+          || (!isDamaging && cat === '')
+        if (!applyToAttacker && !applyToDefender) continue
+        if (applyToAttacker) {
+          const statKey = sc.stat as keyof typeof attackerStages
+          const oldStage = attackerStages[statKey]
+          const newStage = Math.max(-6, Math.min(6, oldStage + sc.change))
+          if (newStage !== oldStage) {
+            attackerStages = { ...attackerStages, [statKey]: newStage }
+            const direction = sc.change > 0 ? 'subió' : 'bajó'
+            const statName = statKey === 'attack' ? 'Ataque' : statKey === 'defense' ? 'Defensa' : 'Velocidad'
+            lines.push(`${effectiveAttacker.name} ${direction} su ${statName}! (${oldStage > 0 ? '+' : ''}${oldStage} → ${newStage > 0 ? '+' : ''}${newStage})`)
+          }
+        } else if (applyToDefender && currentDefender.hp > 0) {
+          let newStages = currentDefender.statStages ?? { attack: 0, defense: 0, speed: 0 }
+          const statKey = sc.stat as keyof typeof newStages
+          const oldStage = newStages[statKey]
+          const newStage = Math.max(-6, Math.min(6, oldStage + sc.change))
+          if (newStage !== oldStage) {
+            newStages = { ...newStages, [statKey]: newStage }
+            currentDefender = { ...currentDefender, statStages: newStages }
+            const direction = sc.change > 0 ? 'subió' : 'bajó'
+            const statName = statKey === 'attack' ? 'Ataque' : statKey === 'defense' ? 'Defensa' : 'Velocidad'
+            lines.push(`${currentDefender.name} ${direction} su ${statName}! (${oldStage > 0 ? '+' : ''}${oldStage} → ${newStage > 0 ? '+' : ''}${newStage})`)
+          }
+        }
+      }
+    }
+
+    // --- Furia (Rage): boost defender's Attack when hit while furiaActive ---
+    if (totalDamage > 0 && currentDefender.hp > 0 && defender.furiaActive) {
+      let newStages = currentDefender.statStages ?? { attack: 0, defense: 0, speed: 0 }
+      if (newStages.attack < 6) {
+        newStages = { ...newStages, attack: Math.min(6, newStages.attack + 1) }
+        currentDefender = { ...currentDefender, statStages: newStages }
+        lines.push(`💢 ¡${currentDefender.name} se enfurece! Su Ataque sube! (${newStages.attack > 0 ? '+' : ''}${newStages.attack})`)
+      }
+    }
+
     // --- Fire thaws frozen ---
     if (effectiveMove.type === 'fire' && currentDefender.status?.type === 'freeze' && currentDefender.hp > 0) {
       currentDefender = { ...currentDefender, status: undefined }
@@ -3028,7 +3101,11 @@ function MainApp() {
 
     // --- Recoil damage ---
     let recoilDamage = 0
-    let updatedAttacker = { ...attacker }
+    const hasAttackerStageChange = attackerStages.attack !== 0 || attackerStages.defense !== 0 || attackerStages.speed !== 0
+    const furiaActive = move.name === 'Furia' || attacker.furiaActive || false
+    let updatedAttacker = hasAttackerStageChange
+      ? { ...attacker, statStages: attackerStages, furiaActive }
+      : { ...attacker, furiaActive }
     if (move.recoilPercent && move.recoilPercent > 0 && totalDamage > 0) {
       recoilDamage = Math.floor(totalDamage * move.recoilPercent)
       updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - recoilDamage) }
@@ -3150,13 +3227,27 @@ function MainApp() {
     const enemyItem = nextEnemy.holdItem ? HOLDABLE_ITEMS[nextEnemy.holdItem] : null
     const playerParalysisNerf = nextPlayer.status?.type === 'paralysis' ? 0.75 : 1
     const enemyParalysisNerf = nextEnemy.status?.type === 'paralysis' ? 0.75 : 1
-    const playerEffectiveSpeed = Math.round(nextPlayer.speed * (1 + (playerItem?.speedMod ?? 0)) * playerParalysisNerf)
-    const enemyEffectiveSpeed = Math.round(nextEnemy.speed * (1 + (enemyItem?.speedMod ?? 0)) * enemyParalysisNerf)
-    const playerStarts = playerEffectiveSpeed >= enemyEffectiveSpeed
+    const playerPriority = move.priority ?? 0
+    const enemyMoveForPriority = nextEnemy.moves[Math.floor(Math.random() * nextEnemy.moves.length)]
+    const enemyPriority = enemyMoveForPriority.priority ?? 0
+
+    let playerStarts: boolean
+    if (playerPriority !== enemyPriority) {
+      playerStarts = playerPriority > enemyPriority
+    } else {
+      const pStages = nextPlayer.statStages ?? { attack: 0, defense: 0, speed: 0 }
+      const eStages = nextEnemy.statStages ?? { attack: 0, defense: 0, speed: 0 }
+      const pSpdStage = getStageMultiplier(pStages.speed)
+      const eSpdStage = getStageMultiplier(eStages.speed)
+      const playerEffectiveSpeed = Math.round(nextPlayer.speed * (1 + (playerItem?.speedMod ?? 0)) * playerParalysisNerf * pSpdStage)
+      const enemyEffectiveSpeed = Math.round(nextEnemy.speed * (1 + (enemyItem?.speedMod ?? 0)) * enemyParalysisNerf * eSpdStage)
+      playerStarts = playerEffectiveSpeed >= enemyEffectiveSpeed
+    }
 
     let playerCrits = 0
     const doPlayerAttack = async () => {
       if (nextPlayer.hp <= 0 || nextEnemy.hp <= 0 || playerSkipped || playerConfusedSelfHit) return
+      if (move.name !== 'Furia') nextPlayer = { ...nextPlayer, furiaActive: false }
       const playerHit = performHit(nextPlayer, nextEnemy, move, false)
       nextEnemy = playerHit.updatedDefender
       nextPlayer = playerHit.updatedAttacker
@@ -3177,7 +3268,8 @@ function MainApp() {
 
     const doEnemyAttack = async () => {
       if (nextEnemy.hp <= 0 || nextPlayer.hp <= 0 || enemySkipped || enemyConfusedSelfHit) return
-      const enemyMove = nextEnemy.moves[Math.floor(Math.random() * nextEnemy.moves.length)]
+      const enemyMove = enemyMoveForPriority
+      if (enemyMove.name !== 'Furia') nextEnemy = { ...nextEnemy, furiaActive: false }
       const enemyHit = performHit(nextEnemy, nextPlayer, enemyMove, true)
       nextPlayer = enemyHit.updatedDefender
       nextEnemy = enemyHit.updatedAttacker
@@ -3491,7 +3583,7 @@ function MainApp() {
         const nextPkmn = updatedTrainerTeam[nextTrainerIndex]
         setTrainerTeam(updatedTrainerTeam)
         setTrainerPokemonIndex(nextTrainerIndex)
-        setEnemy(nextPkmn)
+        setEnemy({ ...nextPkmn, statStages: { attack: 0, defense: 0, speed: 0 } })
         setTeam(newTeam)
         setBattleLog((prev) => [
           `${trainerName} envía a ${nextPkmn.name} Nv.${nextPkmn.level}!`,
@@ -4504,9 +4596,14 @@ function MainApp() {
         <section className="panel setup-panel">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h2 style={{ margin: 0 }}>1. Selecciona la Generación</h2>
-            <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowMetaShop(true) }} style={{ fontSize: '0.8rem' }}>
-              🪙 Tienda Meta ({metaProgression.pokeCoins} 🪙)
-            </button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button className="cta" type="button" onClick={() => { playClick(); startNewRun() }} onMouseEnter={playHover} disabled={isLoading} style={{ padding: '6px 10px', fontSize: '0.8rem', marginTop: 0 }}>
+                {isLoading ? '...' : 'Iniciar Aventura'}
+              </button>
+              <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowMetaShop(true) }} style={{ fontSize: '0.8rem' }}>
+                🪙 Tienda Meta ({metaProgression.pokeCoins} 🪙)
+              </button>
+            </div>
           </div>
           <div className="generation-grid">
             {generations.map((gen) => {
@@ -4908,17 +5005,33 @@ function MainApp() {
                     )}
                     {(() => {
                       const eff = getEffectiveStats(pokemon)
+                      const stages = pokemon.statStages ?? { attack: 0, defense: 0, speed: 0 }
                       const hasItem = !!pokemon.holdItem
-                      const fmt = (base: number, eff_: number) => hasItem && base !== eff_
-                        ? <><strong>{eff_}</strong> <span style={{ fontSize: '0.6rem', color: '#4ade80' }}>(+{eff_ - base})</span></>
-                        : <strong>{base}</strong>
+                      const isMegaGmax = pokemon.megaEvolved || pokemon.gmaxEvolved
+                      const fmt = (base: number, eff_: number, stage_: number) => {
+                        const parts: ReactNode[] = []
+                        if (hasItem && base !== eff_ && !isMegaGmax) {
+                          parts.push(<strong key="v">{eff_}</strong>)
+                          parts.push(<span key="i" style={{ fontSize: '0.6rem', color: '#4ade80' }}> (+{eff_ - base})</span>)
+                        } else if (isMegaGmax) {
+                          parts.push(<strong key="v" style={{ color: '#f472b6' }}>{eff_}</strong>)
+                          parts.push(<span key="i" style={{ fontSize: '0.6rem', color: '#f472b6' }}> (+{eff_ - base})</span>)
+                        } else {
+                          parts.push(<strong key="v">{base}</strong>)
+                        }
+                        if (stage_ !== 0) {
+                          const color = stage_ > 0 ? '#4ade80' : '#ef4444'
+                          parts.push(<span key="s" style={{ fontSize: '0.6rem', color, marginLeft: '2px' }}>({stage_ > 0 ? '+' : ''}{stage_})</span>)
+                        }
+                        return <>{parts}</>
+                      }
                       return (
                         <>
                           <div className="tooltip-stat"><span>Nivel</span><strong>{pokemon.level}</strong></div>
                           <div className="tooltip-stat"><span>HP</span><strong>{pokemon.hp}/{pokemon.maxHp}</strong></div>
-                          <div className="tooltip-stat"><span>Ataque</span>{fmt(pokemon.attack, eff.attack)}</div>
-                          <div className="tooltip-stat"><span>Defensa</span>{fmt(pokemon.defense, eff.defense)}</div>
-                          <div className="tooltip-stat"><span>Velocidad</span>{fmt(pokemon.speed, eff.speed)}</div>
+                          <div className="tooltip-stat"><span>Ataque</span>{fmt(pokemon.attack, eff.attack, stages.attack)}</div>
+                          <div className="tooltip-stat"><span>Defensa</span>{fmt(pokemon.defense, eff.defense, stages.defense)}</div>
+                          <div className="tooltip-stat"><span>Velocidad</span>{fmt(pokemon.speed, eff.speed, stages.speed)}</div>
                         </>
                       )
                     })()}
