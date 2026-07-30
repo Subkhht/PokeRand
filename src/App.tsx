@@ -90,6 +90,19 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'X Attack 2': { price: 150, desc: 'Aumenta permanentemente en +10 el ataque.' },
   'X Defense 2': { price: 150, desc: 'Aumenta permanentemente en +10 la defensa.' },
   'X Speed 2': { price: 150, desc: 'Aumenta permanentemente en +10 la velocidad.' },
+  'Poké Ball': { price: 20, desc: 'Una ball básica para capturar Pokémon salvajes.' },
+  'Great Ball': { price: 50, desc: 'Una ball con mayor ratio de captura.' },
+  'Ultra Ball': { price: 80, desc: 'Una ball con alto ratio de captura.' },
+  'Master Ball': { price: 500, desc: '¡Captura cualquier Pokémon sin fallo!' },
+  'Quick Ball': { price: 60, desc: 'Más efectiva si se usa al inicio del combate.' },
+  'Timer Ball': { price: 60, desc: 'Más efectiva cuantos más turnos hayan pasado.' },
+  'Dusk Ball': { price: 60, desc: 'Más efectiva en la oscuridad.' },
+  'Net Ball': { price: 60, desc: 'Más efectiva contra tipos Agua o Bicho.' },
+  'Level Ball': { price: 60, desc: 'Más efectiva si superas en nivel al rival.' },
+  'Repeat Ball': { price: 60, desc: 'Más efectiva si ya capturaste esa especie.' },
+  'Love Ball': { price: 60, desc: 'Más efectiva si es de la misma familia evolutiva.' },
+  'Friend Ball': { price: 60, desc: 'Una ball especial amistosa.' },
+  'Heavy Ball': { price: 60, desc: 'Más efectiva contra Pokémon pesados.' },
 }
 
 const itemDescriptions: Record<string, string> = {
@@ -111,6 +124,19 @@ const itemDescriptions: Record<string, string> = {
   'X Attack 2': 'Aumenta permanentemente en +10 el ataque.',
   'X Defense 2': 'Aumenta permanentemente en +10 la defensa.',
   'X Speed 2': 'Aumenta permanentemente en +10 la velocidad.',
+  'Poké Ball': 'Una ball básica para capturar Pokémon salvajes.',
+  'Great Ball': 'Una ball con mayor ratio de captura (x1.5).',
+  'Ultra Ball': 'Una ball con alto ratio de captura (x2).',
+  'Master Ball': '¡Captura cualquier Pokémon sin fallo!',
+  'Quick Ball': 'Más efectiva al inicio (x5 en turno 1).',
+  'Timer Ball': 'Mejora con los turnos (hasta x4).',
+  'Dusk Ball': 'Efectiva en la oscuridad (x3).',
+  'Net Ball': 'Efectiva contra Agua/Bicho (x3).',
+  'Level Ball': 'Mejor si superas en nivel al rival (hasta x8).',
+  'Repeat Ball': 'x3.5 si ya capturaste esa especie.',
+  'Love Ball': 'x8 si es de la misma familia evolutiva.',
+  'Friend Ball': 'Una ball especial amistosa (x1).',
+  'Heavy Ball': 'Mejor contra Pokémon pesados (hasta x4).',
 }
 
 const ITEM_SPRITES: Record<string, string> = {
@@ -163,6 +189,19 @@ const ITEM_SPRITES: Record<string, string> = {
   'Cursed Blade': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/razor-claw.png',
   'Mega Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/key-stone.png',
   'Dynamax Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png',
+  'Poké Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png',
+  'Great Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/great-ball.png',
+  'Ultra Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ultra-ball.png',
+  'Master Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png',
+  'Quick Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/quick-ball.png',
+  'Timer Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/timer-ball.png',
+  'Dusk Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dusk-ball.png',
+  'Net Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/net-ball.png',
+  'Level Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/level-ball.png',
+  'Repeat Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/repeat-ball.png',
+  'Love Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/love-ball.png',
+  'Friend Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/friend-ball.png',
+  'Heavy Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/heavy-ball.png',
 }
 
 interface HoldableItem {
@@ -218,6 +257,64 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
 }
 
 const HOLDABLE_ITEM_NAMES = Object.keys(HOLDABLE_ITEMS)
+
+// --- Pokéballs ---
+interface PokeBallDef {
+  name: string
+  rate: number
+  desc: string
+  price: number
+  spriteKey: string
+  isMaster?: boolean
+  rateFn?: (target: Pokemon, turns: number, alreadyCaught: boolean) => number
+}
+
+const POKEBALLS: PokeBallDef[] = [
+  { name: 'Poké Ball', rate: 1, desc: 'Una ball básica para capturar Pokémon.', price: 20, spriteKey: 'poke-ball' },
+  { name: 'Great Ball', rate: 1.5, desc: 'Una ball con mayor ratio de captura.', price: 50, spriteKey: 'great-ball' },
+  { name: 'Ultra Ball', rate: 2, desc: 'Una ball con alto ratio de captura.', price: 80, spriteKey: 'ultra-ball' },
+  { name: 'Master Ball', rate: 99, desc: '¡Captura cualquier Pokémon sin fallo!', price: 500, spriteKey: 'master-ball', isMaster: true },
+  { name: 'Quick Ball', rate: 1, desc: 'Más efectiva si se usa al inicio del combate.', price: 60, spriteKey: 'quick-ball', rateFn: (_, turns) => turns <= 1 ? 5 : 1 },
+  { name: 'Timer Ball', rate: 1, desc: 'Más efectiva cuantos más turnos hayan pasado.', price: 60, spriteKey: 'timer-ball', rateFn: (_, turns) => Math.min(1 + turns * 0.3, 4) },
+  { name: 'Dusk Ball', rate: 1, desc: 'Más efectiva en la oscuridad (x3).', price: 60, spriteKey: 'dusk-ball', rateFn: () => 3 },
+  { name: 'Net Ball', rate: 1, desc: 'Más efectiva contra tipos Agua o Bicho (x3).', price: 60, spriteKey: 'net-ball', rateFn: (target) => target.types?.some(t => t === 'water' || t === 'bug') ? 3 : 1 },
+  { name: 'Level Ball', rate: 1, desc: 'Más efectiva si tu nivel supera al del rival.', price: 60, spriteKey: 'level-ball', rateFn: (target, _, __, playerLevel) => { const ratio = (playerLevel ?? 50) / target.level; return ratio >= 4 ? 8 : ratio >= 2 ? 4 : ratio >= 1 ? 2 : 1; } },
+  { name: 'Repeat Ball', rate: 1, desc: 'Más efectiva si ya capturaste esta especie (x3.5).', price: 60, spriteKey: 'repeat-ball', rateFn: (_, __, alreadyCaught) => alreadyCaught ? 3.5 : 1 },
+  { name: 'Love Ball', rate: 1, desc: 'Más efectiva si es de la misma familia evolutiva (x8).', price: 60, spriteKey: 'love-ball', rateFn: (_, __, alreadyCaught) => alreadyCaught ? 8 : 1 },
+  { name: 'Friend Ball', rate: 1, desc: 'Hace más amistoso al Pokémon capturado.', price: 60, spriteKey: 'friend-ball' },
+  { name: 'Heavy Ball', rate: 1, desc: 'Más efectiva contra Pokémon pesados.', price: 60, spriteKey: 'heavy-ball', rateFn: (target) => Math.max(1, Math.min(Math.floor(target.maxHp / 40), 4)) },
+]
+
+const POKEBALL_NAMES = POKEBALLS.map(b => b.name)
+const POKEBALL_RATES: Record<string, number> = {}
+for (const b of POKEBALLS) POKEBALL_RATES[b.name] = b.rate
+const POKEBALL_DEFS: Record<string, PokeBallDef> = {}
+for (const b of POKEBALLS) POKEBALL_DEFS[b.name] = b
+const POKEBALL_PRICES: Record<string, number> = {}
+for (const b of POKEBALLS) POKEBALL_PRICES[b.name] = b.price
+
+// IDs de meta-shop para desbloquear pokeballs
+const POKEBALL_UNLOCK_IDS: Record<string, string> = {
+  'Great Ball': 'unlock_great_ball',
+  'Ultra Ball': 'unlock_ultra_ball',
+  'Quick Ball': 'unlock_quick_ball',
+  'Timer Ball': 'unlock_timer_ball',
+  'Dusk Ball': 'unlock_dusk_ball',
+  'Net Ball': 'unlock_net_ball',
+  'Level Ball': 'unlock_level_ball',
+  'Repeat Ball': 'unlock_repeat_ball',
+  'Love Ball': 'unlock_love_ball',
+  'Friend Ball': 'unlock_friend_ball',
+  'Heavy Ball': 'unlock_heavy_ball',
+  'Master Ball': 'unlock_master_ball',
+}
+
+function getPokeBallRate(ballName: string, target: Pokemon, turns: number, alreadyCaught: boolean, playerLevel?: number): number {
+  const def = POKEBALL_DEFS[ballName]
+  if (!def) return 1
+  if (def.rateFn) return def.rateFn(target, turns, alreadyCaught, playerLevel)
+  return def.rate
+}
 
 const MEGA_CAPABLE_IDS = new Set([
   3, 6, 9, 15, 18, 26, 36, 65, 71, 80, 94, 115, 121, 127, 130, 142, 149, 150,
@@ -492,6 +589,22 @@ const RANDOM_EVENTS = [
     desc: 'El suelo brilla. Tu próximo encuentro de descanso será shiny.',
     minRouteProgress: 0.4,
   },
+  {
+    id: 'mysterious_help',
+    weight: 6,
+    icon: '🩺',
+    title: 'Ayuda Misteriosa',
+    desc: 'Una fuerza misteriosa revive a uno de tus Pokémon debilitados.',
+    minRouteProgress: 0.0,
+  },
+  {
+    id: 'scammer',
+    weight: 5,
+    icon: '💸',
+    title: 'Estafador',
+    desc: 'Un tipo sospechoso te ofrece un objeto raro a un precio especial.',
+    minRouteProgress: 0.1,
+  },
 ]
 
 const THEMES: Array<{ id: string; name: string; desc: string; price: number; colors: Record<string, string> }> = [
@@ -554,6 +667,18 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_cursed_blade', name: 'Cursed Blade', desc: '+35% ATK, -5 HP/turno.', price: 90, spriteKey: 'Cursed Blade', category: 'holdable' },
   { id: 'unlock_mega_node', name: 'Nodo Mega', desc: 'Desbloquea nodos de Mega Piedra en Hard/Infinite.', price: 150, spriteKey: 'Mega Stone', category: 'upgrade' },
   { id: 'unlock_gmax_node', name: 'Nodo G-MAX', desc: 'Desbloquea nodos G-MAX en Hard/Infinite.', price: 200, spriteKey: 'Dynamax Band', category: 'upgrade' },
+  { id: 'unlock_quick_ball', name: 'Quick Ball', desc: 'x5 en el primer turno. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Quick Ball', category: 'pokeball' },
+  { id: 'unlock_timer_ball', name: 'Timer Ball', desc: 'Mejora con los turnos (hasta x4). Aparece en tiendas y descansos.', price: 35, spriteKey: 'Timer Ball', category: 'pokeball' },
+  { id: 'unlock_dusk_ball', name: 'Dusk Ball', desc: 'x3 en oscuridad. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Dusk Ball', category: 'pokeball' },
+  { id: 'unlock_net_ball', name: 'Net Ball', desc: 'x3 contra Agua/Bicho. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Net Ball', category: 'pokeball' },
+  { id: 'unlock_level_ball', name: 'Level Ball', desc: 'Mejor si tu nivel supera al rival. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Level Ball', category: 'pokeball' },
+  { id: 'unlock_repeat_ball', name: 'Repeat Ball', desc: 'x3.5 si ya capturaste esa especie. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Repeat Ball', category: 'pokeball' },
+  { id: 'unlock_love_ball', name: 'Love Ball', desc: 'x8 si es misma familia. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Love Ball', category: 'pokeball' },
+  { id: 'unlock_friend_ball', name: 'Friend Ball', desc: 'Ratio base x1. Aparece en tiendas y descansos.', price: 30, spriteKey: 'Friend Ball', category: 'pokeball' },
+  { id: 'unlock_heavy_ball', name: 'Heavy Ball', desc: 'Mejor contra Pokémon pesados. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Heavy Ball', category: 'pokeball' },
+  { id: 'unlock_great_ball', name: 'Great Ball', desc: 'x1.5 de captura. Aparece en tiendas y descansos.', price: 25, spriteKey: 'Great Ball', category: 'pokeball' },
+  { id: 'unlock_ultra_ball', name: 'Ultra Ball', desc: 'x2 de captura. Aparece en tiendas y descansos.', price: 50, spriteKey: 'Ultra Ball', category: 'pokeball' },
+  { id: 'unlock_master_ball', name: 'Master Ball', desc: 'Captura cualquier Pokémon sin fallo. Aparece raramente en tiendas.', price: 100, spriteKey: 'Master Ball', category: 'pokeball' },
   { id: 'music_menu_chill', name: 'Menú Relax', desc: 'Música de menú relajante y ambiental.', price: 40, spriteKey: 'Potion', category: 'music' },
   { id: 'music_battle_epic', name: 'Batalla Épica', desc: 'Música de batalla más intensa y rápida.', price: 60, spriteKey: 'Potion', category: 'music' },
 ]
@@ -843,6 +968,11 @@ function MainApp() {
   const [reviveModal, setReviveModal] = useState<{ itemName: string; itemIndex: number } | null>(null)
   const [equipModal, setEquipModal] = useState<{ itemName: string; itemIndex: number } | null>(null)
 
+  // Captura de Pokémon salvaje
+  const [captureModal, setCaptureModal] = useState(false)
+  const [captureMessage, setCaptureMessage] = useState<string | null>(null)
+  const [battleTurns, setBattleTurns] = useState(0)
+
   const battleStartHPRef = useRef<number>(0)
 
   // Team Rocket
@@ -972,6 +1102,8 @@ function MainApp() {
 
   const [activeRandomEvent, setActiveRandomEvent] = useState<{ id: string; icon: string; title: string; desc: string } | null>(null)
   const [traderModal, setTraderModal] = useState<boolean>(false)
+  const [scammerModal, setScammerModal] = useState<boolean>(false)
+  const [scammerOffer, setScammerOffer] = useState<{ itemName: string; price: number } | null>(null)
   const [randomEventUsed, setRandomEventUsed] = useState<Set<string>>(new Set())
   const [showMetaShop, setShowMetaShop] = useState<boolean>(false)
   const [unlockPopup, setUnlockPopup] = useState<{ name: string; spriteKey: string } | null>(null)
@@ -1122,8 +1254,14 @@ function MainApp() {
     unlock_vampire_fang: 'Vampire Fang',
     unlock_cursed_blade: 'Cursed Blade',
   }
+  const LOCKED_POKEBALL_MAP: Record<string, string> = {}
+  for (const [ballName, unlockId] of Object.entries(POKEBALL_UNLOCK_IDS)) {
+    LOCKED_POKEBALL_MAP[unlockId] = ballName
+  }
+
   const isConsumableUnlocked = (name: string) => !Object.values(LOCKED_CONSUMABLE_MAP).includes(name) || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_CONSUMABLE_MAP[k] === name)
   const isHoldableUnlocked = (name: string) => !Object.values(LOCKED_HOLDABLE_MAP).includes(name) || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_HOLDABLE_MAP[k] === name)
+  const isPokeballUnlocked = (name: string) => name === 'Poké Ball' || !POKEBALL_UNLOCK_IDS[name] || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_POKEBALL_MAP[k] === name)
 
   function isGenUnlocked(gen: number): boolean {
     if (gen === 1) return true
@@ -1448,6 +1586,25 @@ function MainApp() {
         setBattleLog(prev => [`✨ ¡La zona brilla! Tu próximo encuentro de descanso será shiny.`, ...prev])
         break
       }
+      case 'mysterious_help': {
+        const faintedIdx = team.findIndex(p => p.hp <= 0)
+        if (faintedIdx >= 0) {
+          const revivedHp = Math.max(1, Math.floor(team[faintedIdx].maxHp * 0.5))
+          setTeam(prev => prev.map((p, i) => i === faintedIdx ? { ...p, hp: revivedHp } : p))
+          setBattleLog(prev => [`🩺 ¡${team[faintedIdx].name} fue revivido con ${revivedHp} HP por una fuerza misteriosa!`, ...prev])
+        } else {
+          setBattleLog(prev => [`🩺 Una fuerza misteriosa pasa de largo... todos tus Pokémon están en pie.`, ...prev])
+        }
+        break
+      }
+      case 'scammer': {
+        const rareItems = HOLDABLE_ITEM_NAMES.filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band')
+        const itemName = rareItems[Math.floor(Math.random() * rareItems.length)]
+        const price = 80 + Math.floor(Math.random() * 120)
+        setScammerOffer({ itemName, price })
+        setScammerModal(true)
+        break
+      }
     }
   }
 
@@ -1477,6 +1634,23 @@ function MainApp() {
     } catch {
       setBattleLog(prev => [`🎭 El comerciante se fue sin hacer nada.`, ...prev].slice(0, 15))
     }
+  }
+
+  function handleScammerChoice(accept: boolean): void {
+    setScammerModal(false)
+    if (!scammerOffer) return
+    if (accept) {
+      if (money >= scammerOffer.price) {
+        setMoney(prev => prev - scammerOffer.price)
+        setInventory(prev => [...prev, scammerOffer.itemName])
+        setBattleLog(prev => [`💸 Compraste ${scammerOffer.itemName} por $${scammerOffer.price}.`, ...prev].slice(0, 15))
+      } else {
+        setBattleLog(prev => [`💸 No tienes suficiente dinero para el ${scammerOffer.itemName} ($${scammerOffer.price}).`, ...prev].slice(0, 15))
+      }
+    } else {
+      setBattleLog(prev => [`💸 Rechazaste la oferta del estafador.`, ...prev].slice(0, 15))
+    }
+    setScammerOffer(null)
   }
 
   function handleAchievementDismiss(): void {
@@ -1726,7 +1900,7 @@ function MainApp() {
       setTeam([starterWithBonus])
       setActiveIndex(0)
       setMoney(activeChallenges.noMoney ? 0 : 100)
-      setInventory([run.item])
+      setInventory([run.item, ...Array(5).fill('Poké Ball')])
       setModifier(run.modifier)
       setRoute(customRoute)
       setRouteIndex(0)
@@ -2136,13 +2310,19 @@ function MainApp() {
     if (!activePokemon || !currentNode) return
 
     if (currentNode.type === 'shop') {
-      const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(isConsumableUnlocked)
+      const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i))
       const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band')
       const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
       const shuffledHoldables = [...allHoldableKeys].sort(() => 0.5 - Math.random())
       const selectedConsumables = shuffledConsumables.slice(0, 2)
       const selectedHoldables = shuffledHoldables.slice(0, 1)
-      setShopStock([...selectedConsumables, ...selectedHoldables])
+      const unlockedNonBasicBalls = POKEBALL_NAMES.filter(b => b !== 'Poké Ball' && isPokeballUnlocked(b))
+      const ballPool = unlockedNonBasicBalls.length > 0
+        ? unlockedNonBasicBalls.filter(b => b !== 'Master Ball' || Math.random() < 0.15)
+        : ['Poké Ball']
+      const shuffledBalls = [...ballPool].sort(() => 0.5 - Math.random())
+      const selectedBalls = shuffledBalls.slice(0, 2)
+      setShopStock([...selectedConsumables, ...selectedHoldables, ...selectedBalls])
       if (runChallenges.noPurchasing) {
         setBattleLog((prev) => [
           `🚫 Desafío Sin Compras: No puedes comprar nada en la tienda.`,
@@ -2323,9 +2503,11 @@ function MainApp() {
             id: eggId
           }
           setEggInventory(prev => [...prev, eggEntry])
-          const rewardItem = runChallenges.noHealing
+          const unlockedBalls = POKEBALL_NAMES.filter(b => isPokeballUnlocked(b) && b !== 'Master Ball')
+          const ballReward = Math.random() < 0.35 ? randomFrom(unlockedBalls) : null
+          const rewardItem = ballReward ?? (runChallenges.noHealing
             ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
-            : randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry'])
+            : randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry']))
           setRestRewardItem(rewardItem)
           setInventory((previous) => [...previous, rewardItem])
           setBattleLog((prev) => [
@@ -2348,9 +2530,11 @@ function MainApp() {
           generatedEncounter.sprite = makeShinySprite(generatedEncounter.sprite, generatedEncounter.id)
           setShinyNextEncounter(false)
         }
-        const rewardItem = runChallenges.noHealing
+        const unlockedBalls = POKEBALL_NAMES.filter(b => isPokeballUnlocked(b) && b !== 'Master Ball')
+        const ballReward = Math.random() < 0.35 ? randomFrom(unlockedBalls) : null
+        const rewardItem = ballReward ?? (runChallenges.noHealing
           ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
-          : randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry'])
+          : randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry']))
 
         setRestEncounter(generatedEncounter)
         seenInPokedex(generatedEncounter)
@@ -3139,6 +3323,8 @@ function MainApp() {
   async function onPlayerMove(move: Move): Promise<void> {
     if (!activePokemon || !enemy) return
 
+    setBattleTurns(t => t + 1)
+
     if (runChallenges.speedrun && speedrunSeconds <= 0) {
       setBattleLog((prev) => ['⏱️ ¡Se acabó el tiempo! Pierdes tu turno.', ...prev].slice(0, 15))
       return
@@ -3625,6 +3811,92 @@ function MainApp() {
     setBattleLog((prev) => [...logs, ...prev].slice(0, 15))
   }
 
+  function attemptCapture(ballName: string): void {
+    if (!enemy || !activePokemon) return
+
+    const ballIdx = inventory.indexOf(ballName)
+    if (ballIdx === -1) return
+
+    setCaptureModal(false)
+    setCaptureMessage(null)
+
+    const def = POKEBALL_DEFS[ballName]
+    if (!def) return
+
+    // Master Ball: captura automática
+    if (def.isMaster) {
+      setInventory(prev => prev.filter((_, i) => i !== ballIdx))
+      const capturedPkmn = { ...enemy, holdItem: difficulty === 'hard' ? null : enemy.holdItem }
+      registerInPokedex(capturedPkmn)
+      setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
+      if (capturedPkmn.shiny) unlockAchievement('shiny_catch')
+      const bst = capturedPkmn.attack + capturedPkmn.defense + capturedPkmn.speed + capturedPkmn.maxHp
+      if (bst >= 600) unlockAchievement('legendary_catch')
+      setBattleLog(prev => [`🏆 ¡${capturedPkmn.name} fue capturado con ${ballName}!`, ...prev].slice(0, 15))
+      if (team.length >= maxTeamSize) {
+        setPcStorage(prev => [...prev, capturedPkmn])
+        setBattleLog(prev => [`📦 ${capturedPkmn.name} fue enviado al PC (equipo lleno).`, ...prev].slice(0, 15))
+      } else {
+        setTeam(prev => [...prev, capturedPkmn])
+      }
+      completeCurrentNode()
+      return
+    }
+
+    // Fórmula de captura
+    const maxHP = enemy.maxHp
+    const currentHP = enemy.hp
+    const hpFactor = Math.max(0.05, (3 * maxHP - 2 * currentHP) / (3 * maxHP))
+    const ballRate = getPokeBallRate(ballName, enemy, battleTurns, !!pokedex[enemy.id]?.caught, activePokemon.level)
+    const statusMult = enemy.status
+      ? (enemy.status.type === 'sleep' || enemy.status.type === 'freeze' ? 2.5 : 1.5)
+      : 1
+    const catchProbability = Math.min(hpFactor * ballRate * statusMult, 1)
+
+    // Consumir la ball
+    setInventory(prev => prev.filter((_, i) => i !== ballIdx))
+
+    if (Math.random() < catchProbability) {
+      // Captura exitosa
+      const capturedPkmn = { ...enemy, holdItem: difficulty === 'hard' ? null : enemy.holdItem }
+      registerInPokedex(capturedPkmn)
+      setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
+      if (capturedPkmn.shiny) unlockAchievement('shiny_catch')
+      const bst = capturedPkmn.attack + capturedPkmn.defense + capturedPkmn.speed + capturedPkmn.maxHp
+      if (bst >= 600) unlockAchievement('legendary_catch')
+      setBattleLog(prev => [`🏆 ¡${capturedPkmn.name} fue capturado con ${ballName}! (${Math.round(catchProbability * 100)}%)`, ...prev].slice(0, 15))
+      if (team.length >= maxTeamSize) {
+        setPcStorage(prev => [...prev, capturedPkmn])
+        setBattleLog(prev => [`📦 ${capturedPkmn.name} fue enviado al PC (equipo lleno).`, ...prev].slice(0, 15))
+      } else {
+        setTeam(prev => [...prev, capturedPkmn])
+      }
+      completeCurrentNode()
+    } else {
+      // Falló
+      setBattleLog(prev => [`💨 ¡${enemy.name} escapó de la ${ballName}! (${Math.round(catchProbability * 100)}%)`, ...prev].slice(0, 15))
+      setCaptureMessage(`¡${enemy.name} escapó!`)
+      setTimeout(() => setCaptureMessage(null), 2000)
+    }
+  }
+
+  function openCaptureMenu(): void {
+    const hasBalls = inventory.some(i => POKEBALL_NAMES.includes(i))
+    if (!hasBalls) {
+      setBattleLog(prev => ['No tienes Poké Balls para capturar.', ...prev].slice(0, 15))
+      return
+    }
+    if (runChallenges.soloStarter) {
+      setBattleLog(prev => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
+      return
+    }
+    if (runChallenges.fixedTeam) {
+      setBattleLog(prev => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
+      return
+    }
+    setCaptureModal(true)
+  }
+
   function megaEvolveActive(): void {
     if (!activePokemon || activePokemon.holdItem !== 'Mega Stone' || battleMegaUsed || activePokemon.gmaxEvolved || !MEGA_CAPABLE_IDS.has(activePokemon.id)) return
     const formId = MEGA_FORM_IDS[activePokemon.id]
@@ -3734,6 +4006,7 @@ function MainApp() {
     const itemIndex = inventory.indexOf(itemName)
     if (itemIndex === -1) return
     if (HOLDABLE_ITEMS[itemName]) return
+    if (POKEBALL_NAMES.includes(itemName)) return
 
     if (runChallenges.noItems) {
       setBattleLog((prev) => ['🚫 Desafío Sin Objetos: No puedes usar items en batalla.', ...prev].slice(0, 15))
@@ -4205,6 +4478,102 @@ function MainApp() {
               Cancelar
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Capture Modal */}
+      {captureModal && enemy && (
+        <div className="modal-backdrop" onClick={() => setCaptureModal(false)}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+              border: '1px solid rgba(34, 197, 94, 0.4)',
+              borderRadius: '16px',
+              padding: '1.5rem',
+              maxWidth: '420px',
+              width: '90%',
+              margin: 'auto',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.6)'
+            }}
+          >
+            <h3 style={{ margin: '0 0 0.25rem', color: '#22c55e', textAlign: 'center' }}>
+              🏐 Capturar {enemy.name}
+            </h3>
+            <p className="muted" style={{ textAlign: 'center', margin: '0 0 1rem', fontSize: '0.8rem' }}>
+              HP: {enemy.hp}/{enemy.maxHp} · Turno: {battleTurns}
+              {enemy.status && ` · ${STATUS_LABELS[enemy.status.type]}`}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {POKEBALLS.map(b => {
+                const count = inventory.filter(i => i === b.name).length
+                const unlockId = POKEBALL_UNLOCK_IDS[b.name]
+                const isUnlocked = b.name === 'Poké Ball' || !unlockId || metaProgression.permanentlyUnlockedItems.includes(unlockId)
+                if (count <= 0) return null
+                if (!isUnlocked) return null
+                const ballRate = getPokeBallRate(b.name, enemy, battleTurns, !!pokedex[enemy.id]?.caught, activePokemon?.level ?? 50)
+                const hpFactor = Math.max(0.05, (3 * enemy.maxHp - 2 * enemy.hp) / (3 * enemy.maxHp))
+                const statusMult = enemy.status ? (enemy.status.type === 'sleep' || enemy.status.type === 'freeze' ? 2.5 : 1.5) : 1
+                const chance = b.isMaster ? 100 : Math.min(Math.round(hpFactor * ballRate * statusMult * 100), 100)
+                return (
+                  <button
+                    key={b.name}
+                    type="button"
+                    onClick={() => attemptCapture(b.name)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(34, 197, 94, 0.3)',
+                      background: 'rgba(34, 197, 94, 0.06)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      color: '#e2e8f0'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(34, 197, 94, 0.15)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(34, 197, 94, 0.06)' }}
+                  >
+                    {ITEM_SPRITES[b.name] && (
+                      <img src={ITEM_SPRITES[b.name]} alt={b.name} style={{ width: '32px', height: '32px', imageRendering: 'pixelated' }} />
+                    )}
+                    <div style={{ flex: 1, textAlign: 'left' }}>
+                      <strong>{b.name}</strong>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: '8px' }}>x{count}</span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 'bold', color: chance >= 90 ? '#22c55e' : chance >= 50 ? '#eab308' : chance >= 20 ? '#f97316' : '#ef4444', fontSize: '0.9rem' }}>
+                        {chance}%
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: '#64748b' }}>{b.desc}</div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+            <button
+              type="button"
+              className="secondary"
+              style={{ width: '100%', marginTop: '1rem' }}
+              onClick={() => setCaptureModal(false)}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Capture message overlay */}
+      {captureMessage && (
+        <div style={{
+          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          background: 'rgba(0,0,0,0.85)', color: '#facc15', padding: '1.5rem 2.5rem',
+          borderRadius: '16px', fontSize: '1.2rem', fontWeight: 'bold',
+          border: '2px solid #facc15', zIndex: 10000,
+          textAlign: 'center', pointerEvents: 'none', animation: 'fadeIn 0.3s ease'
+        }}>
+          {captureMessage}
         </div>
       )}
 
@@ -5714,6 +6083,17 @@ function MainApp() {
                     </button>
                   ))}
                 </div>
+                {!isTrainerBattle && (
+                  <button
+                    className="cta"
+                    onClick={openCaptureMenu}
+                    type="button"
+                    disabled={isLoading || !inventory.some(i => POKEBALL_NAMES.includes(i))}
+                    style={{ marginTop: '8px', width: '100%', background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}
+                  >
+                    🏐 Capturar ({inventory.filter(i => POKEBALL_NAMES.includes(i)).length} balls)
+                  </button>
+                )}
                 {activePokemon.holdItem === 'Mega Stone' && !battleMegaUsed && !activePokemon.gmaxEvolved && MEGA_CAPABLE_IDS.has(activePokemon.id) && (
                   <button
                     className="cta"
@@ -5966,6 +6346,49 @@ function MainApp() {
         </div>
       )}
 
+      {/* Scammer Modal */}
+      {scammerModal && scammerOffer && (
+        <div className="modal-backdrop" onClick={() => handleScammerChoice(false)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', padding: '2rem' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>💸</div>
+            <h3 style={{ color: '#facc15', margin: '0.5rem 0' }}>¡Estafador!</h3>
+            <p style={{ color: '#cbd5e1', marginBottom: '0.5rem' }}>Un tipo sospechoso se acerca y te muestra un objeto.</p>
+            <div style={{
+              background: 'rgba(30,41,59,0.6)', border: '1px solid #334155', borderRadius: '12px',
+              padding: '1rem', margin: '1rem 0', display: 'flex', alignItems: 'center', gap: '12px'
+            }}>
+              {ITEM_SPRITES[scammerOffer.itemName] && (
+                <img src={ITEM_SPRITES[scammerOffer.itemName]} alt={scammerOffer.itemName}
+                  style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
+              )}
+              <div style={{ textAlign: 'left' }}>
+                <strong style={{ color: '#e2e8f0' }}>{scammerOffer.itemName}</strong>
+                <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                  {HOLDABLE_ITEMS[scammerOffer.itemName]?.desc ?? ''}
+                </div>
+              </div>
+            </div>
+            <p style={{ color: '#facc15', fontWeight: 'bold', marginBottom: '1.5rem' }}>
+              Precio: 🪙 ${scammerOffer.price}
+              <span style={{ color: '#94a3b8', fontWeight: 'normal', marginLeft: '8px' }}>
+                (Tienes: ${money})
+              </span>
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+              <button className="cta" onClick={() => handleScammerChoice(true)}
+                disabled={money < scammerOffer.price}
+                style={{ background: money >= scammerOffer.price ? '#22c55e' : '#475569', color: '#000' }}>
+                {money >= scammerOffer.price ? '¡Comprar!' : 'No alcanza'}
+              </button>
+              <button className="cta" onClick={() => handleScammerChoice(false)}
+                style={{ background: '#64748b', color: '#fff' }}>
+                Rechazar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Achievements Modal */}
       {showAchievements && (
         <div className="modal-backdrop" onClick={() => setShowAchievements(false)}>
@@ -6079,6 +6502,38 @@ function MainApp() {
                       <div>
                         <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
                         <div style={{ color: '#f97316', fontSize: '0.7rem' }}>Consumible</div>
+                      </div>
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    {owned ? (
+                      <div style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                    ) : (
+                      <button className="cta" onClick={() => buyMetaItem(item)}
+                        disabled={metaProgression.pokeCoins < item.price}
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#facc15' : '#475569', color: '#000' }}>
+                        🪙 {item.price}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <h3 style={{ color: '#ef4444', marginBottom: '0.5rem' }}>🏐 Poké Balls</h3>
+            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea distintos tipos de Poké Balls para usar en la captura de Pokémon salvajes.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {META_SHOP_ITEMS.filter(item => item.category === 'pokeball').map(item => {
+                const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                return (
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#22c55e' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      {ITEM_SPRITES[item.spriteKey]
+                        ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
+                        : <span style={{ fontSize: '1.5rem' }}>🏐</span>
+                      }
+                      <div>
+                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#ef4444', fontSize: '0.7rem' }}>Poké Ball</div>
                       </div>
                     </div>
                     <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
