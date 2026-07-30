@@ -6866,7 +6866,7 @@ function MainApp() {
               <button className="cta" onClick={async () => {
                 setLeagueTeamSelection(false)
                 const healed = tempLeagueTeam.map(p => ({ ...p, hp: p.maxHp, status: undefined }))
-                const avgLevel = Math.round(healed.reduce((s, p) => s + p.level, 0) / healed.length) + 2
+                const maxLvl = Math.max(...healed.map(p => p.level)) + 2
                 const leagueRoute: RouteNode[] = []
                 for (let i = 0; i < 4; i++) {
                   leagueRoute.push({ id: 1000 + i, type: 'boss', label: `Liga #${i + 1}`, done: false })
@@ -6876,7 +6876,7 @@ function MainApp() {
                 setRoute(leagueRoute)
                 setRouteIndex(0)
                 setScreen('route')
-                setBattleLog(prev => [`🏆 ¡Bienvenido a la Liga Pokémon! 4 jefes te esperan (Nv.${avgLevel}).`, ...prev].slice(0, 15))
+                setBattleLog(prev => [`🏆 ¡Bienvenido a la Liga Pokémon! 4 jefes te esperan (Nv.${maxLvl}).`, ...prev].slice(0, 15))
               }} style={{ background: '#38bdf8', color: '#000', width: '100%', marginBottom: '1rem' }}>
                 🏆 ¡Comenzar Liga!
               </button>
