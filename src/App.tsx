@@ -1016,6 +1016,7 @@ interface ProgressionData {
   completedAny: number[]
   completedHard: number[]
   completedColiseum: number[]
+  completedLeague: number[]
 }
 
 interface VictoryUnlocks {
@@ -1046,13 +1047,14 @@ function MainApp() {
           completedMedium: Array.isArray(parsed.completedMedium) ? parsed.completedMedium : [],
           completedAny: Array.isArray(parsed.completedAny) ? parsed.completedAny : [],
           completedHard: Array.isArray(parsed.completedHard) ? parsed.completedHard : [],
-          completedColiseum: Array.isArray(parsed.completedColiseum) ? parsed.completedColiseum : []
+          completedColiseum: Array.isArray(parsed.completedColiseum) ? parsed.completedColiseum : [],
+          completedLeague: Array.isArray(parsed.completedLeague) ? parsed.completedLeague : []
         }
       }
     } catch {
       // fallback
     }
-    return { completedMedium: [], completedAny: [], completedHard: [], completedColiseum: [] }
+    return { completedMedium: [], completedAny: [], completedHard: [], completedColiseum: [], completedLeague: [] }
   })
 
   const [team, setTeam] = useState<Pokemon[]>([])
@@ -1126,6 +1128,9 @@ function MainApp() {
   const [captureModal, setCaptureModal] = useState(false)
   const [captureMessage, setCaptureMessage] = useState<string | null>(null)
   const [evoPopup, setEvoPopup] = useState<{ oldSprite: string; newSprite: string; oldName: string; newName: string } | null>(null)
+  const [leagueOffer, setLeagueOffer] = useState(false)
+  const [leagueTeamSelection, setLeagueTeamSelection] = useState(false)
+  const [tempLeagueTeam, setTempLeagueTeam] = useState<Pokemon[]>([])
   const [battleTurns, setBattleTurns] = useState(0)
   const [enemyHitFlash, setEnemyHitFlash] = useState(false)
 
@@ -2276,7 +2281,11 @@ function MainApp() {
           setScreen('route')
           return
         }
-        // badges.length >= 2 → 3ª insignia ya entregada → victoria
+        // badges.length >= 2 → 3ª insignia ya entregada → ofrecer liga
+        if (difficulty === 'easy' || difficulty === 'medium' || difficulty === 'hard') {
+          setLeagueOffer(true)
+          return
+        }
       }
 
       const wins = record.wins + 1
@@ -2302,7 +2311,10 @@ function MainApp() {
         completedAny: nextCompletedAny,
         completedMedium: nextCompletedMedium,
         completedHard: nextCompletedHard,
-        completedColiseum: progression.completedColiseum
+        completedColiseum: progression.completedColiseum,
+        completedLeague: currentNode && currentNode.id >= 1000
+          ? Array.from(new Set([...progression.completedLeague, genPlayed]))
+          : progression.completedLeague
       }
 
       localStorage.setItem('pokerand_progression', JSON.stringify(updatedProgression))
@@ -2797,10 +2809,11 @@ function MainApp() {
 
       if (willBeTrainer) {
         const progress = routeIndex / Math.max(1, route.length - 1)
+        const isLeague = currentNode.id >= 1000
         const maxSize = isBoss ? 6 : Math.max(1, Math.min(6, Math.floor(progress * 6) + 1))
         const teamSize = isBoss ? maxSize : Math.max(1, Math.min(maxSize, 1 + Math.floor(Math.random() * maxSize)))
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
-        const trainerLevelOffset = isBoss
+        const trainerLevelOffset = isLeague ? 2 : isBoss
           ? Math.floor(Math.random() * 3) // boss: 0, 1, or 2 levels above player
           : Math.floor(Math.random() * 3) - 1 // trainer/TeamR: -1, 0, or +1
 
@@ -5404,6 +5417,7 @@ function MainApp() {
               const completedAny = progression.completedAny.includes(gen)
               const completedHard = progression.completedHard.includes(gen)
               const completedColiseum = progression.completedColiseum.includes(gen)
+              const completedLeague = progression.completedLeague.includes(gen)
 
               return (
                 <button
@@ -5426,6 +5440,9 @@ function MainApp() {
                       ) : null}
                       {completedColiseum && (
                         <span className="badge-medium" title="Completado en COLISEUM" style={{ marginLeft: '4px' }}>👑</span>
+                      )}
+                      {completedLeague && (
+                        <span className="badge-medium" title="Completado en Liga" style={{ marginLeft: '4px' }}>🏅</span>
                       )}
                     </span>
                   </div>
@@ -6799,6 +6816,85 @@ function MainApp() {
               })}
             </div>
             <button className="cta" onClick={() => setMerchantItems(null)} style={{ marginTop: '1rem', background: '#64748b', width: '100%' }}>Salir</button>
+          </div>
+        </div>
+      )}
+
+      {/* League Offer Modal */}
+      {leagueOffer && (
+        <div className="modal-backdrop" onClick={() => { setLeagueOffer(false); setScreen('victory'); playVictoryFanfare() }}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', padding: '1.5rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🏆</div>
+            <h3 style={{ color: '#facc15', margin: '0.5rem 0' }}>¡Campeón de la Liga!</h3>
+            <p style={{ color: '#cbd5e1', marginBottom: '1rem' }}>
+              Has derrotado al líder de gimnasio. ¿Deseas entrar a la <strong style={{ color: '#38bdf8' }}>Liga Pokémon</strong>?
+            </p>
+            <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+              Deberás elegir 6 Pokémon de tu equipo y PC. Una vez dentro no podrás cambiarlos.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+              <button className="cta" onClick={() => { setLeagueOffer(false); setLeagueTeamSelection(true) }} style={{ background: '#38bdf8', color: '#000' }}>
+                ¡Sí, a la Liga!
+              </button>
+              <button className="cta" onClick={() => { setLeagueOffer(false); setScreen('victory'); playVictoryFanfare() }} style={{ background: '#64748b' }}>
+                No, terminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* League Team Selection Modal */}
+      {leagueTeamSelection && (
+        <div className="modal-backdrop" onClick={() => setLeagueTeamSelection(false)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
+            <h3 style={{ color: '#38bdf8', margin: '0 0 0.5rem' }}>🏆 Equipo para la Liga</h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+              Selecciona 6 Pokémon de tu equipo y PC ({tempLeagueTeam.length}/6)
+            </p>
+            {tempLeagueTeam.length === 6 && (
+              <button className="cta" onClick={async () => {
+                setLeagueTeamSelection(false)
+                const avgLevel = Math.round(tempLeagueTeam.reduce((s, p) => s + p.level, 0) / tempLeagueTeam.length) + 2
+                const leagueRoute: RouteNode[] = []
+                for (let i = 0; i < 4; i++) {
+                  leagueRoute.push({ id: 1000 + i, type: 'boss', label: `Liga #${i + 1}`, done: false })
+                }
+                setTeam(tempLeagueTeam)
+                setRoute(leagueRoute)
+                setRouteIndex(0)
+                setScreen('route')
+                setBattleLog(prev => [`🏆 ¡Bienvenido a la Liga Pokémon! 4 jefes te esperan (Nv.${avgLevel}).`, ...prev].slice(0, 15))
+              }} style={{ background: '#38bdf8', color: '#000', width: '100%', marginBottom: '1rem' }}>
+                🏆 ¡Comenzar Liga!
+              </button>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '6px' }}>
+              {[...team.map(p => ({ ...p, _source: 'team' as const })), ...pcStorage.map(p => ({ ...p, _source: 'pc' as const }))].map((pkmn, idx) => {
+                const key = `${pkmn._source}-${idx}`
+                const selected = tempLeagueTeam.some(p => p.id === pkmn.id && p.hp === pkmn.hp)
+                return (
+                  <div key={key}
+                    onClick={() => {
+                      if (selected) {
+                        setTempLeagueTeam(prev => prev.filter(p => !(p.id === pkmn.id && p.hp === pkmn.hp)))
+                      } else if (tempLeagueTeam.length < 6) {
+                        setTempLeagueTeam(prev => [...prev, pkmn])
+                      }
+                    }}
+                    style={{
+                      padding: '6px', borderRadius: '8px', textAlign: 'center', cursor: 'pointer',
+                      background: selected ? 'rgba(56,189,248,0.2)' : 'rgba(30,41,59,0.6)',
+                      border: selected ? '2px solid #38bdf8' : '1px solid #334155', opacity: !selected && tempLeagueTeam.length >= 6 ? 0.4 : 1
+                    }}
+                  >
+                    <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
+                    <div style={{ fontSize: '0.7rem', textTransform: 'capitalize', color: selected ? '#38bdf8' : '#e2e8f0' }}>{pkmn.name}</div>
+                    <div style={{ fontSize: '0.6rem', color: pkmn._source === 'team' ? '#4ade80' : '#94a3b8' }}>Nv.{pkmn.level}</div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
       )}
