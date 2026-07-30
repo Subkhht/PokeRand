@@ -2382,7 +2382,7 @@ function MainApp() {
     setRouteIndex((previous) => previous + 1)
     setRunStats(prev => ({ ...prev, nodesCleared: prev.nodesCleared + 1 }))
     const progress = route.length > 0 ? (routeIndex + 1) / route.length : 0
-    triggerRandomEvent(progress)
+    if (difficulty !== 'coliseum') triggerRandomEvent(progress)
     if (!activeRandomEvent) setScreen('route')
   }
 
@@ -2805,9 +2805,14 @@ function MainApp() {
         const fetches = Array.from({ length: teamSize }, () =>
           difficulty === 'coliseum'
             ? (async () => {
-                const randomGen = Math.floor(Math.random() * 9) + 1
-                const pokemon = await buildPokemonFromApi(randomFrom(await getSpeciesIdsByGeneration(randomGen)), randomGen, 50, false, difficulty)
-                return { ...pokemon, level: 50 }
+                try {
+                  const ids = await getSpeciesIdsByGeneration(targetGen)
+                  const id = ids[Math.floor(Math.random() * ids.length)] || 1
+                  const pokemon = await buildPokemonFromApi(id, targetGen, 50, false, difficulty)
+                  return { ...pokemon, level: 50, statStages: { attack: 0, defense: 0, speed: 0 } }
+                } catch {
+                  return { id: 1, name: 'Bulbasaur', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png', level: 50, hp: 100, maxHp: 100, attack: 50, defense: 50, speed: 50, moves: [], statStages: { attack: 0, defense: 0, speed: 0 } } as Pokemon
+                }
               })()
             : getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? badges.length : -1)
             .then((base) => {
@@ -5565,7 +5570,7 @@ function MainApp() {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '1.2rem', color: '#facc15' }}>👑 COLISEUM</span>
-                <strong style={{ fontSize: '1rem', color: '#facc15' }}>— 8 jefes a nivel 50 (Generaciones Aleatorias)</strong>
+                <strong style={{ fontSize: '1rem', color: '#facc15' }}>— 8 jefes a nivel 50</strong>
               </div>
               <span className="lock-text" style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
                 Elige 6 Pokémon de tu Pokédex para enfrentarlos
