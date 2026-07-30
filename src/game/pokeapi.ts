@@ -399,6 +399,15 @@ export async function buildPokemonFromApi(
 
   const data = await fetchJson<PokeApiPokemon>(`${API_BASE}/pokemon/${identifier}`)
 
+  let captureRate = 45
+  try {
+    const speciesRes = await fetch(`${API_BASE}/pokemon-species/${data.id}`)
+    if (speciesRes.ok) {
+      const speciesData = await speciesRes.json()
+      captureRate = speciesData.capture_rate ?? 45
+    }
+  } catch {}
+
   const statMap = new Map(data.stats.map((entry) => [entry.stat.name, entry.base_stat]))
   const baseStatTotal = data.stats.reduce((acc, entry) => acc + entry.base_stat, 0)
   
@@ -424,7 +433,8 @@ export async function buildPokemonFromApi(
     })(),
     shiny: shiny || undefined,
     moves: parsedMoves,
-    rawLevelUpMoves
+    rawLevelUpMoves,
+    captureRate
   }
 
   pokemonCache.set(cacheKey, pokemon)

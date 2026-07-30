@@ -2342,7 +2342,7 @@ function MainApp() {
     }
 
     if (currentNode.type === 'spin') {
-      const healingPool = Object.keys(ALL_SHOP_ITEMS).filter(isConsumableUnlocked)
+      const healingPool = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && (POKEBALL_NAMES.includes(i) ? isPokeballUnlocked(i) : true))
       const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band')
       const shuffledH = [...healingPool].sort(() => 0.5 - Math.random())
       const shuffledP = [...passivePool].sort(() => 0.5 - Math.random())
@@ -3851,7 +3851,8 @@ function MainApp() {
     const statusMult = enemy.status
       ? (enemy.status.type === 'sleep' || enemy.status.type === 'freeze' ? 2.5 : 1.5)
       : 1
-    const catchProbability = Math.min(hpFactor * ballRate * statusMult, 1)
+    const speciesRate = (enemy.captureRate ?? 45) / 255
+    const catchProbability = Math.min(hpFactor * ballRate * statusMult * speciesRate, 1)
 
     // Consumir la ball
     setInventory(prev => prev.filter((_, i) => i !== ballIdx))
@@ -4514,7 +4515,8 @@ function MainApp() {
                 const ballRate = getPokeBallRate(b.name, enemy, battleTurns, !!pokedex[enemy.id]?.caught, activePokemon?.level ?? 50)
                 const hpFactor = Math.max(0.05, (3 * enemy.maxHp - 2 * enemy.hp) / (3 * enemy.maxHp))
                 const statusMult = enemy.status ? (enemy.status.type === 'sleep' || enemy.status.type === 'freeze' ? 2.5 : 1.5) : 1
-                const chance = b.isMaster ? 100 : Math.min(Math.round(hpFactor * ballRate * statusMult * 100), 100)
+                const speciesRate = (enemy.captureRate ?? 45) / 255
+                const chance = b.isMaster ? 100 : Math.min(Math.round(hpFactor * ballRate * statusMult * speciesRate * 100), 100)
                 return (
                   <button
                     key={b.name}

@@ -51,6 +51,7 @@ export interface Pokemon {
   moves: Move[]
   types?: string[]
   baseStatTotal?: number
+  captureRate?: number
   rawLevelUpMoves?: RawLevelUpMove[]
   holdItem?: string | null
   shiny?: boolean
