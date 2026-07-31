@@ -1060,6 +1060,7 @@ function MainApp() {
   const [team, setTeam] = useState<Pokemon[]>([])
   const [coliseumTempTeam, setColiseumTempTeam] = useState<Pokemon[]>([])
   const [coliseumSeed, setColiseumSeed] = useState(0)
+  const [coliseumSearch, setColiseumSearch] = useState('')
   const [activeIndex, setActiveIndex] = useState<number>(0)
   const [enemy, setEnemy] = useState<Pokemon | null>(null)
   const [route, setRoute] = useState<RouteNode[]>([])
@@ -2257,7 +2258,7 @@ function MainApp() {
       }
 
       // Sistema de insignias: al derrotar un jefe, obtienes una insignia
-      if (currentNode?.type === 'boss') {
+      if (currentNode?.type === 'boss' && currentNode.id < 1000) {
         const availableBadges = GYM_BADGES.filter(b => !badges.some(h => h.id === b.id))
         if (availableBadges.length > 0) {
           const newBadge = availableBadges[Math.floor(Math.random() * availableBadges.length)]
@@ -2282,7 +2283,7 @@ function MainApp() {
           return
         }
         // badges.length >= 2 → 3ª insignia ya entregada → ofrecer liga
-        if (difficulty === 'easy' || difficulty === 'medium' || difficulty === 'hard') {
+        if ((difficulty === 'easy' || difficulty === 'medium' || difficulty === 'hard') && currentNode && currentNode.id < 1000) {
           setLeagueOffer(true)
           return
         }
@@ -2375,6 +2376,9 @@ function MainApp() {
         return updated
       })
       awardPokeCoins(baseCoins, `¡Victoria! (${difficulty === 'easy' ? 'Fácil' : difficulty === 'hard' ? 'Difícil' : 'Medio'})`)
+      if (currentNode && currentNode.id >= 1000) {
+        awardPokeCoins(15, '🏆 Victoria en la Liga Pokémon')
+      }
       if (badges.length > 0) {
         const stageCoins = Math.floor(baseCoins / 2)
         awardPokeCoins(stageCoins * badges.length, `Bonus por ${badges.length} etapa${badges.length > 1 ? 's' : ''} completada${badges.length > 1 ? 's' : ''}`)
@@ -5346,13 +5350,24 @@ function MainApp() {
 
       {screen === 'coliseum_select' && (
         <section className="panel setup-panel" style={{ maxWidth: '600px', margin: '0 auto' }}>
-          <h2 style={{ textAlign: 'center', color: '#facc15' }}>👑 COLISEUM</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <h2 style={{ margin: 0, color: '#facc15' }}>👑 COLISEUM</h2>
+            <button className="tiny-btn" onClick={() => { playClick(); setColiseumTempTeam([]); setScreen('setup'); stopMusic() }} type="button" style={{ color: '#f87171' }}>
+              ✕ Salir
+            </button>
+          </div>
           <p style={{ textAlign: 'center', color: '#94a3b8', marginBottom: '1rem' }}>
             Selecciona 6 Pokémon de tu Pokédex para enfrentar 8 jefes a nivel 50.
           </p>
-          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>
+          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#64748b', marginBottom: '0.5rem' }}>
             Elegidos: {coliseumTempTeam.length}/6
           </p>
+          <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
+            <input type="text" placeholder="🔍 Buscar Pokémon..." value={coliseumSearch} onChange={e => setColiseumSearch(e.target.value)}
+              style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }} />
+            {coliseumSearch && <button type="button" onClick={() => setColiseumSearch('')}
+              style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.9rem' }}>✖</button>}
+          </div>
           {coliseumTempTeam.length === 6 && (
             <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
               <button className="cta" onClick={async () => {
@@ -5375,7 +5390,10 @@ function MainApp() {
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '0.5rem', maxHeight: '400px', overflowY: 'auto' }}>
-            {Object.values(pokedex).filter(p => p.caught).sort((a, b) => a.id - b.id).map(pkmn => {
+            {Object.values(pokedex).filter(p => p.caught).filter(p => {
+              const term = coliseumSearch.toLowerCase().trim()
+              return !term || p.name.toLowerCase().includes(term) || String(p.id).includes(term)
+            }).sort((a, b) => a.id - b.id).map(pkmn => {
               const selectedIdx = coliseumTempTeam.findIndex(p => p.id === pkmn.id)
               return (
                 <div key={pkmn.id}
