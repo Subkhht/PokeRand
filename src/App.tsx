@@ -2515,9 +2515,10 @@ function MainApp() {
       const selectedConsumables = shuffledConsumables.slice(0, 2)
       const selectedHoldables = shuffledHoldables.slice(0, 1)
       const unlockedNonBasicBalls = POKEBALL_NAMES.filter(b => b !== 'Poké Ball' && isPokeballUnlocked(b))
-      const ballPool = unlockedNonBasicBalls.length > 0
+      const rareBalls = unlockedNonBasicBalls.length > 0
         ? unlockedNonBasicBalls.filter(b => b !== 'Master Ball' || Math.random() < 0.15)
-        : ['Poké Ball']
+        : []
+      const ballPool = ['Poké Ball', ...rareBalls]
       const shuffledBalls = [...ballPool].sort(() => 0.5 - Math.random())
       const selectedBalls = shuffledBalls.slice(0, 2)
       const unlockedStones = EVOLUTION_STONES.filter(s => isEvolutionStoneUnlocked(s))
