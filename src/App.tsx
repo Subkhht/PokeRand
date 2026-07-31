@@ -5283,6 +5283,44 @@ function MainApp() {
             </div>
             </div>
 
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem', marginTop: '0.75rem' }}>
+              <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
+                💾 Datos
+              </strong>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button className="tiny-btn" type="button" onClick={() => {
+                  const data: Record<string, string> = {}
+                  const keys = ['pokerand_progression', 'pokerand_pokedex', 'pokerand_wins', 'pokerand_losses', 'pokerand_streak', 'pokerand_best_streak', 'pokerand_achievements', 'pokerand_meta']
+                  for (const k of keys) {
+                    const v = localStorage.getItem(k)
+                    if (v) data[k] = v
+                  }
+                  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a'); a.href = url; a.download = 'pokerand_backup.json'; a.click()
+                  URL.revokeObjectURL(url)
+                }} style={{ color: '#38bdf8' }}>📤 Exportar datos</button>
+                <label className="tiny-btn" style={{ color: '#facc15', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px', border: '1px solid #facc15', background: 'rgba(250,204,21,0.1)', fontSize: '0.75rem' }}>
+                  📥 Importar datos
+                  <input type="file" accept=".json" style={{ display: 'none' }} onChange={e => {
+                    const file = e.target.files?.[0]; if (!file) return
+                    const reader = new FileReader()
+                    reader.onload = (ev) => {
+                      try {
+                        const data = JSON.parse(ev.target?.result as string)
+                        if (typeof data !== 'object' || !data) throw new Error()
+                        for (const [k, v] of Object.entries(data)) {
+                          if (typeof v === 'string') localStorage.setItem(k, v)
+                        }
+                        alert('✅ Datos importados. Recarga la página.')
+                      } catch { alert('❌ Archivo no válido.') }
+                    }
+                    reader.readAsText(file); e.target.value = ''
+                  }} />
+                </label>
+              </div>
+            </div>
+
             <div className="pokedex-controls">
               <div className="d-pad" title="D-Pad Options"></div>
               <button
