@@ -152,6 +152,7 @@ const EVOLUTION_STONE_ITEM_NAMES: Record<string, string> = {
   'Dusk Stone': 'dusk-stone',
   'Dawn Stone': 'dawn-stone',
   'Ice Stone': 'ice-stone',
+  'Gorra de Ash': 'gorra-de-ash',
 }
 
 const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
@@ -167,6 +168,7 @@ const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
   'Prism Scale': 'unlock_prism_scale',
   'Sachet': 'unlock_sachet',
   'Whipped Dream': 'unlock_whipped_dream',
+  'Gorra de Ash': 'unlock_gorra_de_ash',
 }
 
 const itemDescriptions: Record<string, string> = {
@@ -851,6 +853,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_prism_scale', name: 'Prism Scale', desc: 'Evoluciona a Milotic. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Prism Scale', category: 'evolution_item' },
   { id: 'unlock_sachet', name: 'Sachet', desc: 'Evoluciona a Aromatisse. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Sachet', category: 'evolution_item' },
   { id: 'unlock_whipped_dream', name: 'Whipped Dream', desc: 'Evoluciona a Slurpuff. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Whipped Dream', category: 'evolution_item' },
+  { id: 'unlock_gorra_de_ash', name: 'Gorra de Ash', desc: 'Evoluciona a Greninja en Greninja-Ash. Aparece con el Comerciante Misterioso.', price: 50, spriteKey: 'Gorra de Ash', category: 'evolution_item' },
   { id: 'music_menu_chill', name: 'Menú Relax', desc: 'Música de menú relajante y ambiental.', price: 40, spriteKey: 'Potion', category: 'music' },
   { id: 'music_battle_epic', name: 'Batalla Épica', desc: 'Música de batalla más intensa y rápida.', price: 60, spriteKey: 'Potion', category: 'music' },
 ]
@@ -4297,6 +4300,7 @@ function MainApp() {
       const newBase = await buildPokemonFromApi(evolvedName, 1, targetPokemon.level, targetPokemon.shiny ?? false)
       const evolved: Pokemon = {
         ...newBase,
+        name: evolvedName === 'greninja-ash' ? 'Greninja Ash' : newBase.name,
         level: targetPokemon.level,
         maxHp: newBase.maxHp + 15,
         hp: newBase.maxHp + 15,
@@ -4328,7 +4332,7 @@ function MainApp() {
     if (HOLDABLE_ITEMS[itemName]) return
     if (POKEBALL_NAMES.includes(itemName)) return
 
-    if (EVOLUTION_STONE_UNLOCK_IDS[itemName]) {
+    if (EVOLUTION_STONE_UNLOCK_IDS[itemName] || itemName === 'Gorra de Ash') {
       const candidates = team.filter(p => p.hp > 0)
       if (candidates.length === 0) {
         setBattleLog((prev) => ['No tienes Pokémon en pie para usar la piedra.', ...prev].slice(0, 15))

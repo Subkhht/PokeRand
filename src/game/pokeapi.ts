@@ -991,6 +991,11 @@ export async function canEvolveWithStone(pokemonId: number, stoneItemName: strin
     if (evolved) return { canEvolve: true, evolvedName: evolved }
   }
 
+  // Gorra de Ash: Greninja → Greninja-Ash (Battle Bond, ID 10117)
+  if (pokemonId === 658 && stoneItemName === 'gorra-de-ash') {
+    return { canEvolve: true, evolvedName: 'greninja-ash' }
+  }
+
   try {
     const speciesRes = await fetch(`${API_BASE}/pokemon-species/${pokemonId}`)
     if (!speciesRes.ok) return { canEvolve: false, evolvedName: null }
