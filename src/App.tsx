@@ -2600,8 +2600,14 @@ function MainApp() {
       setApiError('')
       try {
         const targetGen = getEffectiveGen()
+        const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const fetches = Array.from({ length: 6 }, () =>
           getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length)
+            .then((base) => {
+              const levelDiff = (avgPlayerLevel + Math.floor(Math.random() * 3) - 1) - base.level
+              const scaled = scalePokemonForNode(base, currentNode, routeIndex, levelDiff, difficulty)
+              return runChallenges.fixedLevel ? { ...scaled, level: 50 } : scaled
+            })
         )
         const pokemonList = await Promise.all(fetches)
         setPokeRandPokemon(pokemonList)
@@ -2761,7 +2767,9 @@ function MainApp() {
 
       const targetGen = getEffectiveGen()
       const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length)
-      const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty)
+      const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
+      const levelDiff = (avgPlayerLevel - 2 + Math.floor(Math.random() * 3) - 1) - restPokemonBase.level
+      const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, levelDiff, difficulty)
       if (shinyNextEncounter) {
         generatedEncounter.shiny = true
         generatedEncounter.sprite = makeShinySprite(generatedEncounter.sprite, generatedEncounter.id)
