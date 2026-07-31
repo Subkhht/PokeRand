@@ -5,6 +5,8 @@ let musicTimeoutId: ReturnType<typeof setTimeout> | null = null
 let currentTrack: string = 'none'
 let masterVolume = 0.5
 let sfxVolume = 0.5
+let musicMuted = false
+let savedVolume = 0.5
 let activeMenuMusic = 'default'
 let activeBattleMusic = 'default'
 
@@ -448,6 +450,21 @@ export function setVolume(v: number): void {
 
 export function getVolume(): number {
   return masterVolume
+}
+
+export function isMusicMuted(): boolean {
+  return musicMuted
+}
+
+export function setMusicMuted(muted: boolean): void {
+  if (muted === musicMuted) return
+  musicMuted = muted
+  if (muted) {
+    savedVolume = masterVolume
+    setVolume(0)
+  } else {
+    setVolume(savedVolume > 0 ? savedVolume : 0.5)
+  }
 }
 
 export function setSfxVolume(v: number): void {

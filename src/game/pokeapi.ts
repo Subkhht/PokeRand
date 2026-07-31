@@ -6,6 +6,11 @@ const generationSpeciesCache = new Map<number, number[]>()
 const pokemonCache = new Map<string | number, Pokemon>()
 const legendaryIdsCache = new Map<number, Promise<Set<number>>>()
 let allFormIdsPromise: Promise<number[]> | null = null
+let runSeed = 0
+
+export function setRunSeed(seed: number): void {
+  runSeed = seed
+}
 
 interface PokeApiNamedResource {
   name: string
@@ -509,7 +514,7 @@ export async function buildPokemonFromApi(
   shiny: boolean = false,
   difficulty: string = 'medium'
 ): Promise<Pokemon> {
-  const cacheKey = `${identifier}_lvl${targetLevel}_${difficulty}`
+  const cacheKey = `${identifier}_lvl${targetLevel}_${difficulty}_r${runSeed}`
   const cached = pokemonCache.get(cacheKey)
   if (cached) {
     const result = { ...cached, hp: cached.maxHp }

@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef, Component, type ReactNode } from 'react'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
-import { playHover, playClick, playHit, playEvolution, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic } from './game/sound'
+import { playHover, playClick, playHit, playEvolution, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, isMusicMuted, setMusicMuted } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -15,6 +15,7 @@ import {
   makeShinySprite,
   canEvolveWithStone,
   stripRegional,
+  setRunSeed,
   type PokemonDetails
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
@@ -34,13 +35,13 @@ const STATUS_LABELS: Record<StatusType, string> = {
 }
 
 const STATUS_COLORS: Record<StatusType, string> = {
-  burn: '#f97316',
+  burn: '#ff8a33',
   poison: '#a855f7',
   paralysis: '#eab308',
-  freeze: '#38bdf8',
-  sleep: '#94a3b8',
+  freeze: '#4d9bff',
+  sleep: '#9b98cf',
   confusion: '#ec4899',
-  flinch: '#facc15',
+  flinch: '#ffcb05',
 }
 
 const difficultyNodeCounts: Record<Difficulty, number> = {
@@ -754,12 +755,12 @@ const RANDOM_EVENTS = [
 ]
 
 const THEMES: Array<{ id: string; name: string; desc: string; price: number; colors: Record<string, string> }> = [
-  { id: 'dark', name: 'Oscuro (Default)', desc: 'El tema clásico oscuro', price: 0, colors: { bg: '#0f172a', surface: '#1e293b', border: '#334155', text: '#f8fafc', accent: '#38bdf8', muted: '#94a3b8' } },
+  { id: 'dark', name: 'Oscuro (Default)', desc: 'El tema clásico oscuro', price: 0, colors: { bg: '#12122b', surface: '#1c1c3a', border: '#3f3f6e', text: '#f8fafc', accent: '#4d9bff', muted: '#9b98cf' } },
   { id: 'retro', name: 'Retro Game Boy', desc: 'Verde y negro clásico', price: 50, colors: { bg: '#0f380f', surface: '#1a5c1a', border: '#306230', text: '#9bbc0f', accent: '#9bbc0f', muted: '#306230' } },
-  { id: 'light', name: 'Claro', desc: 'Tema blanco limpio', price: 40, colors: { bg: '#f1f5f9', surface: '#ffffff', border: '#cbd5e1', text: '#1e293b', accent: '#2563eb', muted: '#94a3b8' } },
-  { id: 'neon', name: 'Neón Cyberpunk', desc: 'Rosa neón y negro', price: 75, colors: { bg: '#0a0a0f', surface: '#1a1a2e', border: '#e94560', text: '#e2e8f0', accent: '#e94560', muted: '#7c7c9a' } },
+  { id: 'light', name: 'Claro', desc: 'Tema blanco limpio', price: 40, colors: { bg: '#f1f5f9', surface: '#ffffff', border: '#d9d6f2', text: '#1c1c3a', accent: '#2563eb', muted: '#9b98cf' } },
+  { id: 'neon', name: 'Neón Cyberpunk', desc: 'Rosa neón y negro', price: 75, colors: { bg: '#0a0a0f', surface: '#1a1a2e', border: '#e94560', text: '#f3f1ff', accent: '#e94560', muted: '#7c7c9a' } },
   { id: 'crimson', name: 'Carmesí', desc: 'Rojo oscuro y dorado', price: 75, colors: { bg: '#1a0000', surface: '#2d0a0a', border: '#8b0000', text: '#ffd700', accent: '#ff4444', muted: '#8b4513' } },
-  { id: 'ocean', name: 'Océano Profundo', desc: 'Azules y turquesa', price: 60, colors: { bg: '#001220', surface: '#001f3f', border: '#0074D9', text: '#e2e8f0', accent: '#7FDBFF', muted: '#39CCCC' } },
+  { id: 'ocean', name: 'Océano Profundo', desc: 'Azules y turquesa', price: 60, colors: { bg: '#001220', surface: '#001f3f', border: '#0074D9', text: '#f3f1ff', accent: '#7FDBFF', muted: '#39CCCC' } },
   { id: 'forest', name: 'Bosque Encantado', desc: 'Verdes y tierra', price: 60, colors: { bg: '#0d1f0d', surface: '#1a2e1a', border: '#2d5a27', text: '#d4edda', accent: '#28a745', muted: '#6b8e23' } },
 ]
 
@@ -982,6 +983,51 @@ function nodeTypeLabel(node: RouteNode): string {
   }
 }
 
+const NODE_EMOJIS: Record<string, string> = {
+  battle: '⚔️',
+  rest: '🏕️',
+  shop: '🏪',
+  boss: '👑',
+  teamRocket: '®️',
+  spin: '🎰',
+  pokeRand: '🎲',
+  move: '🧬',
+  mega: '💎',
+  gmax: '⚡',
+}
+
+const NODE_TYPE_COLORS: Record<string, string> = {
+  battle: '#7d7ab5',
+  rest: '#37d16b',
+  shop: '#ffcb05',
+  boss: '#ee3b2f',
+  teamRocket: '#ee3b2f',
+  spin: '#a855f7',
+  pokeRand: '#4d9bff',
+  move: '#56e0cd',
+  mega: '#ff9ad6',
+  gmax: '#9da6ff',
+}
+
+function getNodeMapLayout(nodeCount: number): { positions: Array<{ x: number; y: number }>; width: number; height: number } {
+  const perRow = nodeCount <= 6 ? nodeCount : Math.min(6, Math.max(4, Math.ceil(Math.sqrt(nodeCount * 2.5))))
+  const rows = Math.ceil(nodeCount / perRow)
+  const spacingX = 150
+  const spacingY = 145
+  const marginX = 75
+  const width = marginX * 2 + (perRow - 1) * spacingX
+  const height = 70 + (rows - 1) * spacingY + 90
+  const positions: Array<{ x: number; y: number }> = []
+  for (let i = 0; i < nodeCount; i++) {
+    const row = Math.floor(i / perRow)
+    const col = row % 2 === 0 ? i % perRow : perRow - 1 - (i % perRow)
+    const rowCount = Math.min(perRow, nodeCount - row * perRow)
+    const rowCenteredOffset = (row % 2 === 0 ? 1 : -1) * (perRow - rowCount) * spacingX / 2
+    positions.push({ x: marginX + rowCenteredOffset + col * spacingX, y: 70 + row * spacingY })
+  }
+  return { positions, width, height }
+}
+
 function moveTooltip(move: Move): string {
   const accuracy = move.accuracy === null ? 'Siempre acierta' : `${move.accuracy}% precisión`
   let info = `${move.name}\nPotencia: ${move.power}\n${accuracy}`
@@ -1151,6 +1197,7 @@ function MainApp() {
   const [equipModal, setEquipModal] = useState<{ itemName: string; itemIndex: number } | null>(null)
   const [stoneEvoModal, setStoneEvoModal] = useState<{ stoneName: string; stoneIndex: number } | null>(null)
   const [stoneEvoTargets, setStoneEvoTargets] = useState<Pokemon[]>([])
+  const [stoneEvoCanEvolve, setStoneEvoCanEvolve] = useState<Set<number>>(new Set())
 
   // Captura de Pokémon salvaje
   const [captureModal, setCaptureModal] = useState(false)
@@ -1214,6 +1261,7 @@ function MainApp() {
   const optionsBeganInBattle = useRef(false)
   const [volume, setVolumeState] = useState<number>(() => Math.round(getVolume() * 100))
   const [sfxVol, setSfxVolState] = useState<number>(() => Math.round(getSfxVolume() * 100))
+  const [musicMuted, setMusicMutedState] = useState<boolean>(() => isMusicMuted())
 
   const [pokedex, setPokedex] = useState<Record<number, PokedexEntry>>(() => {
     try {
@@ -1925,6 +1973,8 @@ function MainApp() {
 
     megaNodeSpawnedRef.current = false
 
+    setRunSeed(Math.random())
+
     setIsLoading(true)
     setApiError('')
 
@@ -2231,6 +2281,110 @@ function MainApp() {
     }
   }
 
+  function finalizeRunVictory(): void {
+    const wins = record.wins + 1
+    persistRecord(wins, record.losses)
+
+    // Actualizar progresión de desbloqueos
+    const genPlayed = currentRunGen
+    const isMediumOrHard = difficulty === 'medium' || difficulty === 'hard'
+
+    const newlyUnlockedHard = !progression.completedAny.includes(genPlayed)
+    const newlyUnlockedNextGen = isMediumOrHard && genPlayed < 9 && !progression.completedMedium.includes(genPlayed)
+    const newlyUnlockedInfinite = difficulty === 'hard' && !progression.completedHard.includes(genPlayed)
+
+    const nextCompletedAny = Array.from(new Set([...progression.completedAny, genPlayed]))
+    const nextCompletedMedium = isMediumOrHard
+      ? Array.from(new Set([...progression.completedMedium, genPlayed]))
+      : progression.completedMedium
+    const nextCompletedHard = difficulty === 'hard'
+      ? Array.from(new Set([...progression.completedHard, genPlayed]))
+      : progression.completedHard
+
+    const updatedProgression: ProgressionData = {
+      completedAny: nextCompletedAny,
+      completedMedium: nextCompletedMedium,
+      completedHard: nextCompletedHard,
+      completedColiseum: progression.completedColiseum,
+      completedLeague: currentNode && currentNode.id >= 1000
+        ? Array.from(new Set([...progression.completedLeague, genPlayed]))
+        : progression.completedLeague
+    }
+
+    localStorage.setItem('pokerand_progression', JSON.stringify(updatedProgression))
+    setProgression(updatedProgression)
+
+    setVictoryUnlocks({
+      genName: generationRegions[genPlayed],
+      nextGenNumber: newlyUnlockedNextGen ? genPlayed + 1 : null,
+      nextGenName: newlyUnlockedNextGen ? generationRegions[genPlayed + 1] : null,
+      unlockedHard: newlyUnlockedHard,
+      unlockedInfinite: newlyUnlockedInfinite
+    })
+
+    const newStreak = winStreak + 1
+    setWinStreak(newStreak)
+    localStorage.setItem('pokerand_streak', String(newStreak))
+    if (newStreak > bestStreak) {
+      setBestStreak(newStreak)
+      localStorage.setItem('pokerand_best_streak', String(newStreak))
+    }
+    unlockAchievement('first_win')
+    if (runChallenges.nuzlocke || runChallenges.nuzlockeHardcore) unlockAchievement('nuzlocke_win')
+    if (team.length <= 1) unlockAchievement('solo_win')
+    if (runChallenges.speedrun) unlockAchievement('speedrun_win')
+    if (runChallenges.noItems) unlockAchievement('no_item_win')
+    if (runChallenges.ironman) unlockAchievement('ironman_win')
+    if (difficulty === 'hard') unlockAchievement('hard_win')
+    if (difficulty === 'easy') unlockAchievement('rookie')
+    if (runChallenges.bossRush) unlockAchievement('boss_rush_win')
+    if (runChallenges.challengeGauntlet) unlockAchievement('gauntlet_win')
+    if (nextCompletedAny.length >= 9) unlockAchievement('all_gens')
+
+    if (difficulty === 'medium') unlockAchievement('medium_win')
+    if (metaProgression.totalWins === 0) unlockAchievement('first_try')
+
+    if (runChallenges.noShops) unlockAchievement('noShops_win')
+    if (runChallenges.noRests) unlockAchievement('noRests_win')
+    if (runChallenges.allShiny) unlockAchievement('allShiny_win')
+    if (runChallenges.noMoney) unlockAchievement('noMoney_win')
+    if (runChallenges.egglocke) unlockAchievement('egglocke_win')
+    if (runChallenges.nuzlockeHardcore) unlockAchievement('nuzlockeHC_win')
+    if (runChallenges.noHealing) unlockAchievement('noHeal_win')
+    if (runChallenges.allTeamRocket) unlockAchievement('allTeamRocket_win')
+
+    const activeChallengeCount = Object.entries(runChallenges).filter(([k, v]) => v && k !== 'allShiny').length
+    if (activeChallengeCount >= 3) unlockAchievement('triple_challenge')
+    if (activeChallengeCount >= 5) unlockAchievement('challenge_mania')
+    if (battleMegaUsed) unlockAchievement('mega_win')
+    if (battleGmaxUsed) unlockAchievement('gmax_win')
+
+    const hasActiveChallenge = activeChallengeCount > 0
+    const baseCoins = difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15
+
+    setMetaProgression(prev => {
+      const coins = baseCoins + (hasActiveChallenge ? 15 : 0)
+      const updated = { ...prev, totalRuns: prev.totalRuns + 1, totalWins: prev.totalWins + 1, bestStreak: Math.max(prev.bestStreak, newStreak), pokeCoins: prev.pokeCoins + coins }
+      localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+      return updated
+    })
+    awardPokeCoins(baseCoins, `¡Victoria! (${difficulty === 'easy' ? 'Fácil' : difficulty === 'hard' ? 'Difícil' : 'Medio'})`)
+    if (currentNode && currentNode.id >= 1000) {
+      awardPokeCoins(15, '🏆 Victoria en la Liga Pokémon')
+    }
+    if (hasActiveChallenge) awardPokeCoins(15, 'Bonus Desafío Activo')
+    if (team.length <= 1) awardPokeCoins(5, 'Bonus Solo Pokémon')
+
+    setScreen('victory')
+    playVictoryFanfare()
+    if (isDailyRunRef.current && Object.values(runChallenges).every(v => !v)) {
+      setDailyPlayed(true)
+      localStorage.setItem('pokerand_daily', dailySeed)
+      awardPokeCoins(15, 'Bonus Desafío Diario')
+      unlockAchievement('daily_3')
+    }
+  }
+
   function completeCurrentNode(): void {
     if (difficulty === 'coliseum') {
       setTeam(prev => prev.map(p => ({ ...p, hp: p.maxHp, status: undefined })))
@@ -2240,6 +2394,7 @@ function MainApp() {
     setRestEncounter(null)
     setRestRewardItem('')
     setLegendaryEncounter(null)
+    setBattleTurns(0)
     if (speedrunTimerRef.current) {
       clearInterval(speedrunTimerRef.current)
       speedrunTimerRef.current = null
@@ -2329,107 +2484,7 @@ function MainApp() {
         }
       }
 
-      const wins = record.wins + 1
-      persistRecord(wins, record.losses)
-
-      // Actualizar progresión de desbloqueos
-      const genPlayed = currentRunGen
-      const isMediumOrHard = difficulty === 'medium' || difficulty === 'hard'
-
-      const newlyUnlockedHard = !progression.completedAny.includes(genPlayed)
-      const newlyUnlockedNextGen = isMediumOrHard && genPlayed < 9 && !progression.completedMedium.includes(genPlayed)
-      const newlyUnlockedInfinite = difficulty === 'hard' && !progression.completedHard.includes(genPlayed)
-
-      const nextCompletedAny = Array.from(new Set([...progression.completedAny, genPlayed]))
-      const nextCompletedMedium = isMediumOrHard
-        ? Array.from(new Set([...progression.completedMedium, genPlayed]))
-        : progression.completedMedium
-      const nextCompletedHard = difficulty === 'hard'
-        ? Array.from(new Set([...progression.completedHard, genPlayed]))
-        : progression.completedHard
-
-      const updatedProgression: ProgressionData = {
-        completedAny: nextCompletedAny,
-        completedMedium: nextCompletedMedium,
-        completedHard: nextCompletedHard,
-        completedColiseum: progression.completedColiseum,
-        completedLeague: currentNode && currentNode.id >= 1000
-          ? Array.from(new Set([...progression.completedLeague, genPlayed]))
-          : progression.completedLeague
-      }
-
-      localStorage.setItem('pokerand_progression', JSON.stringify(updatedProgression))
-      setProgression(updatedProgression)
-
-      setVictoryUnlocks({
-        genName: generationRegions[genPlayed],
-        nextGenNumber: newlyUnlockedNextGen ? genPlayed + 1 : null,
-        nextGenName: newlyUnlockedNextGen ? generationRegions[genPlayed + 1] : null,
-        unlockedHard: newlyUnlockedHard,
-        unlockedInfinite: newlyUnlockedInfinite
-      })
-
-      const newStreak = winStreak + 1
-      setWinStreak(newStreak)
-      localStorage.setItem('pokerand_streak', String(newStreak))
-      if (newStreak > bestStreak) {
-        setBestStreak(newStreak)
-        localStorage.setItem('pokerand_best_streak', String(newStreak))
-      }
-      unlockAchievement('first_win')
-      if (runChallenges.nuzlocke || runChallenges.nuzlockeHardcore) unlockAchievement('nuzlocke_win')
-      if (team.length <= 1) unlockAchievement('solo_win')
-      if (runChallenges.speedrun) unlockAchievement('speedrun_win')
-      if (runChallenges.noItems) unlockAchievement('no_item_win')
-      if (runChallenges.ironman) unlockAchievement('ironman_win')
-      if (difficulty === 'hard') unlockAchievement('hard_win')
-      if (difficulty === 'easy') unlockAchievement('rookie')
-      if (runChallenges.bossRush) unlockAchievement('boss_rush_win')
-      if (runChallenges.challengeGauntlet) unlockAchievement('gauntlet_win')
-      if (nextCompletedAny.length >= 9) unlockAchievement('all_gens')
-
-      if (difficulty === 'medium') unlockAchievement('medium_win')
-      if (metaProgression.totalWins === 0) unlockAchievement('first_try')
-
-      if (runChallenges.noShops) unlockAchievement('noShops_win')
-      if (runChallenges.noRests) unlockAchievement('noRests_win')
-      if (runChallenges.allShiny) unlockAchievement('allShiny_win')
-      if (runChallenges.noMoney) unlockAchievement('noMoney_win')
-      if (runChallenges.egglocke) unlockAchievement('egglocke_win')
-      if (runChallenges.nuzlockeHardcore) unlockAchievement('nuzlockeHC_win')
-      if (runChallenges.noHealing) unlockAchievement('noHeal_win')
-      if (runChallenges.allTeamRocket) unlockAchievement('allTeamRocket_win')
-
-      const activeChallengeCount = Object.entries(runChallenges).filter(([k, v]) => v && k !== 'allShiny').length
-      if (activeChallengeCount >= 3) unlockAchievement('triple_challenge')
-      if (activeChallengeCount >= 5) unlockAchievement('challenge_mania')
-      if (battleMegaUsed) unlockAchievement('mega_win')
-      if (battleGmaxUsed) unlockAchievement('gmax_win')
-
-      const hasActiveChallenge = activeChallengeCount > 0
-      const baseCoins = difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15
-
-      setMetaProgression(prev => {
-        const coins = baseCoins + (hasActiveChallenge ? 15 : 0)
-        const updated = { ...prev, totalRuns: prev.totalRuns + 1, totalWins: prev.totalWins + 1, bestStreak: Math.max(prev.bestStreak, newStreak), pokeCoins: prev.pokeCoins + coins }
-        localStorage.setItem('pokerand_meta', JSON.stringify(updated))
-        return updated
-      })
-      awardPokeCoins(baseCoins, `¡Victoria! (${difficulty === 'easy' ? 'Fácil' : difficulty === 'hard' ? 'Difícil' : 'Medio'})`)
-      if (currentNode && currentNode.id >= 1000) {
-        awardPokeCoins(15, '🏆 Victoria en la Liga Pokémon')
-      }
-      if (hasActiveChallenge) awardPokeCoins(15, 'Bonus Desafío Activo')
-      if (team.length <= 1) awardPokeCoins(5, 'Bonus Solo Pokémon')
-
-      setScreen('victory')
-      playVictoryFanfare()
-      if (isDailyRunRef.current && Object.values(runChallenges).every(v => !v)) {
-        setDailyPlayed(true)
-        localStorage.setItem('pokerand_daily', dailySeed)
-        awardPokeCoins(15, 'Bonus Desafío Diario')
-        unlockAchievement('daily_3')
-      }
+      finalizeRunVictory()
       return
     }
 
@@ -2699,6 +2754,7 @@ function MainApp() {
         setEnemy(gmaxEnemy)
         setBattleLog(prev => [`⚡ ¡Un Pokémon Gigamax aparece! ${gmaxEnemy.name} está listo para el combate.`, ...prev].slice(0, 15))
         startBattleMusic()
+        setBattleTurns(0)
         setScreen('battle')
       } catch {
         setApiError('Error al generar el Pokémon G-MAX.')
@@ -2723,6 +2779,7 @@ function MainApp() {
     }
 
     if (currentNode.type === 'rest') {
+    if (restEncounter) return
     setIsLoading(true)
     setApiError('')
 
@@ -2987,6 +3044,7 @@ function MainApp() {
       setBattleGmaxUsed(false)
       originalPokemonDataRef.current = {}
       battleStartHPRef.current = activePokemon.hp
+      setBattleTurns(0)
       setScreen('battle')
 
       if (runChallenges.speedrun) {
@@ -4301,6 +4359,7 @@ function MainApp() {
         setBattleLog((prev) => [`${stoneEvoModal.stoneName} no tiene efecto en ${targetPokemon.name}.`, ...prev].slice(0, 15))
         setStoneEvoModal(null)
         setStoneEvoTargets([])
+        setStoneEvoCanEvolve(new Set())
         return
       }
 
@@ -4331,6 +4390,7 @@ function MainApp() {
       setIsLoading(false)
       setStoneEvoModal(null)
       setStoneEvoTargets([])
+      setStoneEvoCanEvolve(new Set())
     }
   }
 
@@ -4338,7 +4398,21 @@ function MainApp() {
     const itemIndex = inventory.indexOf(itemName)
     if (itemIndex === -1) return
     if (HOLDABLE_ITEMS[itemName]) return
-    if (POKEBALL_NAMES.includes(itemName)) return
+    if (POKEBALL_NAMES.includes(itemName)) {
+      if (screen === 'battle' && enemy && !isTrainerBattle && currentNode?.type !== 'gmax') {
+        if (isLoading) return
+        if (runChallenges.soloStarter) {
+          setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
+          return
+        }
+        if (runChallenges.fixedTeam) {
+          setBattleLog((prev) => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
+          return
+        }
+        attemptCapture(itemName)
+      }
+      return
+    }
 
     if (EVOLUTION_STONE_UNLOCK_IDS[itemName] || itemName === 'Gorra de Ash') {
       const candidates = team.filter(p => p.hp > 0)
@@ -4348,6 +4422,22 @@ function MainApp() {
       }
       setStoneEvoTargets(candidates)
       setStoneEvoModal({ stoneName: itemName, stoneIndex: itemIndex })
+      setStoneEvoCanEvolve(new Set())
+      const stoneItemName = EVOLUTION_STONE_ITEM_NAMES[itemName]
+      if (stoneItemName) {
+        Promise.all(candidates.map(p => canEvolveWithStone(p.id, stoneItemName)))
+          .then(results => {
+            const evolvable = new Set<number>()
+            candidates.forEach((p, i) => {
+              if (results[i]?.canEvolve) {
+                const realIdx = team.indexOf(p)
+                if (realIdx >= 0) evolvable.add(realIdx)
+              }
+            })
+            setStoneEvoCanEvolve(evolvable)
+          })
+          .catch(() => { /* sin resaltar si falla la consulta */ })
+      }
       return
     }
 
@@ -4610,30 +4700,69 @@ function MainApp() {
     return pkmn.name.toLowerCase().includes(term) || String(pkmn.id).includes(term) || formattedId.includes(term)
   })
 
+  const toggleMusicMuted = (): void => {
+    playClick()
+    const next = !musicMuted
+    setMusicMuted(next)
+    setMusicMutedState(next)
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
         <div className="left-toolbar">
+          <button
+            className="tiny-btn"
+            type="button"
+            title={musicMuted ? 'Activar música' : 'Silenciar música'}
+            onClick={toggleMusicMuted}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              {musicMuted ? (
+                <>
+                  <line x1="23" y1="9" x2="17" y2="15" />
+                  <line x1="17" y1="9" x2="23" y2="15" />
+                </>
+              ) : (
+                <>
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                </>
+              )}
+            </svg>
+          </button>
           <button className="tiny-btn" type="button" onClick={() => setShowPokedex(true)}>
-            📖 Pokédex ({pokedexCaught}/{pokedexSeen})
+            Pokédex ({pokedexCaught}/{pokedexSeen})
           </button>
           <button className="tiny-btn" type="button" onClick={() => { playClick(); optionsBeganInBattle.current = screen === 'battle'; setShowOptions(!showOptions) }}>
-            ⚙️ Opciones
+            Opciones
           </button>
           <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowAchievements(!showAchievements) }}>
-            🏅 Logros
+            Logros
           </button>
           <button className="tiny-btn" type="button" onClick={onRestartRun}>
-            Restart
+            Volver a inicio
           </button>
         </div>
         <h1>PokeRand</h1>
         <div className="record-box">
-          {winStreak >= 2 && <span style={{ color: '#f97316', fontWeight: 'bold', marginRight: '0.5rem' }}>🔥 {winStreak}</span>}
-          <span style={{ color: '#facc15', fontWeight: 'bold' }}>🪙 {metaProgression.pokeCoins}</span>
-          <span style={{ color: '#facc15', fontWeight: 'bold', marginLeft: '0.5rem' }}>💵 ${money}</span>
+          {winStreak >= 2 && <span style={{ color: '#ff8a33', fontWeight: 'bold', marginRight: '0.5rem' }}>🔥 {winStreak}</span>}
+          <span style={{ color: '#ffcb05', fontWeight: 'bold' }}>🪙 {metaProgression.pokeCoins}</span>
+          <span style={{ color: '#ffcb05', fontWeight: 'bold', marginLeft: '0.5rem' }}>💵 ${money}</span>
           <span style={{ color: '#10b981', fontWeight: 'bold' }}>W {record.wins}</span>
-          <span style={{ color: '#ef4444', fontWeight: 'bold' }}>L {record.losses}</span>
+          <span style={{ color: '#ee3b2f', fontWeight: 'bold' }}>L {record.losses}</span>
         </div>
       </header>
 
@@ -4641,17 +4770,13 @@ function MainApp() {
       {reviveModal && (
         <div className="modal-backdrop" onClick={() => setReviveModal(null)}>
           <div
-            className="revive-modal"
+            className="panel"
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-              border: '1px solid rgba(250, 204, 21, 0.4)',
-              borderRadius: '16px',
               padding: '1.5rem',
               maxWidth: '380px',
               width: '90%',
-              margin: 'auto',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.6)'
+              margin: 'auto'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
@@ -4663,13 +4788,13 @@ function MainApp() {
                 />
               )}
               <div>
-                <h3 style={{ margin: 0, color: '#facc15', fontSize: '1.1rem' }}>{reviveModal.itemName}</h3>
-                <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8' }}>
+                <h3 style={{ margin: 0, color: '#ffcb05', fontSize: '1.1rem' }}>{reviveModal.itemName}</h3>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#9b98cf' }}>
                   {reviveModal.itemName === 'Max Revive' ? 'Revive con HP completo' : 'Revive con 50% HP'}
                 </p>
               </div>
             </div>
-            <p style={{ color: '#cbd5e1', fontSize: '0.85rem', marginBottom: '1rem' }}>Elige a qué Pokémon debilitado dárselo:</p>
+            <p style={{ color: '#d9d6f2', fontSize: '0.85rem', marginBottom: '1rem' }}>Elige a qué Pokémon debilitado dárselo:</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {team.map((pkmn, idx) => {
                 const isFainted = pkmn.hp <= 0
@@ -4705,20 +4830,20 @@ function MainApp() {
                       }}
                     />
                     <div style={{ textAlign: 'left', flex: 1 }}>
-                      <strong style={{ display: 'block', fontSize: '0.95rem', textTransform: 'capitalize', color: isFainted ? '#f8fafc' : '#64748b' }}>
+                      <strong style={{ display: 'block', fontSize: '0.95rem', textTransform: 'capitalize', color: isFainted ? '#f8fafc' : '#7d7ab5' }}>
                         {pkmn.name}
                       </strong>
-                      <span style={{ fontSize: '0.75rem', color: isFainted ? '#94a3b8' : '#475569' }}>
+                      <span style={{ fontSize: '0.75rem', color: isFainted ? '#9b98cf' : '#475569' }}>
                         Nv. {pkmn.level} · HP: {pkmn.hp}/{pkmn.maxHp}
                       </span>
                     </div>
                     {isFainted && (
-                      <span style={{ fontSize: '0.8rem', color: '#4ade80', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#7ceb95', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
                         → {restoredHp} HP
                       </span>
                     )}
                     {!isFainted && (
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>No debilitado</span>
+                      <span style={{ fontSize: '0.75rem', color: '#7d7ab5' }}>No debilitado</span>
                     )}
                   </button>
                 )
@@ -4740,17 +4865,13 @@ function MainApp() {
       {equipModal && (
         <div className="modal-backdrop" onClick={() => setEquipModal(null)}>
           <div
-            className="revive-modal"
+            className="panel"
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-              border: '1px solid rgba(168, 85, 247, 0.4)',
-              borderRadius: '16px',
               padding: '1.5rem',
               maxWidth: '380px',
               width: '90%',
-              margin: 'auto',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.6)'
+              margin: 'auto'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
@@ -4762,13 +4883,13 @@ function MainApp() {
                 />
               )}
               <div>
-                <h3 style={{ margin: 0, color: '#c084fc', fontSize: '1.1rem' }}>{equipModal.itemName}</h3>
-                <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8' }}>
+                <h3 style={{ margin: 0, color: '#cba3ff', fontSize: '1.1rem' }}>{equipModal.itemName}</h3>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#9b98cf' }}>
                   {HOLDABLE_ITEMS[equipModal.itemName]?.desc}
                 </p>
               </div>
             </div>
-            <p style={{ color: '#cbd5e1', fontSize: '0.85rem', marginBottom: '1rem' }}>Elige a qué Pokémon equipárselo:</p>
+            <p style={{ color: '#d9d6f2', fontSize: '0.85rem', marginBottom: '1rem' }}>Elige a qué Pokémon equipárselo:</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {team.map((pkmn, idx) => {
                 const isAlive = pkmn.hp > 0
@@ -4810,16 +4931,16 @@ function MainApp() {
                       }}
                     />
                     <div style={{ textAlign: 'left', flex: 1 }}>
-                      <strong style={{ display: 'block', fontSize: '0.95rem', textTransform: 'capitalize', color: canEquip ? '#f8fafc' : '#64748b' }}>
+                      <strong style={{ display: 'block', fontSize: '0.95rem', textTransform: 'capitalize', color: canEquip ? '#f8fafc' : '#7d7ab5' }}>
                         {pkmn.name}
-                        {pkmn.holdItem && <span style={{ fontSize: '0.7rem', color: '#a78bfa', marginLeft: '6px' }}>({pkmn.holdItem})</span>}
+                        {pkmn.holdItem && <span style={{ fontSize: '0.7rem', color: '#b8a1ff', marginLeft: '6px' }}>({pkmn.holdItem})</span>}
                       </strong>
-                      <span style={{ fontSize: '0.75rem', color: canEquip ? '#94a3b8' : '#475569' }}>
+                      <span style={{ fontSize: '0.75rem', color: canEquip ? '#9b98cf' : '#475569' }}>
                         Nv. {pkmn.level} · ATK: {eff.attack} · DEF: {eff.defense} · SPD: {eff.speed}
                       </span>
                     </div>
                     {canEquip && item && (
-                      <div style={{ fontSize: '0.65rem', color: '#c084fc', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: '0.65rem', color: '#cba3ff', textAlign: 'right', whiteSpace: 'nowrap' }}>
                         {item.attackMod && <div>ATK {eff.attack} → {Math.round(pkmn.attack * (1 + item.attackMod))}</div>}
                         {item.defenseMod && <div>DEF {eff.defense} → {Math.round(pkmn.defense * (1 + item.defenseMod))}</div>}
                         {item.speedMod && <div>SPD {eff.speed} → {Math.round(pkmn.speed * (1 + item.speedMod))}</div>}
@@ -4830,10 +4951,10 @@ function MainApp() {
                       </div>
                     )}
                     {!isAlive && (
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Debilitado</span>
+                      <span style={{ fontSize: '0.75rem', color: '#7d7ab5' }}>Debilitado</span>
                     )}
                     {hasItem && (
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Ocupado</span>
+                      <span style={{ fontSize: '0.75rem', color: '#7d7ab5' }}>Ocupado</span>
                     )}
                   </button>
                 )
@@ -4853,20 +4974,28 @@ function MainApp() {
 
       {/* Stone Evolution Modal */}
       {stoneEvoModal && (
-        <div className="modal-backdrop" onClick={() => { setStoneEvoModal(null); setStoneEvoTargets([]) }}>
+        <div className="modal-backdrop" onClick={() => { setStoneEvoModal(null); setStoneEvoTargets([]); setStoneEvoCanEvolve(new Set()) }}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', padding: '1.5rem' }}>
-            <h3 style={{ margin: '0 0 0.75rem', color: '#38bdf8' }}>Evolucionar con {stoneEvoModal.stoneName}</h3>
-            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1rem' }}>Selecciona un Pokémon para evolucionar:</p>
+            <h3 style={{ margin: '0 0 0.75rem', color: '#4d9bff' }}>Evolucionar con {stoneEvoModal.stoneName}</h3>
+            <p style={{ fontSize: '0.85rem', color: '#9b98cf', marginBottom: '1rem' }}>Selecciona un Pokémon para evolucionar:</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {stoneEvoTargets.map((pkmn, idx) => {
                 const realIdx = team.indexOf(pkmn)
+                const canEvo = stoneEvoCanEvolve.has(realIdx)
                 return (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(30,41,59,0.6)', border: '1px solid #334155', cursor: 'pointer' }}
+                  <div key={idx} style={{
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: '8px',
+                    background: canEvo ? 'rgba(74,222,128,0.12)' : 'rgba(30,41,59,0.6)',
+                    border: canEvo ? '1px solid rgba(74,222,128,0.6)' : '1px solid #3f3f6e',
+                    boxShadow: canEvo ? '0 0 10px rgba(74,222,128,0.35)' : 'none',
+                    cursor: 'pointer'
+                  }}
                     onClick={() => handleStoneEvolution(realIdx)}>
                     <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '40px', height: '40px' }} />
                     <div>
-                      <strong style={{ textTransform: 'capitalize', color: '#e2e8f0' }}>{pkmn.name}</strong>
-                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: '8px' }}>Nv.{pkmn.level}</span>
+                      <strong style={{ textTransform: 'capitalize', color: canEvo ? '#a7f3d0' : '#f3f1ff' }}>{pkmn.name}</strong>
+                      <span style={{ fontSize: '0.75rem', color: '#9b98cf', marginLeft: '8px' }}>Nv.{pkmn.level}</span>
+                      {canEvo && <span style={{ fontSize: '0.7rem', color: '#4ade80', marginLeft: '8px' }}>✓ Puede evolucionar</span>}
                     </div>
                   </div>
                 )
@@ -4880,19 +5009,16 @@ function MainApp() {
       {captureModal && enemy && (
         <div className="modal-backdrop" onClick={() => setCaptureModal(false)}>
           <div
+            className="panel"
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-              border: '1px solid rgba(34, 197, 94, 0.4)',
-              borderRadius: '16px',
               padding: '1.5rem',
               maxWidth: '420px',
               width: '90%',
-              margin: 'auto',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.6)'
+              margin: 'auto'
             }}
           >
-            <h3 style={{ margin: '0 0 0.25rem', color: '#22c55e', textAlign: 'center' }}>
+            <h3 style={{ margin: '0 0 0.25rem', color: '#37d16b', textAlign: 'center' }}>
               🏐 Capturar {enemy.name}
             </h3>
             <p className="muted" style={{ textAlign: 'center', margin: '0 0 1rem', fontSize: '0.8rem' }}>
@@ -4926,7 +5052,7 @@ function MainApp() {
                       background: 'rgba(34, 197, 94, 0.06)',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
-                      color: '#e2e8f0'
+                      color: '#f3f1ff'
                     }}
                     onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(34, 197, 94, 0.15)' }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(34, 197, 94, 0.06)' }}
@@ -4936,13 +5062,13 @@ function MainApp() {
                     )}
                     <div style={{ flex: 1, textAlign: 'left' }}>
                       <strong>{b.name}</strong>
-                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: '8px' }}>x{count}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#9b98cf', marginLeft: '8px' }}>x{count}</span>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 'bold', color: chance >= 90 ? '#22c55e' : chance >= 50 ? '#eab308' : chance >= 20 ? '#f97316' : '#ef4444', fontSize: '0.9rem' }}>
+                      <div style={{ fontWeight: 'bold', color: chance >= 90 ? '#37d16b' : chance >= 50 ? '#eab308' : chance >= 20 ? '#ff8a33' : '#ee3b2f', fontSize: '1.3rem' }}>
                         {chance}%
                       </div>
-                      <div style={{ fontSize: '0.65rem', color: '#64748b' }}>{b.desc}</div>
+                      <div style={{ fontSize: '0.65rem', color: '#7d7ab5' }}>{b.desc}</div>
                     </div>
                   </button>
                 )
@@ -4963,21 +5089,21 @@ function MainApp() {
       {/* Evolution popup */}
       {evoPopup && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, background: 'rgba(0,0,0,0.6)', animation: 'evoFadeIn 0.3s' }}>
-          <div style={{ textAlign: 'center', padding: '2rem', borderRadius: '16px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', border: '2px solid #38bdf8', boxShadow: '0 0 40px rgba(56,189,248,0.3)' }}>
-            <p style={{ color: '#facc15', fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '1rem' }}>✨ ¡Evolución!</p>
+          <div style={{ textAlign: 'center', padding: '2rem', borderRadius: '6px', background: '#1c1c3a', border: '3px solid #4d9bff', boxShadow: '4px 4px 0 0 rgba(0,0,0,0.55)' }}>
+            <p style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '1rem' }}>✨ ¡Evolución!</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'center' }}>
               <div style={{ animation: 'evoFlash 0.6s' }}>
                 <img src={evoPopup.oldSprite} alt="" style={{ width: '80px', height: '80px', imageRendering: 'pixelated', filter: 'brightness(2) sepia(0.5)' }} />
               </div>
-              <span style={{ color: '#94a3b8', fontSize: '1.5rem' }}>→</span>
+              <span style={{ color: '#9b98cf', fontSize: '1.5rem' }}>→</span>
               <div style={{ animation: 'evoAppear 0.6s' }}>
                 <img src={evoPopup.newSprite} alt="" style={{ width: '80px', height: '80px', imageRendering: 'pixelated' }} />
               </div>
             </div>
-            <p style={{ color: '#e2e8f0', marginTop: '0.75rem' }}>
+            <p style={{ color: '#f3f1ff', marginTop: '0.75rem' }}>
               <span style={{ textTransform: 'capitalize' }}>{evoPopup.oldName}</span>
               {' '}evolucionó en{' '}
-              <strong style={{ color: '#38bdf8', textTransform: 'capitalize' }}>{evoPopup.newName}</strong>
+              <strong style={{ color: '#4d9bff', textTransform: 'capitalize' }}>{evoPopup.newName}</strong>
             </p>
           </div>
         </div>
@@ -4987,9 +5113,9 @@ function MainApp() {
       {captureMessage && (
         <div style={{
           position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          background: 'rgba(0,0,0,0.85)', color: '#facc15', padding: '1.5rem 2.5rem',
+          background: 'rgba(0,0,0,0.85)', color: '#ffcb05', padding: '1.5rem 2.5rem',
           borderRadius: '16px', fontSize: '1.2rem', fontWeight: 'bold',
-          border: '2px solid #facc15', zIndex: 10000,
+          border: '2px solid #ffcb05', zIndex: 10000,
           textAlign: 'center', pointerEvents: 'none', animation: 'fadeIn 0.3s ease'
         }}>
           {captureMessage}
@@ -5024,7 +5150,7 @@ function MainApp() {
                     />
                     <div className="detail-title">
                       <span className="pokedex-id">#{String(selectedPokemonDetail.id).padStart(3, '0')}</span>
-                      <h2 style={{ textTransform: 'capitalize', margin: '4px 0 8px 0', color: '#38bdf8' }}>
+                      <h2 style={{ textTransform: 'capitalize', margin: '4px 0 8px 0', color: '#4d9bff' }}>
                         {selectedPokemonDetail.name}
                       </h2>
                       <div className="types-list" style={{ display: 'flex', gap: '4px' }}>
@@ -5050,20 +5176,20 @@ function MainApp() {
 
                   {selectedPokemonDetail.evolutions.length > 0 && (
                     <>
-                      <h3 style={{ fontSize: '0.9rem', color: '#94a3b8', marginTop: '12px' }}>Cadena Evolutiva</h3>
+                      <h3 style={{ fontSize: '0.9rem', color: '#9b98cf', marginTop: '12px' }}>Cadena Evolutiva</h3>
                       <div className="evolution-chain" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', padding: '8px 0' }}>
                         {selectedPokemonDetail.evolutions.map((evo, idx) => {
                           const entry = pokedex[evo.id]
                           const known = !!entry?.caught
                           return (
                             <div key={evo.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              {idx > 0 && <span style={{ color: '#64748b', fontSize: '1.2rem' }}>→</span>}
+                              {idx > 0 && <span style={{ color: '#7d7ab5', fontSize: '1.2rem' }}>→</span>}
                               <div
                                 className="pokedex-card"
                                 style={{
                                   display: 'flex', flexDirection: 'column', alignItems: 'center',
                                   padding: '6px', borderRadius: '8px', background: 'rgba(15,23,42,0.6)',
-                                  border: evo.id === selectedPokemonDetail.id ? '2px solid #38bdf8' : '1px solid #334155',
+                                  border: evo.id === selectedPokemonDetail.id ? '2px solid #4d9bff' : '1px solid #3f3f6e',
                                   minWidth: '80px', opacity: known ? 1 : 0.5, cursor: known ? 'pointer' : 'default'
                                 }}
                                 onClick={() => known && handleSelectPokedexPokemon(evo.id)}
@@ -5074,14 +5200,14 @@ function MainApp() {
                                   onError={(e) => { (e.target as HTMLImageElement).src = evo.sprite }}
                                   style={{ width: '56px', height: '56px', imageRendering: 'pixelated', filter: known ? 'none' : 'brightness(0) invert(0)' }}
                                 />
-                                <strong style={{ textTransform: 'capitalize', fontSize: '0.75rem', color: evo.id === selectedPokemonDetail.id ? '#38bdf8' : '#e2e8f0', textAlign: 'center' }}>
+                                <strong style={{ textTransform: 'capitalize', fontSize: '0.75rem', color: evo.id === selectedPokemonDetail.id ? '#4d9bff' : '#f3f1ff', textAlign: 'center' }}>
                                   {known ? evo.name : '???'}
                                 </strong>
                                 {evo.level && (
                                   <span style={{ fontSize: '0.65rem', color: '#a855f7' }}>Nv. {evo.level}</span>
                                 )}
                                 {!evo.level && evo.trigger && evo.trigger !== 'level-up' && (
-                                  <span style={{ fontSize: '0.65rem', color: '#facc15' }}>{evo.trigger}</span>
+                                  <span style={{ fontSize: '0.65rem', color: '#ffcb05' }}>{evo.trigger}</span>
                                 )}
                               </div>
                             </div>
@@ -5091,7 +5217,7 @@ function MainApp() {
                     </>
                   )}
 
-                  <h3 style={{ fontSize: '0.9rem', color: '#94a3b8', marginTop: '8px' }}>Estadísticas Base</h3>
+                  <h3 style={{ fontSize: '0.9rem', color: '#9b98cf', marginTop: '8px' }}>Estadísticas Base</h3>
                   <div className="stats-grid">
                     {selectedPokemonDetail.stats.map((st) => (
                       <div key={st.name} className="stat-row">
@@ -5109,7 +5235,7 @@ function MainApp() {
                 <>
                   <div className="modal-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <h2 style={{ fontSize: '1.2rem', color: '#38bdf8', margin: 0 }}>
+                      <h2 style={{ fontSize: '0.65rem', color: '#4d9bff', margin: 0 }}>
                         Pokédex ({pokedexSeen} vistos · {pokedexCaught} capturados)
                       </h2>
                     </div>
@@ -5143,7 +5269,7 @@ function MainApp() {
                             transform: 'translateY(-50%)',
                             background: 'none',
                             border: 'none',
-                            color: '#94a3b8',
+                            color: '#9b98cf',
                             cursor: 'pointer',
                             fontSize: '0.9rem'
                           }}
@@ -5219,7 +5345,7 @@ function MainApp() {
                     🎵 Volumen de Música
                   </strong>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', minWidth: '20px' }}>🔈</span>
+                    <span style={{ fontSize: '0.8rem', color: '#9b98cf', minWidth: '20px' }}>🔈</span>
                     <input
                       type="range"
                       min={0}
@@ -5229,10 +5355,14 @@ function MainApp() {
                         const v = Number(e.target.value)
                         setVolumeState(v)
                         setVolume(v / 100)
+                        if (musicMuted) {
+                          setMusicMuted(false)
+                          setMusicMutedState(false)
+                        }
                       }}
                       style={{ flex: 1, accentColor: '#10b981', height: '6px', cursor: 'pointer' }}
                     />
-                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', minWidth: '32px', textAlign: 'right' }}>{volume}%</span>
+                    <span style={{ fontSize: '0.8rem', color: '#9b98cf', minWidth: '32px', textAlign: 'right' }}>{volume}%</span>
                   </div>
                 </div>
 
@@ -5241,7 +5371,7 @@ function MainApp() {
                     🔉 Volumen de Efectos
                   </strong>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', minWidth: '20px' }}>🔈</span>
+                    <span style={{ fontSize: '0.8rem', color: '#9b98cf', minWidth: '20px' }}>🔈</span>
                     <input
                       type="range"
                       min={0}
@@ -5254,7 +5384,7 @@ function MainApp() {
                       }}
                       style={{ flex: 1, accentColor: '#f59e0b', height: '6px', cursor: 'pointer' }}
                     />
-                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', minWidth: '32px', textAlign: 'right' }}>{sfxVol}%</span>
+                    <span style={{ fontSize: '0.8rem', color: '#9b98cf', minWidth: '32px', textAlign: 'right' }}>{sfxVol}%</span>
                   </div>
               </div>
 
@@ -5267,7 +5397,7 @@ function MainApp() {
                     <button key={theme.id} type="button"
                       onClick={() => { playClick(); setTheme(theme.id) }}
                       style={{
-                        padding: '6px 12px', borderRadius: '8px', border: `2px solid ${metaProgression.activeTheme === theme.id ? '#facc15' : '#475569'}`,
+                        padding: '6px 12px', borderRadius: '8px', border: `2px solid ${metaProgression.activeTheme === theme.id ? '#ffcb05' : '#475569'}`,
                         background: theme.colors.bg, color: theme.colors.text, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold',
                       }}>
                       {theme.name}
@@ -5282,7 +5412,7 @@ function MainApp() {
                   🎵 Música
                 </strong>
                 <div style={{ marginBottom: '0.75rem' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Menú:</div>
+                  <div style={{ fontSize: '0.8rem', color: '#9b98cf', marginBottom: '0.25rem' }}>Menú:</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                     {[
                       { id: 'default', name: 'Menú Clásico', always: true },
@@ -5305,9 +5435,9 @@ function MainApp() {
                           disabled={!unlocked}
                           style={{
                             padding: '6px 12px', borderRadius: '8px',
-                            border: `2px solid ${active ? '#facc15' : '#475569'}`,
-                            background: unlocked ? '#1e293b' : '#0f172a',
-                            color: unlocked ? '#e2e8f0' : '#475569',
+                            border: `2px solid ${active ? '#ffcb05' : '#475569'}`,
+                            background: unlocked ? '#1c1c3a' : '#12122b',
+                            color: unlocked ? '#f3f1ff' : '#475569',
                             cursor: unlocked ? 'pointer' : 'not-allowed',
                             fontSize: '0.75rem', fontWeight: 'bold',
                             opacity: unlocked ? 1 : 0.5,
@@ -5319,7 +5449,7 @@ function MainApp() {
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Batalla:</div>
+                  <div style={{ fontSize: '0.8rem', color: '#9b98cf', marginBottom: '0.25rem' }}>Batalla:</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                     {[
                       { id: 'default', name: 'Batalla Clásica', always: true },
@@ -5341,9 +5471,9 @@ function MainApp() {
                           disabled={!unlocked}
                           style={{
                             padding: '6px 12px', borderRadius: '8px',
-                            border: `2px solid ${active ? '#facc15' : '#475569'}`,
-                            background: unlocked ? '#1e293b' : '#0f172a',
-                            color: unlocked ? '#e2e8f0' : '#475569',
+                            border: `2px solid ${active ? '#ffcb05' : '#475569'}`,
+                            background: unlocked ? '#1c1c3a' : '#12122b',
+                            color: unlocked ? '#f3f1ff' : '#475569',
                             cursor: unlocked ? 'pointer' : 'not-allowed',
                             fontSize: '0.75rem', fontWeight: 'bold',
                             opacity: unlocked ? 1 : 0.5,
@@ -5374,8 +5504,8 @@ function MainApp() {
                   const url = URL.createObjectURL(blob)
                   const a = document.createElement('a'); a.href = url; a.download = 'pokerand_backup.json'; a.click()
                   URL.revokeObjectURL(url)
-                }} style={{ color: '#38bdf8' }}>📤 Exportar datos</button>
-                <label className="tiny-btn" style={{ color: '#facc15', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px', border: '1px solid #facc15', background: 'rgba(250,204,21,0.1)', fontSize: '0.75rem' }}>
+                }} style={{ color: '#4d9bff' }}>📤 Exportar datos</button>
+                <label className="tiny-btn" style={{ color: '#ffcb05', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px', border: '1px solid #ffcb05', background: 'rgba(250,204,21,0.1)', fontSize: '0.75rem' }}>
                   📥 Importar datos
                   <input type="file" accept=".json" style={{ display: 'none' }} onChange={e => {
                     const file = e.target.files?.[0]; if (!file) return
@@ -5464,22 +5594,22 @@ function MainApp() {
       {screen === 'coliseum_select' && (
         <section className="panel setup-panel" style={{ maxWidth: '600px', margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <h2 style={{ margin: 0, color: '#facc15' }}>👑 COLISEUM</h2>
-            <button className="tiny-btn" onClick={() => { playClick(); setColiseumTempTeam([]); setRunChallenges({ noShops: false, noRests: false, allShiny: false, allTeamRocket: false, nuzlocke: false, soloStarter: false, fixedTeam: false, noEvolution: false, noItems: false, restrictedMoves: false, firstStrike: false, fixedLevel: false, noCrits: false, typeRandomizer: false, noPurchasing: false, blindRoute: false, bossRush: false, speedrun: false, noMoney: false, doubleModifiers: false, scalingEnemies: false, noHealing: false, ironman: false, totalRandomizer: false, nuzlockeHardcore: false, challengeGauntlet: false, egglocke: false }); setScreen('setup'); stopMusic() }} type="button" style={{ color: '#f87171' }}>
+            <h2 style={{ margin: 0, color: '#ffcb05' }}>👑 COLISEUM</h2>
+            <button className="tiny-btn" onClick={() => { playClick(); setColiseumTempTeam([]); setRunChallenges({ noShops: false, noRests: false, allShiny: false, allTeamRocket: false, nuzlocke: false, soloStarter: false, fixedTeam: false, noEvolution: false, noItems: false, restrictedMoves: false, firstStrike: false, fixedLevel: false, noCrits: false, typeRandomizer: false, noPurchasing: false, blindRoute: false, bossRush: false, speedrun: false, noMoney: false, doubleModifiers: false, scalingEnemies: false, noHealing: false, ironman: false, totalRandomizer: false, nuzlockeHardcore: false, challengeGauntlet: false, egglocke: false }); setScreen('setup'); stopMusic() }} type="button" style={{ color: '#ff8a80' }}>
               ✕ Salir
             </button>
           </div>
-          <p style={{ textAlign: 'center', color: '#94a3b8', marginBottom: '1rem' }}>
+          <p style={{ textAlign: 'center', color: '#9b98cf', marginBottom: '1rem' }}>
             Selecciona 6 Pokémon de tu Pokédex para enfrentar 8 jefes a nivel 50.
           </p>
-          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#64748b', marginBottom: '0.5rem' }}>
+          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#7d7ab5', marginBottom: '0.5rem' }}>
             Elegidos: {coliseumTempTeam.length}/6
           </p>
           <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
             <input type="text" placeholder="🔍 Buscar Pokémon..." value={coliseumSearch} onChange={e => setColiseumSearch(e.target.value)}
               style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }} />
             {coliseumSearch && <button type="button" onClick={() => setColiseumSearch('')}
-              style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.9rem' }}>✖</button>}
+              style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#9b98cf', cursor: 'pointer', fontSize: '0.9rem' }}>✖</button>}
           </div>
           {coliseumTempTeam.length === 6 && (
             <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
@@ -5497,7 +5627,7 @@ function MainApp() {
                 } finally {
                   setIsLoading(false)
                 }
-              }} style={{ background: '#facc15', color: '#000' }} disabled={isLoading}>
+              }} style={{ background: '#ffcb05', color: '#000' }} disabled={isLoading}>
                 {isLoading ? 'Preparando equipo...' : '👑 ¡Comenzar COLISEUM!'}
               </button>
             </div>
@@ -5520,15 +5650,15 @@ function MainApp() {
                   style={{
                     padding: '8px', borderRadius: '8px', textAlign: 'center', cursor: 'pointer',
                     background: selectedIdx >= 0 ? 'rgba(250,204,21,0.2)' : 'rgba(30,41,59,0.6)',
-                    border: selectedIdx >= 0 ? '2px solid #facc15' : '1px solid #334155',
+                    border: selectedIdx >= 0 ? '2px solid #ffcb05' : '1px solid #3f3f6e',
                     opacity: selectedIdx < 0 && coliseumTempTeam.length >= 6 ? 0.4 : 1
                   }}
                 >
                   <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pkmn.id}.gif`}
                     alt={pkmn.name} onError={fallbackSprite}
                     style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} />
-                  <div style={{ fontSize: '0.75rem', textTransform: 'capitalize', color: selectedIdx >= 0 ? '#facc15' : '#e2e8f0' }}>{pkmn.name}</div>
-                  {selectedIdx >= 0 && <div style={{ fontSize: '0.65rem', color: '#facc15' }}>#{selectedIdx + 1}</div>}
+                  <div style={{ fontSize: '0.75rem', textTransform: 'capitalize', color: selectedIdx >= 0 ? '#ffcb05' : '#f3f1ff' }}>{pkmn.name}</div>
+                  {selectedIdx >= 0 && <div style={{ fontSize: '0.65rem', color: '#ffcb05' }}>#{selectedIdx + 1}</div>}
                 </div>
               )
             })}
@@ -5539,12 +5669,12 @@ function MainApp() {
       {screen === 'setup' && (
         <section className="panel setup-panel">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2 style={{ margin: 0 }}>1. Selecciona la Generación</h2>
+            <h2 style={{ margin: 0, fontSize: '0.85rem' }}>1. Selecciona la Generación</h2>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <button className="cta" type="button" onClick={() => { playClick(); startNewRun() }} onMouseEnter={playHover} disabled={isLoading} style={{ padding: '6px 10px', fontSize: '0.8rem', marginTop: 0 }}>
                 {isLoading ? '...' : 'Iniciar Aventura'}
               </button>
-              <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowMetaShop(true) }} style={{ fontSize: '0.8rem' }}>
+              <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowMetaShop(true) }}>
                 🪙 Tienda Meta ({metaProgression.pokeCoins} 🪙)
               </button>
             </div>
@@ -5629,10 +5759,10 @@ function MainApp() {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.2rem', color: randomUnlocked ? '#facc15' : '#64748b' }}>
+                    <span style={{ fontSize: '1.2rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5' }}>
                       🎲 RANDOM {randomUnlocked ? '' : '🔒'}
                     </span>
-                    <strong style={{ fontSize: '1rem', color: randomUnlocked ? '#facc15' : '#64748b' }}>
+                    <strong style={{ fontSize: '1rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5' }}>
                       — {randomUnlocked ? 'Mezclar todas las generaciones' : 'Modo Caos (Completa todas las generaciones)'}
                     </strong>
                   </div>
@@ -5646,7 +5776,7 @@ function MainApp() {
             })()}
           </div>
 
-          <h2 style={{ marginTop: '1.5rem' }}>2. Selecciona la Dificultad</h2>
+          <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>2. Selecciona la Dificultad</h2>
           <div className="generation-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             {(['easy', 'medium', 'hard'] as Difficulty[]).map((diff) => {
               const isHard = diff === 'hard'
@@ -5703,8 +5833,8 @@ function MainApp() {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.2rem', color: infUnlocked ? '#c084fc' : '#64748b' }}>♾️ INFINITE {infUnlocked ? '' : '🔒'}</span>
-                    <strong style={{ fontSize: '1rem', color: infUnlocked ? '#c084fc' : '#64748b' }}>— Rutas infinitas</strong>
+                    <span style={{ fontSize: '1.2rem', color: infUnlocked ? '#cba3ff' : '#7d7ab5' }}>♾️ INFINITE {infUnlocked ? '' : '🔒'}</span>
+                    <strong style={{ fontSize: '1rem', color: infUnlocked ? '#cba3ff' : '#7d7ab5' }}>— Rutas infinitas</strong>
                   </div>
                   {!infUnlocked && (
                     <span className="lock-text">
@@ -5727,7 +5857,7 @@ function MainApp() {
               type="button"
               disabled={isLoading || !coliseumUnlocked}
               style={{
-                borderColor: difficulty === 'coliseum' ? '#facc15' : '#475569',
+                borderColor: difficulty === 'coliseum' ? '#ffcb05' : '#475569',
                 background: difficulty === 'coliseum' ? 'rgba(250,204,21,0.15)' : 'rgba(15,23,42,0.6)',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 gap: '4px', padding: '12px', opacity: coliseumUnlocked ? 1 : 0.65,
@@ -5735,11 +5865,11 @@ function MainApp() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem', color: coliseumUnlocked ? '#facc15' : '#64748b' }}>👑 COLISEUM {coliseumUnlocked ? '' : '🔒'}</span>
-                <strong style={{ fontSize: '1rem', color: coliseumUnlocked ? '#facc15' : '#64748b' }}>— 8 jefes a nivel 50</strong>
+                <span style={{ fontSize: '1.2rem', color: coliseumUnlocked ? '#ffcb05' : '#7d7ab5' }}>👑 COLISEUM {coliseumUnlocked ? '' : '🔒'}</span>
+                <strong style={{ fontSize: '1rem', color: coliseumUnlocked ? '#ffcb05' : '#7d7ab5' }}>— 8 jefes a nivel 50</strong>
               </div>
               {coliseumUnlocked ? (
-                <span className="lock-text" style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                <span className="lock-text" style={{ color: '#9b98cf', fontSize: '0.75rem' }}>
                   Elige 6 Pokémon de tu Pokédex para enfrentarlos
                 </span>
               ) : (
@@ -5751,7 +5881,7 @@ function MainApp() {
             )})()}
           </div>
 
-          <h2 style={{ marginTop: '1.5rem' }}>🎲 Desafío Diario</h2>
+          <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>🎲 Desafío Diario</h2>
           <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
             {(() => {
               const dailyConfig = getDailyConfig(dailySeed, [1,2,3,4,5,6,7,8,9])
@@ -5771,17 +5901,17 @@ function MainApp() {
               type="button"
               disabled={isLoading || dailyPlayed || !dailyConfig}
               style={{
-                borderColor: dailyPlayed ? '#475569' : '#22c55e',
+                borderColor: dailyPlayed ? '#475569' : '#37d16b',
                 background: dailyPlayed ? 'rgba(15,23,42,0.6)' : 'rgba(34,197,94,0.1)',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '12px',
                 opacity: dailyPlayed ? 0.65 : 1, cursor: dailyPlayed ? 'not-allowed' : 'pointer',
-                border: `1px solid ${dailyPlayed ? '#475569' : '#22c55e'}`, borderRadius: '12px',
+                border: `1px solid ${dailyPlayed ? '#475569' : '#37d16b'}`, borderRadius: '12px',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem', color: dailyPlayed ? '#64748b' : '#22c55e' }}>📅 {dailyPlayed ? 'Completado hoy ✅' : 'Desafío del Día'}</span>
+                <span style={{ fontSize: '1.2rem', color: dailyPlayed ? '#7d7ab5' : '#37d16b' }}>📅 {dailyPlayed ? 'Completado hoy ✅' : 'Desafío del Día'}</span>
               </div>
-              <strong style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+              <strong style={{ fontSize: '0.85rem', color: '#9b98cf' }}>
                 {dailyPlayed ? 'Vuelve mañana para uno nuevo' : `Gen ${dailyConfig?.generation} (${genLabel}) — ${diffLabel} — ${modName}`}
               </strong>
             </button>
@@ -5789,7 +5919,7 @@ function MainApp() {
             })()}
           </div>
 
-          <h2 style={{ marginTop: '1.5rem' }}>3. Desafíos de Run <span className="muted" style={{ fontSize: '0.75rem', fontWeight: 'normal' }}>(opcional)</span></h2>
+          <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>3. Desafíos de Run <span className="muted" style={{ fontSize: '0.7rem', fontWeight: 'normal' }}>(opcional)</span></h2>
           {(() => {
             const challengesUnlocked = generation === 0
               ? generations.every((g) => progression.completedMedium.includes(g))
@@ -5869,7 +5999,7 @@ function MainApp() {
                 )}
                 {challengeCategories.map((cat) => (
                   <div key={cat.title} style={{ marginBottom: '0.75rem' }}>
-                    <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'normal', textAlign: 'center' }}>{cat.title}</h3>
+                    <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '0.85rem', color: '#9b98cf', fontWeight: 'normal', textAlign: 'center' }}>{cat.title}</h3>
                     <div className="challenge-toggles">
                       {cat.items.map((item) => (
                         <button
@@ -5976,7 +6106,7 @@ function MainApp() {
                   <div className="sprite-tooltip">
                     <div className="tooltip-name">{pokemon.name}</div>
                     {pokemon.holdItem && (
-                      <div style={{ fontSize: '0.65rem', color: '#c084fc', marginBottom: '4px' }}>
+                      <div style={{ fontSize: '0.65rem', color: '#cba3ff', marginBottom: '4px' }}>
                         {ITEM_SPRITES[pokemon.holdItem] && (
                           <img src={ITEM_SPRITES[pokemon.holdItem]} alt="" style={{ width: '14px', height: '14px', imageRendering: 'pixelated', verticalAlign: 'middle', marginRight: '3px' }} />
                         )}
@@ -6001,16 +6131,16 @@ function MainApp() {
                         const parts: ReactNode[] = []
                         if (hasItem && base !== eff_ && !isMegaGmax) {
                           parts.push(<strong key="v">{eff_}</strong>)
-                          parts.push(<span key="i" style={{ fontSize: '0.6rem', color: '#4ade80' }}> (+{eff_ - base})</span>)
+                          parts.push(<span key="i" style={{ fontSize: '0.7rem', color: '#7ceb95' }}> (+{eff_ - base})</span>)
                         } else if (isMegaGmax) {
-                          parts.push(<strong key="v" style={{ color: '#f472b6' }}>{eff_}</strong>)
-                          parts.push(<span key="i" style={{ fontSize: '0.6rem', color: '#f472b6' }}> (+{eff_ - base})</span>)
+                          parts.push(<strong key="v" style={{ color: '#ff9ad6' }}>{eff_}</strong>)
+                          parts.push(<span key="i" style={{ fontSize: '0.7rem', color: '#ff9ad6' }}> (+{eff_ - base})</span>)
                         } else {
                           parts.push(<strong key="v">{base}</strong>)
                         }
                         if (stage_ !== 0) {
-                          const color = stage_ > 0 ? '#4ade80' : '#ef4444'
-                          parts.push(<span key="s" style={{ fontSize: '0.6rem', color, marginLeft: '2px' }}>({stage_ > 0 ? '+' : ''}{stage_})</span>)
+                          const color = stage_ > 0 ? '#7ceb95' : '#ee3b2f'
+                          parts.push(<span key="s" style={{ fontSize: '0.7rem', color, marginLeft: '2px' }}>({stage_ > 0 ? '+' : ''}{stage_})</span>)
                         }
                         return <>{parts}</>
                       }
@@ -6036,7 +6166,7 @@ function MainApp() {
                     <button
                       type="button"
                       className="tiny-btn"
-                      style={{ background: '#ef4444', color: '#fff', fontSize: '0.7rem', padding: '2px 4px' }}
+                      style={{ background: '#ee3b2f', color: '#fff', fontSize: '0.7rem', padding: '2px 4px' }}
                       onClick={() => removeFaintedPokemon(index)}
                     >
                       🗑️ Liberar
@@ -6110,7 +6240,7 @@ function MainApp() {
             )}
 
             {team.length > 1 && pcStorage.length > 0 && (
-              <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem', textAlign: 'center' }}>
+              <p style={{ fontSize: '0.7rem', color: '#7d7ab5', marginTop: '0.5rem', textAlign: 'center' }}>
                 Haz clic en "→ Equipo" para sacar del PC. Si el equipo está lleno, se intercambia con el activo.
               </p>
             )}
@@ -6120,14 +6250,14 @@ function MainApp() {
             <h2>
               {difficulty === 'infinite' ? `Ruta #${route.length}` : `Ruta (${routeIndex + 1}/${route.length})`}
               {runChallenges.speedrun && screen === 'battle' && (
-                <span style={{ marginLeft: '10px', fontSize: '0.9rem', color: speedrunSeconds <= 10 ? '#ef4444' : '#facc15', fontWeight: 'bold' }}>
+                <span style={{ marginLeft: '10px', fontSize: '0.9rem', color: speedrunSeconds <= 10 ? '#ee3b2f' : '#ffcb05', fontWeight: 'bold' }}>
                   ⏱️ {speedrunSeconds}s
                 </span>
               )}
             </h2>
             {difficulty !== 'infinite' && difficulty !== 'coliseum' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', padding: '6px 10px', background: 'rgba(250,204,21,0.08)', borderRadius: '8px', border: '1px solid rgba(250,204,21,0.2)' }}>
-                <span style={{ fontSize: '0.85rem', color: '#facc15', fontWeight: 'bold' }}>Etapa {currentStage}/3</span>
+                <span style={{ fontSize: '0.85rem', color: '#ffcb05', fontWeight: 'bold' }}>Etapa {currentStage}/3</span>
                 <div style={{ display: 'flex', gap: '4px' }}>
                   {[0, 1, 2].map(i => {
                     const badge = badges[i]
@@ -6135,7 +6265,7 @@ function MainApp() {
                       <div key={i} style={{
                         width: '28px', height: '28px', borderRadius: '50%',
                         background: badge ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.05)',
-                        border: badge ? '2px solid #facc15' : '2px dashed #475569',
+                        border: badge ? '2px solid #ffcb05' : '2px dashed #475569',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         overflow: 'hidden', transition: 'all 0.3s'
                       }}>
@@ -6157,42 +6287,51 @@ function MainApp() {
               </div>
             )}
             {modifier2 && (
-              <div style={{ fontSize: '0.75rem', color: '#c084fc', marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.75rem', color: '#cba3ff', marginBottom: '0.5rem' }}>
                 🎰 Modifier 2: <strong>{modifier2.name}</strong> — {modifier2.description}
               </div>
             )}
-            <div className="route-grid" style={{ maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }}>
-              {route.map((node, index) => {
-                const isBlindHidden = runChallenges.blindRoute && index > routeIndex
-                const stateClass = index === routeIndex ? 'current' : node.done ? 'done' : 'pending'
-                const rocketClass = node.type === 'teamRocket' ? ' node-teamrocket' : ''
-                const spinClass = node.type === 'spin' ? ' node-spin' : ''
-                const pokeRandClass = node.type === 'pokeRand' ? ' node-pokerand' : ''
-                const moveClass = node.type === 'move' ? ' node-move' : ''
-                const megaClass = node.type === 'mega' ? ' node-mega' : ''
-                const gmaxClass = node.type === 'gmax' ? ' node-gmax' : ''
-                if (isBlindHidden) {
-                  return (
-                    <div key={node.id} className={`node pending`} style={{ opacity: 0.4 }}>
-                      <span>#{node.id}</span>
-                      <strong>???</strong>
-                    </div>
-                  )
-                }
+            <div className="route-map" style={{ paddingRight: '4px' }}>
+              {(() => {
+                const { positions, width, height } = getNodeMapLayout(route.length)
+                const points = positions.map((p) => `${p.x},${p.y}`).join(' ')
                 return (
-                  <div key={node.id} className={`node ${stateClass}${rocketClass}${spinClass}${pokeRandClass}${moveClass}${megaClass}${gmaxClass}`}>
-                    <span>#{node.id}</span>
-                    <strong>{nodeTypeLabel(node)}</strong>
-                  </div>
+                  <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label="Mapa de la ruta">
+                    <polyline points={points} fill="none" stroke="#3f3f6e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                    {route.map((node, index) => {
+                      const pos = positions[index]
+                      const isCurrent = index === routeIndex
+                      const isDone = node.done
+                      const isBlindHidden = runChallenges.blindRoute && index > routeIndex
+                      const color = NODE_TYPE_COLORS[node.type] ?? '#7d7ab5'
+                      const label = isBlindHidden ? '???' : nodeTypeLabel(node)
+                      const clickable = isCurrent && screen === 'route' && !isLoading && !(node.type === 'rest' && restEncounter)
+                      return (
+                        <g key={node.id} transform={`translate(${pos.x},${pos.y})`}
+                          className={isCurrent ? 'map-node map-node-current' : 'map-node'}
+                          style={{ opacity: isDone ? 0.45 : 1, cursor: clickable ? 'pointer' : 'default' }}
+                          onClick={clickable ? () => enterNode() : undefined}>
+                          <circle r="42" fill={color} fillOpacity="0.14" stroke={isCurrent ? '#ffcb05' : color} strokeWidth={isCurrent ? 4 : 2.5} />
+                          <text y="0" textAnchor="middle" dominantBaseline="central" fontSize="44" style={{ pointerEvents: 'none' }}>{isBlindHidden ? '?' : NODE_EMOJIS[node.type] ?? '•'}</text>
+                          {!isBlindHidden && (
+                            <>
+                              <text y="-54" textAnchor="middle" fontSize="15" fill={isCurrent ? '#ffcb05' : '#9b98cf'}>#{node.id}</text>
+                              <text y="64" textAnchor="middle" fontSize="16" fill={isCurrent ? '#ffcb05' : '#d9d6f2'} fontWeight={isCurrent ? 'bold' : 'normal'}>{label}</text>
+                            </>
+                          )}
+                        </g>
+                      )
+                    })}
+                  </svg>
                 )
-              })}
+              })()}
             </div>
 
             {screen === 'shop' && (
               <div className="action-block shop-block" style={{ marginTop: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <h3 style={{ margin: 0, color: '#facc15' }}>🏪 Pokémart</h3>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#4ade80' }}>
+                  <h3 style={{ margin: 0, color: '#ffcb05' }}>🏪 Pokémart</h3>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#7ceb95' }}>
                     Dinero: ${money}
                   </span>
                 </div>
@@ -6232,9 +6371,9 @@ function MainApp() {
                             />
                           )}
                           <div>
-                            <strong style={{ color: isHoldable ? '#c084fc' : '#38bdf8' }}>{itemName}</strong>
-                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8' }}>{data.desc}</p>
-                            {isHoldable && <span style={{ fontSize: '0.65rem', color: '#a78bfa' }}>objeto pasivo</span>}
+                            <strong style={{ color: isHoldable ? '#cba3ff' : '#4d9bff' }}>{itemName}</strong>
+                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#9b98cf' }}>{data.desc}</p>
+                            {isHoldable && <span style={{ fontSize: '0.65rem', color: '#b8a1ff' }}>objeto pasivo</span>}
                           </div>
                         </div>
                         <button
@@ -6245,7 +6384,7 @@ function MainApp() {
                           style={{
                             background: canBuy ? '#10b981' : '#475569',
                             minWidth: '70px',
-                            color: canBuy ? '#0f172a' : '#cbd5e1',
+                            color: canBuy ? '#12122b' : '#d9d6f2',
                             fontWeight: 'bold',
                             cursor: canBuy ? 'pointer' : 'not-allowed'
                           }}
@@ -6259,13 +6398,13 @@ function MainApp() {
 
                 </div>
 
-                <details style={{ marginTop: '1rem', borderTop: '1px solid #334155', paddingTop: '0.75rem' }}>
-                  <summary style={{ cursor: 'pointer', color: '#f87171', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                <details style={{ marginTop: '1rem', borderTop: '1px solid #3f3f6e', paddingTop: '0.75rem' }}>
+                  <summary style={{ cursor: 'pointer', color: '#ff8a80', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
                     🏷️ Vender Objetos (50% del precio)
                   </summary>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto' }}>
                     {inventory.length === 0 ? (
-                      <p style={{ color: '#64748b', fontSize: '0.8rem' }}>No tienes objetos para vender.</p>
+                      <p style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No tienes objetos para vender.</p>
                     ) : (
                       inventory.map((itemName, idx) => {
                         if (itemName === 'Mega Stone' || itemName === 'Dynamax Band') return null
@@ -6285,7 +6424,7 @@ function MainApp() {
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               {itemIcon && <img src={itemIcon} alt={itemName} style={{ width: '24px', height: '24px', imageRendering: 'pixelated' }} />}
-                              <span style={{ color: '#e2e8f0', fontSize: '0.85rem' }}>{itemName}</span>
+                              <span style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{itemName}</span>
                             </div>
                             <button className="tiny-btn" type="button"
                               onClick={() => {
@@ -6293,7 +6432,7 @@ function MainApp() {
                                 setInventory(prev => [...prev.slice(0, idx), ...prev.slice(idx + 1)])
                                 setBattleLog(prev => [`💰 Vendiste ${itemName} por $${sellPrice}.`, ...prev].slice(0, 15))
                               }}
-                              style={{ background: '#ef4444', minWidth: '60px', color: '#0f172a', fontWeight: 'bold' }}
+                              style={{ background: '#ee3b2f', minWidth: '60px', color: '#12122b', fontWeight: 'bold' }}
                             >
                               ${sellPrice}
                             </button>
@@ -6312,7 +6451,7 @@ function MainApp() {
 
             {screen === 'spin' && (
               <div className="action-block spin-block">
-                <h3 style={{ margin: '0 0 0.5rem', color: '#c084fc', textAlign: 'center' }}>🎰 ¡Ruleta del Botín!</h3>
+                <h3 style={{ margin: '0 0 0.5rem', color: '#cba3ff', textAlign: 'center' }}>🎰 ¡Ruleta del Botín!</h3>
                 <p className="muted" style={{ textAlign: 'center', margin: '0 0 1rem' }}>Gira para obtener un objeto al azar</p>
                 <div className="roulette-wheel">
                   <div className={`roulette-items ${spinAnimating ? 'spinning' : ''}`}>
@@ -6342,11 +6481,11 @@ function MainApp() {
                   </button>
                 )}
                 {spinAnimating && (
-                  <p style={{ textAlign: 'center', color: '#c084fc', fontWeight: 'bold', margin: '0.5rem 0' }}>Girando...</p>
+                  <p style={{ textAlign: 'center', color: '#cba3ff', fontWeight: 'bold', margin: '0.5rem 0' }}>Girando...</p>
                 )}
                 {spinRevealed && spinWinnerIndex !== null && (
                   <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
-                    <p style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '1.1rem', margin: '0 0 0.5rem' }}>
+                    <p style={{ color: '#7ceb95', fontWeight: 'bold', fontSize: '1.1rem', margin: '0 0 0.5rem' }}>
                       ¡Obtuviste {spinItems[spinWinnerIndex]}!
                     </p>
                     <button className="cta spin-cta" onClick={claimSpinItem} type="button">
@@ -6359,7 +6498,7 @@ function MainApp() {
 
             {screen === 'pokeRand' && (
               <div className="action-block pokeRand-block">
-                <h3 style={{ margin: '0 0 0.5rem', color: '#38bdf8', textAlign: 'center' }}>🎲 ¡PokeRand Ruleta!</h3>
+                <h3 style={{ margin: '0 0 0.5rem', color: '#4d9bff', textAlign: 'center' }}>🎲 ¡PokeRand Ruleta!</h3>
                 <p className="muted" style={{ textAlign: 'center', margin: '0 0 1rem' }}>Gira para obtener un Pokémon que se una a tu equipo</p>
                 <div className="roulette-wheel" style={{ borderColor: 'rgba(56, 189, 248, 0.3)', background: 'rgba(56, 189, 248, 0.06)' }}>
                   <div className={`roulette-items ${pokeRandAnimating ? 'spinning' : ''}`}>
@@ -6369,12 +6508,12 @@ function MainApp() {
                         <div
                           key={`pr-${pokemon.id}-${idx}`}
                           className={`roulette-item ${isWinner ? 'winner' : ''} ${pokeRandWinnerIndex === idx && pokeRandAnimating ? 'highlight' : ''}`}
-                          style={isWinner ? { borderColor: '#38bdf8', boxShadow: '0 0 16px rgba(56, 189, 248, 0.4)' } : undefined}
+                          style={isWinner ? { borderColor: '#4d9bff', boxShadow: '0 0 16px rgba(56, 189, 248, 0.4)' } : undefined}
                         >
                           <img src={pokemon.sprite} alt={pokemon.name} className="roulette-item-icon" onError={fallbackSprite} style={{ width: '48px', height: '48px' }} />
                           <span className="roulette-item-name">{pokemon.name}</span>
                           <span className="roulette-item-desc">Nv.{pokemon.level}</span>
-                          <span className="roulette-item-desc" style={{ fontSize: '0.55rem', color: '#94a3b8' }}>
+                          <span className="roulette-item-desc" style={{ fontSize: '0.55rem', color: '#9b98cf' }}>
                             {pokemon.types?.join('/')}
                           </span>
                         </div>
@@ -6388,11 +6527,11 @@ function MainApp() {
                   </button>
                 )}
                 {pokeRandAnimating && (
-                  <p style={{ textAlign: 'center', color: '#38bdf8', fontWeight: 'bold', margin: '0.5rem 0' }}>Girando...</p>
+                  <p style={{ textAlign: 'center', color: '#4d9bff', fontWeight: 'bold', margin: '0.5rem 0' }}>Girando...</p>
                 )}
                 {pokeRandRevealed && pokeRandWinnerIndex !== null && (
                   <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
-                    <p style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '1.1rem', margin: '0 0 0.5rem' }}>
+                    <p style={{ color: '#7ceb95', fontWeight: 'bold', fontSize: '1.1rem', margin: '0 0 0.5rem' }}>
                       ¡{pokeRandPokemon[pokeRandWinnerIndex].name} quiere unirse a tu equipo!
                     </p>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
@@ -6420,7 +6559,7 @@ function MainApp() {
 
             {screen === 'move' && (
               <div className="action-block">
-                <h3 style={{ margin: '0 0 0.5rem', color: '#e2e8f0', textAlign: 'center' }}>📝 ¡Move Tutor!</h3>
+                <h3 style={{ margin: '0 0 0.5rem', color: '#f3f1ff', textAlign: 'center' }}>📝 ¡Move Tutor!</h3>
                 {!selectedNewMove ? (
                   <>
                     <p className="muted" style={{ textAlign: 'center', margin: '0 0 0.75rem' }}>
@@ -6430,13 +6569,13 @@ function MainApp() {
                       {moveOptions.map((move) => (
                         <button
                           key={`move-opt-${move.name}`}
-                          className="move-btn"
+                          className="move-btn move-opt-btn"
                           type="button"
                           onClick={() => setSelectedNewMove(move)}
                           style={{ borderColor: TYPE_COLORS[move.type] ?? '#475569' }}
                         >
                           <strong>{move.name}</strong>
-                          <span className="muted" style={{ fontSize: '0.7rem' }}>
+                          <span className="muted" style={{ fontSize: '0.5rem' }}>
                             {move.type.toUpperCase()} · Pwr {move.power} · Acc {move.accuracy ?? '—'}
                           </span>
                         </button>
@@ -6451,20 +6590,20 @@ function MainApp() {
                 ) : (
                   <>
                     <p className="muted" style={{ textAlign: 'center', margin: '0 0 0.75rem' }}>
-                      <strong style={{ color: TYPE_COLORS[selectedNewMove.type] ?? '#e2e8f0' }}>{selectedNewMove.name}</strong>
+                      <strong style={{ color: TYPE_COLORS[selectedNewMove.type] ?? '#f3f1ff' }}>{selectedNewMove.name}</strong>
                       {' '} — Elige qué movimiento reemplazar:
                     </p>
                     <div className="moves-grid" style={{ marginBottom: '1rem' }}>
                       {activePokemon?.moves.map((move, idx) => (
                         <button
                           key={`move-replace-${idx}`}
-                          className="move-btn"
+                          className="move-btn move-opt-btn"
                           type="button"
                           onClick={() => replaceTeamMove(idx)}
                           style={{ borderColor: TYPE_COLORS[move.type] ?? '#475569' }}
                         >
                           <strong>{move.name}</strong>
-                          <span className="muted" style={{ fontSize: '0.7rem' }}>
+                          <span className="muted" style={{ fontSize: '0.5rem' }}>
                             {move.type.toUpperCase()} · Pwr {move.power}
                           </span>
                         </button>
@@ -6483,7 +6622,7 @@ function MainApp() {
             {screen === 'mega' && (
               <div className="action-block" style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>💎</div>
-                <h3 style={{ margin: '0 0 0.5rem', color: '#f472b6' }}>¡Mega Piedra!</h3>
+                <h3 style={{ margin: '0 0 0.5rem', color: '#ff9ad6' }}>¡Mega Piedra!</h3>
                 {inventory.includes('Mega Stone') || team.some(p => p.holdItem === 'Mega Stone') ? (
                   <>
                     <p style={{ margin: '0 0 0.25rem' }}>Has recibido una <strong>Mega Piedra</strong>.</p>
@@ -6499,7 +6638,7 @@ function MainApp() {
                     </p>
                   </>
                 )}
-                <button className="cta" onClick={() => { completeCurrentNode(); setScreen('route') }} type="button" style={{ background: '#f472b6' }}>
+                <button className="cta" onClick={() => { completeCurrentNode(); setScreen('route') }} type="button" style={{ background: '#ff9ad6' }}>
                   Continuar
                 </button>
               </div>
@@ -6542,7 +6681,7 @@ function MainApp() {
                   Rest stop: <strong>{restEncounter.name}{restEncounter.shiny ? ' ✨' : ''}</strong> is waiting.
                 </p>
                 <p className="muted">Reward item added: {restRewardItem}</p>
-                <div className="capture-card" style={restEncounter.shiny ? { border: '2px solid #facc15', boxShadow: '0 0 12px rgba(250,204,21,0.4)' } : undefined}>
+                <div className="capture-card" style={restEncounter.shiny ? { border: '2px solid #ffcb05', boxShadow: '0 0 12px rgba(250,204,21,0.4)' } : undefined}>
                   <img className="sprite" src={restEncounter.sprite} alt={restEncounter.name} onError={fallbackSprite} />
                 </div>
                 <div className="moves-grid" style={{ marginBottom: '1rem' }}>
@@ -6555,7 +6694,7 @@ function MainApp() {
                 </div>
                 <div className="evolve-section" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
                   <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>Descansa para recuperar energía:</p>
-                  <button className="cta" onClick={() => { if (runChallenges.noHealing) { setBattleLog(prev => ['🚫 Desafío Sin Curación: No puedes curar en descanso.', ...prev].slice(0, 15)); completeCurrentNode(); return } setTeam(prev => prev.map(p => p.hp <= 0 ? { ...p, hp: Math.max(1, Math.floor(p.maxHp * 0.5)) } : { ...p, hp: p.maxHp })); setBattleLog(prev => ['💊 ¡Equipo restaurado completamente en el descanso!', ...prev].slice(0, 15)); completeCurrentNode() }} type="button" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', width: '100%' }}>
+                  <button className="cta" onClick={() => { if (runChallenges.noHealing) { setBattleLog(prev => ['🚫 Desafío Sin Curación: No puedes curar en descanso.', ...prev].slice(0, 15)); completeCurrentNode(); return } setTeam(prev => prev.map(p => p.hp <= 0 ? { ...p, hp: Math.max(1, Math.floor(p.maxHp * 0.5)) } : { ...p, hp: p.maxHp })); setBattleLog(prev => ['💊 ¡Equipo restaurado completamente en el descanso!', ...prev].slice(0, 15)); completeCurrentNode() }} type="button"                     style={{ background: '#ee3b2f', width: '100%' }}>
                     💊 Curar Equipo
                   </button>
                 </div>
@@ -6587,13 +6726,13 @@ function MainApp() {
                         />
                       )}
                       <div>
-                        <p style={{ margin: '0', fontWeight: 'bold', color: '#facc15', fontSize: '0.95rem' }}>
+                        <p style={{ margin: '0', fontWeight: 'bold', color: '#ffcb05', fontSize: '0.95rem' }}>
                           {trainerBadge ? `🏆 Líder ${trainerName}` : `⚔️ ${trainerName}`}
                         </p>
                         {trainerBadge && (
                           <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#fbbf24' }}>{trainerBadge}</p>
                         )}
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#9b98cf' }}>
                           Equipo: {trainerTeam.length} Pokémon
                         </p>
                       </div>
@@ -6610,7 +6749,7 @@ function MainApp() {
                               width: '36px',
                               height: '36px',
                               borderRadius: '6px',
-                              border: isActive ? '2px solid #facc15' : '1px solid rgba(255,255,255,0.15)',
+                              border: isActive ? '2px solid #ffcb05' : '1px solid rgba(255,255,255,0.15)',
                               background: isDefeated ? 'rgba(239,68,68,0.15)' : isActive ? 'rgba(250,204,21,0.12)' : 'rgba(255,255,255,0.05)',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               overflow: 'hidden', position: 'relative'
@@ -6629,7 +6768,7 @@ function MainApp() {
                             {isActive && (
                               <div style={{
                                 position: 'absolute', bottom: 0, left: 0, right: 0,
-                                height: '3px', background: '#facc15', borderRadius: '0 0 4px 4px'
+                                height: '3px', background: '#ffcb05', borderRadius: '0 0 4px 4px'
                               }} />
                             )}
                           </div>
@@ -6685,7 +6824,7 @@ function MainApp() {
                     onClick={openCaptureMenu}
                     type="button"
                     disabled={isLoading || !inventory.some(i => POKEBALL_NAMES.includes(i))}
-                    style={{ marginTop: '8px', width: '100%', background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}
+                    style={{ marginTop: '8px', width: '100%', background: '#37d16b' }}
                   >
                     🏐 Capturar ({inventory.filter(i => POKEBALL_NAMES.includes(i)).length} balls)
                   </button>
@@ -6695,7 +6834,7 @@ function MainApp() {
                     className="cta"
                     onClick={megaEvolveActive}
                     type="button"
-                    style={{ marginTop: '8px', width: '100%', background: 'linear-gradient(135deg, #f472b6, #c084fc)' }}
+                    style={{ marginTop: '8px', width: '100%', background: '#e060a8' }}
                   >
                     💥 ¡Mega Evolucionar!
                   </button>
@@ -6705,7 +6844,7 @@ function MainApp() {
                     className="cta"
                     onClick={gmaxEvolveActive}
                     type="button"
-                    style={{ marginTop: '8px', width: '100%', background: 'linear-gradient(135deg, #60a5fa, #a78bfa)' }}
+                    style={{ marginTop: '8px', width: '100%', background: '#6b8cff' }}
                   >
                     ⚡ ¡Gigamaximar!
                   </button>
@@ -6725,15 +6864,13 @@ function MainApp() {
                   const isHoldable = !!HOLDABLE_ITEMS[entry.name]
                   if (isHoldable) {
                     const holdableIdx = inventory.indexOf(entry.name)
-                    const holdDesc = HOLDABLE_ITEMS[entry.name]?.desc ?? entry.description
                     return (
                       <button
                         key={entry.name}
                         className="item-slot filled item-button"
                         type="button"
                         onClick={() => setEquipModal({ itemName: entry.name, itemIndex: holdableIdx })}
-                        title={holdDesc}
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderLeft: '3px solid #a78bfa' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderLeft: '3px solid #b8a1ff' }}
                       >
                         {itemIcon && (
                           <img
@@ -6743,8 +6880,7 @@ function MainApp() {
                           />
                         )}
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                          <strong style={{ color: '#c084fc' }}>{entry.name}</strong>
-                          <span style={{ fontSize: '0.65rem', color: '#a78bfa' }}>{holdDesc}</span>
+                          <strong style={{ color: '#cba3ff' }}>{entry.name}</strong>
                           <span style={{ fontSize: '0.6rem', color: '#7c3aed' }}>x{entry.count} · equipar</span>
                         </div>
                       </button>
@@ -6768,7 +6904,7 @@ function MainApp() {
                       )}
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                         <strong>{entry.name}</strong>
-                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>x{entry.count}</span>
+                        <span style={{ fontSize: '0.75rem', color: '#9b98cf' }}>x{entry.count}</span>
                       </div>
                     </button>
                   )
@@ -6823,7 +6959,7 @@ function MainApp() {
                   🔓 <strong>¡NUEVA GENERACIÓN DESBLOQUEADA!</strong> Gen {victoryUnlocks.nextGenNumber} ({victoryUnlocks.nextGenName}) ya está disponible para jugar.
                 </p>
               ) : difficulty === 'easy' && currentRunGen < 9 && !progression.completedMedium.includes(currentRunGen) ? (
-                <p style={{ margin: '6px 0', color: '#94a3b8', fontSize: '0.85rem' }}>
+                <p style={{ margin: '6px 0', color: '#9b98cf', fontSize: '0.85rem' }}>
                   💡 <em>Consejo: Completa la Gen {currentRunGen} ({victoryUnlocks.genName}) en dificultad Intermedia para desbloquear la Gen {currentRunGen + 1}.</em>
                 </p>
               ) : null}
@@ -6834,7 +6970,7 @@ function MainApp() {
                 </p>
               )}
               {victoryUnlocks.unlockedInfinite && (
-                <p style={{ margin: '6px 0', color: '#c084fc', fontSize: '0.95rem' }}>
+                <p style={{ margin: '6px 0', color: '#cba3ff', fontSize: '0.95rem' }}>
                   ♾️ <strong>¡MODO INFINITE DESBLOQUEADO!</strong> Ahora puedes jugar la Gen {currentRunGen} ({victoryUnlocks.genName}) en modo Infinite (rutas infinitas).
                 </p>
               )}
@@ -6857,7 +6993,7 @@ function MainApp() {
           {defeatSummary && (
             <div className="defeat-details-grid" style={{ marginTop: '1rem', textAlign: 'left' }}>
               <div className="defeat-box" style={{ marginBottom: '1.5rem' }}>
-                <h3 className="section-subtitle" style={{ fontSize: '1rem', color: '#f87171' }}>🛡️ Equipo Caído</h3>
+                <h3 className="section-subtitle" style={{ fontSize: '1rem', color: '#ff8a80' }}>🛡️ Equipo Caído</h3>
                 <div className="fainted-team-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.5rem', marginTop: '0.5rem' }}>
                   {defeatSummary.finalTeam.map((pkmn, idx) => (
                     <div key={`${pkmn.id}-${idx}`} className="fainted-card" style={{ background: 'rgba(0,0,0,0.3)', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
@@ -6894,16 +7030,16 @@ function MainApp() {
 
       {/* Achievement Popup */}
       {newAchievement && (
-        <div style={{ position: 'fixed', top: '20px', right: '20px', left: '20px', zIndex: 9999, background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', border: '2px solid #facc15', borderRadius: '16px', padding: '1rem 1.5rem', boxShadow: '0 0 30px rgba(250,204,21,0.3)', animation: 'slideInRight 0.5s ease', maxWidth: '300px', marginLeft: 'auto' }}>
+        <div style={{ position: 'fixed', top: '20px', right: '20px', left: '20px', zIndex: 9999, background: '#1c1c3a', border: '3px solid #ffcb05', borderRadius: '6px', padding: '1rem 1.5rem', boxShadow: '4px 4px 0 0 rgba(0,0,0,0.6)', animation: 'slideInRight 0.5s ease', maxWidth: '300px', marginLeft: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <span style={{ fontSize: '2rem' }}>{newAchievement.icon}</span>
           <div>
-            <div style={{ color: '#facc15', fontWeight: 'bold', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>¡Logro Desbloqueado!</div>
+            <div style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>¡Logro Desbloqueado!</div>
             <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '1rem' }}>{newAchievement.name}</div>
-            <div style={{ color: '#94a3b8', fontSize: '0.8rem' }}>{newAchievement.desc}</div>
+            <div style={{ color: '#9b98cf', fontSize: '0.8rem' }}>{newAchievement.desc}</div>
           </div>
         </div>
-        <button onClick={handleAchievementDismiss} style={{ position: 'absolute', top: '4px', right: '8px', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+        <button onClick={handleAchievementDismiss} style={{ position: 'absolute', top: '4px', right: '8px', background: 'none', border: 'none', color: '#7d7ab5', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
       </div>
       )}
 
@@ -6912,9 +7048,9 @@ function MainApp() {
         <div className="modal-backdrop" onClick={() => { playClick(); handleRandomEventChoice() }}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>{activeRandomEvent.icon}</div>
-            <h3 style={{ color: '#facc15', margin: '0.5rem 0' }}>{activeRandomEvent.title}</h3>
-            <p style={{ color: '#cbd5e1', marginBottom: '1.5rem' }}>{activeRandomEvent.desc}</p>
-            <button className="cta" onClick={() => { playClick(); handleRandomEventChoice() }} style={{ background: '#facc15', color: '#000' }}>¡Continuar!</button>
+            <h3 style={{ color: '#ffcb05', margin: '0.5rem 0' }}>{activeRandomEvent.title}</h3>
+            <p style={{ color: '#d9d6f2', marginBottom: '1.5rem' }}>{activeRandomEvent.desc}</p>
+            <button className="cta" onClick={() => { playClick(); handleRandomEventChoice() }} style={{ background: '#ffcb05', color: '#000' }}>¡Continuar!</button>
           </div>
         </div>
       )}
@@ -6923,21 +7059,21 @@ function MainApp() {
       {traderModal && (
         <div className="modal-backdrop" onClick={() => setTraderModal(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
-            <h3 style={{ color: '#facc15', textAlign: 'center', marginBottom: '0.5rem' }}>🎭 Comerciante Misterioso</h3>
-            <p style={{ color: '#94a3b8', textAlign: 'center', marginBottom: '1rem', fontSize: '0.85rem' }}>Elige un Pokémon para intercambiar por uno nuevo de la misma generación.</p>
+            <h3 style={{ color: '#ffcb05', textAlign: 'center', marginBottom: '0.5rem' }}>🎭 Comerciante Misterioso</h3>
+            <p style={{ color: '#9b98cf', textAlign: 'center', marginBottom: '1rem', fontSize: '0.85rem' }}>Elige un Pokémon para intercambiar por uno nuevo de la misma generación.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {team.map((p, i) => (
                 <button key={i} onClick={() => { playClick(); handleTraderChoice(i) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: i === activeIndex ? 'rgba(56,189,248,0.15)' : 'rgba(30,41,59,0.6)', border: `1px solid ${i === activeIndex ? '#38bdf8' : '#334155'}`, borderRadius: '12px', cursor: 'pointer', textAlign: 'left', color: '#e2e8f0' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: i === activeIndex ? 'rgba(56,189,248,0.15)' : 'rgba(30,41,59,0.6)', border: `1px solid ${i === activeIndex ? '#4d9bff' : '#3f3f6e'}`, borderRadius: '6px', cursor: 'pointer', textAlign: 'left', color: '#f3f1ff' }}>
                   <img src={p.sprite} alt={p.name} style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
                   <div>
                     <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{p.name} {p.shiny ? '✨' : ''}</div>
-                    <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Nv.{p.level} — HP:{p.hp}/{p.maxHp} — ATK:{p.attack} DEF:{p.defense} SPD:{p.speed}</div>
+                    <div style={{ color: '#9b98cf', fontSize: '0.75rem' }}>Nv.{p.level} — HP:{p.hp}/{p.maxHp} — ATK:{p.attack} DEF:{p.defense} SPD:{p.speed}</div>
                   </div>
                 </button>
               ))}
             </div>
-            <button className="cta" onClick={() => { playClick(); setTraderModal(false); setBattleLog(prev => [`🎭 Rechazaste el intercambio.`, ...prev].slice(0, 15)) }} style={{ marginTop: '1rem', background: '#64748b', width: '100%' }}>Rechazar</button>
+            <button className="cta" onClick={() => { playClick(); setTraderModal(false); setBattleLog(prev => [`🎭 Rechazaste el intercambio.`, ...prev].slice(0, 15)) }} style={{ marginTop: '1rem', background: '#7d7ab5', width: '100%' }}>Rechazar</button>
           </div>
         </div>
       )}
@@ -6946,49 +7082,49 @@ function MainApp() {
       {merchantItems && (
         <div className="modal-backdrop" onClick={() => setMerchantItems(null)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', padding: '1.5rem' }}>
-            <h3 style={{ color: '#facc15', margin: '0 0 0.5rem' }}>🧳 Mercader Misterioso</h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1rem' }}>El mercader te ofrece objetos evolutivos:</p>
+            <h3 style={{ color: '#ffcb05', margin: '0 0 0.5rem' }}>🧳 Mercader Misterioso</h3>
+            <p style={{ color: '#9b98cf', fontSize: '0.85rem', marginBottom: '1rem' }}>El mercader te ofrece objetos evolutivos:</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {merchantItems.map(item => {
                 const canBuy = money >= item.price
                 return (
-                  <div key={item.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', background: 'rgba(30,41,59,0.6)', border: '1px solid #334155' }}>
+                  <div key={item.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', background: 'rgba(30,41,59,0.6)', border: '1px solid #3f3f6e' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       {ITEM_SPRITES[item.name] && <img src={ITEM_SPRITES[item.name]} alt={item.name} style={{ width: '32px', height: '32px' }} onError={fallbackSprite} />}
                       <div>
-                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
-                        <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>${item.price}</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#9b98cf', fontSize: '0.75rem' }}>${item.price}</div>
                       </div>
                     </div>
-                    <button className="cta" onClick={() => { if (money >= item.price) { setMoney(prev => prev - item.price); setInventory(prev => [...prev, item.name]); setBattleLog(prev => [`🧳 Compraste ${item.name} por $${item.price}.`, ...prev].slice(0, 15)) } }} disabled={!canBuy} style={{ fontSize: '0.8rem', padding: '4px 14px', background: canBuy ? '#facc15' : '#475569', color: '#000' }}>
+                    <button className="cta" onClick={() => { if (money >= item.price) { setMoney(prev => prev - item.price); setInventory(prev => [...prev, item.name]); setBattleLog(prev => [`🧳 Compraste ${item.name} por $${item.price}.`, ...prev].slice(0, 15)) } }} disabled={!canBuy} style={{ fontSize: '0.8rem', padding: '4px 14px', background: canBuy ? '#ffcb05' : '#475569', color: '#000' }}>
                       {canBuy ? 'Comprar' : 'No alcanza'}
                     </button>
                   </div>
                 )
               })}
             </div>
-            <button className="cta" onClick={() => setMerchantItems(null)} style={{ marginTop: '1rem', background: '#64748b', width: '100%' }}>Salir</button>
+            <button className="cta" onClick={() => setMerchantItems(null)} style={{ marginTop: '1rem', background: '#7d7ab5', width: '100%' }}>Salir</button>
           </div>
         </div>
       )}
 
       {/* League Offer Modal */}
       {leagueOffer && (
-        <div className="modal-backdrop" onClick={() => { setLeagueOffer(false); setScreen('victory'); playVictoryFanfare() }}>
+        <div className="modal-backdrop" onClick={() => { setLeagueOffer(false); finalizeRunVictory() }}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', padding: '1.5rem', textAlign: 'center' }}>
             <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🏆</div>
-            <h3 style={{ color: '#facc15', margin: '0.5rem 0' }}>¡Campeón de la Liga!</h3>
-            <p style={{ color: '#cbd5e1', marginBottom: '1rem' }}>
-              Has derrotado al líder de gimnasio. ¿Deseas entrar a la <strong style={{ color: '#38bdf8' }}>Liga Pokémon</strong>?
+            <h3 style={{ color: '#ffcb05', margin: '0.5rem 0' }}>¡Campeón de la Liga!</h3>
+            <p style={{ color: '#d9d6f2', marginBottom: '1rem' }}>
+              Has derrotado al líder de gimnasio. ¿Deseas entrar a la <strong style={{ color: '#4d9bff' }}>Liga Pokémon</strong>?
             </p>
-            <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+            <p style={{ color: '#9b98cf', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
               Deberás elegir 6 Pokémon de tu equipo y PC. Una vez dentro no podrás cambiarlos.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
-              <button className="cta" onClick={() => { setLeagueOffer(false); setLeagueTeamSelection(true) }} style={{ background: '#38bdf8', color: '#000' }}>
+              <button className="cta" onClick={() => { setLeagueOffer(false); setLeagueTeamSelection(true) }} style={{ background: '#4d9bff', color: '#000' }}>
                 ¡Sí, a la Liga!
               </button>
-              <button className="cta" onClick={() => { setLeagueOffer(false); setScreen('victory'); playVictoryFanfare() }} style={{ background: '#64748b' }}>
+              <button className="cta" onClick={() => { setLeagueOffer(false); finalizeRunVictory() }} style={{ background: '#7d7ab5' }}>
                 No, terminar
               </button>
             </div>
@@ -7000,8 +7136,8 @@ function MainApp() {
       {leagueTeamSelection && (
         <div className="modal-backdrop" onClick={() => setLeagueTeamSelection(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
-            <h3 style={{ color: '#38bdf8', margin: '0 0 0.5rem' }}>🏆 Equipo para la Liga</h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+            <h3 style={{ color: '#4d9bff', margin: '0 0 0.5rem' }}>🏆 Equipo para la Liga</h3>
+            <p style={{ color: '#9b98cf', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
               Selecciona 6 Pokémon de tu equipo y PC ({tempLeagueTeam.length}/6)
             </p>
             {tempLeagueTeam.length === 6 && (
@@ -7019,7 +7155,7 @@ function MainApp() {
                 setRouteIndex(0)
                 setScreen('route')
                 setBattleLog(prev => [`🏆 ¡Bienvenido a la Liga Pokémon! 4 jefes te esperan (Nv.${maxLvl}).`, ...prev].slice(0, 15))
-              }} style={{ background: '#38bdf8', color: '#000', width: '100%', marginBottom: '1rem' }}>
+              }} style={{ background: '#4d9bff', color: '#000', width: '100%', marginBottom: '1rem' }}>
                 🏆 ¡Comenzar Liga!
               </button>
             )}
@@ -7039,12 +7175,12 @@ function MainApp() {
                     style={{
                       padding: '6px', borderRadius: '8px', textAlign: 'center', cursor: 'pointer',
                       background: selected ? 'rgba(56,189,248,0.2)' : 'rgba(30,41,59,0.6)',
-                      border: selected ? '2px solid #38bdf8' : '1px solid #334155', opacity: !selected && tempLeagueTeam.length >= 6 ? 0.4 : 1
+                      border: selected ? '2px solid #4d9bff' : '1px solid #3f3f6e', opacity: !selected && tempLeagueTeam.length >= 6 ? 0.4 : 1
                     }}
                   >
                     <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
-                    <div style={{ fontSize: '0.7rem', textTransform: 'capitalize', color: selected ? '#38bdf8' : '#e2e8f0' }}>{pkmn.name}</div>
-                    <div style={{ fontSize: '0.6rem', color: pkmn._source === 'team' ? '#4ade80' : '#94a3b8' }}>Nv.{pkmn.level}</div>
+                    <div style={{ fontSize: '0.7rem', textTransform: 'capitalize', color: selected ? '#4d9bff' : '#f3f1ff' }}>{pkmn.name}</div>
+                    <div style={{ fontSize: '0.6rem', color: pkmn._source === 'team' ? '#7ceb95' : '#9b98cf' }}>Nv.{pkmn.level}</div>
                   </div>
                 )
               })}
@@ -7057,17 +7193,17 @@ function MainApp() {
       {showAchievements && (
         <div className="modal-backdrop" onClick={() => setShowAchievements(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
-            <h2 style={{ color: '#38bdf8', textAlign: 'center', marginBottom: '1rem' }}>🏅 Logros ({Object.values(achievements).filter(a => a.unlocked).length}/{ACHIEVEMENTS.length})</h2>
+            <h2 style={{ color: '#4d9bff', textAlign: 'center', marginBottom: '1rem' }}>🏅 Logros ({Object.values(achievements).filter(a => a.unlocked).length}/{ACHIEVEMENTS.length})</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               {ACHIEVEMENTS.map(a => {
                 const unlocked = achievements[a.id]?.unlocked
                 return (
-                  <div key={a.id} style={{ background: unlocked ? 'rgba(250,204,21,0.1)' : 'rgba(30,41,59,0.5)', border: `1px solid ${unlocked ? '#facc15' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                  <div key={a.id} style={{ background: unlocked ? 'rgba(250,204,21,0.1)' : 'rgba(30,41,59,0.5)', border: `1px solid ${unlocked ? '#ffcb05' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontSize: '1.5rem' }}>{a.icon}</span>
                       <div>
-                        <div style={{ color: unlocked ? '#facc15' : '#94a3b8', fontWeight: 'bold', fontSize: '0.85rem' }}>{a.name}</div>
-                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{a.desc}</div>
+                        <div style={{ color: unlocked ? '#ffcb05' : '#9b98cf', fontWeight: 'bold', fontSize: '0.85rem' }}>{a.name}</div>
+                        <div style={{ color: '#7d7ab5', fontSize: '0.75rem' }}>{a.desc}</div>
                       </div>
                     </div>
                   </div>
@@ -7083,34 +7219,34 @@ function MainApp() {
 
       {/* Run Stats on Victory */}
       {screen === 'victory' && (
-        <div className="panel" style={{ maxWidth: '400px', margin: '0 auto', padding: '1rem', background: 'rgba(30,41,59,0.6)', borderRadius: '12px', border: '1px solid #334155' }}>
-          <h3 style={{ color: '#38bdf8', textAlign: 'center', marginBottom: '0.75rem' }}>📊 Estadísticas de la Run</h3>
+        <div className="panel" style={{ maxWidth: '400px', margin: '0 auto', padding: '1rem' }}>
+          <h3 style={{ color: '#4d9bff', textAlign: 'center', marginBottom: '0.75rem' }}>📊 Estadísticas de la Run</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem' }}>
-            <div style={{ color: '#94a3b8' }}>⚔️ Batallas ganadas:</div><div style={{ color: '#22c55e', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
-            <div style={{ color: '#94a3b8' }}>💥 Daño total infligido:</div><div style={{ color: '#f87171', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
-            <div style={{ color: '#94a3b8' }}>🛡️ Daño total recibido:</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>
-            <div style={{ color: '#94a3b8' }}>🎯 Golpes críticos:</div><div style={{ color: '#facc15', fontWeight: 'bold' }}>{runStats.critsLanded}</div>
-            <div style={{ color: '#94a3b8' }}>🔄 Turnos jugados:</div><div style={{ color: '#cbd5e1', fontWeight: 'bold' }}>{runStats.totalTurns}</div>
-            <div style={{ color: '#94a3b8' }}>📦 Capturas:</div><div style={{ color: '#22d3ee', fontWeight: 'bold' }}>{runStats.captures}</div>
-            <div style={{ color: '#94a3b8' }}>💰 Dinero ganado:</div><div style={{ color: '#facc15', fontWeight: 'bold' }}>${runStats.moneyEarned}</div>
-            <div style={{ color: '#94a3b8' }}>💸 Dinero gastado:</div><div style={{ color: '#f87171', fontWeight: 'bold' }}>${runStats.moneySpent}</div>
-            <div style={{ color: '#94a3b8' }}>🪙 PokéCoins ganadas:</div><div style={{ color: '#facc15', fontWeight: 'bold' }}>+{(() => { const b = difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15; const c = Object.entries(runChallenges).some(([k, v]) => v && k !== 'allShiny') ? 15 : 0; return b + c + (team.length <= 1 ? 5 : 0) })()}</div>
-            {winStreak >= 2 && <><div style={{ color: '#94a3b8' }}>🔥 Racha:</div><div style={{ color: '#f97316', fontWeight: 'bold' }}>{winStreak} seguidas</div></>}
+            <div style={{ color: '#9b98cf' }}>⚔️ Batallas ganadas:</div><div style={{ color: '#37d16b', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
+            <div style={{ color: '#9b98cf' }}>💥 Daño total infligido:</div><div style={{ color: '#ff8a80', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
+            <div style={{ color: '#9b98cf' }}>🛡️ Daño total recibido:</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>
+            <div style={{ color: '#9b98cf' }}>🎯 Golpes críticos:</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>{runStats.critsLanded}</div>
+            <div style={{ color: '#9b98cf' }}>🔄 Turnos jugados:</div><div style={{ color: '#d9d6f2', fontWeight: 'bold' }}>{runStats.totalTurns}</div>
+            <div style={{ color: '#9b98cf' }}>📦 Capturas:</div><div style={{ color: '#22d3ee', fontWeight: 'bold' }}>{runStats.captures}</div>
+            <div style={{ color: '#9b98cf' }}>💰 Dinero ganado:</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>${runStats.moneyEarned}</div>
+            <div style={{ color: '#9b98cf' }}>💸 Dinero gastado:</div><div style={{ color: '#ff8a80', fontWeight: 'bold' }}>${runStats.moneySpent}</div>
+            <div style={{ color: '#9b98cf' }}>🪙 PokéCoins ganadas:</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>+{(() => { const b = difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15; const c = Object.entries(runChallenges).some(([k, v]) => v && k !== 'allShiny') ? 15 : 0; return b + c + (team.length <= 1 ? 5 : 0) })()}</div>
+            {winStreak >= 2 && <><div style={{ color: '#9b98cf' }}>🔥 Racha:</div><div style={{ color: '#ff8a33', fontWeight: 'bold' }}>{winStreak} seguidas</div></>}
           </div>
         </div>
       )}
 
       {/* Run Stats on Defeat */}
       {screen === 'defeat' && (
-        <div className="panel" style={{ maxWidth: '400px', margin: '0 auto', padding: '1rem', background: 'rgba(30,41,59,0.6)', borderRadius: '12px', border: '1px solid #334155' }}>
-          <h3 style={{ color: '#ef4444', textAlign: 'center', marginBottom: '0.75rem' }}>📊 Estadísticas de la Run</h3>
+        <div className="panel" style={{ maxWidth: '400px', margin: '0 auto', padding: '1rem' }}>
+          <h3 style={{ color: '#ee3b2f', textAlign: 'center', marginBottom: '0.75rem' }}>📊 Estadísticas de la Run</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem' }}>
-            <div style={{ color: '#94a3b8' }}>⚔️ Batallas ganadas:</div><div style={{ color: '#22c55e', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
-            <div style={{ color: '#94a3b8' }}>💥 Daño total infligido:</div><div style={{ color: '#f87171', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
-            <div style={{ color: '#94a3b8' }}>🛡️ Daño total recibido:</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>
-            <div style={{ color: '#94a3b8' }}>🔄 Turnos jugados:</div><div style={{ color: '#cbd5e1', fontWeight: 'bold' }}>{runStats.totalTurns}</div>
-            <div style={{ color: '#94a3b8' }}>📦 Capturas:</div><div style={{ color: '#22d3ee', fontWeight: 'bold' }}>{runStats.captures}</div>
-            <div style={{ color: '#94a3b8' }}>🪙 PokéCoins ganadas:</div><div style={{ color: '#facc15', fontWeight: 'bold' }}>+5</div>
+            <div style={{ color: '#9b98cf' }}>⚔️ Batallas ganadas:</div><div style={{ color: '#37d16b', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
+            <div style={{ color: '#9b98cf' }}>💥 Daño total infligido:</div><div style={{ color: '#ff8a80', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
+            <div style={{ color: '#9b98cf' }}>🛡️ Daño total recibido:</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>
+            <div style={{ color: '#9b98cf' }}>🔄 Turnos jugados:</div><div style={{ color: '#d9d6f2', fontWeight: 'bold' }}>{runStats.totalTurns}</div>
+            <div style={{ color: '#9b98cf' }}>📦 Capturas:</div><div style={{ color: '#22d3ee', fontWeight: 'bold' }}>{runStats.captures}</div>
+            <div style={{ color: '#9b98cf' }}>🪙 PokéCoins ganadas:</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>+5</div>
           </div>
         </div>
       )}
@@ -7119,16 +7255,16 @@ function MainApp() {
       {showMetaShop && (
         <div className="modal-backdrop" onClick={() => setShowMetaShop(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
-            <h2 style={{ color: '#facc15', textAlign: 'center', marginBottom: '0.5rem' }}>🪙 PokéShop</h2>
-            <p style={{ textAlign: 'center', color: '#94a3b8', marginBottom: '1rem' }}>Tus PokéCoins: <strong style={{ color: '#facc15' }}>{metaProgression.pokeCoins}</strong></p>
+            <h2 style={{ color: '#ffcb05', textAlign: 'center', marginBottom: '0.5rem' }}>🪙 PokéShop</h2>
+            <p style={{ textAlign: 'center', color: '#9b98cf', marginBottom: '1rem' }}>Tus PokéCoins: <strong style={{ color: '#ffcb05' }}>{metaProgression.pokeCoins}</strong></p>
 
-            <h3 style={{ color: '#38bdf8', marginBottom: '0.5rem' }}>🎨 Temas Visuales</h3>
+            <h3 style={{ color: '#4d9bff', marginBottom: '0.5rem' }}>🎨 Temas Visuales</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {THEMES.map(theme => {
                 const owned = metaProgression.ownedThemes.includes(theme.id)
                 const active = metaProgression.activeTheme === theme.id
                 return (
-                  <div key={theme.id} style={{ background: theme.colors.bg, border: `2px solid ${active ? '#facc15' : theme.colors.border}`, borderRadius: '12px', padding: '0.75rem', cursor: owned ? 'pointer' : 'default', opacity: owned ? 1 : 0.7 }}
+                  <div key={theme.id} style={{ background: theme.colors.bg, border: `2px solid ${active ? '#ffcb05' : theme.colors.border}`, borderRadius: '6px', padding: '0.75rem', cursor: owned ? 'pointer' : 'default', opacity: owned ? 1 : 0.7 }}
                     onClick={() => owned ? setTheme(theme.id) : undefined}>
                     <div style={{ display: 'flex', gap: '4px', marginBottom: '0.5rem' }}>
                       {[theme.colors.bg, theme.colors.surface, theme.colors.accent, theme.colors.text].map((c, i) => (
@@ -7138,11 +7274,11 @@ function MainApp() {
                     <div style={{ color: theme.colors.text, fontWeight: 'bold', fontSize: '0.85rem' }}>{theme.name}</div>
                     <div style={{ color: theme.colors.muted, fontSize: '0.75rem' }}>{theme.desc}</div>
                     {owned ? (
-                      active ? <div style={{ color: '#facc15', fontSize: '0.75rem', marginTop: '4px' }}>✅ Activo</div> : <div style={{ color: theme.colors.muted, fontSize: '0.75rem', marginTop: '4px' }}>Tocado para activar</div>
+                      active ? <div style={{ color: '#ffcb05', fontSize: '0.75rem', marginTop: '4px' }}>✅ Activo</div> : <div style={{ color: theme.colors.muted, fontSize: '0.75rem', marginTop: '4px' }}>Tocado para activar</div>
                     ) : (
                       <button className="cta" onClick={(e) => { e.stopPropagation(); buyMetaItem({ ...theme, id: theme.id, category: 'theme' as const, spriteKey: theme.id }) }}
                         disabled={metaProgression.pokeCoins < theme.price}
-                        style={{ marginTop: '0.5rem', fontSize: '0.75rem', padding: '4px 12px', background: metaProgression.pokeCoins >= theme.price ? '#facc15' : '#475569', color: '#000' }}>
+                        style={{ marginTop: '0.5rem', fontSize: '0.75rem', padding: '4px 12px', background: metaProgression.pokeCoins >= theme.price ? '#ffcb05' : '#475569', color: '#000' }}>
                         🪙 {theme.price}
                       </button>
                     )}
@@ -7151,30 +7287,30 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#f97316', marginBottom: '0.5rem' }}>🧪 Items Curativos</h3>
-            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Al comprar un item, empezará a aparecer en tiendas y drops durante las partidas.</p>
+            <h3 style={{ color: '#ff8a33', marginBottom: '0.5rem' }}>🧪 Items Curativos</h3>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Al comprar un item, empezará a aparecer en tiendas y drops durante las partidas.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'consumable').map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#22c55e' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
                         : <span style={{ fontSize: '1.5rem' }}>📦</span>
                       }
                       <div>
-                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
-                        <div style={{ color: '#f97316', fontSize: '0.7rem' }}>Consumible</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#ff8a33', fontSize: '0.7rem' }}>Consumible</div>
                       </div>
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    <div style={{ color: '#7d7ab5', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
                     {owned ? (
-                      <div style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
-                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#facc15' : '#475569', color: '#000' }}>
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#ffcb05' : '#475569', color: '#000' }}>
                         🪙 {item.price}
                       </button>
                     )}
@@ -7183,30 +7319,30 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#ef4444', marginBottom: '0.5rem' }}>🏐 Poké Balls</h3>
-            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea distintos tipos de Poké Balls para usar en la captura de Pokémon salvajes.</p>
+            <h3 style={{ color: '#ee3b2f', marginBottom: '0.5rem' }}>🏐 Poké Balls</h3>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea distintos tipos de Poké Balls para usar en la captura de Pokémon salvajes.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'pokeball').map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#22c55e' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
                         : <span style={{ fontSize: '1.5rem' }}>🏐</span>
                       }
                       <div>
-                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
-                        <div style={{ color: '#ef4444', fontSize: '0.7rem' }}>Poké Ball</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#ee3b2f', fontSize: '0.7rem' }}>Poké Ball</div>
                       </div>
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    <div style={{ color: '#7d7ab5', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
                     {owned ? (
-                      <div style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
-                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#facc15' : '#475569', color: '#000' }}>
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#ffcb05' : '#475569', color: '#000' }}>
                         🪙 {item.price}
                       </button>
                     )}
@@ -7216,29 +7352,29 @@ function MainApp() {
             </div>
 
             <h3 style={{ color: '#a855f7', marginBottom: '0.5rem' }}>💎 Piedras Evolutivas</h3>
-            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea piedras evolutivas para evolucionar ciertos Pokémon. Aparecen en tiendas y Spin.</p>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea piedras evolutivas para evolucionar ciertos Pokémon. Aparecen en tiendas y Spin.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'evolution_stone').map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#22c55e' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
                         : <span style={{ fontSize: '1.5rem' }}>💎</span>
                       }
                       <div>
-                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
                         <div style={{ color: '#a855f7', fontSize: '0.7rem' }}>Piedra Evolutiva</div>
                       </div>
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    <div style={{ color: '#7d7ab5', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
                     {owned ? (
-                      <div style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
-                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#facc15' : '#475569', color: '#000' }}>
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#ffcb05' : '#475569', color: '#000' }}>
                         🪙 {item.price}
                       </button>
                     )}
@@ -7247,30 +7383,30 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#f97316', marginBottom: '0.5rem' }}>🔧 Objetos Evolutivos</h3>
-            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Objetos para evolucionar Pokémon por intercambio. Aparecen con el Comerciante Misterioso.</p>
+            <h3 style={{ color: '#ff8a33', marginBottom: '0.5rem' }}>🔧 Objetos Evolutivos</h3>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Objetos para evolucionar Pokémon por intercambio. Aparecen con el Comerciante Misterioso.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'evolution_item').map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#22c55e' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
                         : <span style={{ fontSize: '1.5rem' }}>🔧</span>
                       }
                       <div>
-                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
-                        <div style={{ color: '#f97316', fontSize: '0.7rem' }}>Objeto Evolutivo</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#ff8a33', fontSize: '0.7rem' }}>Objeto Evolutivo</div>
                       </div>
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    <div style={{ color: '#7d7ab5', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
                     {owned ? (
-                      <div style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
-                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#facc15' : '#475569', color: '#000' }}>
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#ffcb05' : '#475569', color: '#000' }}>
                         🪙 {item.price}
                       </button>
                     )}
@@ -7280,26 +7416,26 @@ function MainApp() {
             </div>
 
             <h3 style={{ color: '#22d3ee', marginBottom: '0.5rem' }}>⚙️ Mejoras</h3>
-            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea nodos especiales en las rutas Hard/Infinite.</p>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea nodos especiales en las rutas Hard/Infinite.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'upgrade').map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#22c55e' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       <span style={{ fontSize: '1.5rem' }}>⚙️</span>
                       <div>
-                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
                         <div style={{ color: '#22d3ee', fontSize: '0.7rem' }}>Mejora</div>
                       </div>
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    <div style={{ color: '#7d7ab5', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
                     {owned ? (
-                      <div style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
-                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#facc15' : '#475569', color: '#000' }}>
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#ffcb05' : '#475569', color: '#000' }}>
                         🪙 {item.price}
                       </button>
                     )}
@@ -7308,27 +7444,27 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#f472b6', marginBottom: '0.5rem' }}>🎵 Música</h3>
-            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Nuevas pistas musicales para el menú y los combates.</p>
+            <h3 style={{ color: '#ff9ad6', marginBottom: '0.5rem' }}>🎵 Música</h3>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Nuevas pistas musicales para el menú y los combates.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'music').map(item => {
                 const owned = metaProgression.ownedMusic.includes(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#22c55e' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       <span style={{ fontSize: '1.5rem' }}>🎵</span>
                       <div>
-                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
-                        <div style={{ color: '#f472b6', fontSize: '0.7rem' }}>Música</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#ff9ad6', fontSize: '0.7rem' }}>Música</div>
                       </div>
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    <div style={{ color: '#7d7ab5', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
                     {owned ? (
-                      <div style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
-                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#facc15' : '#475569', color: '#000' }}>
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#ffcb05' : '#475569', color: '#000' }}>
                         🪙 {item.price}
                       </button>
                     )}
@@ -7338,29 +7474,29 @@ function MainApp() {
             </div>
 
             <h3 style={{ color: '#a855f7', marginBottom: '0.5rem' }}>⚔️ Objetos Pasivos</h3>
-            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Se equipan a un Pokémon y otorgan efectos permanentes durante la batalla.</p>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Se equipan a un Pokémon y otorgan efectos permanentes durante la batalla.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'holdable').map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#22c55e' : '#334155'}`, borderRadius: '12px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
                         : <span style={{ fontSize: '1.5rem' }}>📦</span>
                       }
                       <div>
-                        <div style={{ color: '#e2e8f0', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
                         <div style={{ color: '#a855f7', fontSize: '0.7rem' }}>Objeto Pasivo</div>
                       </div>
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    <div style={{ color: '#7d7ab5', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
                     {owned ? (
-                      <div style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
-                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#facc15' : '#475569', color: '#000' }}>
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#ffcb05' : '#475569', color: '#000' }}>
                         🪙 {item.price}
                       </button>
                     )}
@@ -7378,16 +7514,16 @@ function MainApp() {
 
       {/* Unlock Animation Popup */}
       {unlockPopup && (
-        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10000, background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', border: '3px solid #facc15', borderRadius: '20px', padding: '2rem 3rem', textAlign: 'center', boxShadow: '0 0 60px rgba(250,204,21,0.4)', animation: 'slideInRight 0.5s ease' }}>
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10000, background: '#1c1c3a', border: '3px solid #ffcb05', borderRadius: '8px', padding: '2rem 3rem', textAlign: 'center', boxShadow: '5px 5px 0 0 rgba(0,0,0,0.6)', animation: 'slideInRight 0.5s ease' }}>
           <div style={{ marginBottom: '0.5rem', animation: 'pulseGlow 1s infinite' }}>
             {ITEM_SPRITES[unlockPopup.spriteKey]
               ? <img src={ITEM_SPRITES[unlockPopup.spriteKey]} alt={unlockPopup.name} style={{ width: '80px', height: '80px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
               : <span style={{ fontSize: '4rem' }}>📦</span>
             }
           </div>
-          <div style={{ color: '#facc15', fontWeight: 'bold', fontSize: '1.1rem', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.25rem' }}>¡Item Desbloqueado!</div>
+          <div style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '1.1rem', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.25rem' }}>¡Item Desbloqueado!</div>
           <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '1.4rem', marginBottom: '0.5rem' }}>{unlockPopup.name}</div>
-          <div style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Ahora puede aparecer en las aventuras</div>
+          <div style={{ color: '#9b98cf', fontSize: '0.9rem' }}>Ahora puede aparecer en las aventuras</div>
         </div>
       )}
 
