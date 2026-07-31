@@ -4343,6 +4343,10 @@ function MainApp() {
         setBattleLog((prev) => ['La Cuerda Huida solo se puede usar durante un combate.', ...prev].slice(0, 15))
         return
       }
+      if (currentNode?.type === 'boss') {
+        setBattleLog((prev) => ['🚫 No puedes escapar de un combate contra un jefe.', ...prev].slice(0, 15))
+        return
+      }
       setInventory(prev => prev.filter((_, i) => i !== itemIndex))
       setBattleLog((prev) => [`💨 ¡Usaste la Cuerda Huida y escapaste del combate!`, ...prev].slice(0, 15))
       completeCurrentNode()
