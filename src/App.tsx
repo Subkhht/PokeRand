@@ -95,6 +95,12 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'X Attack 2': { price: 150, desc: 'Aumenta permanentemente en +10 el ataque.' },
   'X Defense 2': { price: 150, desc: 'Aumenta permanentemente en +10 la defensa.' },
   'X Speed 2': { price: 150, desc: 'Aumenta permanentemente en +10 la velocidad.' },
+  'Cuerda Huida': { price: 200, desc: 'Permite escapar de cualquier combate de la aventura.' },
+  'Moomoo Milk': { price: 120, desc: 'Restaura 100 HP de un Pokémon.' },
+  'Berry Juice': { price: 40, desc: 'Restaura 20 HP de un Pokémon.' },
+  'Fresh Water': { price: 60, desc: 'Restaura 30 HP de un Pokémon.' },
+  'Soda Pop': { price: 80, desc: 'Restaura 40 HP de un Pokémon.' },
+  'Lemonade': { price: 100, desc: 'Restaura 60 HP de un Pokémon.' },
   'Poké Ball': { price: 20, desc: 'Una ball básica para capturar Pokémon salvajes.' },
   'Great Ball': { price: 50, desc: 'Una ball con mayor ratio de captura.' },
   'Ultra Ball': { price: 80, desc: 'Una ball con alto ratio de captura.' },
@@ -195,6 +201,12 @@ const itemDescriptions: Record<string, string> = {
   'Love Ball': 'x8 si es de la misma familia evolutiva.',
   'Friend Ball': 'Una ball especial amistosa (x1).',
   'Heavy Ball': 'Mejor contra Pokémon pesados (hasta x4).',
+  'Cuerda Huida': 'Escapa de cualquier combate de la aventura.',
+  'Moomoo Milk': 'Restaura 100 HP de un Pokémon.',
+  'Berry Juice': 'Restaura 20 HP de un Pokémon.',
+  'Fresh Water': 'Restaura 30 HP de un Pokémon.',
+  'Soda Pop': 'Restaura 40 HP de un Pokémon.',
+  'Lemonade': 'Restaura 60 HP de un Pokémon.',
 }
 
 const ITEM_SPRITES: Record<string, string> = {
@@ -281,6 +293,12 @@ const ITEM_SPRITES: Record<string, string> = {
   'Prism Scale': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/prism-scale.png',
   'Sachet': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sachet.png',
   'Whipped Dream': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/whipped-dream.png',
+  'Cuerda Huida': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/escape-rope.png',
+  'Moomoo Milk': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/moomoo-milk.png',
+  'Berry Juice': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/berry-juice.png',
+  'Fresh Water': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fresh-water.png',
+  'Soda Pop': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/soda-pop.png',
+  'Lemonade': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/lemonade.png',
 }
 
 interface HoldableItem {
@@ -763,6 +781,12 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_x_attack_2', name: 'X Attack 2', desc: '+10 ataque permanente.', price: 45, spriteKey: 'X Attack 2', category: 'consumable' },
   { id: 'unlock_x_defense_2', name: 'X Defense 2', desc: '+10 defensa permanente.', price: 45, spriteKey: 'X Defense 2', category: 'consumable' },
   { id: 'unlock_x_speed_2', name: 'X Speed 2', desc: '+10 velocidad permanente.', price: 45, spriteKey: 'X Speed 2', category: 'consumable' },
+  { id: 'unlock_smoke_ball', name: 'Cuerda Huida', desc: 'Escapa de cualquier combate. Aparece en tiendas (25%).', price: 60, spriteKey: 'Cuerda Huida', category: 'consumable' },
+  { id: 'unlock_moomoo_milk', name: 'Moomoo Milk', desc: 'Restaura 100 HP. Aparece en tiendas.', price: 30, spriteKey: 'Moomoo Milk', category: 'consumable' },
+  { id: 'unlock_berry_juice', name: 'Berry Juice', desc: 'Restaura 20 HP. Aparece en tiendas.', price: 15, spriteKey: 'Berry Juice', category: 'consumable' },
+  { id: 'unlock_fresh_water', name: 'Fresh Water', desc: 'Restaura 30 HP. Aparece en tiendas.', price: 20, spriteKey: 'Fresh Water', category: 'consumable' },
+  { id: 'unlock_soda_pop', name: 'Soda Pop', desc: 'Restaura 40 HP. Aparece en tiendas.', price: 25, spriteKey: 'Soda Pop', category: 'consumable' },
+  { id: 'unlock_lemonade', name: 'Lemonade', desc: 'Restaura 60 HP. Aparece en tiendas.', price: 30, spriteKey: 'Lemonade', category: 'consumable' },
   { id: 'unlock_muscle_band', name: 'Muscle Band', desc: '+15% Ataque.', price: 40, spriteKey: 'Muscle Band', category: 'holdable' },
   { id: 'unlock_wise_glasses', name: 'Wise Glasses', desc: '+15% Velocidad.', price: 40, spriteKey: 'Wise Glasses', category: 'holdable' },
   { id: 'unlock_choice_band', name: 'Choice Band', desc: '+25% Ataque.', price: 70, spriteKey: 'Choice Band', category: 'holdable' },
@@ -1386,6 +1410,12 @@ function MainApp() {
     unlock_x_attack_2: 'X Attack 2',
     unlock_x_defense_2: 'X Defense 2',
     unlock_x_speed_2: 'X Speed 2',
+    unlock_smoke_ball: 'Cuerda Huida',
+    unlock_moomoo_milk: 'Moomoo Milk',
+    unlock_berry_juice: 'Berry Juice',
+    unlock_fresh_water: 'Fresh Water',
+    unlock_soda_pop: 'Soda Pop',
+    unlock_lemonade: 'Lemonade',
   }
   const LOCKED_HOLDABLE_MAP: Record<string, string> = {
     unlock_muscle_band: 'Muscle Band',
@@ -1450,6 +1480,10 @@ function MainApp() {
     return progression.completedHard.includes(gen)
   }
 
+  function isColiseumUnlocked(): boolean {
+    return generations.every(g => progression.completedMedium.includes(g))
+  }
+
   function handleSelectGeneration(gen: number) {
     if (!isGenUnlocked(gen)) return
     setGeneration(gen)
@@ -1470,6 +1504,7 @@ function MainApp() {
   function handleSelectDifficulty(diff: Difficulty) {
     if (diff === 'hard' && !isHardUnlocked(generation)) return
     if (diff === 'infinite' && !isInfiniteUnlocked(generation)) return
+    if (diff === 'coliseum' && !isColiseumUnlocked()) return
     setDifficulty(diff)
   }
 
@@ -2523,7 +2558,8 @@ function MainApp() {
       const selectedBalls = shuffledBalls.slice(0, 2)
       const unlockedStones = EVOLUTION_STONES.filter(s => isEvolutionStoneUnlocked(s))
       const selectedStone = unlockedStones.length > 0 ? [unlockedStones[Math.floor(Math.random() * unlockedStones.length)]] : []
-      setShopStock([...selectedConsumables, ...selectedHoldables, ...selectedBalls, ...selectedStone])
+      const smokeBallChance = isConsumableUnlocked('Cuerda Huida') && Math.random() < 0.25 ? ['Cuerda Huida'] : []
+      setShopStock([...selectedConsumables, ...selectedHoldables, ...selectedBalls, ...selectedStone, ...smokeBallChance])
       if (runChallenges.noPurchasing) {
         setBattleLog((prev) => [
           `🚫 Desafío Sin Compras: No puedes comprar nada en la tienda.`,
@@ -2543,7 +2579,7 @@ function MainApp() {
     }
 
     if (currentNode.type === 'spin') {
-      const healingPool = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i])
+      const healingPool = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i] && i !== 'Cuerda Huida')
       const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
       const unlockedStones = EVOLUTION_STONES.filter(s => isEvolutionStoneUnlocked(s))
       const selectedStone = unlockedStones.length > 0 ? [unlockedStones[Math.floor(Math.random() * unlockedStones.length)]] : []
@@ -4302,6 +4338,17 @@ function MainApp() {
       return
     }
 
+    if (itemName === 'Cuerda Huida') {
+      if (screen !== 'battle') {
+        setBattleLog((prev) => ['La Cuerda Huida solo se puede usar durante un combate.', ...prev].slice(0, 15))
+        return
+      }
+      setInventory(prev => prev.filter((_, i) => i !== itemIndex))
+      setBattleLog((prev) => [`💨 ¡Usaste la Cuerda Huida y escapaste del combate!`, ...prev].slice(0, 15))
+      completeCurrentNode()
+      return
+    }
+
     if (runChallenges.noItems) {
       setBattleLog((prev) => ['🚫 Desafío Sin Objetos: No puedes usar items en batalla.', ...prev].slice(0, 15))
       return
@@ -4348,6 +4395,16 @@ function MainApp() {
       updatedPokemon = { ...activePokemon, speed: activePokemon.speed + 5 }
     } else if (itemName === 'Elixir' && activePokemon.hp < activePokemon.maxHp) {
       updatedPokemon = healPokemon(activePokemon, 80)
+    } else if (itemName === 'Moomoo Milk' && activePokemon.hp < activePokemon.maxHp) {
+      updatedPokemon = healPokemon(activePokemon, 100)
+    } else if (itemName === 'Lemonade' && activePokemon.hp < activePokemon.maxHp) {
+      updatedPokemon = healPokemon(activePokemon, 60)
+    } else if (itemName === 'Soda Pop' && activePokemon.hp < activePokemon.maxHp) {
+      updatedPokemon = healPokemon(activePokemon, 40)
+    } else if (itemName === 'Fresh Water' && activePokemon.hp < activePokemon.maxHp) {
+      updatedPokemon = healPokemon(activePokemon, 30)
+    } else if (itemName === 'Berry Juice' && activePokemon.hp < activePokemon.maxHp) {
+      updatedPokemon = healPokemon(activePokemon, 20)
     } else if (itemName === 'Super Elixir' && activePokemon.hp < activePokemon.maxHp) {
       updatedPokemon = healPokemon(activePokemon, 200)
     } else if (itemName === 'Full Elixir') {
@@ -5391,7 +5448,7 @@ function MainApp() {
         <section className="panel setup-panel" style={{ maxWidth: '600px', margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
             <h2 style={{ margin: 0, color: '#facc15' }}>👑 COLISEUM</h2>
-            <button className="tiny-btn" onClick={() => { playClick(); setColiseumTempTeam([]); setScreen('setup'); stopMusic() }} type="button" style={{ color: '#f87171' }}>
+            <button className="tiny-btn" onClick={() => { playClick(); setColiseumTempTeam([]); setRunChallenges({ noShops: false, noRests: false, allShiny: false, allTeamRocket: false, nuzlocke: false, soloStarter: false, fixedTeam: false, noEvolution: false, noItems: false, restrictedMoves: false, firstStrike: false, fixedLevel: false, noCrits: false, typeRandomizer: false, noPurchasing: false, blindRoute: false, bossRush: false, speedrun: false, noMoney: false, doubleModifiers: false, scalingEnemies: false, noHealing: false, ironman: false, totalRandomizer: false, nuzlockeHardcore: false, challengeGauntlet: false, egglocke: false }); setScreen('setup'); stopMusic() }} type="button" style={{ color: '#f87171' }}>
               ✕ Salir
             </button>
           </div>
@@ -5643,27 +5700,38 @@ function MainApp() {
           </div>
 
           <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
+            {(() => {
+              const coliseumUnlocked = isColiseumUnlocked()
+              return (
             <button
               className={`gen-tile ${difficulty === 'coliseum' ? 'is-active' : ''}`}
-              onClick={() => { playClick(); handleSelectDifficulty('coliseum') }}
+              onClick={() => { if (!coliseumUnlocked) return; playClick(); handleSelectDifficulty('coliseum') }}
               onMouseEnter={playHover}
               type="button"
-              disabled={isLoading}
+              disabled={isLoading || !coliseumUnlocked}
               style={{
                 borderColor: difficulty === 'coliseum' ? '#facc15' : '#475569',
                 background: difficulty === 'coliseum' ? 'rgba(250,204,21,0.15)' : 'rgba(15,23,42,0.6)',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: '4px', padding: '12px', cursor: isLoading ? 'not-allowed' : 'pointer'
+                gap: '4px', padding: '12px', opacity: coliseumUnlocked ? 1 : 0.65,
+                cursor: (!isLoading && coliseumUnlocked) ? 'pointer' : 'not-allowed'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem', color: '#facc15' }}>👑 COLISEUM</span>
-                <strong style={{ fontSize: '1rem', color: '#facc15' }}>— 8 jefes a nivel 50</strong>
+                <span style={{ fontSize: '1.2rem', color: coliseumUnlocked ? '#facc15' : '#64748b' }}>👑 COLISEUM {coliseumUnlocked ? '' : '🔒'}</span>
+                <strong style={{ fontSize: '1rem', color: coliseumUnlocked ? '#facc15' : '#64748b' }}>— 8 jefes a nivel 50</strong>
               </div>
-              <span className="lock-text" style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-                Elige 6 Pokémon de tu Pokédex para enfrentarlos
-              </span>
+              {coliseumUnlocked ? (
+                <span className="lock-text" style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                  Elige 6 Pokémon de tu Pokédex para enfrentarlos
+                </span>
+              ) : (
+                <span className="lock-text">
+                  🔒 Completa todas las generaciones en Intermedio
+                </span>
+              )}
             </button>
+            )})()}
           </div>
 
           <h2 style={{ marginTop: '1.5rem' }}>🎲 Desafío Diario</h2>
