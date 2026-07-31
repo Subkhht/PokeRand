@@ -4,6 +4,7 @@ const API_BASE = 'https://pokeapi.co/api/v2'
 
 const generationSpeciesCache = new Map<number, number[]>()
 const pokemonCache = new Map<string | number, Pokemon>()
+const legendaryIdsCache = new Map<number, Promise<Set<number>>>()
 let allFormIdsPromise: Promise<number[]> | null = null
 
 interface PokeApiNamedResource {
@@ -264,6 +265,33 @@ export async function getSpeciesIdsByGeneration(generation: number): Promise<num
   const ids = generationData.pokemon_species.map((species) => extractIdFromResourceUrl(species.url))
   generationSpeciesCache.set(generation, ids)
   return ids
+}
+
+async function getLegendaryIdsByGeneration(generation: number): Promise<Set<number>> {
+  const cached = legendaryIdsCache.get(generation)
+  if (cached) return cached
+
+  const promise = (async () => {
+    const ids = await getSpeciesIdsByGeneration(generation)
+    const flags = await Promise.all(ids.map(async (id) => {
+      try {
+        const res = await fetch(`${API_BASE}/pokemon-species/${id}`)
+        if (!res.ok) return false
+        const data = await res.json()
+        return data.is_legendary === true || data.is_mythical === true
+      } catch {
+        return false
+      }
+    }))
+    const set = new Set<number>()
+    ids.forEach((id, index) => {
+      if (flags[index]) set.add(id)
+    })
+    return set
+  })()
+
+  legendaryIdsCache.set(generation, promise)
+  return promise
 }
 
 // 1. Obtiene detalles del movimiento y descarta los de estado/sin daño
@@ -612,40 +640,38 @@ function filterSpeciesIdsForProgress(
   ids: number[],
   progressRatio: number,
   isBoss: boolean,
-  bossStage: number = -1
+  bossStage: number = -1,
+  legendaryIds: Set<number> = new Set()
 ): number[] {
   if (ids.length <= 10) return ids
 
-  const total = ids.length
-  const legendaryCutoff = Math.floor(total * 0.88)
-  const nonLegendaryIds = ids.slice(0, legendaryCutoff)
-  const legendaryIds = ids.slice(legendaryCutoff)
+  const nonLegendaryIds = ids.filter(id => !legendaryIds.has(id))
+  const legendaryList = ids.filter(id => legendaryIds.has(id))
+  const nonLegendaryTotal = nonLegendaryIds.length
 
   if (isBoss) {
     if (bossStage === 0) {
-      return nonLegendaryIds.slice(0, Math.floor(nonLegendaryIds.length * 0.5))
+      return nonLegendaryIds.slice(0, Math.floor(nonLegendaryTotal * 0.5))
     }
     if (bossStage === 1) {
-      return nonLegendaryIds.slice(Math.floor(nonLegendaryIds.length * 0.3))
+      return nonLegendaryIds.slice(Math.floor(nonLegendaryTotal * 0.3))
     }
-    if (Math.random() < 0.4 && legendaryIds.length > 0) {
-      return legendaryIds
+    if (Math.random() < 0.4 && legendaryList.length > 0) {
+      return legendaryList
     }
-    return ids.slice(Math.floor(total * 0.4))
+    return nonLegendaryIds.slice(Math.floor(nonLegendaryTotal * 0.35))
   }
 
   if (progressRatio < 0.35) {
-    // Principio de la aventura: solo Pokémon no-legendarios, priorizando las especies de las primeras rutas (primer 65%)
-    const earlyCandidates = nonLegendaryIds.slice(0, Math.floor(total * 0.65))
+    // Principio de la aventura: solo Pokémon no-legendarios de las primeras rutas
+    const earlyCandidates = nonLegendaryIds.slice(0, Math.floor(nonLegendaryTotal * 0.65))
     return earlyCandidates.length > 0 ? earlyCandidates : nonLegendaryIds
   }
 
   if (progressRatio < 0.70) {
-    // Mitad de la aventura: especies estándar no legendarias
     return nonLegendaryIds.length > 0 ? nonLegendaryIds : ids
   }
 
-  // Final de la aventura (nodos de combate normales): especies avanzadas no legendarias
   return nonLegendaryIds.length > 0 ? nonLegendaryIds : ids
 }
 
@@ -675,15 +701,23 @@ export async function getBalancedPokemonByGeneration(
   isBoss: boolean = false,
   shiny: boolean = false,
   difficulty: string = 'medium',
-  bossStage: number = -1
+  bossStage: number = -1,
+  stageIndex: number = 0
 ): Promise<Pokemon> {
   const allIds = await getSpeciesIdsByGeneration(generation)
-  const progressRatio = stepIndex / Math.max(1, totalNodes - 1)
+  const legendaryIds = await getLegendaryIdsByGeneration(generation)
+  const routeProgress = stepIndex / Math.max(1, totalNodes - 1)
 
-  const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss, bossStage)
+  // Progreso efectivo: combina la etapa actual con la posición dentro de la ruta.
+  // Infinite no tiene etapas, así que usa el progreso de la ruta directamente.
+  const progressRatio = difficulty === 'infinite'
+    ? routeProgress
+    : (stageIndex + routeProgress) / 3
+
+  const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss, bossStage, legendaryIds)
 
   const levelMult = difficulty === 'infinite' ? 2.5 : difficulty === 'hard' ? 2.0 : 1.5
-  const scaledLevel = 10 + Math.floor(stepIndex * levelMult) + (isBoss ? 2 : 0)
+  const scaledLevel = 10 + Math.floor((stageIndex * totalNodes + stepIndex) * levelMult) + (isBoss ? 2 : 0)
 
   let minBst = 150
   let maxBst = 999
@@ -785,7 +819,7 @@ export async function getBalancedPokemonByGeneration(
 
   if (bestCandidate) return applyHardHeldItem(bestCandidate, difficulty, isBoss)
 
-  const randomId = randomFrom(allIds)
+  const randomId = randomFrom(candidateIds.length > 0 ? candidateIds : allIds)
   return applyHardHeldItem(await buildPokemonFromApi(randomId, generation, scaledLevel, shiny, difficulty), difficulty, isBoss)
 }
 

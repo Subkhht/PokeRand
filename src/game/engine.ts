@@ -47,29 +47,62 @@ export function scalePokemonForNode(base: Pokemon, _node: RouteNode, _stepIndex:
   const hpMultiplier = difficulty === 'infinite' ? 6 : difficulty === 'hard' ? 5 : difficulty === 'coliseum' ? 5 : 4
   const statMultiplier = difficulty === 'infinite' ? 3 : difficulty === 'hard' ? 2.5 : difficulty === 'coliseum' ? 2.5 : 2
 
-  let targetLevel = base.level + levelDelta
-  if (base.minAppearLevel && targetLevel < base.minAppearLevel) {
-    const extra = base.minAppearLevel - targetLevel
-    targetLevel = base.minAppearLevel
-    levelDelta += extra
-  }
-
+  // El nivel mínimo de aparición ya se aplica en buildPokemonFromApi.
+  // Aquí NO debemos volver a subir el nivel: bloquearía bajar el nivel de un
+  // rival para igualarlo al promedio del equipo (p. ej. un salvaje de etapa alta
+  // quedaría clavado en Nv.36 contra un equipo de Nv.20).
+  const targetLevel = Math.max(1, base.level + levelDelta)
   const hpBonus = levelDelta * hpMultiplier
   const statBonus = levelDelta * statMultiplier
 
   return {
     ...base,
     level: targetLevel,
-    maxHp: base.maxHp + hpBonus,
-    hp: base.maxHp + hpBonus,
-    attack: base.attack + statBonus,
-    defense: base.defense + statBonus,
-    speed: base.speed + statBonus
+    maxHp: Math.max(20, base.maxHp + hpBonus),
+    hp: Math.max(20, base.maxHp + hpBonus),
+    attack: Math.max(10, base.attack + statBonus),
+    defense: Math.max(10, base.defense + statBonus),
+    speed: Math.max(10, base.speed + statBonus)
   }
 }
 
 export function applyNoEvolutionBuff(pokemon: Pokemon): Pokemon {
   return pokemon
+}
+
+export function getTeamStatAverages(team: Pokemon[]): { attack: number; defense: number; speed: number; maxHp: number } {
+  const alive = team.filter(p => p.hp > 0)
+  const pool = alive.length > 0 ? alive : team
+  if (pool.length === 0) {
+    return { attack: 50, defense: 50, speed: 50, maxHp: 120 }
+  }
+  const avg = (f: (p: Pokemon) => number) => pool.reduce((acc, p) => acc + f(p), 0) / pool.length
+  return {
+    attack: avg(p => p.attack),
+    defense: avg(p => p.defense),
+    speed: avg(p => p.speed),
+    maxHp: avg(p => p.maxHp),
+  }
+}
+
+export function balanceWildPokemonToTeam(enemy: Pokemon, team: Pokemon[], difficulty: string): Pokemon {
+  const teamAvg = getTeamStatAverages(team)
+  const strength = difficulty === 'infinite' ? 1.15 : difficulty === 'hard' ? 1.05 : difficulty === 'easy' ? 0.85 : 0.95
+  const blend = 0.5
+
+  const attack = Math.max(10, Math.round(enemy.attack * blend + teamAvg.defense * strength * (1 - blend)))
+  const defense = Math.max(10, Math.round(enemy.defense * blend + teamAvg.attack * strength * (1 - blend)))
+  const speed = Math.max(10, Math.round(enemy.speed * blend + teamAvg.speed * strength * (1 - blend)))
+  const maxHp = Math.max(20, Math.round(enemy.maxHp * blend + teamAvg.maxHp * strength * (1 - blend)))
+
+  return {
+    ...enemy,
+    attack,
+    defense,
+    speed,
+    maxHp,
+    hp: maxHp,
+  }
 }
 
 export function generateRoute(): RouteNode[] {

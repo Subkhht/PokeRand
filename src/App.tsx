@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef, Component, type ReactNode } from 'react'
 import './App.css'
-import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
+import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
 import { playHover, playClick, playHit, playEvolution, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
@@ -1706,7 +1706,7 @@ function MainApp() {
         })
       }).catch(() => {})
     })
-  }, [])
+  }, [pokedex])
 
   function awardPokeCoins(amount: number, reason: string): void {
     setMetaProgression(prev => {
@@ -2301,6 +2301,8 @@ function MainApp() {
           setBadges(updatedBadges)
           setCurrentStage(updatedBadges.length + 1)
           setBattleLog((prev) => [`🏅 ¡Obtuviste la ${newBadge.name}! (${updatedBadges.length}/3)`, ...prev].slice(0, 15))
+          const stageCoins = Math.floor((difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15) / 2)
+          awardPokeCoins(stageCoins, `🏅 Bonus por completar la etapa ${updatedBadges.length} de 3`)
         }
         if (badges.length < 2) {
           // Generar nueva ruta para la siguiente etapa
@@ -2413,10 +2415,6 @@ function MainApp() {
       awardPokeCoins(baseCoins, `¡Victoria! (${difficulty === 'easy' ? 'Fácil' : difficulty === 'hard' ? 'Difícil' : 'Medio'})`)
       if (currentNode && currentNode.id >= 1000) {
         awardPokeCoins(15, '🏆 Victoria en la Liga Pokémon')
-      }
-      if (badges.length > 0) {
-        const stageCoins = Math.floor(baseCoins / 2)
-        awardPokeCoins(stageCoins * badges.length, `Bonus por ${badges.length} etapa${badges.length > 1 ? 's' : ''} completada${badges.length > 1 ? 's' : ''}`)
       }
       if (hasActiveChallenge) awardPokeCoins(15, 'Bonus Desafío Activo')
       if (team.length <= 1) awardPokeCoins(5, 'Bonus Solo Pokémon')
@@ -2600,7 +2598,7 @@ function MainApp() {
       try {
         const targetGen = getEffectiveGen()
         const fetches = Array.from({ length: 6 }, () =>
-          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
+          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length)
         )
         const pokemonList = await Promise.all(fetches)
         setPokeRandPokemon(pokemonList)
@@ -2731,7 +2729,7 @@ function MainApp() {
     try {
       if (runChallenges.egglocke) {
         const targetGen = getEffectiveGen()
-        const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
+        const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length)
         const eggId = Math.floor(Math.random() * 900) + 1
         const eggEntry = {
           name: restPokemonBase.name,
@@ -2759,7 +2757,7 @@ function MainApp() {
       }
 
       const targetGen = getEffectiveGen()
-      const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
+      const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length)
       const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, modifier?.enemyLevelDelta ?? 0, difficulty)
       if (shinyNextEncounter) {
         generatedEncounter.shiny = true
@@ -2808,7 +2806,7 @@ function MainApp() {
         const trainerLevelOffset = Math.floor(Math.random() * 3) - 1 // TeamR: -1, 0, or +1
 
         const fetches = Array.from({ length: teamSize }, () =>
-          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
+          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length)
             .then((base) => {
               const targetLevel = avgPlayerLevel + trainerLevelOffset
               const levelDiff = targetLevel - base.level
@@ -2870,7 +2868,7 @@ function MainApp() {
                   return { id: 1, name: 'Bulbasaur', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png', level: 50, hp: 100, maxHp: 100, attack: 50, defense: 50, speed: 50, moves: [], statStages: { attack: 0, defense: 0, speed: 0 } } as Pokemon
                 }
               })()
-            : getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? badges.length : -1)
+            : getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? badges.length : -1, badges.length)
             .then((base) => {
               const targetLevel = avgPlayerLevel + trainerLevelOffset
               const levelDiff = targetLevel - base.level
@@ -2939,12 +2937,13 @@ function MainApp() {
           ...prev
         ])
       } else {
-        const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty)
+        const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length)
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const wildLevelOffset = Math.floor(Math.random() * 3) - 1
         const targetLevel = avgPlayerLevel + wildLevelOffset
         const levelDiff = targetLevel - enemyBase.level
         let generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
+        generatedEnemy = balanceWildPokemonToTeam(generatedEnemy, team, difficulty)
         if (runChallenges.fixedLevel) generatedEnemy = { ...generatedEnemy, level: 50 }
         if (runChallenges.totalRandomizer) {
           generatedEnemy = {
@@ -3893,7 +3892,9 @@ function MainApp() {
 
       const baseMoneyReward = Math.floor((40 + nextEnemy.level * 5) / (isTrainerBattle ? trainerTeam.length : 1))
       const hardMoneyPenalty = difficulty === 'hard' ? 0.6 : difficulty === 'infinite' ? 0.5 : 1
-      const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoneyReward * (modifier?.moneyMultiplier ?? 1) * hardMoneyPenalty)
+      const trainerMoneyPenalty = isTeamRocketBattle ? 0.4 : (isTrainerBattle && currentNode?.type !== 'boss') ? 0.5 : 1
+      const wildMoneyPenalty = (!isTrainerBattle && currentNode?.type === 'battle') ? 0.7 : 1
+      const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoneyReward * (modifier?.moneyMultiplier ?? 1) * hardMoneyPenalty * trainerMoneyPenalty * wildMoneyPenalty)
       if (!runChallenges.noMoney) setMoney((prev) => prev + moneyReward)
 
       setRunStats(prev => ({
@@ -3950,7 +3951,7 @@ function MainApp() {
 
         if (nextTrainerIndex === -1) {
           const baseTotalReward = 40 + nextEnemy.level * 5 * trainerTeam.length
-          const totalReward = Math.floor(baseTotalReward * (modifier?.moneyMultiplier ?? 1) * hardMoneyPenalty)
+          const totalReward = Math.floor(baseTotalReward * (modifier?.moneyMultiplier ?? 1) * hardMoneyPenalty * trainerMoneyPenalty)
           setMoney((prev) => prev + totalReward)
           setTeam(newTeam)
           setTrainerTeam(updatedTrainerTeam)
@@ -4321,7 +4322,7 @@ function MainApp() {
     }
   }
 
-  function useInventoryItem(itemName: string): void {
+  function consumeInventoryItem(itemName: string): void {
     const itemIndex = inventory.indexOf(itemName)
     if (itemIndex === -1) return
     if (HOLDABLE_ITEMS[itemName]) return
@@ -6742,7 +6743,7 @@ function MainApp() {
                       key={entry.name}
                       className="item-slot filled item-button"
                       type="button"
-                      onClick={() => useInventoryItem(entry.name)}
+                      onClick={() => consumeInventoryItem(entry.name)}
                       title={entry.description}
                       style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px' }}
                     >
