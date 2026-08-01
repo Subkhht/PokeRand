@@ -1282,7 +1282,13 @@ function MainApp() {
   const runStartTimeRef = useRef<number>(0)
   const pendingScoreRef = useRef<InfiniteScoreInsert | null>(null)
   const showLeaderboardRef = useRef(false)
+  const routeMapRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => { showLeaderboardRef.current = showLeaderboard }, [showLeaderboard])
+  useEffect(() => {
+    if (difficulty === 'infinite' && routeMapRef.current) {
+      routeMapRef.current.scrollTop = routeMapRef.current.scrollHeight
+    }
+  }, [routeIndex, difficulty])
   useEffect(() => {
     try {
       const raw = localStorage.getItem('pokerand_pending_score')
@@ -6041,7 +6047,7 @@ function MainApp() {
                       )}
                     </span>
                     <strong style={{ fontSize: '1rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5' }}>
-                      — {randomUnlocked ? 'Mezclar todas las generaciones' : 'Modo Caos (Completa todas las generaciones)'}
+                      — {randomUnlocked ? 'Mezclar todas las generaciones' : 'Todas las Generaciones'}
                     </strong>
                   </div>
                   {!randomUnlocked && (
@@ -6588,7 +6594,13 @@ function MainApp() {
                 🎰 Modifier 2: <strong>{modifier2.name}</strong> — {modifier2.description}
               </div>
             )}
-            <div className="route-map" style={{ paddingRight: '4px' }}>
+            <div
+              className="route-map"
+              ref={difficulty === 'infinite' ? routeMapRef : undefined}
+              style={difficulty === 'infinite'
+                ? { paddingRight: '4px', maxHeight: '340px', overflowY: 'auto' }
+                : { paddingRight: '4px' }}
+            >
               {(() => {
                 const { positions, width, height } = getNodeMapLayout(route.length)
                 const points = positions.map((p) => `${p.x},${p.y}`).join(' ')
