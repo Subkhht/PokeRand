@@ -384,12 +384,7 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
 // Límite realista de potencia de movimiento según el nivel del Pokémon
 export function getMaxMovePowerForLevel(level: number, difficulty: string = 'medium'): number {
   if (difficulty.startsWith('coliseum')) return 150
-  if (difficulty === 'infinite') {
-    if (level <= 14) return 90
-    if (level <= 22) return 115
-    return 150
-  }
-  if (difficulty === 'hard') {
+  if (difficulty === 'hard' || difficulty === 'infinite') {
     if (level <= 12) return 85
     if (level <= 20) return 100
     return 150
@@ -721,7 +716,7 @@ export async function getBalancedPokemonByGeneration(
 
   const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss, bossStage, legendaryIds)
 
-  const levelMult = difficulty === 'infinite' ? 2.15 : difficulty === 'hard' ? 2.0 : 1.5
+  const levelMult = difficulty === 'infinite' ? 1.0 : difficulty === 'hard' ? 2.0 : 1.5
   const scaledLevel = 10 + Math.floor((stageIndex * totalNodes + stepIndex) * levelMult) + (isBoss ? 2 : 0)
 
   let minBst = 150

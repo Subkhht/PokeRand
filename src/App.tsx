@@ -1636,6 +1636,10 @@ function MainApp() {
     return generation
   }
 
+  function getMaxTeamLevel(): number {
+    return team.reduce((max, p) => Math.max(max, p.level), 0)
+  }
+
   async function handleSelectPokedexPokemon(id: number) {
     setIsLoadingDetail(true)
     try {
@@ -1863,7 +1867,10 @@ function MainApp() {
       case 'legendary_appears': {
         const legendaryIds = [144,145,146,150,151,243,244,245,249,250,251,377,378,379,380,381,382,383,384,385,480,481,482,483,484,485,486,487,488,491,492,493,494,638,639,640,641,642,643,644,645,646,647,648,649]
         const id = legendaryIds[Math.floor(Math.random() * legendaryIds.length)]
-        const legendaryData = await buildPokemonFromApi(id, 1, current.level + 5)
+        const legendaryLevel = difficulty === 'infinite'
+          ? getMaxTeamLevel() + (Math.floor(Math.random() * 3) - 1)
+          : current.level + 5
+        const legendaryData = await buildPokemonFromApi(id, 1, legendaryLevel)
         const legendary: Pokemon = {
           ...legendaryData,
           level: current.level + 5,
@@ -2585,7 +2592,7 @@ function MainApp() {
       completeCurrentNode()
       return
     }
-    let captured: Pokemon = { ...pokemon, hp: Math.floor(pokemon.maxHp / 2), holdItem: difficulty === 'hard' ? null : pokemon.holdItem }
+    let captured: Pokemon = { ...pokemon, hp: Math.floor(pokemon.maxHp / 2), holdItem: (difficulty === 'hard' || difficulty === 'infinite') ? null : pokemon.holdItem }
     if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
     if (runChallenges.fixedLevel) captured = { ...captured, level: 50 }
     registerInPokedex(captured)
@@ -2734,7 +2741,10 @@ function MainApp() {
         const fetches = Array.from({ length: 6 }, () =>
           getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length)
             .then((base) => {
-              const levelDiff = (avgPlayerLevel + Math.floor(Math.random() * 3) - 1) - base.level
+              const targetLevel = difficulty === 'infinite'
+                ? getMaxTeamLevel() + 1 + Math.floor(Math.random() * 2)
+                : avgPlayerLevel + Math.floor(Math.random() * 3) - 1
+              const levelDiff = targetLevel - base.level
               const scaled = scalePokemonForNode(base, currentNode, routeIndex, levelDiff, difficulty)
               return runChallenges.fixedLevel ? { ...scaled, level: 50 } : scaled
             })
@@ -2796,7 +2806,10 @@ function MainApp() {
         const targetGen = getEffectiveGen()
         const gmaxId = Array.from(GMAX_CAPABLE_IDS)[Math.floor(Math.random() * GMAX_CAPABLE_IDS.size)]
         const base = await buildPokemonFromApi(gmaxId, targetGen, 1, false, difficulty)
-        let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0), difficulty)
+        const gmaxLevelDelta = difficulty === 'infinite'
+          ? getMaxTeamLevel() + 1 + Math.floor(Math.random() * 2) - base.level
+          : (modifier?.enemyLevelDelta ?? 0)
+        let scaled = scalePokemonForNode(base, currentNode, routeIndex, gmaxLevelDelta, difficulty)
         if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
         if (runChallenges.totalRandomizer) {
           scaled = {
@@ -2841,7 +2854,7 @@ function MainApp() {
 
     if (currentNode.type === 'mega') {
       const alreadyHas = inventory.includes('Mega Stone') || team.some(p => p.holdItem === 'Mega Stone')
-      if (!alreadyHas) {
+      if (!alreadyHas || difficulty === 'infinite') {
         setInventory(prev => [...prev, 'Mega Stone'])
         setBattleLog(prev => [`💎 ¡Recibes una Mega Piedra! Un Pokémon puede equiparla para mega-evolucionar en combate.`, ...prev].slice(0, 15))
       } else {
@@ -2900,7 +2913,10 @@ function MainApp() {
       const targetGen = getEffectiveGen()
       const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length)
       const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
-      const levelDiff = (avgPlayerLevel - 2 + Math.floor(Math.random() * 3) - 1) - restPokemonBase.level
+      const restTargetLevel = difficulty === 'infinite'
+        ? getMaxTeamLevel() + (Math.floor(Math.random() * 3) - 1)
+        : avgPlayerLevel - 2 + Math.floor(Math.random() * 3) - 1
+      const levelDiff = restTargetLevel - restPokemonBase.level
       const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, levelDiff, difficulty)
       if (shinyNextEncounter) {
         generatedEncounter.shiny = true
@@ -2951,7 +2967,9 @@ function MainApp() {
         const fetches = Array.from({ length: teamSize }, () =>
           getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length)
             .then((base) => {
-              const targetLevel = avgPlayerLevel + trainerLevelOffset
+              const targetLevel = difficulty === 'infinite'
+                ? getMaxTeamLevel() + 1 + Math.floor(Math.random() * 2)
+                : avgPlayerLevel + trainerLevelOffset
               const levelDiff = targetLevel - base.level
               let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
               if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
@@ -3013,7 +3031,9 @@ function MainApp() {
               })()
             : getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? badges.length : -1, badges.length)
             .then((base) => {
-              const targetLevel = avgPlayerLevel + trainerLevelOffset
+              const targetLevel = difficulty === 'infinite'
+                ? getMaxTeamLevel() + 1 + Math.floor(Math.random() * 2)
+                : avgPlayerLevel + trainerLevelOffset
               const levelDiff = targetLevel - base.level
               let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
               if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
@@ -3083,7 +3103,9 @@ function MainApp() {
         const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length)
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const wildLevelOffset = Math.floor(Math.random() * 3) - 1
-        const targetLevel = avgPlayerLevel + wildLevelOffset
+        const targetLevel = difficulty === 'infinite'
+          ? getMaxTeamLevel() + (Math.floor(Math.random() * 3) - 1)
+          : avgPlayerLevel + wildLevelOffset
         const levelDiff = targetLevel - enemyBase.level
         let generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
         generatedEnemy = balanceWildPokemonToTeam(generatedEnemy, team, difficulty)
@@ -3220,7 +3242,7 @@ function MainApp() {
     }
     if (runChallenges.noEvolution) pokemon = applyNoEvolutionBuff(pokemon)
     if (runChallenges.fixedLevel) pokemon = { ...pokemon, level: 50 }
-    if (difficulty === 'hard') pokemon = { ...pokemon, holdItem: null }
+    if (difficulty === 'hard' || difficulty === 'infinite') pokemon = { ...pokemon, holdItem: null }
     registerInPokedex(pokemon)
     setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
     if (pokemon.shiny) unlockAchievement('shiny_catch')
@@ -4246,7 +4268,7 @@ function MainApp() {
     // Master Ball: captura automática
     if (def.isMaster) {
       setInventory(prev => prev.filter((_, i) => i !== ballIdx))
-      const capturedPkmn = { ...enemy, holdItem: difficulty === 'hard' ? null : enemy.holdItem }
+      const capturedPkmn = { ...enemy, holdItem: (difficulty === 'hard' || difficulty === 'infinite') ? null : enemy.holdItem }
       registerInPokedex(capturedPkmn)
       setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
       if (capturedPkmn.shiny) unlockAchievement('shiny_catch')
@@ -4279,7 +4301,7 @@ function MainApp() {
 
     if (Math.random() < catchProbability) {
       // Captura exitosa
-      const capturedPkmn = { ...enemy, holdItem: difficulty === 'hard' ? null : enemy.holdItem }
+      const capturedPkmn = { ...enemy, holdItem: (difficulty === 'hard' || difficulty === 'infinite') ? null : enemy.holdItem }
       registerInPokedex(capturedPkmn)
       setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
       if (capturedPkmn.shiny) unlockAchievement('shiny_catch')
@@ -4642,7 +4664,7 @@ function MainApp() {
     }
 
     const hpBonus = modifier?.playerMaxHpBonus ?? 0
-    let captured: Pokemon = { ...restEncounter, maxHp: restEncounter.maxHp + hpBonus, hp: restEncounter.hp + hpBonus, holdItem: difficulty === 'hard' ? null : restEncounter.holdItem }
+    let captured: Pokemon = { ...restEncounter, maxHp: restEncounter.maxHp + hpBonus, hp: restEncounter.hp + hpBonus, holdItem: (difficulty === 'hard' || difficulty === 'infinite') ? null : restEncounter.holdItem }
     if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
     if (runChallenges.fixedLevel) captured = { ...captured, level: 50 }
     registerInPokedex(captured)
@@ -4680,7 +4702,7 @@ function MainApp() {
     }
 
     const hpBonus = modifier?.playerMaxHpBonus ?? 0
-    let captured: Pokemon = { ...legendaryEncounter, maxHp: legendaryEncounter.maxHp + hpBonus, hp: legendaryEncounter.hp + hpBonus, holdItem: difficulty === 'hard' ? null : legendaryEncounter.holdItem }
+    let captured: Pokemon = { ...legendaryEncounter, maxHp: legendaryEncounter.maxHp + hpBonus, hp: legendaryEncounter.hp + hpBonus, holdItem: (difficulty === 'hard' || difficulty === 'infinite') ? null : legendaryEncounter.holdItem }
     if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
     if (runChallenges.fixedLevel) captured = { ...captured, level: 50 }
     registerInPokedex(captured)
