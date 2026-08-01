@@ -5669,7 +5669,7 @@ function MainApp() {
       {screen === 'setup' && (
         <section className="panel setup-panel">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2 style={{ margin: 0, fontSize: '0.85rem' }}>1. Selecciona la Generación</h2>
+            <h2 style={{ margin: 0, fontSize: '0.75rem' }}>1. Selecciona la Generación</h2>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <button className="cta" type="button" onClick={() => { playClick(); startNewRun() }} onMouseEnter={playHover} disabled={isLoading} style={{ padding: '6px 10px', fontSize: '0.8rem', marginTop: 0 }}>
                 {isLoading ? '...' : 'Iniciar Aventura'}
