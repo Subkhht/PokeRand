@@ -1425,12 +1425,25 @@ button {
 }
 
 @keyframes megaGlow {
-  0%, 100% { filter: drop-shadow(0 0 6px #ff9ad6) drop-shadow(0 0 12px #cba3ff); }
-  50% { filter: drop-shadow(0 0 12px #ff9ad6) drop-shadow(0 0 24px #cba3ff); }
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 6px #ff9ad6) drop-shadow(0 0 12px #cba3ff) brightness(1); }
+  50% { transform: scale(1.05); filter: drop-shadow(0 0 12px #ff9ad6) drop-shadow(0 0 24px #cba3ff) brightness(1.15); }
 }
 
 .mega-active {
-  animation: megaGlow 1.5s ease-in-out infinite;
+  animation: megaGlow 1.6s ease-in-out infinite;
+}
+
+@keyframes gmaxRumble {
+  0% { transform: scale(1) rotate(-1deg); filter: drop-shadow(0 0 8px #f9a8d4) drop-shadow(0 0 16px #ff9ad6) brightness(1); }
+  20% { transform: scale(1.18) rotate(1deg); filter: drop-shadow(0 0 16px #f9a8d4) drop-shadow(0 0 32px #ff9ad6) brightness(1.35); }
+  40% { transform: scale(1.12) rotate(-1deg); filter: drop-shadow(0 0 10px #f9a8d4) drop-shadow(0 0 22px #ff9ad6) brightness(1.1); }
+  60% { transform: scale(1.22) rotate(1.5deg); filter: drop-shadow(0 0 18px #f9a8d4) drop-shadow(0 0 36px #ff9ad6) brightness(1.4); }
+  80% { transform: scale(1.14) rotate(-1.5deg); filter: drop-shadow(0 0 12px #f9a8d4) drop-shadow(0 0 26px #ff9ad6) brightness(1.15); }
+  100% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 8px #f9a8d4) drop-shadow(0 0 16px #ff9ad6) brightness(1); }
+}
+
+.gmax-active {
+  animation: gmaxRumble 1s ease-in-out infinite;
 }
 
 .node-gmax {
@@ -1440,15 +1453,6 @@ button {
 
 .node-gmax.current {
   box-shadow: 0 0 8px rgba(249, 168, 212, 0.5) !important;
-}
-
-@keyframes gmaxGlow {
-  0%, 100% { filter: drop-shadow(0 0 6px #f9a8d4) drop-shadow(0 0 12px #ff9ad6); }
-  50% { filter: drop-shadow(0 0 12px #f9a8d4) drop-shadow(0 0 24px #ff9ad6); }
-}
-
-.gmax-active {
-  animation: gmaxGlow 1.5s ease-in-out infinite;
 }
 
 @keyframes slideInRight {
