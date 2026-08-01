@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js'
+import type { SupabaseClient, User } from '@supabase/supabase-js'
 
 export interface LeaderboardTeamMember {
   name: string
@@ -26,24 +26,33 @@ export interface LeaderboardEntry extends InfiniteScoreInsert {
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
-const client: SupabaseClient | null =
-  supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey)
-    : null
+let clientPromise: Promise<SupabaseClient | null> | null = null
+
+function getClient(): Promise<SupabaseClient | null> {
+  if (!supabaseUrl || !supabaseAnonKey) return Promise.resolve(null)
+  if (!clientPromise) {
+    clientPromise = import('@supabase/supabase-js').then(({ createClient }) =>
+      createClient(supabaseUrl, supabaseAnonKey)
+    )
+  }
+  return clientPromise
+}
 
 export function isLeaderboardEnabled(): boolean {
-  return client !== null
+  return Boolean(supabaseUrl && supabaseAnonKey)
 }
 
 // --- Autenticación ---
 
 export async function getCurrentUser(): Promise<User | null> {
+  const client = await getClient()
   if (!client) return null
   const { data } = await client.auth.getUser()
   return data.user ?? null
 }
 
-export function onAuthChange(cb: (user: User | null) => void): () => void {
+export async function onAuthChange(cb: (user: User | null) => void): Promise<() => void> {
+  const client = await getClient()
   if (!client) return () => {}
   const { data } = client.auth.onAuthStateChange((_event, session) => {
     cb(session?.user ?? null)
@@ -64,6 +73,7 @@ export interface AuthResult {
 }
 
 export async function signUpWithUsername(email: string, password: string, username: string): Promise<AuthResult> {
+  const client = await getClient()
   if (!client) return { ok: false, user: null, error: 'El ranking no está configurado.' }
   const { data, error } = await client.auth.signUp({
     email: email.trim(),
@@ -75,6 +85,7 @@ export async function signUpWithUsername(email: string, password: string, userna
 }
 
 export async function signIn(email: string, password: string): Promise<AuthResult> {
+  const client = await getClient()
   if (!client) return { ok: false, user: null, error: 'El ranking no está configurado.' }
   const { data, error } = await client.auth.signInWithPassword({ email: email.trim(), password })
   if (error) return { ok: false, user: null, error: error.message }
@@ -82,11 +93,13 @@ export async function signIn(email: string, password: string): Promise<AuthResul
 }
 
 export async function signOut(): Promise<void> {
+  const client = await getClient()
   if (!client) return
   await client.auth.signOut()
 }
 
 export async function isUsernameTaken(username: string): Promise<boolean> {
+  const client = await getClient()
   if (!client) return false
   const { data, error } = await client
     .from('profiles')
@@ -100,6 +113,7 @@ export async function isUsernameTaken(username: string): Promise<boolean> {
 // --- Ranking ---
 
 export async function submitInfiniteScore(entry: InfiniteScoreInsert): Promise<boolean> {
+  const client = await getClient()
   if (!client) return false
   const { error } = await client.from('infinite_leaderboard').insert(entry)
   if (error) {
@@ -110,6 +124,7 @@ export async function submitInfiniteScore(entry: InfiniteScoreInsert): Promise<b
 }
 
 export async function fetchInfiniteLeaderboard(limit = 50): Promise<LeaderboardEntry[]> {
+  const client = await getClient()
   if (!client) return []
   const { data, error } = await client
     .from('infinite_leaderboard')

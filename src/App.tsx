@@ -1398,17 +1398,21 @@ function MainApp() {
   // Restaurar sesión de Supabase y reaccionar a cambios de login/logout
   useEffect(() => {
     let cancelled = false
+    let unsubscribe: (() => void) | null = null
     void getCurrentUser().then((user) => {
       if (!cancelled) setAuthUser(user)
     })
-    const unsubscribe = onAuthChange((user) => {
+    void onAuthChange((user) => {
       if (cancelled) return
       setAuthUser(user)
       if (user) void submitPendingScore()
+    }).then((cleanup) => {
+      if (cancelled) cleanup()
+      else unsubscribe = cleanup
     })
     return () => {
       cancelled = true
-      unsubscribe()
+      unsubscribe?.()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
