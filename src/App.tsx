@@ -1515,7 +1515,7 @@ function MainApp() {
   function isGenUnlocked(gen: number): boolean {
     if (gen === 1) return true
     if (gen === 0) {
-      return generations.every((g) => g === 1 || progression.completedMedium.includes(g - 1))
+      return generations.every((g) => progression.completedMedium.includes(g))
     }
     return progression.completedMedium.includes(gen - 1)
   }
@@ -1560,6 +1560,7 @@ function MainApp() {
   }
 
   function getEffectiveGen(): number {
+    if (isDailyRunRef.current) return currentRunGen
     if (generation === 0) {
       const unlockedGens = generations.filter((g) => isGenUnlocked(g))
       if (unlockedGens.length === 0) return 1
@@ -5732,6 +5733,11 @@ function MainApp() {
 
             {(() => {
               const randomUnlocked = isGenUnlocked(0)
+              const randomCompletedHard = generations.every((g) => progression.completedHard.includes(g))
+              const randomCompletedMed = generations.every((g) => progression.completedMedium.includes(g))
+              const randomCompletedAny = progression.completedAny.length > 0
+              const randomCompletedColiseum = generations.every((g) => progression.completedColiseum.includes(g))
+              const randomCompletedLeague = generations.every((g) => progression.completedLeague.includes(g))
               return (
                 <button
                   key={0}
@@ -5761,6 +5767,21 @@ function MainApp() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '1.2rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5' }}>
                       🎲 RANDOM {randomUnlocked ? '' : '🔒'}
+                    </span>
+                    <span>
+                      {randomCompletedHard ? (
+                        <span className="badge-medium" title="Completado en Difícil">🏆🏆</span>
+                      ) : randomCompletedMed ? (
+                        <span className="badge-medium" title="Completado en Intermedio">🏆</span>
+                      ) : randomCompletedAny ? (
+                        <span className="badge-easy" title="Completado en Fácil">⭐</span>
+                      ) : null}
+                      {randomCompletedColiseum && (
+                        <span className="badge-medium" title="Completado en COLISEUM" style={{ marginLeft: '4px' }}>👑</span>
+                      )}
+                      {randomCompletedLeague && (
+                        <span className="badge-medium" title="Completado en Liga" style={{ marginLeft: '4px' }}>🏅</span>
+                      )}
                     </span>
                     <strong style={{ fontSize: '1rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5' }}>
                       — {randomUnlocked ? 'Mezclar todas las generaciones' : 'Modo Caos (Completa todas las generaciones)'}
