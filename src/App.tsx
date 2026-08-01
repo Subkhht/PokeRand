@@ -1163,6 +1163,8 @@ function MainApp() {
   // Economía y Tienda
   const [money, setMoney] = useState<number>(100)
   const [shopStock, setShopStock] = useState<string[]>([])
+  const [shopQty, setShopQty] = useState<Record<string, number>>({})
+  const [sellQty, setSellQty] = useState<Record<string, number>>({})
 
   const [inventory, setInventory] = useState<string[]>([])
   const [modifier, setModifier] = useState<RunModifier | null>(null)
@@ -3316,7 +3318,7 @@ function MainApp() {
     setScreen('route')
   }
 
-  function buyShopItem(itemName: string) {
+  function buyShopItem(itemName: string, qty = 1) {
     if (runChallenges.noPurchasing) {
       setBattleLog((prev) => ['🚫 Desafío Sin Compras: No puedes comprar nada.', ...prev].slice(0, 15))
       return
@@ -3327,12 +3329,14 @@ function MainApp() {
     const hardMarkup = (difficulty === 'hard' || difficulty === 'infinite') ? 1.4 : 1
     const stageMarkup = 1 + badges.length * 0.15
     const finalPrice = Math.floor(item.price * (1 - discount) * hardMarkup * stageMarkup)
-    if (money < finalPrice) return
+    const total = finalPrice * qty
+    if (money < total) return
 
-    setMoney((prev) => prev - finalPrice)
-    setInventory((prev) => [...prev, itemName])
-    setRunStats(prev => ({ ...prev, moneySpent: prev.moneySpent + finalPrice }))
-    setBattleLog((prev) => [`Compraste ${itemName} por $${finalPrice}.`, ...prev].slice(0, 15))
+    setMoney((prev) => prev - total)
+    setInventory((prev) => [...prev, ...Array(qty).fill(itemName)])
+    setRunStats(prev => ({ ...prev, moneySpent: prev.moneySpent + total }))
+    setBattleLog((prev) => [`Compraste ${qty}× ${itemName} por $${total}.`, ...prev].slice(0, 15))
+    setShopQty(prev => ({ ...prev, [itemName]: 1 }))
   }
 
   function buyHoldableItem(itemName: string) {
@@ -3359,6 +3363,32 @@ function MainApp() {
     setInventory((prev) => [...prev, itemName])
     setRunStats(prev => ({ ...prev, moneySpent: prev.moneySpent + finalPrice }))
     setBattleLog((prev) => [`Compraste ${itemName} por $${finalPrice}.`, ...prev].slice(0, 15))
+  }
+
+  function sellItems(itemName: string, qty: number) {
+    if (qty <= 0) return
+    const consumable = ALL_SHOP_ITEMS[itemName]
+    const holdable = HOLDABLE_ITEMS[itemName]
+    const data = consumable ?? holdable
+    if (!data) return
+    const sellPrice = Math.floor(data.price * 0.5)
+    const total = sellPrice * qty
+
+    setMoney((prev) => prev + total)
+    setInventory((prev) => {
+      const out: string[] = []
+      let remaining = qty
+      for (const i of prev) {
+        if (i === itemName && remaining > 0) {
+          remaining--
+        } else {
+          out.push(i)
+        }
+      }
+      return out
+    })
+    setBattleLog((prev) => [`💰 Vendiste ${qty}× ${itemName} por $${total}.`, ...prev].slice(0, 15))
+    setSellQty(prev => ({ ...prev, [itemName]: 1 }))
   }
 
   function equipItem(itemName: string, pokemonIndex: number) {
@@ -6656,7 +6686,22 @@ function MainApp() {
                     const hardMarkup = (difficulty === 'hard' || difficulty === 'infinite') ? 1.4 : 1
                     const stageMarkup = 1 + badges.length * 0.15
                     const finalPrice = Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0)) * hardMarkup * stageMarkup)
-                    const canBuy = money >= finalPrice
+                    const qty = shopQty[itemName] ?? 1
+                    const maxQty = isHoldable ? 1 : Math.max(1, Math.min(99, Math.floor(money / finalPrice)))
+                    const totalPrice = finalPrice * qty
+                    const canBuy = money >= totalPrice
+
+                        const stepperBtnStyle: CSSProperties = {
+                      background: '#2a2a55',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      width: '26px',
+                      height: '26px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      lineHeight: '1',
+                    }
 
                     return (
                       <div
@@ -6685,21 +6730,42 @@ function MainApp() {
                             {isHoldable && <span style={{ fontSize: '0.65rem', color: '#b8a1ff' }}>objeto pasivo</span>}
                           </div>
                         </div>
-                        <button
-                          className="tiny-btn"
-                          type="button"
-                          onClick={() => isHoldable ? buyHoldableItem(itemName) : buyShopItem(itemName)}
-                          disabled={!canBuy}
-                          style={{
-                            background: canBuy ? '#10b981' : '#475569',
-                            minWidth: '70px',
-                            color: canBuy ? '#12122b' : '#d9d6f2',
-                            fontWeight: 'bold',
-                            cursor: canBuy ? 'pointer' : 'not-allowed'
-                          }}
-                        >
-                          ${finalPrice}
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {!isHoldable && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <button
+                                type="button"
+                                aria-label={`Reducir cantidad de ${itemName}`}
+                                style={stepperBtnStyle}
+                                onClick={() => setShopQty(prev => ({ ...prev, [itemName]: Math.max(1, (prev[itemName] ?? 1) - 1) }))}
+                              >−</button>
+                              <span style={{ minWidth: '20px', textAlign: 'center', color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                                {qty}
+                              </span>
+                              <button
+                                type="button"
+                                aria-label={`Aumentar cantidad de ${itemName}`}
+                                style={{ ...stepperBtnStyle, background: '#10b981' }}
+                                onClick={() => setShopQty(prev => ({ ...prev, [itemName]: Math.min(maxQty, (prev[itemName] ?? 1) + 1) }))}
+                              >+</button>
+                            </div>
+                          )}
+                          <button
+                            className="tiny-btn"
+                            type="button"
+                            onClick={() => isHoldable ? buyHoldableItem(itemName) : buyShopItem(itemName, qty)}
+                            disabled={!canBuy}
+                            style={{
+                              background: canBuy ? '#10b981' : '#475569',
+                              minWidth: '70px',
+                              color: canBuy ? '#12122b' : '#d9d6f2',
+                              fontWeight: 'bold',
+                              cursor: canBuy ? 'pointer' : 'not-allowed'
+                            }}
+                          >
+                            {isHoldable ? `$${finalPrice}` : `${qty > 1 ? `${qty}× ` : ''}$${totalPrice}`}
+                          </button>
+                        </div>
                       </div>
                     )
                   })}
@@ -6712,19 +6778,34 @@ function MainApp() {
                     🏷️ Vender Objetos (50% del precio)
                   </summary>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto' }}>
-                    {inventory.length === 0 ? (
+                    {inventoryEntries.length === 0 ? (
                       <p style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No tienes objetos para vender.</p>
                     ) : (
-                      inventory.map((itemName, idx) => {
-                        if (itemName === 'Mega Stone' || itemName === 'Dynamax Band') return null
-                        const consumable = ALL_SHOP_ITEMS[itemName]
-                        const holdable = HOLDABLE_ITEMS[itemName]
+                      inventoryEntries.map((entry) => {
+                        if (entry.name === 'Mega Stone' || entry.name === 'Dynamax Band') return null
+                        const consumable = ALL_SHOP_ITEMS[entry.name]
+                        const holdable = HOLDABLE_ITEMS[entry.name]
                         if (!consumable && !holdable) return null
                         const data = consumable ?? holdable!
                         const sellPrice = Math.floor(data.price * 0.5)
-                        const itemIcon = ITEM_SPRITES[itemName]
+                        const itemIcon = ITEM_SPRITES[entry.name]
+                        const qty = Math.min(sellQty[entry.name] ?? 1, entry.count)
+                        const totalSell = sellPrice * qty
+
+                    const stepperBtnStyle: CSSProperties = {
+                          background: '#4a2a2a',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          width: '24px',
+                          height: '24px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          lineHeight: '1',
+                        }
+
                         return (
-                          <div key={`${itemName}-${idx}`}
+                          <div key={entry.name}
                             style={{
                               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                               background: 'rgba(248, 113, 113, 0.08)', padding: '6px 10px', borderRadius: '6px',
@@ -6732,19 +6813,38 @@ function MainApp() {
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              {itemIcon && <img src={itemIcon} alt={itemName} style={{ width: '24px', height: '24px', imageRendering: 'pixelated' }} />}
-                              <span style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{itemName}</span>
+                              {itemIcon && <img src={itemIcon} alt={entry.name} style={{ width: '24px', height: '24px', imageRendering: 'pixelated' }} />}
+                              <span style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>
+                                {entry.name} {entry.count > 1 && <span style={{ color: '#ff8a80', fontWeight: 'bold' }}>×{entry.count}</span>}
+                              </span>
                             </div>
-                            <button className="tiny-btn" type="button"
-                              onClick={() => {
-                                setMoney(prev => prev + sellPrice)
-                                setInventory(prev => [...prev.slice(0, idx), ...prev.slice(idx + 1)])
-                                setBattleLog(prev => [`💰 Vendiste ${itemName} por $${sellPrice}.`, ...prev].slice(0, 15))
-                              }}
-                              style={{ background: '#ee3b2f', minWidth: '60px', color: '#12122b', fontWeight: 'bold' }}
-                            >
-                              ${sellPrice}
-                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {entry.count > 1 && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <button
+                                    type="button"
+                                    aria-label={`Reducir cantidad a vender de ${entry.name}`}
+                                    style={stepperBtnStyle}
+                                    onClick={() => setSellQty(prev => ({ ...prev, [entry.name]: Math.max(1, (prev[entry.name] ?? 1) - 1) }))}
+                                  >−</button>
+                                  <span style={{ minWidth: '16px', textAlign: 'center', color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                                    {qty}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    aria-label={`Aumentar cantidad a vender de ${entry.name}`}
+                                    style={{ ...stepperBtnStyle, background: '#ee3b2f' }}
+                                    onClick={() => setSellQty(prev => ({ ...prev, [entry.name]: Math.min(entry.count, (prev[entry.name] ?? 1) + 1) }))}
+                                  >+</button>
+                                </div>
+                              )}
+                              <button className="tiny-btn" type="button"
+                                onClick={() => sellItems(entry.name, qty)}
+                                style={{ background: '#ee3b2f', minWidth: '60px', color: '#12122b', fontWeight: 'bold' }}
+                              >
+                                {entry.count > 1 && qty > 1 ? `${qty}× ` : ''}${totalSell}
+                              </button>
+                            </div>
                           </div>
                         )
                       })
