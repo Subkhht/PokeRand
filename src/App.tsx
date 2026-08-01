@@ -1211,6 +1211,8 @@ function MainApp() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
   const [scoreSubmitState, setScoreSubmitState] = useState<'idle' | 'submitting' | 'submitted' | 'error' | 'disabled' | 'loginRequired'>('idle')
   const [submitIsNewBest, setSubmitIsNewBest] = useState<boolean | null>(null)
+  const [showEndRunModal, setShowEndRunModal] = useState(false)
+  const [voluntaryRunEnd, setVoluntaryRunEnd] = useState(false)
   const [authUser, setAuthUser] = useState<User | null>(null)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [authEmail, setAuthEmail] = useState('')
@@ -2354,6 +2356,8 @@ function MainApp() {
 
       runStartTimeRef.current = Date.now()
       setScoreSubmitState('idle')
+      setVoluntaryRunEnd(false)
+      setShowEndRunModal(false)
       setScreen('route')
       startBattleMusic()
     } catch {
@@ -4754,6 +4758,25 @@ function MainApp() {
     void submitPendingScore(entry)
   }
 
+  function handleEndRunConfirm(): void {
+    playClick()
+    setShowEndRunModal(false)
+    if (speedrunTimerRef.current) {
+      clearInterval(speedrunTimerRef.current)
+      speedrunTimerRef.current = null
+    }
+    const finalTeam = team
+    setVoluntaryRunEnd(true)
+    setDefeatSummary({
+      finalTeam,
+      battleLog: [`🏁 Has terminado la aventura en el Nodo ${routeIndex + 1}.`, ...battleLog],
+      lastNodeLabel: currentNode?.label,
+    })
+    handleInfiniteRunDefeat(finalTeam)
+    setScreen('defeat')
+    playDefeatMusic()
+  }
+
   async function submitPendingScore(entry?: InfiniteScoreInsert): Promise<void> {
     const target = entry ?? pendingScoreRef.current
     if (!target) return
@@ -4845,6 +4868,8 @@ function MainApp() {
     runStartTimeRef.current = 0
     setScoreSubmitState('idle')
     setSubmitIsNewBest(null)
+    setShowEndRunModal(false)
+    setVoluntaryRunEnd(false)
     setTeam([])
     setActiveIndex(0)
     setEnemy(null)
@@ -6520,6 +6545,13 @@ function MainApp() {
                 </span>
               )}
             </h2>
+            {difficulty === 'infinite' && (
+              <div style={{ textAlign: 'right', marginBottom: '0.5rem' }}>
+                <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowEndRunModal(true) }} style={{ color: '#ffcb05', borderColor: '#ffcb05' }}>
+                  🏁 Terminar run
+                </button>
+              </div>
+            )}
             {difficulty !== 'infinite' && difficulty !== 'coliseum' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', padding: '6px 10px', background: 'rgba(250,204,21,0.08)', borderRadius: '8px', border: '1px solid rgba(250,204,21,0.2)' }}>
                 <span style={{ fontSize: '0.85rem', color: '#ffcb05', fontWeight: 'bold' }}>Etapa {currentStage}/3</span>
@@ -7251,8 +7283,8 @@ function MainApp() {
       {screen === 'defeat' && (
         <section className="panel end-panel defeat-panel">
           <div className="defeat-header">
-            <h2 className="defeat-title">💀 HAS SIDO DERROTADO</h2>
-            <p className="muted">Tu equipo ha quedado fuera de combate.</p>
+            <h2 className="defeat-title">{voluntaryRunEnd ? '🏁 AVENTURA TERMINADA' : '💀 HAS SIDO DERROTADO'}</h2>
+            <p className="muted">{voluntaryRunEnd ? 'Has decidido finalizar la aventura.' : 'Tu equipo ha quedado fuera de combate.'}</p>
           </div>
 
           {defeatSummary && (
@@ -7537,6 +7569,27 @@ function MainApp() {
             <div style={{ color: '#9b98cf' }}>🔄 Turnos jugados:</div><div style={{ color: '#d9d6f2', fontWeight: 'bold' }}>{runStats.totalTurns}</div>
             <div style={{ color: '#9b98cf' }}>📦 Capturas:</div><div style={{ color: '#22d3ee', fontWeight: 'bold' }}>{runStats.captures}</div>
             <div style={{ color: '#9b98cf' }}>🪙 PokéCoins ganadas:</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>+5</div>
+          </div>
+        </div>
+      )}
+
+      {/* End Run Modal (modo Infinite) */}
+      {showEndRunModal && (
+        <div className="modal-backdrop" onClick={() => setShowEndRunModal(false)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', padding: '1.5rem' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🏁</div>
+            <h3 style={{ color: '#ffcb05', margin: '0.5rem 0' }}>¿Terminar la aventura?</h3>
+            <p style={{ color: '#d9d6f2', marginBottom: '1.25rem' }}>
+              Se registrará tu progreso en el ranking mundial (Nodo #{routeIndex + 1}).
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+              <button className="cta" type="button" onClick={() => { playClick(); setShowEndRunModal(false) }} style={{ background: '#7d7ab5', marginTop: 0 }}>
+                No, seguir
+              </button>
+              <button className="cta" type="button" onClick={handleEndRunConfirm} style={{ marginTop: 0 }}>
+                Sí, terminar
+              </button>
+            </div>
           </div>
         </div>
       )}
