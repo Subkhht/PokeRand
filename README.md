@@ -54,6 +54,10 @@ Al derrotar al tercer jefe, puedes optar por entrar a la Liga Pokémon: seleccio
 - Desbloqueo de generaciones y dificultades progresivo
 - Modo diario con semilla fija
 
+## Ranking mundial (modo Infinite)
+
+El ranking mundial usa **Supabase** (Postgres + Auth, plan gratuito). Para registrar una puntuación hay que **crear una cuenta** (nombre de usuario + email + contraseña); el nombre que aparece en el ranking es el de la cuenta, no algo editable por el cliente.
+
 ## Ejecutar en local
 
 ```bash

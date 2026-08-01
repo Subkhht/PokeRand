@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, Component, type ReactNode } from 'react'
+import { useMemo, useState, useEffect, useRef, Component, type ReactNode, type CSSProperties } from 'react'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
 import { playHover, playClick, playHit, playEvolution, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, isMusicMuted, setMusicMuted } from './game/sound'
@@ -19,6 +19,8 @@ import {
   type PokemonDetails
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
+import { isLeaderboardEnabled, submitInfiniteScore, fetchInfiniteLeaderboard, formatDuration, getCurrentUser, onAuthChange, signUpWithUsername, signIn, signOut, getUsername, isUsernameTaken, type LeaderboardEntry, type InfiniteScoreInsert } from './game/leaderboard'
+import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 
 type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'victory' | 'defeat' | 'coliseum_select'
@@ -50,6 +52,17 @@ const difficultyNodeCounts: Record<Difficulty, number> = {
   hard: 25,
   infinite: 0,
   coliseum: 8
+}
+
+const authInputStyle: CSSProperties = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '6px 10px',
+  borderRadius: '6px',
+  border: '1px solid #3f3f6e',
+  background: 'rgba(15,23,42,0.8)',
+  color: '#f3f1ff',
+  fontSize: '0.9rem',
 }
 
 const difficultyLabels: Record<Difficulty, { title: string; desc: string }> = {
@@ -1192,6 +1205,19 @@ function MainApp() {
   // Resumen de derrota
   const [defeatSummary, setDefeatSummary] = useState<DefeatSummary | null>(null)
 
+  // Ranking mundial (modo Infinite)
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
+  const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[] | null>(null)
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
+  const [scoreSubmitState, setScoreSubmitState] = useState<'idle' | 'submitting' | 'submitted' | 'error' | 'disabled' | 'loginRequired'>('idle')
+  const [authUser, setAuthUser] = useState<User | null>(null)
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authUsername, setAuthUsername] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
+  const [authMessage, setAuthMessage] = useState<{ type: 'error' | 'info' | 'success'; text: string } | null>(null)
+
   // Modal de selección de objetivo para Revive
   const [reviveModal, setReviveModal] = useState<{ itemName: string; itemIndex: number } | null>(null)
   const [equipModal, setEquipModal] = useState<{ itemName: string; itemIndex: number } | null>(null)
@@ -1249,6 +1275,23 @@ function MainApp() {
   const [battleMegaUsed, setBattleMegaUsed] = useState(false)
   const [battleGmaxUsed, setBattleGmaxUsed] = useState(false)
   const originalPokemonDataRef = useRef<Record<number, { sprite: string; attack: number; defense: number; speed: number }>>({})
+
+  const runStartTimeRef = useRef<number>(0)
+  const pendingScoreRef = useRef<InfiniteScoreInsert | null>(null)
+  const showLeaderboardRef = useRef(false)
+  useEffect(() => { showLeaderboardRef.current = showLeaderboard }, [showLeaderboard])
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('pokerand_pending_score')
+      if (raw) {
+        const parsed = JSON.parse(raw) as InfiniteScoreInsert & { route?: number }
+        if (parsed.node === undefined && typeof parsed.route === 'number') parsed.node = parsed.route
+        pendingScoreRef.current = parsed
+      }
+    } catch {
+      pendingScoreRef.current = null
+    }
+  }, [])
 
   // Pokédex
   const [showPokedex, setShowPokedex] = useState<boolean>(false)
@@ -1352,6 +1395,24 @@ function MainApp() {
 
   useEffect(() => { startMenuMusic() }, [])
 
+  // Restaurar sesión de Supabase y reaccionar a cambios de login/logout
+  useEffect(() => {
+    let cancelled = false
+    void getCurrentUser().then((user) => {
+      if (!cancelled) setAuthUser(user)
+    })
+    const unsubscribe = onAuthChange((user) => {
+      if (cancelled) return
+      setAuthUser(user)
+      if (user) void submitPendingScore()
+    })
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Reset mega/gmax state when battle ends
   useEffect(() => {
     if (screen === 'defeat' || screen === 'victory') {
@@ -1383,6 +1444,7 @@ function MainApp() {
         enemy: enemy,
         lastNodeLabel: currentNode?.label
       })
+      handleInfiniteRunDefeat(team)
       const losses = record.losses + 1
       persistRecord(record.wins, losses)
       if (isDailyRunRef.current) {
@@ -1970,6 +2032,11 @@ function MainApp() {
         setApiError('El modo Infinite se desbloquea completando Difícil en esta generación.')
         return
       }
+      if (effectiveDifficulty === 'infinite' && !authUser) {
+        setApiError('Para jugar al modo Infinite necesitas una cuenta. Crea una o inicia sesión en el ranking.')
+        openLeaderboard()
+        return
+      }
     }
 
     megaNodeSpawnedRef.current = false
@@ -2273,6 +2340,8 @@ function MainApp() {
       setShinyNextEncounter(false)
       setActiveRandomEvent(null)
 
+      runStartTimeRef.current = Date.now()
+      setScoreSubmitState('idle')
       setScreen('route')
       startBattleMusic()
     } catch {
@@ -2737,7 +2806,7 @@ function MainApp() {
         const gmaxSprite = gmaxFormId
           ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${gmaxFormId}.png`
           : scaled.sprite
-        const gmaxMultiplier = difficulty === 'infinite' ? 1.50 : difficulty === 'hard' ? 1.40 : 1.30
+        const gmaxMultiplier = difficulty === 'infinite' ? 1.45 : difficulty === 'hard' ? 1.40 : 1.30
         const gmaxEnemy: Pokemon = {
           ...scaled,
           gmaxEvolved: true,
@@ -3218,7 +3287,7 @@ function MainApp() {
     const item = ALL_SHOP_ITEMS[itemName]
     if (!item) return
     const discount = modifier?.shopDiscount ?? 0
-    const hardMarkup = difficulty === 'hard' ? 1.4 : difficulty === 'infinite' ? 1.5 : 1
+    const hardMarkup = (difficulty === 'hard' || difficulty === 'infinite') ? 1.4 : 1
     const stageMarkup = 1 + badges.length * 0.15
     const finalPrice = Math.floor(item.price * (1 - discount) * hardMarkup * stageMarkup)
     if (money < finalPrice) return
@@ -3244,7 +3313,7 @@ function MainApp() {
     const item = HOLDABLE_ITEMS[itemName]
     if (!item) return
     const discount = modifier?.shopDiscount ?? 0
-    const hardMarkup = difficulty === 'hard' ? 1.4 : difficulty === 'infinite' ? 1.5 : 1
+    const hardMarkup = (difficulty === 'hard' || difficulty === 'infinite') ? 1.4 : 1
     const stageMarkup = 1 + badges.length * 0.15
     const finalPrice = Math.floor(item.price * (1 - discount) * hardMarkup * stageMarkup)
     if (money < finalPrice) return
@@ -3666,6 +3735,7 @@ function MainApp() {
         setTeam(nextTeam)
         setBattleLog(fullLogs)
         setDefeatSummary({ finalTeam: nextTeam, battleLog: fullLogs, enemy: nextEnemy, lastNodeLabel: currentNode?.label })
+        handleInfiniteRunDefeat(nextTeam)
         const losses = record.losses + 1
         persistRecord(record.wins, losses)
         setWinStreak(0)
@@ -3861,6 +3931,7 @@ function MainApp() {
           enemy: nextEnemy,
           lastNodeLabel: currentNode?.label
         })
+        handleInfiniteRunDefeat(nextTeam)
         const losses = record.losses + 1
         persistRecord(record.wins, losses)
         setWinStreak(0)
@@ -3961,7 +4032,7 @@ function MainApp() {
       const pendingPc: Pokemon[] = []
 
       const baseMoneyReward = Math.floor((40 + nextEnemy.level * 5) / (isTrainerBattle ? trainerTeam.length : 1))
-      const hardMoneyPenalty = difficulty === 'hard' ? 0.6 : difficulty === 'infinite' ? 0.5 : 1
+      const hardMoneyPenalty = difficulty === 'hard' ? 0.6 : difficulty === 'infinite' ? 0.55 : 1
       const trainerMoneyPenalty = isTeamRocketBattle ? 0.4 : (isTrainerBattle && currentNode?.type !== 'boss') ? 0.5 : 1
       const wildMoneyPenalty = (!isTrainerBattle && currentNode?.type === 'battle') ? 0.7 : 1
       const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoneyReward * (modifier?.moneyMultiplier ?? 1) * hardMoneyPenalty * trainerMoneyPenalty * wildMoneyPenalty)
@@ -4061,6 +4132,7 @@ function MainApp() {
                       enemy: nextEnemy,
                       lastNodeLabel: currentNode?.label
                     })
+                    handleInfiniteRunDefeat(remainingTeam)
                     const losses = record.losses + 1
                     persistRecord(record.wins, losses)
                     if (isDailyRunRef.current) {
@@ -4627,9 +4699,122 @@ function MainApp() {
     setLegendaryEncounter(null)
   }
 
+  function handleInfiniteRunDefeat(finalTeam: Pokemon[]): void {
+    if (difficulty !== 'infinite') {
+      setScoreSubmitState('idle')
+      return
+    }
+    if (!isLeaderboardEnabled()) {
+      setScoreSubmitState('disabled')
+      return
+    }
+    const durationSeconds = Math.max(0, Math.round((Date.now() - runStartTimeRef.current) / 1000))
+    const entry: InfiniteScoreInsert = {
+      node: routeIndex + 1,
+      generation: currentRunGen,
+      is_random: generation === 0,
+      duration_seconds: durationSeconds,
+      team: finalTeam.map((p) => ({ name: p.name, level: p.level, sprite: p.sprite, shiny: !!p.shiny })),
+      challenges: runStats.challengesActive,
+    }
+    if (!authUser) {
+      pendingScoreRef.current = entry
+      localStorage.setItem('pokerand_pending_score', JSON.stringify(entry))
+      setScoreSubmitState('loginRequired')
+      return
+    }
+    void submitPendingScore(entry)
+  }
+
+  async function submitPendingScore(entry?: InfiniteScoreInsert): Promise<void> {
+    const target = entry ?? pendingScoreRef.current
+    if (!target) return
+    setScoreSubmitState('submitting')
+    const ok = await submitInfiniteScore(target)
+    if (ok) {
+      pendingScoreRef.current = null
+      localStorage.removeItem('pokerand_pending_score')
+      setScoreSubmitState('submitted')
+      if (showLeaderboardRef.current) void loadLeaderboard()
+    } else {
+      setScoreSubmitState('error')
+    }
+  }
+
+  function openLeaderboard(): void {
+    playClick()
+    setShowLeaderboard(true)
+    void loadLeaderboard()
+  }
+
+  function friendlyAuthError(msg: string): string {
+    if (/rate limit|rate_limit/i.test(msg)) {
+      return 'Demasiados intentos en poco tiempo. Supabase limita los intentos de registro/login por hora; espera unos minutos y vuelve a intentarlo.'
+    }
+    if (/invalid login credentials/i.test(msg)) {
+      return 'Email o contraseña incorrectos.'
+    }
+    return msg
+  }
+
+  async function handleAuthSubmit(): Promise<void> {
+    setAuthMessage(null)
+    if (authLoading) return
+    if (!authEmail.trim() || !authPassword) {
+      setAuthMessage({ type: 'error', text: 'Introduce tu email y contraseña.' })
+      return
+    }
+    setAuthLoading(true)
+    if (authMode === 'signup') {
+      const username = authUsername.trim()
+      if (!username) {
+        setAuthLoading(false)
+        setAuthMessage({ type: 'error', text: 'Elige un nombre de usuario.' })
+        return
+      }
+      const taken = await isUsernameTaken(username)
+      if (taken) {
+        setAuthLoading(false)
+        setAuthMessage({ type: 'error', text: 'Ese nombre de usuario ya está en uso.' })
+        return
+      }
+      const res = await signUpWithUsername(authEmail, authPassword, username)
+      if (!res.ok) {
+        setAuthMessage({ type: 'error', text: friendlyAuthError(res.error ?? 'No se pudo crear la cuenta.') })
+      } else if (res.needsEmailConfirmation) {
+        setAuthMessage({ type: 'info', text: 'Cuenta creada. Revisa tu correo para confirmarla antes de iniciar sesión.' })
+      } else {
+        setAuthMessage({ type: 'success', text: 'Cuenta creada. ¡Bienvenido!' })
+      }
+    } else {
+      const res = await signIn(authEmail, authPassword)
+      if (!res.ok) {
+        setAuthMessage({ type: 'error', text: friendlyAuthError(res.error ?? 'No se pudo iniciar sesión.') })
+      }
+    }
+    setAuthLoading(false)
+  }
+
+  function handleLogout(): void {
+    void signOut()
+  }
+
+  async function loadLeaderboard(): Promise<void> {
+    if (!isLeaderboardEnabled()) {
+      setLeaderboardEntries([])
+      return
+    }
+    setLeaderboardLoading(true)
+    const entries = await fetchInfiniteLeaderboard(50)
+    setLeaderboardEntries(entries)
+    setLeaderboardLoading(false)
+  }
+
   function resetToSetup(): void {
     setScreen('setup')
     startMenuMusic()
+    runStartTimeRef.current = 0
+    setScoreSubmitState('idle')
     setTeam([])
     setActiveIndex(0)
     setEnemy(null)
@@ -4749,6 +4934,9 @@ function MainApp() {
           </button>
           <button className="tiny-btn" type="button" onClick={() => { playClick(); optionsBeganInBattle.current = screen === 'battle'; setShowOptions(!showOptions) }}>
             Opciones
+          </button>
+          <button className="tiny-btn" type="button" onClick={openLeaderboard}>
+            Ranking ♾️
           </button>
           <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowAchievements(!showAchievements) }}>
             Logros
@@ -5834,7 +6022,14 @@ function MainApp() {
               return (
                 <button
                   className={`gen-tile ${difficulty === 'infinite' ? 'is-active' : ''} ${!infUnlocked ? 'is-locked' : ''}`}
-                  onClick={() => { playClick(); handleSelectDifficulty('infinite') }}
+                  onClick={() => {
+                    playClick()
+                    handleSelectDifficulty('infinite')
+                    if (infUnlocked && !authUser) {
+                      setApiError('Para jugar al modo Infinite necesitas una cuenta. Crea una o inicia sesión en el ranking.')
+                      openLeaderboard()
+                    }
+                  }}
                   onMouseEnter={playHover}
                   type="button"
                   disabled={isLoading || !infUnlocked}
@@ -5857,6 +6052,11 @@ function MainApp() {
                     <span style={{ fontSize: '1.2rem', color: infUnlocked ? '#cba3ff' : '#7d7ab5' }}>♾️ INFINITE {infUnlocked ? '' : '🔒'}</span>
                     <strong style={{ fontSize: '1rem', color: infUnlocked ? '#cba3ff' : '#7d7ab5' }}>— Rutas infinitas</strong>
                   </div>
+                  {infUnlocked && !authUser && (
+                    <span className="lock-text" style={{ color: '#ffcb05' }}>
+                      🔑 Requiere cuenta (inicia sesión en Ranking ♾️)
+                    </span>
+                  )}
                   {!infUnlocked && (
                     <span className="lock-text">
                       🔒 Completa {generationRegions[generation]} en Difícil
@@ -6365,7 +6565,7 @@ function MainApp() {
                     const data = consumable ?? holdable!
                     const itemIcon = ITEM_SPRITES[itemName]
                     const isHoldable = !!holdable
-                    const hardMarkup = difficulty === 'hard' ? 1.4 : difficulty === 'infinite' ? 1.5 : 1
+                    const hardMarkup = (difficulty === 'hard' || difficulty === 'infinite') ? 1.4 : 1
                     const stageMarkup = 1 + badges.length * 0.15
                     const finalPrice = Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0)) * hardMarkup * stageMarkup)
                     const canBuy = money >= finalPrice
@@ -7043,6 +7243,25 @@ function MainApp() {
             </div>
           )}
 
+          {difficulty === 'infinite' && (
+            <div style={{ marginTop: '1.5rem', padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid #3f3f6e', fontSize: '0.85rem' }}>
+              {scoreSubmitState === 'submitting' && <span style={{ color: '#9b98cf' }}>⏳ Enviando puntuación al ranking mundial...</span>}
+              {scoreSubmitState === 'submitted' && <span style={{ color: '#37d16b' }}>✅ ¡Puntuación registrada en el ranking mundial!</span>}
+              {scoreSubmitState === 'error' && <span style={{ color: '#ff8a80' }}>⚠️ No se pudo enviar la puntuación al ranking.</span>}
+              {scoreSubmitState === 'loginRequired' && (
+                <span style={{ color: '#ffcb05' }}>
+                  🔑 ¡Llegaste al Nodo #{pendingScoreRef.current?.node}! Inicia sesión o crea una cuenta para registrar tu puntuación en el ranking mundial.
+                </span>
+              )}
+              {scoreSubmitState === 'disabled' && <span style={{ color: '#9b98cf' }}>⚙️ Ranking no configurado. Añade las variables de entorno de Supabase para habilitarlo.</span>}
+              <div style={{ marginTop: '0.5rem', textAlign: 'center' }}>
+                <button className="tiny-btn" type="button" onClick={openLeaderboard}>
+                  🌍 Ver ranking mundial
+                </button>
+              </div>
+            </div>
+          )}
+
           <button className="cta" onClick={resetToSetup} type="button" style={{ marginTop: '1.5rem' }}>
             Intentar de nuevo
           </button>
@@ -7268,6 +7487,158 @@ function MainApp() {
             <div style={{ color: '#9b98cf' }}>🔄 Turnos jugados:</div><div style={{ color: '#d9d6f2', fontWeight: 'bold' }}>{runStats.totalTurns}</div>
             <div style={{ color: '#9b98cf' }}>📦 Capturas:</div><div style={{ color: '#22d3ee', fontWeight: 'bold' }}>{runStats.captures}</div>
             <div style={{ color: '#9b98cf' }}>🪙 PokéCoins ganadas:</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>+5</div>
+          </div>
+        </div>
+      )}
+
+      {/* Leaderboard Modal */}
+      {showLeaderboard && (
+        <div className="modal-backdrop" onClick={() => setShowLeaderboard(false)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
+            <h2 style={{ color: '#cba3ff', textAlign: 'center', margin: '0 0 0.5rem' }}>🌍 Ranking Mundial — ♾️ Infinite</h2>
+            <p style={{ textAlign: 'center', color: '#9b98cf', fontSize: '0.85rem', marginBottom: '1rem' }}>
+              Los entrenadores se ordenan por el nodo más lejano alcanzado. Si empatan, gana el que tardó menos.
+            </p>
+
+            {isLeaderboardEnabled() && (
+              authUser ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.25rem', padding: '0.6rem 0.9rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                  <span style={{ color: '#d9d6f2', fontWeight: 'bold', fontSize: '0.9rem' }}>👤 {getUsername(authUser) || authUser.email}</span>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {pendingScoreRef.current && (
+                      <button className="cta" type="button" onClick={() => void submitPendingScore()} style={{ fontSize: '0.75rem', padding: '4px 12px', marginTop: 0 }}>
+                        📤 Registrar puntuación (Nodo #{pendingScoreRef.current.node})
+                      </button>
+                    )}
+                    <button className="tiny-btn" type="button" onClick={handleLogout}>Cerrar sesión</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginBottom: '1.25rem', padding: '1rem', borderRadius: '8px', background: 'rgba(15,23,42,0.5)', border: '1px solid #3f3f6e' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.9rem' }}>
+                    {(['signin', 'signup'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        className="tiny-btn"
+                        type="button"
+                        onClick={() => { playClick(); setAuthMode(mode); setAuthMessage(null) }}
+                        style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          background: authMode === mode ? 'rgba(168,85,247,0.25)' : 'transparent',
+                          borderColor: authMode === mode ? '#a855f7' : '#3f3f6e',
+                          color: authMode === mode ? '#cba3ff' : '#9b98cf'
+                        }}
+                      >
+                        {mode === 'signup' ? 'Crear cuenta' : 'Iniciar sesión'}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {authMode === 'signup' && (
+                      <input
+                        value={authUsername}
+                        onChange={(e) => setAuthUsername(e.target.value)}
+                        maxLength={20}
+                        placeholder="Nombre de usuario (aparece en el ranking)"
+                        style={authInputStyle}
+                      />
+                    )}
+                    <input
+                      type="email"
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      placeholder="Email"
+                      style={authInputStyle}
+                    />
+                    <input
+                      type="password"
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      placeholder="Contraseña (mín. 6 caracteres)"
+                      onKeyDown={(e) => { if (e.key === 'Enter') void handleAuthSubmit() }}
+                      style={authInputStyle}
+                    />
+                    <button className="cta" type="button" onClick={() => void handleAuthSubmit()} disabled={authLoading} style={{ marginTop: '0.25rem' }}>
+                      {authLoading ? '...' : authMode === 'signup' ? 'Crear cuenta y entrar' : 'Iniciar sesión'}
+                    </button>
+                    {authMessage && (
+                      <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: authMessage.type === 'error' ? '#ff8a80' : authMessage.type === 'info' ? '#9b98cf' : '#37d16b' }}>
+                        {authMessage.text}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )
+            )}
+
+            {!isLeaderboardEnabled() ? (
+              <div style={{ textAlign: 'center', padding: '1.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px dashed #3f3f6e' }}>
+                <p style={{ color: '#9b98cf', fontSize: '0.9rem', marginBottom: '0.5rem' }}>⚙️ El ranking aún no está configurado.</p>
+                <p style={{ color: '#7d7ab5', fontSize: '0.8rem', margin: 0 }}>
+                  Copia <strong style={{ color: '#cba3ff' }}>.env.example</strong> a <strong style={{ color: '#cba3ff' }}>.env</strong>, rellena tus credenciales de Supabase (URL + anon key) y ejecuta el esquema de <strong style={{ color: '#cba3ff' }}>supabase/schema.sql</strong>.
+                </p>
+              </div>
+            ) : leaderboardLoading && !leaderboardEntries ? (
+              <p style={{ textAlign: 'center', color: '#9b98cf' }}>Cargando ranking...</p>
+            ) : !leaderboardEntries || leaderboardEntries.length === 0 ? (
+              <p style={{ textAlign: 'center', color: '#9b98cf' }}>Aún no hay puntuaciones. ¡Sé el primero en llegar lejos en modo Infinite!</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {leaderboardEntries.map((entry, idx) => {
+                  const isMe = authUser !== null && entry.user_id === authUser.id
+                  const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}º`
+                  return (
+                    <div
+                      key={entry.id ?? idx}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '44px 1fr auto',
+                        gap: '0.75rem',
+                        alignItems: 'center',
+                        padding: '0.6rem 0.75rem',
+                        borderRadius: '8px',
+                        background: isMe ? 'rgba(168,85,247,0.15)' : 'rgba(15,23,42,0.5)',
+                        border: `1px solid ${isMe ? '#a855f7' : '#3f3f6e'}`
+                      }}
+                    >
+                      <div style={{ textAlign: 'center', fontWeight: 'bold', color: idx < 3 ? '#ffcb05' : '#9b98cf' }}>{medal}</div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <strong style={{ color: '#f3f1ff', fontSize: '0.9rem' }}>{entry.player_name}</strong>
+                          {isMe && <span style={{ color: '#cba3ff', fontSize: '0.7rem' }}>(tú)</span>}
+                          <span style={{ color: '#7d7ab5', fontSize: '0.75rem' }}>
+                            {entry.is_random ? `🎲 Random · Gen ${entry.generation}` : `Gen ${entry.generation}`}
+                          </span>
+                          {entry.challenges && entry.challenges.length > 0 && (
+                            <span style={{ color: '#fb923c', fontSize: '0.7rem' }}>🎲 {entry.challenges.join(', ')}</span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '2px', marginTop: '4px', alignItems: 'flex-end' }}>
+                          {(entry.team ?? []).map((member, mi) => (
+                            <img
+                              key={`${entry.id}-${mi}`}
+                              src={member.sprite}
+                              alt={member.name}
+                              title={`${member.name} Nv.${member.level}`}
+                              onError={fallbackSprite}
+                              style={{ width: '28px', height: '28px', imageRendering: 'pixelated' }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ color: '#cba3ff', fontWeight: 'bold', fontSize: '1.05rem' }}>Nodo #{entry.node}</div>
+                        <div style={{ color: '#9b98cf', fontSize: '0.75rem' }}>⏱️ {formatDuration(entry.duration_seconds)}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            <button className="cta" onClick={() => setShowLeaderboard(false)} style={{ marginTop: '1.25rem', background: '#7d7ab5', width: '100%' }}>Cerrar</button>
           </div>
         </div>
       )}

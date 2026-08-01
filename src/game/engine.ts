@@ -44,8 +44,8 @@ export function healPokemon(pokemon: Pokemon, amount: number): Pokemon {
 }
 
 export function scalePokemonForNode(base: Pokemon, _node: RouteNode, _stepIndex: number, levelDelta = 0, difficulty: string = 'medium'): Pokemon {
-  const hpMultiplier = difficulty === 'infinite' ? 6 : difficulty === 'hard' ? 5 : difficulty === 'coliseum' ? 5 : 4
-  const statMultiplier = difficulty === 'infinite' ? 3 : difficulty === 'hard' ? 2.5 : difficulty === 'coliseum' ? 2.5 : 2
+  const hpMultiplier = difficulty === 'infinite' ? 5.5 : difficulty === 'hard' ? 5 : difficulty === 'coliseum' ? 5 : 4
+  const statMultiplier = difficulty === 'infinite' ? 2.75 : difficulty === 'hard' ? 2.5 : difficulty === 'coliseum' ? 2.5 : 2
 
   // El nivel mínimo de aparición ya se aplica en buildPokemonFromApi.
   // Aquí NO debemos volver a subir el nivel: bloquearía bajar el nivel de un
@@ -87,7 +87,7 @@ export function getTeamStatAverages(team: Pokemon[]): { attack: number; defense:
 
 export function balanceWildPokemonToTeam(enemy: Pokemon, team: Pokemon[], difficulty: string): Pokemon {
   const teamAvg = getTeamStatAverages(team)
-  const strength = difficulty === 'infinite' ? 1.15 : difficulty === 'hard' ? 1.05 : difficulty === 'easy' ? 0.85 : 0.95
+  const strength = difficulty === 'infinite' ? 1.07 : difficulty === 'hard' ? 1.05 : difficulty === 'easy' ? 0.85 : 0.95
   const blend = 0.5
 
   const attack = Math.max(10, Math.round(enemy.attack * blend + teamAvg.defense * strength * (1 - blend)))

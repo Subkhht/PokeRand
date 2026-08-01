@@ -385,8 +385,8 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
 export function getMaxMovePowerForLevel(level: number, difficulty: string = 'medium'): number {
   if (difficulty.startsWith('coliseum')) return 150
   if (difficulty === 'infinite') {
-    if (level <= 14) return 100
-    if (level <= 22) return 130
+    if (level <= 14) return 90
+    if (level <= 22) return 115
     return 150
   }
   if (difficulty === 'hard') {
@@ -693,7 +693,7 @@ const HARD_HELD_ITEMS = [
 function applyHardHeldItem(pokemon: Pokemon, difficulty: string, isBoss: boolean): Pokemon {
   if (difficulty !== 'hard' && difficulty !== 'infinite') return pokemon
   if (pokemon.holdItem) return pokemon
-  const chance = isBoss ? 1.0 : difficulty === 'infinite' ? 0.65 : 0.4
+  const chance = isBoss ? 1.0 : difficulty === 'infinite' ? 0.5 : 0.4
   if (Math.random() > chance) return pokemon
   const item = HARD_HELD_ITEMS[Math.floor(Math.random() * HARD_HELD_ITEMS.length)]
   return { ...pokemon, holdItem: item.name }
@@ -721,7 +721,7 @@ export async function getBalancedPokemonByGeneration(
 
   const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss, bossStage, legendaryIds)
 
-  const levelMult = difficulty === 'infinite' ? 2.5 : difficulty === 'hard' ? 2.0 : 1.5
+  const levelMult = difficulty === 'infinite' ? 2.15 : difficulty === 'hard' ? 2.0 : 1.5
   const scaledLevel = 10 + Math.floor((stageIndex * totalNodes + stepIndex) * levelMult) + (isBoss ? 2 : 0)
 
   let minBst = 150
@@ -737,20 +737,20 @@ export async function getBalancedPokemonByGeneration(
     }
   } else if (difficulty === 'infinite') {
     if (isBoss) {
-      minBst = 580
+      minBst = 550
       maxBst = 999
     } else if (progressRatio < 0.25) {
-      minBst = 320
-      maxBst = 550
+      minBst = 280
+      maxBst = 500
     } else if (progressRatio < 0.50) {
-      minBst = 440
-      maxBst = 650
+      minBst = 390
+      maxBst = 590
     } else if (progressRatio < 0.75) {
-      minBst = 520
-      maxBst = 750
+      minBst = 470
+      maxBst = 680
     } else {
-      minBst = 600
-      maxBst = 999
+      minBst = 550
+      maxBst = 850
     }
   } else if (difficulty === 'hard') {
     if (isBoss) {
