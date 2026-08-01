@@ -2,6 +2,10 @@ import type { Move, Pokemon, RawLevelUpMove, StatusType, StatChange } from './ty
 
 const API_BASE = 'https://pokeapi.co/api/v2'
 
+// Nivel mínimo de aparición para formas que evolucionan por piedra, intercambio,
+// amistad, etc. Sin un nivel de evolución definido, no deben aparecer al principio.
+const SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL = 20
+
 const generationSpeciesCache = new Map<number, number[]>()
 const pokemonCache = new Map<string | number, Pokemon>()
 const legendaryIdsCache = new Map<number, Promise<Set<number>>>()
@@ -819,7 +823,16 @@ export async function getBalancedPokemonByGeneration(
 
   if (bestCandidate) return applyHardHeldItem(bestCandidate, difficulty, isBoss)
 
-  const randomId = randomFrom(candidateIds.length > 0 ? candidateIds : allIds)
+  // Fallback: evita que formas con nivel mínimo de aparición (piedras, intercambio, etc.)
+  // se cuelen al principio del juego.
+  const pool = candidateIds.length > 0 ? candidateIds : allIds
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const randomId = randomFrom(pool)
+    const pokemon = await buildPokemonFromApi(randomId, generation, scaledLevel, shiny, difficulty)
+    if (pokemon.minAppearLevel && scaledLevel < pokemon.minAppearLevel) continue
+    return applyHardHeldItem(pokemon, difficulty, isBoss)
+  }
+  const randomId = randomFrom(pool)
   return applyHardHeldItem(await buildPokemonFromApi(randomId, generation, scaledLevel, shiny, difficulty), difficulty, isBoss)
 }
 
@@ -893,8 +906,11 @@ function findPreEvolutionLevel(chainNode: EvolutionChainNode, speciesName: strin
       const details = evo.evolution_details?.[0]
       const minLevel = details?.min_level ?? null
       const trigger = details?.trigger?.name ?? 'level-up'
+      // Evoluciones por nivel usan su nivel como umbral. Las que evolucionan por
+      // piedra/intercambio/amistad/etc. no tienen nivel, pero tampoco deberían
+      // aparecer al inicio del juego.
       if (trigger === 'level-up' && minLevel) return minLevel
-      return null
+      return SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL
     }
     const found = findPreEvolutionLevel(evo, speciesName)
     if (found) return found

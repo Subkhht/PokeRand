@@ -1097,6 +1097,24 @@ function groupInventory(items: string[]): Array<{ name: string; count: number; d
   }))
 }
 
+// Reparte los niveles de un equipo de entrenador dentro de los rangos conocidos
+// por dificultad, para que no todos los Pokémon tengan el mismo nivel.
+// El primer Pokémon (líder) es el más fuerte y el resto baja progresivamente.
+function trainerMemberLevelOffset(idx: number, teamSize: number, isBoss: boolean, difficulty: string): number {
+  const progress = idx / Math.max(1, teamSize - 1)
+  const jitter = Math.floor(Math.random() * 3) - 1 // -1, 0, +1
+  if (difficulty === 'infinite') {
+    // -1..+3 sobre el nivel máximo del equipo
+    return Math.round((1 - progress) * 4) - 1 + jitter
+  }
+  if (isBoss) {
+    // 0..+2 por encima del promedio del equipo
+    return Math.round((1 - progress) * 2) + jitter
+  }
+  // -1..+1 alrededor del promedio del equipo
+  return Math.round((1 - progress) * 2) - 1 + jitter
+}
+
 interface ProgressionData {
   completedMedium: number[]
   completedAny: number[]
@@ -2972,16 +2990,19 @@ function MainApp() {
 
       if (isTeamRocket) {
         const progress = routeIndex / Math.max(1, route.length - 1)
-        const teamSize = Math.max(2, Math.min(4, 2 + Math.floor(progress * 3)))
+        // El tamaño del equipo escala con el progreso: 1-2 al inicio hasta 5-6 al final.
+        const teamSize = Math.max(1, Math.min(6, 1 + Math.floor(progress * 4) + Math.floor(Math.random() * 2)))
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
-        const trainerLevelOffset = Math.floor(Math.random() * 3) - 1 // TeamR: -1, 0, or +1
 
-        const fetches = Array.from({ length: teamSize }, () =>
-          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length)
+        const fetches = Array.from({ length: teamSize }, (_, idx) => {
+          const targetLevel = difficulty === 'infinite'
+            ? getMaxTeamLevel() + trainerMemberLevelOffset(idx, teamSize, false, difficulty)
+            : avgPlayerLevel + trainerMemberLevelOffset(idx, teamSize, false, difficulty)
+          // En Infinite, genera al rival directamente a su nivel objetivo para que
+          // respete etapas evolutivas y movimientos según el nivel.
+          const baseStepIndex = difficulty === 'infinite' ? Math.max(0, targetLevel - 10) : routeIndex
+          return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length)
             .then((base) => {
-              const targetLevel = difficulty === 'infinite'
-                ? getMaxTeamLevel() + 1 + Math.floor(Math.random() * 2)
-                : avgPlayerLevel + trainerLevelOffset
               const levelDiff = targetLevel - base.level
               let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
               if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
@@ -2995,7 +3016,7 @@ function MainApp() {
               }
               return scaled
             })
-        )
+        })
         const rocketTeam = await Promise.all(fetches)
         rocketTeam.forEach(p => seenInPokedex(p))
 
@@ -3025,11 +3046,8 @@ function MainApp() {
         const maxSize = isBoss ? 6 : Math.max(1, Math.min(6, Math.floor(progress * 6) + 1))
         const teamSize = isBoss ? maxSize : Math.max(1, Math.min(maxSize, 1 + Math.floor(Math.random() * maxSize)))
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
-        const trainerLevelOffset = isLeague ? 2 : isBoss
-          ? Math.floor(Math.random() * 3) // boss: 0, 1, or 2 levels above player
-          : Math.floor(Math.random() * 3) - 1 // trainer/TeamR: -1, 0, or +1
 
-        const fetches = Array.from({ length: teamSize }, () =>
+        const fetches = Array.from({ length: teamSize }, (_, idx) =>
           difficulty === 'coliseum'
             ? (async () => {
                 try {
@@ -3041,24 +3059,29 @@ function MainApp() {
                   return { id: 1, name: 'Bulbasaur', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png', level: 50, hp: 100, maxHp: 100, attack: 50, defense: 50, speed: 50, moves: [], statStages: { attack: 0, defense: 0, speed: 0 } } as Pokemon
                 }
               })()
-            : getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? badges.length : -1, badges.length)
-            .then((base) => {
-              const targetLevel = difficulty === 'infinite'
-                ? getMaxTeamLevel() + 1 + Math.floor(Math.random() * 2)
-                : avgPlayerLevel + trainerLevelOffset
-              const levelDiff = targetLevel - base.level
-              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
-              if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
-              if (runChallenges.totalRandomizer) {
-                scaled = {
-                  ...scaled,
-                  attack: scaled.attack + Math.floor(Math.random() * 20) - 10,
-                  defense: scaled.defense + Math.floor(Math.random() * 20) - 10,
-                  speed: scaled.speed + Math.floor(Math.random() * 20) - 10,
-                }
-              }
-              return scaled
-            })
+            : (() => {
+                const targetLevel = difficulty === 'infinite'
+                  ? getMaxTeamLevel() + trainerMemberLevelOffset(idx, teamSize, isBoss, difficulty) + (isLeague ? 2 : 0)
+                  : avgPlayerLevel + trainerMemberLevelOffset(idx, teamSize, isBoss, difficulty) + (isLeague ? 2 : 0)
+                // En Infinite, genera al rival directamente a su nivel objetivo para que
+                // respete etapas evolutivas y movimientos según el nivel.
+                const baseStepIndex = difficulty === 'infinite' ? Math.max(0, targetLevel - 10) : routeIndex
+                return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? badges.length : -1, badges.length)
+                  .then((base) => {
+                    const levelDiff = targetLevel - base.level
+                    let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
+                    if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
+                    if (runChallenges.totalRandomizer) {
+                      scaled = {
+                        ...scaled,
+                        attack: scaled.attack + Math.floor(Math.random() * 20) - 10,
+                        defense: scaled.defense + Math.floor(Math.random() * 20) - 10,
+                        speed: scaled.speed + Math.floor(Math.random() * 20) - 10,
+                      }
+                    }
+                    return scaled
+                  })
+              })()
         )
         const newTrainerTeam = await Promise.all(fetches)
 
