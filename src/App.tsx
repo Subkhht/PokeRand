@@ -46,6 +46,27 @@ const STATUS_COLORS: Record<StatusType, string> = {
   flinch: '#ffcb05',
 }
 
+function StatusBadge({ status, compact = false }: { status?: Pokemon['status']; compact?: boolean }) {
+  if (!status) return null
+  const label = STATUS_LABELS[status.type]
+  const color = STATUS_COLORS[status.type]
+  return (
+    <span
+      title={label}
+      style={{
+        fontSize: compact ? '0.65rem' : '0.75rem',
+        color,
+        fontWeight: 'bold',
+        marginLeft: '4px',
+        whiteSpace: 'nowrap',
+        textShadow: '0 1px 2px rgba(0,0,0,0.8)',
+      }}
+    >
+      {compact ? label.split(' ')[0] : label}
+    </span>
+  )
+}
+
 const difficultyNodeCounts: Record<Difficulty, number> = {
   easy: 5,
   medium: 10,
@@ -5135,6 +5156,7 @@ function MainApp() {
                     <div style={{ textAlign: 'left', flex: 1 }}>
                       <strong style={{ display: 'block', fontSize: '0.95rem', textTransform: 'capitalize', color: isFainted ? '#f8fafc' : '#7d7ab5' }}>
                         {pkmn.name}
+                        <StatusBadge status={pkmn.status} compact />
                       </strong>
                       <span style={{ fontSize: '0.75rem', color: isFainted ? '#9b98cf' : '#475569' }}>
                         Nv. {pkmn.level} · HP: {pkmn.hp}/{pkmn.maxHp}
@@ -5240,6 +5262,7 @@ function MainApp() {
                     <div style={{ textAlign: 'left', flex: 1 }}>
                       <strong style={{ display: 'block', fontSize: '0.95rem', textTransform: 'capitalize', color: canEquip ? '#f8fafc' : '#7d7ab5' }}>
                         {pkmn.name}
+                        <StatusBadge status={pkmn.status} compact />
                         {pkmn.holdItem && <span style={{ fontSize: '0.7rem', color: '#b8a1ff', marginLeft: '6px' }}>({pkmn.holdItem})</span>}
                         {isGmaxEquip && (
                           <span style={{ fontSize: '0.7rem', color: canUseTransform ? '#4ade80' : '#7d7ab5', marginLeft: '6px' }}>
@@ -5311,6 +5334,7 @@ function MainApp() {
                     <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '40px', height: '40px' }} />
                     <div>
                       <strong style={{ textTransform: 'capitalize', color: canEvo ? '#a7f3d0' : '#f3f1ff' }}>{pkmn.name}</strong>
+                      <StatusBadge status={pkmn.status} compact />
                       <span style={{ fontSize: '0.75rem', color: '#9b98cf', marginLeft: '8px' }}>Nv.{pkmn.level}</span>
                       {canEvo && <span style={{ fontSize: '0.7rem', color: '#4ade80', marginLeft: '8px' }}>✓ Puede evolucionar</span>}
                     </div>
@@ -5336,7 +5360,7 @@ function MainApp() {
             }}
           >
             <h3 style={{ margin: '0 0 0.25rem', color: '#37d16b', textAlign: 'center' }}>
-              🏐 Capturar {enemy.name}
+              🏐 Capturar {enemy.name}<StatusBadge status={enemy.status} />
             </h3>
             <p className="muted" style={{ textAlign: 'center', margin: '0 0 1rem', fontSize: '0.8rem' }}>
               HP: {enemy.hp}/{enemy.maxHp} · Turno: {battleTurns}
@@ -6412,11 +6436,7 @@ function MainApp() {
             <img className={`sprite trainer-sprite${activePokemon.megaEvolved ? ' mega-active' : ''}${activePokemon.gmaxEvolved ? ' gmax-active' : ''}`} src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
             <h2>
               {activePokemon.name}{activePokemon.shiny ? ' ✨' : ''}
-              {activePokemon.status && (
-                <span style={{ fontSize: '0.75rem', color: STATUS_COLORS[activePokemon.status.type], marginLeft: '6px' }}>
-                  {STATUS_LABELS[activePokemon.status.type]}
-                </span>
-              )}
+              <StatusBadge status={activePokemon.status} />
             </h2>
             <p className="muted" style={{ fontSize: '1.2rem' }}>
               {generation === 0 ? 'Random All-Stars' : `Gen ${generation}`} · Nv.{activePokemon.level}
@@ -6450,10 +6470,16 @@ function MainApp() {
                       />
                     )}
                     <strong>{pokemon.name}{pokemon.shiny ? ' ✨' : ''}</strong>
-                    <span>{pokemon.hp}/{pokemon.maxHp}</span>
+                    <span>
+                      {pokemon.hp}/{pokemon.maxHp}
+                      <StatusBadge status={pokemon.status} compact />
+                    </span>
                   </button>
                   <div className="sprite-tooltip">
-                    <div className="tooltip-name">{pokemon.name}</div>
+                    <div className="tooltip-name">
+                      {pokemon.name}
+                      <StatusBadge status={pokemon.status} />
+                    </div>
                     {pokemon.holdItem && (
                       <div style={{ fontSize: '0.65rem', color: '#cba3ff', marginBottom: '4px' }}>
                         {ITEM_SPRITES[pokemon.holdItem] && (
@@ -6572,7 +6598,10 @@ function MainApp() {
                           />
                         )}
                         <strong>{pokemon.name}{pokemon.shiny ? ' ✨' : ''}</strong>
-                        <span>{pokemon.hp}/{pokemon.maxHp}</span>
+                        <span>
+                          {pokemon.hp}/{pokemon.maxHp}
+                          <StatusBadge status={pokemon.status} compact />
+                        </span>
                       </button>
                       <button
                         type="button"
@@ -7197,6 +7226,11 @@ function MainApp() {
                                 opacity: isDefeated ? 0.4 : 1
                               }}
                             />
+                            {tp.status && (
+                              <span style={{ position: 'absolute', top: 1, right: 1, fontSize: '0.6rem', lineHeight: 1, textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>
+                                {STATUS_LABELS[tp.status.type].split(' ')[0]}
+                              </span>
+                            )}
                             {isActive && (
                               <div style={{
                                 position: 'absolute', bottom: 0, left: 0, right: 0,
@@ -7214,17 +7248,8 @@ function MainApp() {
 
                 <p style={{ margin: '0 0 4px 0', fontSize: '1.2rem' }}>
                   <strong style={{ textTransform: 'capitalize' }}>{enemy.name}{enemy.shiny ? ' ✨' : ''}</strong>
-                  {enemy.status && (
-                    <span style={{ fontSize: '0.7rem', color: STATUS_COLORS[enemy.status.type], marginLeft: '4px' }}>
-                      {STATUS_LABELS[enemy.status.type]}
-                    </span>
-                  )}
+                  <StatusBadge status={enemy.status} />
                   {' · '}Nv. {enemy.level}
-                  {enemy.status && (
-                    <span style={{ fontSize: '0.7rem', color: STATUS_COLORS[enemy.status.type], marginLeft: '4px' }}>
-                      {STATUS_LABELS[enemy.status.type]}
-                    </span>
-                  )}
                 </p>
                 <img className={`sprite enemy-sprite${enemy.gmaxEvolved ? ' gmax-active' : ''}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={enemyHitFlash ? { filter: 'brightness(1.5) sepia(1) hue-rotate(-40deg) saturate(5)', transition: 'filter 0.05s' } : { transition: 'filter 0.3s' }} />
                 <div className="hp-line">
@@ -7430,7 +7455,7 @@ function MainApp() {
                   {defeatSummary.finalTeam.map((pkmn, idx) => (
                     <div key={`${pkmn.id}-${idx}`} className="fainted-card" style={{ background: 'rgba(0,0,0,0.3)', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
                       <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '48px', height: '48px', opacity: 0.6, filter: 'grayscale(100%)' }} />
-                      <strong style={{ display: 'block', fontSize: '0.85rem' }}>{pkmn.name}</strong>
+                      <strong style={{ display: 'block', fontSize: '0.85rem' }}>{pkmn.name}<StatusBadge status={pkmn.status} compact /></strong>
                       <span className="muted" style={{ fontSize: '0.75rem' }}>Nv. {pkmn.level}</span>
                     </div>
                   ))}
@@ -7524,7 +7549,7 @@ function MainApp() {
                   style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: i === activeIndex ? 'rgba(56,189,248,0.15)' : 'rgba(30,41,59,0.6)', border: `1px solid ${i === activeIndex ? '#4d9bff' : '#3f3f6e'}`, borderRadius: '6px', cursor: 'pointer', textAlign: 'left', color: '#f3f1ff' }}>
                   <img src={p.sprite} alt={p.name} style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
                   <div>
-                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{p.name} {p.shiny ? '✨' : ''}</div>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{p.name} {p.shiny ? '✨' : ''}<StatusBadge status={p.status} compact /></div>
                     <div style={{ color: '#9b98cf', fontSize: '0.75rem' }}>Nv.{p.level} — HP:{p.hp}/{p.maxHp} — ATK:{p.attack} DEF:{p.defense} SPD:{p.speed}</div>
                   </div>
                 </button>

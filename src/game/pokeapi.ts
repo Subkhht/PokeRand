@@ -907,10 +907,11 @@ function findPreEvolutionLevel(chainNode: EvolutionChainNode, speciesName: strin
       const minLevel = details?.min_level ?? null
       const trigger = details?.trigger?.name ?? 'level-up'
       // Evoluciones por nivel usan su nivel como umbral. Las que evolucionan por
-      // piedra/intercambio/amistad/etc. no tienen nivel, pero tampoco deberían
-      // aparecer al inicio del juego.
+      // piedra o intercambio no tienen nivel, pero tampoco deberían aparecer al
+      // inicio del juego. Las de amistad (Pichu→Pikachu, etc.) sí pueden.
       if (trigger === 'level-up' && minLevel) return minLevel
-      return SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL
+      if (trigger === 'use-item' || trigger === 'trade') return SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL
+      return null
     }
     const found = findPreEvolutionLevel(evo, speciesName)
     if (found) return found
