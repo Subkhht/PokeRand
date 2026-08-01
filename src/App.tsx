@@ -1210,6 +1210,7 @@ function MainApp() {
   const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[] | null>(null)
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
   const [scoreSubmitState, setScoreSubmitState] = useState<'idle' | 'submitting' | 'submitted' | 'error' | 'disabled' | 'loginRequired'>('idle')
+  const [submitIsNewBest, setSubmitIsNewBest] = useState<boolean | null>(null)
   const [authUser, setAuthUser] = useState<User | null>(null)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [authEmail, setAuthEmail] = useState('')
@@ -4712,6 +4713,7 @@ function MainApp() {
       setScoreSubmitState('disabled')
       return
     }
+    setSubmitIsNewBest(null)
     const durationSeconds = Math.max(0, Math.round((Date.now() - runStartTimeRef.current) / 1000))
     const entry: InfiniteScoreInsert = {
       node: routeIndex + 1,
@@ -4734,10 +4736,11 @@ function MainApp() {
     const target = entry ?? pendingScoreRef.current
     if (!target) return
     setScoreSubmitState('submitting')
-    const ok = await submitInfiniteScore(target)
-    if (ok) {
+    const result = await submitInfiniteScore(target)
+    if (result.ok) {
       pendingScoreRef.current = null
       localStorage.removeItem('pokerand_pending_score')
+      setSubmitIsNewBest(result.isNewBest)
       setScoreSubmitState('submitted')
       if (showLeaderboardRef.current) void loadLeaderboard()
     } else {
@@ -4819,6 +4822,7 @@ function MainApp() {
     startMenuMusic()
     runStartTimeRef.current = 0
     setScoreSubmitState('idle')
+    setSubmitIsNewBest(null)
     setTeam([])
     setActiveIndex(0)
     setEnemy(null)
@@ -5090,6 +5094,10 @@ function MainApp() {
                 const canEquip = isAlive && !hasItem
                 const eff = getEffectiveStats(pkmn)
                 const item = HOLDABLE_ITEMS[equipModal.itemName]
+                const isGmaxEquip = equipModal.itemName === 'Dynamax Band'
+                const isMegaEquip = equipModal.itemName === 'Mega Stone'
+                const canUseTransform = isGmaxEquip ? GMAX_CAPABLE_IDS.has(pkmn.id) : isMegaEquip ? MEGA_CAPABLE_IDS.has(pkmn.id) : false
+                const highlightGreen = canEquip && (isGmaxEquip || isMegaEquip) && canUseTransform
                 return (
                   <button
                     key={`equip-target-${idx}`}
@@ -5105,8 +5113,8 @@ function MainApp() {
                       gap: '12px',
                       padding: '10px 14px',
                       borderRadius: '10px',
-                      border: canEquip ? '1px solid rgba(168, 85, 247, 0.5)' : '1px solid rgba(255,255,255,0.08)',
-                      background: canEquip ? 'rgba(168, 85, 247, 0.08)' : 'rgba(255,255,255,0.03)',
+                      border: highlightGreen ? '1px solid rgba(74, 222, 128, 0.6)' : canEquip ? '1px solid rgba(168, 85, 247, 0.5)' : '1px solid rgba(255,255,255,0.08)',
+                      background: highlightGreen ? 'rgba(74, 222, 128, 0.12)' : canEquip ? 'rgba(168, 85, 247, 0.08)' : 'rgba(255,255,255,0.03)',
                       cursor: canEquip ? 'pointer' : 'not-allowed',
                       opacity: canEquip ? 1 : 0.45,
                       transition: 'all 0.2s'
@@ -5127,6 +5135,16 @@ function MainApp() {
                       <strong style={{ display: 'block', fontSize: '0.95rem', textTransform: 'capitalize', color: canEquip ? '#f8fafc' : '#7d7ab5' }}>
                         {pkmn.name}
                         {pkmn.holdItem && <span style={{ fontSize: '0.7rem', color: '#b8a1ff', marginLeft: '6px' }}>({pkmn.holdItem})</span>}
+                        {isGmaxEquip && (
+                          <span style={{ fontSize: '0.7rem', color: canUseTransform ? '#4ade80' : '#7d7ab5', marginLeft: '6px' }}>
+                            {canUseTransform ? '✓ Puede Gigamax' : 'No puede'}
+                          </span>
+                        )}
+                        {isMegaEquip && (
+                          <span style={{ fontSize: '0.7rem', color: canUseTransform ? '#4ade80' : '#7d7ab5', marginLeft: '6px' }}>
+                            {canUseTransform ? '✓ Puede Mega' : 'No puede'}
+                          </span>
+                        )}
                       </strong>
                       <span style={{ fontSize: '0.75rem', color: canEquip ? '#9b98cf' : '#475569' }}>
                         Nv. {pkmn.level} · ATK: {eff.attack} · DEF: {eff.defense} · SPD: {eff.speed}
@@ -6294,7 +6312,7 @@ function MainApp() {
                 </span>
               )}
             </h2>
-            <p className="muted">
+            <p className="muted" style={{ fontSize: '1.2rem' }}>
               {generation === 0 ? 'Random All-Stars' : `Gen ${generation}`} · Nv.{activePokemon.level}
             </p>
 
@@ -7005,7 +7023,7 @@ function MainApp() {
                   <p style={{ margin: '0 0 4px 0', color: '#86efac', fontSize: '0.85rem' }}>🌿 Pokémon Salvaje</p>
                 )}
 
-                <p style={{ margin: '0 0 4px 0' }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '1.2rem' }}>
                   <strong style={{ textTransform: 'capitalize' }}>{enemy.name}{enemy.shiny ? ' ✨' : ''}</strong>
                   {enemy.status && (
                     <span style={{ fontSize: '0.7rem', color: STATUS_COLORS[enemy.status.type], marginLeft: '4px' }}>
@@ -7250,7 +7268,13 @@ function MainApp() {
           {difficulty === 'infinite' && (
             <div style={{ marginTop: '1.5rem', padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid #3f3f6e', fontSize: '0.85rem' }}>
               {scoreSubmitState === 'submitting' && <span style={{ color: '#9b98cf' }}>⏳ Enviando puntuación al ranking mundial...</span>}
-              {scoreSubmitState === 'submitted' && <span style={{ color: '#37d16b' }}>✅ ¡Puntuación registrada en el ranking mundial!</span>}
+              {scoreSubmitState === 'submitted' && (
+                <span style={{ color: '#37d16b' }}>
+                  ✅ ¡Puntuación registrada en el ranking mundial!
+                  {submitIsNewBest === true && <strong style={{ color: '#ffcb05' }}> ¡Nuevo récord personal en esta generación!</strong>}
+                  {submitIsNewBest === false && ' Se conserva tu mejor marca de esta generación.'}
+                </span>
+              )}
               {scoreSubmitState === 'error' && <span style={{ color: '#ff8a80' }}>⚠️ No se pudo enviar la puntuación al ranking.</span>}
               {scoreSubmitState === 'loginRequired' && (
                 <span style={{ color: '#ffcb05' }}>
@@ -7465,7 +7489,7 @@ function MainApp() {
       {screen === 'victory' && (
         <div className="panel" style={{ maxWidth: '400px', margin: '0 auto', padding: '1rem' }}>
           <h3 style={{ color: '#4d9bff', textAlign: 'center', marginBottom: '0.75rem' }}>📊 Estadísticas de la Run</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '1.1rem' }}>
             <div style={{ color: '#9b98cf' }}>⚔️ Batallas ganadas:</div><div style={{ color: '#37d16b', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
             <div style={{ color: '#9b98cf' }}>💥 Daño total infligido:</div><div style={{ color: '#ff8a80', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
             <div style={{ color: '#9b98cf' }}>🛡️ Daño total recibido:</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>
@@ -7484,7 +7508,7 @@ function MainApp() {
       {screen === 'defeat' && (
         <div className="panel" style={{ maxWidth: '400px', margin: '0 auto', padding: '1rem' }}>
           <h3 style={{ color: '#ee3b2f', textAlign: 'center', marginBottom: '0.75rem' }}>📊 Estadísticas de la Run</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '1.1rem' }}>
             <div style={{ color: '#9b98cf' }}>⚔️ Batallas ganadas:</div><div style={{ color: '#37d16b', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
             <div style={{ color: '#9b98cf' }}>💥 Daño total infligido:</div><div style={{ color: '#ff8a80', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
             <div style={{ color: '#9b98cf' }}>🛡️ Daño total recibido:</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>

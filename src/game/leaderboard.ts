@@ -112,15 +112,28 @@ export async function isUsernameTaken(username: string): Promise<boolean> {
 
 // --- Ranking ---
 
-export async function submitInfiniteScore(entry: InfiniteScoreInsert): Promise<boolean> {
+export interface ScoreSubmitResult {
+  ok: boolean
+  isNewBest: boolean
+}
+
+export async function submitInfiniteScore(entry: InfiniteScoreInsert): Promise<ScoreSubmitResult> {
   const client = await getClient()
-  if (!client) return false
-  const { error } = await client.from('infinite_leaderboard').insert(entry)
+  if (!client) return { ok: false, isNewBest: false }
+  const { data, error } = await client.rpc('submit_infinite_score', {
+    p_node: entry.node,
+    p_generation: entry.generation,
+    p_is_random: entry.is_random ?? false,
+    p_duration_seconds: entry.duration_seconds,
+    p_team: entry.team,
+    p_challenges: entry.challenges ?? [],
+  })
   if (error) {
     console.error('[leaderboard] submit error:', error)
-    return false
+    return { ok: false, isNewBest: false }
   }
-  return true
+  const isNewBest = (data as { is_new_best?: boolean } | null)?.is_new_best ?? true
+  return { ok: true, isNewBest }
 }
 
 export async function fetchInfiniteLeaderboard(limit = 50): Promise<LeaderboardEntry[]> {

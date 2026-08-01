@@ -61,6 +61,24 @@ end $$;
 delete from public.infinite_leaderboard where user_id is null;
 alter table public.infinite_leaderboard alter column user_id set not null;
 
+-- Una sola entrada por usuario y generación: se conserva el mejor resultado.
+-- Primero se eliminan duplicados (se queda la mejor), luego se añade la restricción.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'infinite_leaderboard_user_gen_unique'
+  ) then
+    delete from public.infinite_leaderboard a
+    using public.infinite_leaderboard b
+    where a.user_id = b.user_id
+      and a.generation = b.generation
+      and (a.node < b.node or (a.node = b.node and a.id > b.id));
+    alter table public.infinite_leaderboard
+      add constraint infinite_leaderboard_user_gen_unique unique (user_id, generation);
+  end if;
+end $$;
+
 -- 4) Trigger que fija la identidad del registro a partir de la sesión actual.
 create or replace function public.set_leaderboard_identity()
 returns trigger
@@ -88,6 +106,65 @@ create trigger infinite_leaderboard_set_identity
 create index if not exists infinite_leaderboard_node_idx
   on public.infinite_leaderboard (node desc, duration_seconds asc);
 
+-- Función para registrar puntuaciones: el servidor toma user_id y player_name
+-- de la sesión, y si el usuario ya tiene una run de esa generación, solo la
+-- actualiza cuando la nueva alcanza un nodo más lejano (se conserva el mejor).
+create or replace function public.submit_infinite_score(
+  p_node integer,
+  p_generation integer,
+  p_is_random boolean default false,
+  p_duration_seconds integer default 0,
+  p_team jsonb default '[]'::jsonb,
+  p_challenges jsonb default '[]'::jsonb
+)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_best integer;
+begin
+  if v_uid is null then
+    raise exception 'Debes iniciar sesión para registrar puntuaciones';
+  end if;
+
+  select node into v_best
+  from public.infinite_leaderboard
+  where user_id = v_uid and generation = p_generation;
+
+  if v_best is null then
+    insert into public.infinite_leaderboard
+      (user_id, player_name, node, generation, is_random, duration_seconds, team, challenges)
+    values (
+      v_uid,
+      (select username from public.profiles where id = v_uid),
+      p_node,
+      p_generation,
+      coalesce(p_is_random, false),
+      coalesce(p_duration_seconds, 0),
+      coalesce(p_team, '[]'::jsonb),
+      coalesce(p_challenges, '[]'::jsonb)
+    );
+    return jsonb_build_object('created', true, 'best', p_node, 'is_new_best', true);
+  end if;
+
+  if p_node > v_best then
+    update public.infinite_leaderboard
+    set node = p_node,
+        player_name = (select username from public.profiles where id = v_uid),
+        is_random = coalesce(p_is_random, false),
+        duration_seconds = coalesce(p_duration_seconds, 0),
+        team = coalesce(p_team, '[]'::jsonb),
+        challenges = coalesce(p_challenges, '[]'::jsonb)
+    where user_id = v_uid and generation = p_generation;
+    return jsonb_build_object('created', false, 'best', p_node, 'is_new_best', true);
+  end if;
+
+  return jsonb_build_object('created', false, 'best', v_best, 'is_new_best', false);
+end;
+$$;
+
 -- 5) Seguridad (RLS):
 alter table public.profiles enable row level security;
 alter table public.infinite_leaderboard enable row level security;
@@ -107,16 +184,14 @@ create policy "Lectura pública del ranking"
   on public.infinite_leaderboard for select
   using (true);
 
--- La inserción solo es válida si el registro pertenece al usuario autenticado.
--- El trigger ya fuerza user_id = auth.uid(), esta política lo refuerza.
+-- La puntuación se registra SOLO a través de la función submit_infinite_score
+-- (que conserva el mejor resultado por generación). No se permite insertar
+-- directamente sobre la tabla para no saltarse esa lógica.
 drop policy if exists "Inserción autenticada de puntuaciones" on public.infinite_leaderboard;
-create policy "Inserción autenticada de puntuaciones"
-  on public.infinite_leaderboard for insert
-  with check (auth.uid() = user_id);
 
 -- 6) Permisos:
 --    - Cualquiera puede leer el ranking y los usernames.
---    - Solo usuarios autenticados pueden insertar puntuaciones.
+--    - Solo usuarios autenticados pueden registrar puntuaciones (vía RPC).
 revoke all on public.infinite_leaderboard from anon;
 revoke all on public.infinite_leaderboard from authenticated;
 revoke all on public.profiles from anon;
@@ -124,7 +199,8 @@ revoke all on public.profiles from authenticated;
 
 grant select on public.infinite_leaderboard to anon;
 grant select on public.infinite_leaderboard to authenticated;
-grant insert on public.infinite_leaderboard to authenticated;
 
 grant select on public.profiles to anon;
 grant select on public.profiles to authenticated;
+
+grant execute on function public.submit_infinite_score to authenticated;

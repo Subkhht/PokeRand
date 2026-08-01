@@ -142,13 +142,13 @@ body {
 }
 
 .label {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-muted);
 }
 
 .small-tag {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--accent-blue);
@@ -180,7 +180,7 @@ body {
 }
 
 .gen-tile span {
-  font-size: 13px;
+  font-size: 14px;
   text-transform: uppercase;
   font-family: var(--font-title);
 }
@@ -217,7 +217,7 @@ body {
 }
 
 .lock-text {
-  font-size: 0.7rem !important;
+  font-size: 0.8rem !important;
   color: #ff8a80 !important;
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.25);
@@ -228,7 +228,7 @@ body {
 }
 
 .unlock-tag {
-  font-size: 0.7rem !important;
+  font-size: 0.8rem !important;
   color: #fb923c !important;
   background: rgba(251, 146, 60, 0.12);
   padding: 2px 6px;
@@ -239,7 +239,7 @@ body {
 
 .badge-medium,
 .badge-easy {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
 }
 
 .setup-footer {
@@ -270,7 +270,7 @@ button {
 .secondary {
   border-radius: 4px;
   padding: 8px 12px;
-  font-size: 11px;
+  font-size: 12px;
   font-family: var(--font-title);
 }
 
@@ -298,7 +298,7 @@ button {
 }
 
 .move-opt-btn {
-  font-size: 9px;
+  font-size: 10px;
   padding: 6px 8px;
 }
 
@@ -321,7 +321,7 @@ button {
   border: 2px solid var(--accent-blue);
   border-radius: 4px;
   padding: 6px 10px;
-  font-size: 10px;
+  font-size: 11px;
   font-family: var(--font-title);
 }
 
@@ -363,7 +363,7 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.85rem;
+  font-size: 1.1rem;
   margin-top: 4px;
 }
 
@@ -459,7 +459,7 @@ button {
 }
 
 .tooltip-type-badge {
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   padding: 2px 6px;
   border-radius: 4px;
   font-weight: 600;
@@ -470,7 +470,7 @@ button {
 .tooltip-stat {
   display: flex;
   justify-content: space-between;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: #d9d6f2;
   padding: 1px 0;
 }
@@ -484,7 +484,7 @@ button {
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px solid var(--panel-border);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: #c8c5ea;
 }
 
@@ -587,7 +587,7 @@ button {
   display: grid;
   gap: 4px;
   justify-items: center;
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
   position: relative;
 }
@@ -687,14 +687,14 @@ button {
   border-radius: 6px;
   padding: 5px 6px;
   background: #12122b;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--text-muted);
 }
 
 .error-line {
   margin-top: 8px;
   color: var(--accent-red);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 @media (max-width: 1024px) {
@@ -875,13 +875,13 @@ button {
 }
 
 .pokedex-card strong {
-  font-size: 13px;
+  font-size: 14px;
   margin: 4px 0;
   color: var(--text-main);
 }
 
 .pokedex-id {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: #9b98cf;
   font-family: monospace;
 }
@@ -896,7 +896,7 @@ button {
 }
 
 .type-badge {
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   background: #3f3f6e;
   color: #4d9bff;
   border: 1px solid #475569;
@@ -925,7 +925,7 @@ button {
   border: 1px solid #3f3f6e;
   border-radius: 8px;
   padding: 10px;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   line-height: 1.4;
   color: #d9d6f2;
 }
@@ -943,7 +943,7 @@ button {
   flex: 1;
   display: flex;
   flex-direction: column;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: #9b98cf;
 }
 
@@ -992,7 +992,7 @@ button {
 .stat-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: bold;
   margin-bottom: 3px;
 }
@@ -1093,7 +1093,7 @@ button {
 .fainted-info {
   display: flex;
   flex-direction: column;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
 }
 
 .fainted-info strong {
@@ -1103,18 +1103,18 @@ button {
 
 .fainted-info .level {
   color: #9b98cf;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .hp-status {
   color: #ee3b2f;
   font-weight: bold;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   margin-top: 2px;
 }
 
 .enemy-tag {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: #d9d6f2;
   margin-bottom: 0.5rem;
 }
@@ -1162,7 +1162,7 @@ button {
   border-radius: 8px;
   padding: 8px 14px;
   color: #9b98cf;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.15s ease;
   font-family: inherit;
@@ -1519,7 +1519,7 @@ button {
 
   .record-box {
     order: 2;
-    font-size: 11px;
+    font-size: 12px;
     padding: 4px 10px;
     gap: 8px;
     flex-wrap: wrap;
@@ -1530,7 +1530,7 @@ button {
     min-height: 44px;
     min-width: 44px;
     padding: 6px 10px;
-    font-size: 13px;
+    font-size: 14px;
   }
 
   .panel {
@@ -1555,12 +1555,12 @@ button {
 
   .team-slot {
     padding: 6px;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .node {
     padding: 6px 4px;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .move-btn {
@@ -1586,7 +1586,7 @@ button {
   }
 
   .gen-tile span {
-    font-size: 0.72rem;
+    font-size: 0.8rem;
   }
 
   .roulette-layout {
@@ -1627,7 +1627,7 @@ button {
 
   .challenge-toggle {
     padding: 6px 10px;
-    font-size: 0.78rem;
+    font-size: 0.85rem;
   }
 
   .teamrocket-pick-panel {
@@ -1708,7 +1708,7 @@ button {
   }
 
   .record-box {
-    font-size: 10px;
+    font-size: 11px;
     padding: 3px 8px;
     gap: 6px;
   }
@@ -1730,7 +1730,7 @@ button {
 
   .team-slot {
     padding: 4px;
-    font-size: 10px;
+    font-size: 11px;
     border-radius: 6px;
   }
 
@@ -1745,7 +1745,7 @@ button {
 
   .node {
     padding: 4px 3px;
-    font-size: 10px;
+    font-size: 11px;
     border-radius: 6px;
   }
 
@@ -1782,7 +1782,7 @@ button {
 
   .tiny-btn {
     padding: 5px 8px;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .generation-grid {
@@ -1800,12 +1800,12 @@ button {
   }
 
   .gen-tile span {
-    font-size: 0.65rem;
+    font-size: 0.72rem;
   }
 
   .challenge-toggle {
     padding: 5px 8px;
-    font-size: 0.72rem;
+    font-size: 0.78rem;
     border-radius: 6px;
   }
 
@@ -1814,7 +1814,7 @@ button {
   }
 
   .hp-line {
-    font-size: 0.78rem;
+    font-size: 1rem;
   }
 
   .roulette-layout {
@@ -1867,11 +1867,11 @@ button {
   }
 
   .pokedex-card strong {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .pokedex-id {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
   }
 
   .high-res-img {
@@ -1897,7 +1897,7 @@ button {
 
   .pokedex-close-btn {
     padding: 5px 12px;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
   }
 
   .teamrocket-pick-panel {
@@ -1917,7 +1917,7 @@ button {
   .teamrocket-pick-card {
     padding: 6px 4px;
     border-radius: 8px;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
   }
 
   .teamrocket-pick-card img {
@@ -1953,7 +1953,7 @@ button {
 
   .description-box {
     padding: 8px;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
   }
 
   .stat-row {
@@ -1961,7 +1961,7 @@ button {
   }
 
   .stat-labels {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .enemy-sprite {
@@ -1996,6 +1996,6 @@ button {
   }
 
   .fainted-info {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
   }
 }
