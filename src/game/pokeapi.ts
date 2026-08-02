@@ -706,7 +706,8 @@ export async function getBalancedPokemonByGeneration(
   shiny: boolean = false,
   difficulty: string = 'medium',
   bossStage: number = -1,
-  stageIndex: number = 0
+  stageIndex: number = 0,
+  forcedLevel?: number
 ): Promise<Pokemon> {
   const allIds = await getSpeciesIdsByGeneration(generation)
   const legendaryIds = await getLegendaryIdsByGeneration(generation)
@@ -721,7 +722,11 @@ export async function getBalancedPokemonByGeneration(
   const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss, bossStage, legendaryIds)
 
   const levelMult = difficulty === 'infinite' ? 1.0 : difficulty === 'hard' ? 2.0 : 1.5
-  const scaledLevel = 10 + Math.floor((stageIndex * totalNodes + stepIndex) * levelMult) + (isBoss ? 2 : 0)
+  // forcedLevel: genera la especie directamente a un nivel concreto (el nivel
+  // objetivo del rival) para que la especie, sus evoluciones y sus movimientos
+  // sean coherentes con ese nivel y no aparezcan formas evolucionadas a niveles
+  // bajos (p. ej. un Venusaur nivel 16).
+  const scaledLevel = forcedLevel ?? (10 + Math.floor((stageIndex * totalNodes + stepIndex) * levelMult) + (isBoss ? 2 : 0))
 
   let minBst = 150
   let maxBst = 999
@@ -823,17 +828,25 @@ export async function getBalancedPokemonByGeneration(
 
   if (bestCandidate) return applyHardHeldItem(bestCandidate, difficulty, isBoss)
 
-  // Fallback: evita que formas con nivel mínimo de aparición (piedras, intercambio, etc.)
-  // se cuelen al principio del juego.
+  // Fallback: evita que formas con nivel mínimo de aparición (piedras, intercambio,
+  // evoluciones por nivel) se cuelen a niveles bajos.
   const pool = candidateIds.length > 0 ? candidateIds : allIds
-  for (let attempt = 0; attempt < 10; attempt++) {
+  for (let attempt = 0; attempt < 20; attempt++) {
     const randomId = randomFrom(pool)
     const pokemon = await buildPokemonFromApi(randomId, generation, scaledLevel, shiny, difficulty)
     if (pokemon.minAppearLevel && scaledLevel < pokemon.minAppearLevel) continue
     return applyHardHeldItem(pokemon, difficulty, isBoss)
   }
-  const randomId = randomFrom(pool)
-  return applyHardHeldItem(await buildPokemonFromApi(randomId, generation, scaledLevel, shiny, difficulty), difficulty, isBoss)
+  // Último recurso: si el pool está casi vacío de válidos, baja el nivel de
+  // aparición (nunca por debajo del nivel solicitado) y reusa la caché.
+  const lastPokemon = await buildPokemonFromApi(randomFrom(pool), generation, scaledLevel, shiny, difficulty)
+  if (lastPokemon.minAppearLevel && scaledLevel < lastPokemon.minAppearLevel) {
+    return applyHardHeldItem(
+      await buildPokemonFromApi(lastPokemon.id, generation, Math.max(scaledLevel, lastPokemon.minAppearLevel), shiny, difficulty),
+      difficulty, isBoss
+    )
+  }
+  return applyHardHeldItem(lastPokemon, difficulty, isBoss)
 }
 
 export async function getRandomPokemonByGeneration(generation: number): Promise<Pokemon> {
