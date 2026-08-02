@@ -20,7 +20,7 @@ import {
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
 import { isLeaderboardEnabled, submitInfiniteScore, fetchInfiniteLeaderboard, formatDuration, getCurrentUser, onAuthChange, signUpWithUsername, signIn, signOut, getUsername, isUsernameTaken, type LeaderboardEntry, type InfiniteScoreInsert } from './game/leaderboard'
-import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, depositTrade, getCoopTrades, claimTrade, finishCoopSession, resetCoopSession, type CoopTrade } from './game/coop'
+import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, finishCoopSession, resetCoopSession, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange } from './game/coop'
 import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 
@@ -1444,12 +1444,19 @@ function MainApp() {
   const coopSeedRef = useRef('')
   const [coopMyRole, setCoopMyRole] = useState<'a' | 'b' | null>(null)
   const coopMyRoleRef = useRef<'a' | 'b' | null>(null)
+  const [coopGen, setCoopGen] = useState<number>(1)
+  const coopGenRef = useRef(1)
+  const [coopDiff, setCoopDiff] = useState<'easy' | 'medium' | 'hard'>('medium')
+  const coopDiffRef = useRef<'easy' | 'medium' | 'hard'>('medium')
   const [coopPartnerJoined, setCoopPartnerJoined] = useState<boolean>(false)
   const [coopJoinCode, setCoopJoinCode] = useState<string>('')
   const [coopWaiting, setCoopWaiting] = useState<boolean>(false)
   const [coopWaitingNode, setCoopWaitingNode] = useState<number>(0)
   const [coopSessionEndedMsg, setCoopSessionEndedMsg] = useState<string>('')
-  const [coopTrades, setCoopTrades] = useState<CoopTrade[]>([])
+  const [coopMyOffer, setCoopMyOffer] = useState<CoopTrade['offer'] | null>(null)
+  const [coopMyOfferSubmitted, setCoopMyOfferSubmitted] = useState<boolean>(false)
+  const coopExchangeAppliedRef = useRef(false)
+  const [coopExchange, setCoopExchange] = useState<CoopExchange | null>(null)
   const [coopTradeMsg, setCoopTradeMsg] = useState<string>('')
   const [coopError, setCoopError] = useState<string>('')
 
@@ -1457,8 +1464,12 @@ function MainApp() {
   useEffect(() => { coopSessionCodeRef.current = coopSessionCode }, [coopSessionCode])
   useEffect(() => { coopSeedRef.current = coopSeed }, [coopSeed])
   useEffect(() => { coopMyRoleRef.current = coopMyRole }, [coopMyRole])
+  useEffect(() => { coopGenRef.current = coopGen }, [coopGen])
+  useEffect(() => { coopDiffRef.current = coopDiff }, [coopDiff])
 
   const [activeRandomEvent, setActiveRandomEvent] = useState<{ id: string; icon: string; title: string; desc: string } | null>(null)
+  const routeSeedRef = useRef('')
+  const routeRandRef = useRef<() => number>(() => Math.random())
   const [traderModal, setTraderModal] = useState<boolean>(false)
   const [merchantItems, setMerchantItems] = useState<Array<{ name: string; price: number }> | null>(null)
   const [randomEventUsed, setRandomEventUsed] = useState<Set<string>>(new Set())
@@ -2049,14 +2060,14 @@ function MainApp() {
     setNewAchievement(null)
   }
 
-  function generateRandomNodeType(id: number): RouteNode {
+  function generateRandomNodeType(id: number, rng: () => number = Math.random): RouteNode {
     let type: RouteNode['type'] = 'battle'
     if (runChallenges.bossRush) {
       type = 'battle'
     } else if (runChallenges.allTeamRocket) {
       type = 'teamRocket'
     } else {
-      const rand = Math.random()
+      const rand = rng()
       if (difficulty === 'infinite') {
         if (rand < 0.10 && !runChallenges.noShops) {
           type = 'shop'
@@ -2103,10 +2114,19 @@ function MainApp() {
     }
   }
 
-  async function startNewRun(): Promise<void> {
+  async function startNewRun(sameRoute = false): Promise<void> {
     const dailyCfg = isDailyRunRef.current ? getDailyConfig(dailySeed, [1,2,3,4,5,6,7,8,9]) : null
-    const effectiveGen = dailyCfg ? dailyCfg.generation : generation
-    const effectiveDifficulty = coopModeRef.current ? 'medium' : (dailyCfg ? dailyCfg.difficulty : difficulty)
+    const effectiveGen = coopModeRef.current ? (coopGenRef.current || generation) : (dailyCfg ? dailyCfg.generation : generation)
+    const effectiveDifficulty = coopModeRef.current ? (coopDiffRef.current || 'medium') : (dailyCfg ? dailyCfg.difficulty : difficulty)
+    // Semilla de la ruta: se guarda para poder "reiniciar" con los mismos nodos.
+    const routeSeed = coopModeRef.current
+      ? (coopSeedRef.current || String(Math.random()).slice(2, 12))
+      : isDailyRunRef.current
+        ? dailySeed
+        : sameRoute && routeSeedRef.current
+          ? routeSeedRef.current
+          : String(Math.random()).slice(2, 12)
+    routeSeedRef.current = routeSeed
 
     if (!dailyCfg) {
       if (!isGenUnlocked(effectiveGen)) {
@@ -2140,7 +2160,7 @@ function MainApp() {
     setApiError('')
 
     try {
-      const targetGen = dailyCfg ? effectiveGen : getEffectiveGen()
+      const targetGen = coopModeRef.current ? (coopGenRef.current || getEffectiveGen()) : (dailyCfg ? effectiveGen : getEffectiveGen())
       setCurrentRunGen(targetGen)
 
       // Handle challengeGauntlet: randomly pick 3 challenges
@@ -2233,18 +2253,19 @@ function MainApp() {
       const totalNodes = difficultyNodeCounts[effectiveDifficulty]
       let customRoute: RouteNode[] = []
 
-      const routeRand = coopModeRef.current
-        ? createSeededRandom(coopSeedRef.current || dailySeed)
-        : isDailyRunRef.current ? createSeededRandom(dailySeed) : null
-      const rr = () => routeRand ? routeRand() : Math.random()
+      const routeRand = createSeededRandom(routeSeed)
+      const rr = () => routeRand()
+      routeRandRef.current = rr
 
       if (coopModeRef.current) {
         // Ruta compartida: misma forma para ambos jugadores (misma semilla).
         // Los encuentros, tiendas y descansos siguen siendo aleatorios por jugador.
-        const coopNodes = difficultyNodeCounts.medium
+        const coopNodes = difficultyNodeCounts[coopDiffRef.current || 'medium'] || 10
+        const tradePos1 = Math.max(1, Math.floor(coopNodes / 3))
+        const tradePos2 = Math.max(2, Math.floor((coopNodes * 2) / 3))
         for (let i = 1; i < coopNodes; i++) {
           let type: RouteNode['type'] = 'battle'
-          if (i === 3 || i === 6) {
+          if (i === tradePos1 || i === tradePos2) {
             type = 'trade'
           } else {
             const r = rr()
@@ -2265,7 +2286,7 @@ function MainApp() {
         customRoute = generateBossRushRoute(totalNodes)
       } else if (effectiveDifficulty === 'infinite') {
         for (let i = 1; i <= 5; i++) {
-          customRoute.push(generateRandomNodeType(i))
+          customRoute.push(generateRandomNodeType(i, rr))
         }
       } else {
         const spinPositions: number[] = []
@@ -2617,7 +2638,7 @@ function MainApp() {
         if (routeIndex >= 49) unlockAchievement('infinite_50')
         if (routeIndex >= 99) unlockAchievement('infinite_100')
         const nextId = route.length + 1
-        const batch = Array.from({ length: 5 }, (_, k) => generateRandomNodeType(nextId + k))
+        const batch = Array.from({ length: 5 }, (_, k) => generateRandomNodeType(nextId + k, routeRandRef.current))
         setRoute((previous) => [...previous, ...batch])
         setBattleLog((prev) => [
           `♾️ ¡Modo Infinite! Aparecen 5 nuevas rutas...`,
@@ -2673,7 +2694,7 @@ function MainApp() {
           const newRoute: RouteNode[] = []
           const startId = route.length + 1
           for (let i = 0; i < totalNodesPerStage - 1; i++) {
-            newRoute.push(generateRandomNodeType(startId + i))
+            newRoute.push(generateRandomNodeType(startId + i, routeRandRef.current))
           }
           const finalNodeId = startId + totalNodesPerStage - 1
           newRoute.push({ id: finalNodeId, label: `Jefe #${finalNodeId}`, type: 'boss', done: false })
@@ -2759,8 +2780,8 @@ function MainApp() {
     try {
       isDailyRunRef.current = false
       const seed = String(Math.random()).slice(2, 12)
-      const gen = generation
-      const code = await createCoopSession(seed, gen, 'medium')
+      const gen = coopGen || generation || 1
+      const code = await createCoopSession(seed, gen, coopDiff)
       if (!code) {
         setCoopError('No se pudo crear la sesión. Revisa que las tablas existan en Supabase (schema.sql).')
         return
@@ -2799,6 +2820,8 @@ function MainApp() {
       setCoopSessionCode(session.code)
       setCoopSeed(session.seed)
       setCoopMyRole('b')
+      setCoopGen(session.gen || 1)
+      setCoopDiff((session.difficulty as 'easy' | 'medium' | 'hard') || 'medium')
       setCoopPartnerJoined(true)
     } finally {
       setIsLoading(false)
@@ -2806,6 +2829,7 @@ function MainApp() {
   }
 
   function cancelCoopSession(): void {
+    if (coopSessionCodeRef.current) void deleteCoopSessionRpc(coopSessionCodeRef.current)
     setCoopMode(false)
     setCoopSessionCode('')
     setCoopSeed('')
@@ -2825,13 +2849,28 @@ function MainApp() {
 
   async function restartRun(): Promise<void> {
     if (coopModeRef.current && coopSessionCodeRef.current) {
-      await resetCoopSession(coopSessionCodeRef.current)
+      const exists = await resetCoopSession(coopSessionCodeRef.current)
       setCoopSessionEndedMsg('')
       setCoopWaiting(false)
+      if (!exists) {
+        // La sesión fue eliminada al terminar (ambos jugadores). Crea una nueva
+        // automáticamente para poder seguir jugando en cooperativo.
+        const seed = String(Math.random()).slice(2, 12)
+        const newCode = await createCoopSession(seed, coopGenRef.current || 1, coopDiffRef.current || 'medium')
+        if (!newCode) {
+          setCoopError('No se pudo crear una nueva sesión. Reinicia desde el menú.')
+          return
+        }
+        setCoopSessionCode(newCode)
+        setCoopSeed(seed)
+        setCoopMyRole('a')
+        setCoopPartnerJoined(false)
+        setCoopError(`🤝 Sesión anterior terminada. Nueva sesión: ${newCode}. Compártela con tu compañero.`)
+      }
     }
     setVoluntaryRunEnd(false)
     setDefeatSummary(null)
-    await startNewRun()
+    await startNewRun(true)
   }
 
   // Polling mientras se crea la sesión: esperar a que el compañero se una
@@ -2855,21 +2894,8 @@ function MainApp() {
     void finishCoopSession(coopSessionCodeRef.current, screen === 'victory' ? 'won' : 'lost')
   }, [screen])
 
-  async function refreshCoopTrades(): Promise<void> {
-    if (!coopSessionCodeRef.current) return
-    const trades = await getCoopTrades(coopSessionCodeRef.current, routeIndex)
-    setCoopTrades(trades)
-  }
-
-  async function coopDepositPokemon(idx: number): Promise<void> {
-    const p = team[idx]
-    if (!p) return
-    if (team.length <= 1) {
-      setCoopTradeMsg('No puedes depositar a tu único Pokémon.')
-      return
-    }
-    if (!coopSessionCodeRef.current) return
-    const offer: CoopTrade['offer'] = {
+  function buildOfferFromPokemon(p: Pokemon): CoopTrade['offer'] {
+    return {
       kind: 'pokemon',
       id: p.id,
       name: p.name,
@@ -2886,76 +2912,119 @@ function MainApp() {
       holdItem: p.holdItem,
       status: p.status ? { type: p.status.type, turns: p.status.turns } : null,
     }
-    const ok = await depositTrade(coopSessionCodeRef.current, routeIndex, offer)
-    if (ok) {
-      setTeam(prev => prev.filter((_, i) => i !== idx))
-      setActiveIndex(prev => Math.max(0, Math.min(prev, team.length - 2)))
-      setCoopTradeMsg(`📦 Depositaste a ${p.name} para tu compañero.`)
-      await refreshCoopTrades()
-    } else {
-      setCoopTradeMsg('No se pudo depositar. Revisa la conexión con Supabase.')
+  }
+
+  function rebuildPokemonFromOffer(offer: CoopTrade['offer']): Pokemon {
+    return {
+      id: offer.id ?? 1,
+      name: offer.name ?? '???',
+      sprite: offer.sprite ?? '',
+      level: offer.level ?? 10,
+      hp: offer.hp ?? 10,
+      maxHp: offer.maxHp ?? 10,
+      attack: offer.attack ?? 10,
+      defense: offer.defense ?? 10,
+      speed: offer.speed ?? 10,
+      moves: (offer.moves ?? []).map(m => ({ ...m, description: '', accuracy: m.accuracy })),
+      types: offer.types,
+      holdItem: offer.holdItem ?? undefined,
+      shiny: offer.shiny,
+      status: offer.status ? { type: offer.status.type as StatusType, turns: offer.status.turns } : undefined,
     }
   }
 
-  async function coopDepositItem(itemName: string): Promise<void> {
-    if (!coopSessionCodeRef.current) return
-    const offer: CoopTrade['offer'] = {
-      kind: 'item',
-      itemName,
-      itemIcon: ITEM_SPRITES[itemName],
+  function offerLabel(ex: CoopExchange): string {
+    const partner = coopMyRoleRef.current === 'a' ? ex.b_offer : ex.a_offer
+    if (!partner) return '...'
+    return partner.kind === 'pokemon' ? `${partner.name} (Nv.${partner.level})` : (partner.itemName ?? 'un objeto')
+  }
+
+  function applyOfferToLocal(offer: CoopTrade['offer']): void {
+    if (!offer) return
+    if (offer.kind === 'pokemon') {
+      const rebuilt = rebuildPokemonFromOffer(offer)
+      if (team.length < maxTeamSize) {
+        setTeam(prev => [...prev, rebuilt])
+        setCoopTradeMsg(`🤝 ¡Intercambio completado! Recibiste a ${rebuilt.name} de tu compañero.`)
+      } else {
+        setPcStorage(prev => [...prev, rebuilt])
+        setCoopTradeMsg(`🤝 ¡Intercambio completado! Recibiste a ${rebuilt.name} (enviado al PC).`)
+      }
+    } else {
+      setInventory(prev => [...prev, offer.itemName ?? 'Potion'])
+      setCoopTradeMsg(`🤝 ¡Intercambio completado! Recibiste ${offer.itemName ?? 'un objeto'} de tu compañero.`)
     }
-    const ok = await depositTrade(coopSessionCodeRef.current, routeIndex, offer)
-    if (ok) {
+  }
+
+  function coopSelectPokemon(idx: number): void {
+    const p = team[idx]
+    if (!p) return
+    if (team.length <= 1) {
+      setCoopTradeMsg('No puedes intercambiar a tu único Pokémon.')
+      return
+    }
+    setCoopMyOffer(buildOfferFromPokemon(p))
+    setCoopTradeMsg(`Seleccionaste a ${p.name} como oferta. Pulsa "Intercambiar".`)
+  }
+
+  function coopSelectItem(itemName: string): void {
+    setCoopMyOffer({ kind: 'item', itemName, itemIcon: ITEM_SPRITES[itemName] })
+    setCoopTradeMsg(`Seleccionaste ${itemName} como oferta. Pulsa "Intercambiar".`)
+  }
+
+  async function coopConfirmExchange(): Promise<void> {
+    if (!coopSessionCodeRef.current || !coopMyOffer) return
+    const ok = await submitExchangeOffer(coopSessionCodeRef.current, routeIndex, coopMyOffer)
+    if (!ok) {
+      setCoopTradeMsg('No se pudo enviar tu oferta. Revisa la conexión con Supabase.')
+      return
+    }
+    // Retira la oferta de tu lado: ya está comprometida en el intercambio.
+    if (coopMyOffer.kind === 'pokemon') {
+      const id = coopMyOffer.id
+      setTeam(prev => {
+        const idx = prev.findIndex(p => p.id === id)
+        if (idx === -1) return prev
+        return prev.filter((_, i) => i !== idx)
+      })
+    } else {
+      const itemName = coopMyOffer.itemName!
       setInventory(prev => {
         const out = [...prev]
         const i = out.indexOf(itemName)
         if (i !== -1) out.splice(i, 1)
         return out
       })
-      setCoopTradeMsg(`📦 Depositaste ${itemName} para tu compañero.`)
-      await refreshCoopTrades()
-    } else {
-      setCoopTradeMsg('No se pudo depositar. Revisa la conexión con Supabase.')
     }
+    setCoopMyOffer(null)
+    setCoopMyOfferSubmitted(true)
+    setCoopTradeMsg('🤝 Oferta enviada. Esperando a que tu compañero pulse "Intercambiar"...')
   }
 
-  async function coopClaimTrade(trade: CoopTrade): Promise<void> {
-    if (!coopSessionCodeRef.current || trade.claimed) return
-    const offer = await claimTrade(trade.id)
-    if (!offer) {
-      setCoopTradeMsg('No se pudo recoger el intercambio.')
-      return
-    }
-    if (offer.kind === 'pokemon') {
-      const rebuilt: Pokemon = {
-        id: offer.id ?? 1,
-        name: offer.name ?? '???',
-        sprite: offer.sprite ?? '',
-        level: offer.level ?? 10,
-        hp: offer.hp ?? 10,
-        maxHp: offer.maxHp ?? 10,
-        attack: offer.attack ?? 10,
-        defense: offer.defense ?? 10,
-        speed: offer.speed ?? 10,
-        moves: (offer.moves ?? []).map(m => ({ ...m, description: '', accuracy: m.accuracy })),
-        types: offer.types,
-        holdItem: offer.holdItem ?? undefined,
-        shiny: offer.shiny,
-        status: offer.status ? { type: offer.status.type as StatusType, turns: offer.status.turns } : undefined,
+  // Polling del intercambio en el nodo actual
+  useEffect(() => {
+    if (screen !== 'trade') return
+    const code = coopSessionCodeRef.current
+    if (!code) return
+    let cancelled = false
+    const poll = async () => {
+      if (cancelled) return
+      const ex = await getCoopExchange(code, routeIndex)
+      if (!ex) return
+      setCoopExchange(ex)
+      if (ex.completed && !coopExchangeAppliedRef.current) {
+        const partnerOffer = await completeCoopExchange(code, routeIndex)
+        if (partnerOffer && partnerOffer.kind) {
+          coopExchangeAppliedRef.current = true
+          applyOfferToLocal(partnerOffer)
+        }
       }
-      if (team.length < maxTeamSize) {
-        setTeam(prev => [...prev, rebuilt])
-        setCoopTradeMsg(`🤝 Recibiste a ${rebuilt.name} de tu compañero.`)
-      } else {
-        setPcStorage(prev => [...prev, rebuilt])
-        setCoopTradeMsg(`🤝 Recibiste a ${rebuilt.name} (enviado al PC).`)
-      }
-    } else {
-      setInventory(prev => [...prev, offer.itemName ?? 'Potion'])
-      setCoopTradeMsg(`🤝 Recibiste ${offer.itemName ?? 'un objeto'} de tu compañero.`)
     }
-    await refreshCoopTrades()
-  }
+    void poll()
+    const timer = setInterval(() => void poll(), 2500)
+    return () => { cancelled = true; clearInterval(timer) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, routeIndex, coopSessionCode])
 
   function pickRocketPokemon(pokemon: Pokemon): void {
     if (runChallenges.soloStarter) {
@@ -3100,12 +3169,10 @@ function MainApp() {
       setIsLoading(true)
       setApiError('')
       setCoopTradeMsg('')
-      if (coopSessionCodeRef.current) {
-        const trades = await getCoopTrades(coopSessionCodeRef.current, routeIndex)
-        setCoopTrades(trades)
-      } else {
-        setCoopError('No hay sesión cooperativa activa para este nodo.')
-      }
+      setCoopMyOffer(null)
+      setCoopMyOfferSubmitted(false)
+      setCoopExchange(null)
+      coopExchangeAppliedRef.current = false
       setIsLoading(false)
       setScreen('trade')
       return
@@ -5331,7 +5398,6 @@ function MainApp() {
     setCoopPartnerJoined(false)
     setCoopWaiting(false)
     setCoopSessionEndedMsg('')
-    setCoopTrades([])
     setCoopTradeMsg('')
     setCoopError('')
     setSpinItems([])
@@ -5350,6 +5416,9 @@ function MainApp() {
 
   function onRestartRun(): void {
     if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'trade') {
+      if (coopModeRef.current && coopSessionCodeRef.current) {
+        void finishCoopSession(coopSessionCodeRef.current, 'lost')
+      }
       resetToSetup()
     }
   }
@@ -6654,6 +6723,32 @@ function MainApp() {
                 <p style={{ margin: '0', color: '#9b98cf', fontSize: '0.8rem' }}>
                   Juega una run compartida con un amigo: misma ruta, mismos nodos, intercambios de Pokémon y objetos. Ambos necesitan cuenta.
                 </p>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <label style={{ flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '4px', color: '#9b98cf', fontSize: '0.75rem' }}>
+                    Generación
+                    <select
+                      value={coopGen}
+                      onChange={(e) => setCoopGen(Number(e.target.value))}
+                      style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
+                    >
+                      {generations.map((g) => (
+                        <option key={g} value={g} disabled={!isGenUnlocked(g)}>Gen {g} — {generationRegions[g]}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={{ flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '4px', color: '#9b98cf', fontSize: '0.75rem' }}>
+                    Dificultad
+                    <select
+                      value={coopDiff}
+                      onChange={(e) => setCoopDiff(e.target.value as 'easy' | 'medium' | 'hard')}
+                      style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
+                    >
+                      <option value="easy">Fácil (5 rutas)</option>
+                      <option value="medium">Intermedio (10 rutas)</option>
+                      <option value="hard">Difícil (25 rutas)</option>
+                    </select>
+                  </label>
+                </div>
                 <button
                   className="cta"
                   type="button"
@@ -6685,10 +6780,15 @@ function MainApp() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', border: '1px solid #37d16b', borderRadius: '12px', background: 'rgba(34,197,94,0.08)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                  <span style={{ color: '#37d16b', fontWeight: 'bold', fontSize: '0.9rem' }}>
-                    🎮 Sesión: <strong style={{ color: '#ffcb05', letterSpacing: '2px' }}>{coopSessionCode}</strong>
-                  </span>
-                  <button className="tiny-btn" type="button" onClick={cancelCoopSession} style={{ color: '#ff8a80' }}>
+                  <div style={{ textAlign: 'center', flex: 1 }}>
+                    <div style={{ color: '#37d16b', fontWeight: 'bold', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>
+                      🎮 Código de sesión
+                    </div>
+                    <div style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '2rem', letterSpacing: '8px', textShadow: '0 2px 0 rgba(0,0,0,0.5)' }}>
+                      {coopSessionCode}
+                    </div>
+                  </div>
+                  <button className="tiny-btn" type="button" onClick={cancelCoopSession} style={{ color: '#ff8a80', alignSelf: 'flex-start' }}>
                     ✕ Cancelar
                   </button>
                 </div>
@@ -6696,13 +6796,13 @@ function MainApp() {
                   coopPartnerJoined ? (
                     <p style={{ margin: '0', color: '#37d16b', fontSize: '0.85rem' }}>✅ ¡Tu compañero se ha unido! Pulsa "Iniciar Aventura" para empezar.</p>
                   ) : (
-                    <p style={{ margin: '0', color: '#ffcb05', fontSize: '0.85rem' }}>⏳ Comparte el código <strong>{coopSessionCode}</strong> y espera a que tu compañero se una...</p>
+                    <p style={{ margin: '0', color: '#ffcb05', fontSize: '0.85rem' }}>⏳ Comparte este código con tu amigo y espera a que se una...</p>
                   )
                 ) : (
                   <p style={{ margin: '0', color: '#37d16b', fontSize: '0.85rem' }}>✅ Sesión unida. Pulsa "Iniciar Aventura" cuando tu compañero esté listo.</p>
                 )}
                 <p style={{ margin: '0', color: '#7d7ab5', fontSize: '0.75rem' }}>
-                  Misma ruta para ambos (misma semilla). Tiendas, enemigos y descansos son distintos por jugador. Al completar un nodo debes esperar a tu compañero.
+                  Gen {coopGen} ({generationRegions[coopGen]}) — {coopDiff === 'easy' ? 'Fácil' : coopDiff === 'hard' ? 'Difícil' : 'Intermedio'}. Misma ruta para ambos (misma semilla); tiendas, enemigos y descansos distintos por jugador.
                 </p>
               </div>
             )}
@@ -7336,73 +7436,89 @@ function MainApp() {
 
             {screen === 'trade' && (
               <div className="action-block shop-block" style={{ marginTop: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <div style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
                   <h3 style={{ margin: 0, color: '#37d16b' }}>🤝 Nodo de Intercambio</h3>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#9b98cf' }}>
-                    Sesión: <strong style={{ color: '#ffcb05' }}>{coopSessionCode || '—'}</strong>
-                  </span>
+                  <p style={{ margin: '0.5rem 0 0 0', color: '#9b98cf', fontSize: '0.8rem' }}>
+                    Sesión: <strong style={{ color: '#ffcb05', fontSize: '1.4rem', letterSpacing: '3px' }}>{coopSessionCode || '—'}</strong>
+                  </p>
                 </div>
 
                 {coopTradeMsg && <p style={{ color: '#ffcb05', fontSize: '0.85rem', marginBottom: '0.5rem' }}>{coopTradeMsg}</p>}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '0.75rem' }}>
-                  <p className="label" style={{ margin: 0 }}>📦 Deposita un Pokémon para tu compañero</p>
-                  {team.map((pokemon, idx) => (
-                    <div key={`dep-${pokemon.id}-${idx}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '6px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <img src={pokemon.sprite} alt={pokemon.name} onError={fallbackSprite} style={{ width: '28px', height: '28px', imageRendering: 'pixelated' }} />
-                        <span style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{pokemon.name} <span className="muted">Nv.{pokemon.level}</span></span>
-                      </div>
-                      <button className="tiny-btn" type="button" disabled={team.length <= 1} onClick={() => void coopDepositPokemon(idx)} style={{ background: '#37d16b', color: '#12122b', fontWeight: 'bold' }}>
-                        Depositar
-                      </button>
+                {!coopMyOfferSubmitted ? (
+                  <>
+                    <p className="label" style={{ margin: '0 0 0.35rem' }}>1️⃣ Elige qué ofreces (un Pokémon o un objeto)</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '0.5rem' }}>
+                      {team.map((pokemon, idx) => {
+                        const selected = coopMyOffer?.kind === 'pokemon' && coopMyOffer.id === pokemon.id
+                        return (
+                          <button
+                            key={`of-${pokemon.id}-${idx}`}
+                            type="button"
+                            className="tiny-btn"
+                            disabled={team.length <= 1}
+                            onClick={() => coopSelectPokemon(idx)}
+                            style={{ background: selected ? '#37d16b' : '#2a2a55', color: '#fff', border: selected ? '2px solid #0f7a43' : '2px solid transparent' }}
+                          >
+                            <img src={pokemon.sprite} alt={pokemon.name} onError={fallbackSprite} style={{ width: '24px', height: '24px', verticalAlign: 'middle', marginRight: '4px', imageRendering: 'pixelated' }} />
+                            {pokemon.name} Nv.{pokemon.level}
+                          </button>
+                        )
+                      })}
                     </div>
-                  ))}
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '0.75rem' }}>
-                  <p className="label" style={{ margin: 0 }}>🎒 Deposita un objeto</p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {Array.from(new Set(inventory)).filter(i => i !== 'Mega Stone' && i !== 'Dynamax Band').map((itemName) => {
-                      const count = inventory.filter(i => i === itemName).length
-                      return (
-                        <button key={itemName} className="tiny-btn" type="button" onClick={() => void coopDepositItem(itemName)} style={{ background: '#4d9bff', color: '#fff' }}>
-                          {ITEM_SPRITES[itemName] && <img src={ITEM_SPRITES[itemName]} alt="" style={{ width: '14px', height: '14px', verticalAlign: 'middle', marginRight: '4px', imageRendering: 'pixelated' }} />}
-                          {itemName} ×{count}
-                        </button>
-                      )
-                    })}
-                    {inventory.length === 0 && <span style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No tienes objetos.</span>}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '0.75rem' }}>
-                  <p className="label" style={{ margin: 0 }}>🎁 Ofertas de tu compañero</p>
-                  {coopTrades.length === 0 ? (
-                    <p style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>Aún no hay intercambios esperándote.</p>
-                  ) : (
-                    coopTrades.map((trade) => (
-                      <div key={trade.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'rgba(74,222,128,0.1)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(74,222,128,0.3)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          {trade.offer.kind === 'pokemon' ? (
-                            <>
-                              {trade.offer.sprite && <img src={trade.offer.sprite} alt="" onError={fallbackSprite} style={{ width: '28px', height: '28px', imageRendering: 'pixelated' }} />}
-                              <span style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{trade.offer.name} <span className="muted">Nv.{trade.offer.level}</span></span>
-                            </>
-                          ) : (
-                            <>
-                              {trade.offer.itemIcon && <img src={trade.offer.itemIcon} alt="" onError={fallbackSprite} style={{ width: '24px', height: '24px', imageRendering: 'pixelated' }} />}
-                              <span style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{trade.offer.itemName}</span>
-                            </>
-                          )}
-                        </div>
-                        <button className="tiny-btn" type="button" onClick={() => void coopClaimTrade(trade)} style={{ background: '#37d16b', color: '#12122b', fontWeight: 'bold' }}>
-                          Recoger
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '0.75rem' }}>
+                      {Array.from(new Set(inventory)).filter(i => i !== 'Mega Stone' && i !== 'Dynamax Band').map((itemName) => {
+                        const count = inventory.filter(i => i === itemName).length
+                        const selected = coopMyOffer?.kind === 'item' && coopMyOffer.itemName === itemName
+                        return (
+                          <button key={itemName} type="button" className="tiny-btn" onClick={() => coopSelectItem(itemName)} style={{ background: selected ? '#37d16b' : '#2a2a55', color: '#fff', border: selected ? '2px solid #0f7a43' : '2px solid transparent' }}>
+                            {ITEM_SPRITES[itemName] && <img src={ITEM_SPRITES[itemName]} alt="" style={{ width: '14px', height: '14px', verticalAlign: 'middle', marginRight: '4px', imageRendering: 'pixelated' }} />}
+                            {itemName} ×{count}
+                          </button>
+                        )
+                      })}
+                      {inventory.length === 0 && <span style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No tienes objetos.</span>}
+                    </div>
+                    {coopMyOffer && (
+                      <p style={{ color: '#f3f1ff', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                        Tu oferta: <strong style={{ color: '#37d16b' }}>{coopMyOffer.kind === 'pokemon' ? `${coopMyOffer.name} (Nv.${coopMyOffer.level})` : coopMyOffer.itemName}</strong>
+                      </p>
+                    )}
+                    <button
+                      className="cta"
+                      type="button"
+                      disabled={!coopMyOffer}
+                      onClick={() => void coopConfirmExchange()}
+                      style={{ width: '100%', background: coopMyOffer ? '#37d16b' : '#475569', color: coopMyOffer ? '#12122b' : '#d9d6f2', marginBottom: '0.5rem' }}
+                    >
+                      🤝 ¡Intercambiar! (los dos deben pulsarlo)
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ color: '#37d16b', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                      ✅ Tu oferta fue enviada. Esperando a que tu compañero pulse "Intercambiar"...
+                    </p>
+                    {coopExchange && ((coopMyRole === 'a' ? coopExchange.b_ready : coopExchange.a_ready)) && !coopExchange.completed && (
+                      <p style={{ color: '#9b98cf', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                        🎁 Tu compañero ofrece: <strong style={{ color: '#f3f1ff' }}>{offerLabel(coopExchange)}</strong>
+                      </p>
+                    )}
+                    {coopExchange?.completed && (
+                      <p style={{ color: '#37d16b', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                        🎉 ¡Intercambio completado! El cambio se ha realizado automáticamente.
+                      </p>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '6px', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.3)', marginBottom: '0.5rem' }}>
+                      <span style={{ color: '#9b98cf', fontSize: '0.8rem' }}>Estado:</span>
+                      <span style={{ color: coopMyOfferSubmitted ? '#37d16b' : '#9b98cf', fontSize: '0.85rem', fontWeight: 'bold' }}>Tú ✅</span>
+                      <span style={{ color: '#9b98cf' }}>·</span>
+                      <span style={{ color: coopExchange?.completed ? '#37d16b' : (coopExchange?.a_ready && coopExchange?.b_ready ? '#ffcb05' : '#9b98cf'), fontSize: '0.85rem', fontWeight: 'bold' }}>
+                        {coopExchange?.completed ? 'Compañero ✅' : (coopExchange?.a_ready && coopExchange?.b_ready ? '¡Ambos listos!' : 'Compañero ⏳')}
+                      </span>
+                    </div>
+                  </>
+                )}
 
                 <button className="cta" onClick={completeCurrentNode} type="button" style={{ width: '100%' }}>
                   Salir del Nodo
@@ -7894,7 +8010,7 @@ function MainApp() {
       {screen === 'victory' && (
         <section className="panel end-panel">
           <h2>¡Victoria!</h2>
-          <p>Has completado la ruta ({coopMode ? 10 : difficultyNodeCounts[difficulty]} nodos) y derrotado al jefe final.</p>
+          <p>Has completado la ruta ({coopMode ? (difficultyNodeCounts[coopDiff] || 10) : difficultyNodeCounts[difficulty]} nodos) y derrotado al jefe final.</p>
 
           {victoryUnlocks && (
             <div

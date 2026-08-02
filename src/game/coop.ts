@@ -49,6 +49,14 @@ export interface CoopNodeProgress {
   result: 'won' | 'lost' | null
 }
 
+export interface CoopExchange {
+  a_offer: CoopTrade['offer'] | null
+  b_offer: CoopTrade['offer'] | null
+  a_ready: boolean
+  b_ready: boolean
+  completed: boolean
+}
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
@@ -123,39 +131,6 @@ export async function getCoopProgress(code: string, node: number): Promise<CoopN
   return (data as CoopNodeProgress) ?? null
 }
 
-export async function depositTrade(code: string, node: number, offer: CoopTrade['offer']): Promise<boolean> {
-  const client = await getClient()
-  if (!client) return false
-  const { error } = await client.rpc('deposit_trade', { p_code: code, p_node: node, p_offer: offer })
-  if (error) {
-    console.error('deposit_trade:', error)
-    return false
-  }
-  return true
-}
-
-export async function getCoopTrades(code: string, node: number): Promise<CoopTrade[]> {
-  const client = await getClient()
-  if (!client) return []
-  const { data, error } = await client.rpc('get_coop_trades', { p_code: code, p_node: node })
-  if (error) {
-    console.error('get_coop_trades:', error)
-    return []
-  }
-  return Array.isArray(data) ? data as CoopTrade[] : []
-}
-
-export async function claimTrade(tradeId: string): Promise<CoopTrade['offer'] | null> {
-  const client = await getClient()
-  if (!client) return null
-  const { data, error } = await client.rpc('claim_trade', { p_trade_id: tradeId })
-  if (error) {
-    console.error('claim_trade:', error)
-    return null
-  }
-  return (data as CoopTrade['offer']) ?? null
-}
-
 export async function finishCoopSession(code: string, result: 'won' | 'lost'): Promise<boolean> {
   const client = await getClient()
   if (!client) return false
@@ -170,10 +145,54 @@ export async function finishCoopSession(code: string, result: 'won' | 'lost'): P
 export async function resetCoopSession(code: string): Promise<boolean> {
   const client = await getClient()
   if (!client) return false
-  const { error } = await client.rpc('reset_coop_session', { p_code: code })
+  const { data, error } = await client.rpc('reset_coop_session', { p_code: code })
   if (error) {
     console.error('reset_coop_session:', error)
     return false
   }
+  return data === true
+}
+
+export async function cancelCoopSession(code: string): Promise<boolean> {
+  const client = await getClient()
+  if (!client) return false
+  const { data, error } = await client.rpc('cancel_coop_session', { p_code: code })
+  if (error) {
+    console.error('cancel_coop_session:', error)
+    return false
+  }
+  return data === true
+}
+
+export async function submitExchangeOffer(code: string, node: number, offer: CoopTrade['offer']): Promise<boolean> {
+  const client = await getClient()
+  if (!client) return false
+  const { error } = await client.rpc('submit_exchange_offer', { p_code: code, p_node: node, p_offer: offer })
+  if (error) {
+    console.error('submit_exchange_offer:', error)
+    return false
+  }
   return true
+}
+
+export async function getCoopExchange(code: string, node: number): Promise<CoopExchange | null> {
+  const client = await getClient()
+  if (!client) return null
+  const { data, error } = await client.rpc('get_exchange', { p_code: code, p_node: node })
+  if (error) {
+    console.error('get_exchange:', error)
+    return null
+  }
+  return (data as CoopExchange) ?? null
+}
+
+export async function completeCoopExchange(code: string, node: number): Promise<CoopTrade['offer'] | null> {
+  const client = await getClient()
+  if (!client) return null
+  const { data, error } = await client.rpc('complete_exchange', { p_code: code, p_node: node })
+  if (error) {
+    console.error('complete_exchange:', error)
+    return null
+  }
+  return (data as CoopTrade['offer']) ?? null
 }

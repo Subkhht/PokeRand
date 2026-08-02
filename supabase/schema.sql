@@ -221,8 +221,13 @@ create table if not exists public.coop_sessions (
   player_b_id uuid references public.profiles(id) on delete cascade,
   status text not null default 'waiting' check (status in ('waiting','active','finished')),
   result text check (result in ('won','lost')),
+  finished_a boolean not null default false,
+  finished_b boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+alter table public.coop_sessions add column if not exists finished_a boolean not null default false;
+alter table public.coop_sessions add column if not exists finished_b boolean not null default false;
 
 create table if not exists public.coop_progress (
   id uuid primary key default gen_random_uuid(),
@@ -245,6 +250,20 @@ create table if not exists public.coop_trades (
   created_at timestamptz not null default now()
 );
 
+-- Intercambio mutuo: cada jugador ofrece un Pokémon u objeto y ambos deben
+-- pulsar "Intercambiar" para que se complete automáticamente.
+create table if not exists public.coop_exchanges (
+  code text not null references public.coop_sessions(code) on delete cascade,
+  node integer not null,
+  a_offer jsonb,
+  b_offer jsonb,
+  a_ready boolean not null default false,
+  b_ready boolean not null default false,
+  completed boolean not null default false,
+  updated_at timestamptz not null default now(),
+  primary key (code, node)
+);
+
 -- Crear sesión: devuelve el código de 6 letras.
 create or replace function public.create_coop_session(p_seed text, p_gen integer, p_difficulty text)
 returns text
@@ -255,6 +274,11 @@ declare
   v_uid uuid := auth.uid();
 begin
   if v_uid is null then raise exception 'Necesitas iniciar sesión'; end if;
+  -- Limpieza: borra sesiones huérfanas o terminadas con más de 24h para que
+  -- la tabla no se llene.
+  delete from public.coop_sessions
+  where created_at < now() - interval '24 hours'
+    and (status = 'finished' or player_b_id is null);
   v_code := upper(substr(md5(random()::text || clock_timestamp()::text), 1, 6));
   insert into public.coop_sessions (code, seed, gen, difficulty, player_a_id, status)
   values (v_code, p_seed, p_gen, coalesce(p_difficulty, 'medium'), v_uid, 'waiting');
@@ -410,28 +434,160 @@ $$;
 
 -- Cierra la sesión (partida terminada para uno de los jugadores).
 -- p_result: 'won' si quien termina ganó la run, 'lost' si perdió/abandonó.
+-- Cuando AMBOS jugadores han terminado, la sesión se elimina (cascade a
+-- progreso e intercambios) para que la base de datos no se llene.
 create or replace function public.finish_coop_session(p_code text, p_result text)
 returns boolean
 language plpgsql security definer set search_path = public
 as $$
+declare
+  v_uid uuid := auth.uid();
+  v_sess public.coop_sessions%rowtype;
 begin
-  update public.coop_sessions set status = 'finished', result = p_result
-  where code = upper(p_code);
+  if v_uid is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select * into v_sess from public.coop_sessions where code = upper(p_code);
+  if not found then
+    return false;
+  end if;
+  if v_uid = v_sess.player_a_id then
+    update public.coop_sessions
+    set status = 'finished', result = p_result, finished_a = true
+    where code = v_sess.code;
+  elsif v_uid = v_sess.player_b_id then
+    update public.coop_sessions
+    set status = 'finished', result = p_result, finished_b = true
+    where code = v_sess.code;
+  else
+    return false;
+  end if;
+  if exists (
+    select 1 from public.coop_sessions
+    where code = v_sess.code and finished_a and finished_b
+  ) then
+    delete from public.coop_sessions where code = v_sess.code;
+  end if;
+  return true;
+end;
+$$;
+
+-- Cancela y elimina la sesión al instante (p. ej. al pulsar "Cancelar" en el
+-- menú antes de empezar, o si el jugador abandona sin compañero).
+create or replace function public.cancel_coop_session(p_code text)
+returns boolean
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_sess public.coop_sessions%rowtype;
+begin
+  if v_uid is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select * into v_sess from public.coop_sessions where code = upper(p_code);
+  if not found then return false; end if;
+  if v_uid <> v_sess.player_a_id and v_uid <> v_sess.player_b_id then return false; end if;
+  delete from public.coop_sessions where code = v_sess.code;
   return true;
 end;
 $$;
 
 -- Reinicia la sesión (misma semilla, mismo código): borra progreso e intercambios.
+-- Devuelve false si la sesión ya no existe (ambos terminaron y fue eliminada).
 create or replace function public.reset_coop_session(p_code text)
 returns boolean
 language plpgsql security definer set search_path = public
 as $$
 begin
   delete from public.coop_trades where code = upper(p_code);
+  delete from public.coop_exchanges where code = upper(p_code);
   delete from public.coop_progress where code = upper(p_code);
-  update public.coop_sessions set status = 'active', result = null
+  update public.coop_sessions set status = 'active', result = null,
+         finished_a = false, finished_b = false
   where code = upper(p_code);
+  return FOUND;
+end;
+$$;
+
+-- Envía tu oferta y te marca listo para el intercambio del nodo.
+create or replace function public.submit_exchange_offer(p_code text, p_node integer, p_offer jsonb)
+returns boolean
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_sess public.coop_sessions%rowtype;
+begin
+  if v_uid is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select * into v_sess from public.coop_sessions where code = upper(p_code);
+  if not found then raise exception 'Sesión no encontrada'; end if;
+  if v_uid = v_sess.player_a_id then
+    insert into public.coop_exchanges (code, node, a_offer, a_ready)
+    values (v_sess.code, p_node, coalesce(p_offer, '{}'::jsonb), true)
+    on conflict (code, node)
+    do update set a_offer = excluded.a_offer, a_ready = true, updated_at = now();
+  elsif v_uid = v_sess.player_b_id then
+    insert into public.coop_exchanges (code, node, b_offer, b_ready)
+    values (v_sess.code, p_node, coalesce(p_offer, '{}'::jsonb), true)
+    on conflict (code, node)
+    do update set b_offer = excluded.b_offer, b_ready = true, updated_at = now();
+  else
+    raise exception 'No eres parte de la sesión';
+  end if;
   return true;
+end;
+$$;
+
+-- Estado del intercambio del nodo.
+create or replace function public.get_exchange(p_code text, p_node integer)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_ex public.coop_exchanges%rowtype;
+begin
+  select * into v_ex from public.coop_exchanges where code = upper(p_code) and node = p_node;
+  return jsonb_build_object(
+    'a_offer', v_ex.a_offer,
+    'b_offer', v_ex.b_offer,
+    'a_ready', coalesce(v_ex.a_ready, false),
+    'b_ready', coalesce(v_ex.b_ready, false),
+    'completed', coalesce(v_ex.completed, false)
+  );
+end;
+$$;
+
+-- Completa el intercambio cuando ambos están listos y devuelve la oferta
+-- del compañero. Idempotente: ambos jugadores reciben la oferta del otro.
+create or replace function public.complete_exchange(p_code text, p_node integer)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_sess public.coop_sessions%rowtype;
+  v_ex public.coop_exchanges%rowtype;
+  v_ready boolean;
+  v_partner_offer jsonb;
+begin
+  if v_uid is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select * into v_sess from public.coop_sessions where code = upper(p_code);
+  if not found then raise exception 'Sesión no encontrada'; end if;
+  select * into v_ex from public.coop_exchanges where code = v_sess.code and node = p_node;
+  if v_ex.code is null then
+    raise exception 'No hay intercambio en este nodo';
+  end if;
+  v_ready := (v_ex.a_ready and v_ex.b_ready);
+  if not v_ready then
+    return null;
+  end if;
+  if not v_ex.completed then
+    update public.coop_exchanges set completed = true, updated_at = now()
+    where code = v_sess.code and node = p_node;
+  end if;
+  if v_uid = v_sess.player_a_id then
+    v_partner_offer := v_ex.b_offer;
+  else
+    v_partner_offer := v_ex.a_offer;
+  end if;
+  return v_partner_offer;
 end;
 $$;
 
@@ -439,10 +595,12 @@ $$;
 alter table public.coop_sessions enable row level security;
 alter table public.coop_progress enable row level security;
 alter table public.coop_trades enable row level security;
+alter table public.coop_exchanges enable row level security;
 
 revoke all on public.coop_sessions from anon, authenticated;
 revoke all on public.coop_progress from anon, authenticated;
 revoke all on public.coop_trades from anon, authenticated;
+revoke all on public.coop_exchanges from anon, authenticated;
 
 grant execute on function public.create_coop_session to authenticated;
 grant execute on function public.join_coop_session to authenticated;
@@ -454,3 +612,7 @@ grant execute on function public.get_coop_trades to authenticated;
 grant execute on function public.claim_trade to authenticated;
 grant execute on function public.finish_coop_session to authenticated;
 grant execute on function public.reset_coop_session to authenticated;
+grant execute on function public.submit_exchange_offer to authenticated;
+grant execute on function public.get_exchange to authenticated;
+grant execute on function public.complete_exchange to authenticated;
+grant execute on function public.cancel_coop_session to authenticated;
