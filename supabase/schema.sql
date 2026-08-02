@@ -631,3 +631,328 @@ grant execute on function public.get_exchange to authenticated;
 grant execute on function public.complete_exchange to authenticated;
 grant execute on function public.cancel_exchange_offer to authenticated;
 grant execute on function public.cancel_coop_session to authenticated;
+
+-- ============================================================================
+-- MODO PVP 1vs1
+-- Tablas y funciones para el combate entre dos jugadores reales. Igual que
+-- el cooperativo: identidad vía auth.uid(), solo acceso mediante RPC.
+-- ============================================================================
+
+create table if not exists public.pvp_matches (
+  id uuid primary key default gen_random_uuid(),
+  code text,
+  status text not null default 'waiting' check (status in ('waiting','active','finished')),
+  player_a_id uuid not null references public.profiles(id) on delete cascade,
+  player_b_id uuid references public.profiles(id) on delete cascade,
+  team_a jsonb not null default '[]'::jsonb,
+  team_b jsonb not null default '[]'::jsonb,
+  result text check (result in ('a','b')),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists pvp_matches_waiting_idx
+  on public.pvp_matches (status) where status = 'waiting' and player_b_id is null;
+
+-- Un único estado compartido por partida: ambos clientes leen/escriben aquí.
+create table if not exists public.pvp_state (
+  match_id uuid primary key references public.pvp_matches(id) on delete cascade,
+  state jsonb not null default '{}'::jsonb,
+  turn integer not null default 0,
+  action_a jsonb,
+  action_b jsonb,
+  updated_at timestamptz not null default now()
+);
+
+-- Construye el estado inicial de la partida a partir de los equipos guardados.
+create or replace function public.init_pvp_state(p_match_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_match public.pvp_matches%rowtype;
+  v_a_revealed jsonb;
+  v_b_revealed jsonb;
+  v_a_name text;
+  v_b_name text;
+begin
+  select * into v_match from public.pvp_matches where id = p_match_id;
+  select coalesce(jsonb_agg(i = 0), '[]'::jsonb)
+    from generate_series(0, greatest(0, jsonb_array_length(v_match.team_a) - 1)) i
+    into v_a_revealed;
+  select coalesce(jsonb_agg(i = 0), '[]'::jsonb)
+    from generate_series(0, greatest(0, jsonb_array_length(v_match.team_b) - 1)) i
+    into v_b_revealed;
+  select username into v_a_name from public.profiles where id = v_match.player_a_id;
+  select username into v_b_name from public.profiles where id = v_match.player_b_id;
+  return jsonb_build_object(
+    'phase', 'picking',
+    'winner', null::text,
+    'switchFor', null::text,
+    'log', '[]'::jsonb,
+    'a', jsonb_build_object('team', coalesce(v_match.team_a, '[]'::jsonb), 'active', 0, 'revealed', v_a_revealed, 'username', v_a_name),
+    'b', jsonb_build_object('team', coalesce(v_match.team_b, '[]'::jsonb), 'active', 0, 'revealed', v_b_revealed, 'username', v_b_name)
+  );
+end;
+$$;
+
+-- Crea una sala personalizada (jugador A) y devuelve el código.
+create or replace function public.create_pvp_room(p_team jsonb)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_code text;
+  v_id uuid;
+  v_name text;
+begin
+  if v_uid is null then raise exception 'Necesitas iniciar sesión'; end if;
+  delete from public.pvp_matches
+  where created_at < now() - interval '24 hours'
+    and (status = 'finished' or player_b_id is null);
+  v_code := upper(substr(md5(random()::text || clock_timestamp()::text), 1, 6));
+  insert into public.pvp_matches (code, player_a_id, team_a, status)
+  values (v_code, v_uid, coalesce(p_team, '[]'::jsonb), 'waiting')
+  returning id into v_id;
+  select username into v_name from public.profiles where id = v_uid;
+  return jsonb_build_object('match_id', v_id, 'code', v_code, 'is_host', true, 'opponent_name', null::text, 'player_name', v_name);
+end;
+$$;
+
+-- Emparejamiento online: intenta unirse a una sala abierta; si no hay ninguna,
+-- crea una nueva y espera. Al unirse, rellena el equipo B, activa la partida
+-- y crea el estado inicial.
+create or replace function public.find_pvp_opponent(p_team jsonb)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_match public.pvp_matches%rowtype;
+  v_code text;
+  v_id uuid;
+  v_a_name text;
+  v_b_name text;
+begin
+  if v_uid is null then raise exception 'Necesitas iniciar sesión'; end if;
+  delete from public.pvp_matches
+  where created_at < now() - interval '24 hours'
+    and (status = 'finished' or player_b_id is null);
+  select * into v_match from public.pvp_matches
+  where status = 'waiting' and player_b_id is null and player_a_id <> v_uid
+  order by created_at asc
+  limit 1;
+  if not found then
+    v_code := upper(substr(md5(random()::text || clock_timestamp()::text), 1, 6));
+    insert into public.pvp_matches (code, player_a_id, team_a, status)
+    values (v_code, v_uid, coalesce(p_team, '[]'::jsonb), 'waiting')
+    returning id into v_id;
+    select username into v_b_name from public.profiles where id = v_uid;
+    return jsonb_build_object('match_id', v_id, 'code', v_code, 'is_host', true, 'opponent_name', null::text, 'player_name', v_b_name, 'joined', false);
+  end if;
+  update public.pvp_matches
+  set player_b_id = v_uid, team_b = coalesce(p_team, '[]'::jsonb), status = 'active'
+  where id = v_match.id;
+  insert into public.pvp_state (match_id, state, turn, action_a, action_b)
+  values (v_match.id, public.init_pvp_state(v_match.id), 0, null, null);
+  select username into v_a_name from public.profiles where id = v_match.player_a_id;
+  select username into v_b_name from public.profiles where id = v_uid;
+  return jsonb_build_object('match_id', v_match.id, 'code', v_match.code, 'is_host', false, 'opponent_name', v_a_name, 'player_name', v_b_name, 'joined', true);
+end;
+$$;
+
+-- Entrar a una sala personalizada mediante código.
+create or replace function public.join_pvp_room(p_code text, p_team jsonb)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_match public.pvp_matches%rowtype;
+  v_a_name text;
+  v_b_name text;
+begin
+  if v_uid is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select * into v_match from public.pvp_matches where code = upper(p_code);
+  if not found then raise exception 'Sala no encontrada'; end if;
+  if v_match.status = 'finished' then raise exception 'La sala ya terminó'; end if;
+  if v_match.player_b_id is not null then raise exception 'La sala ya tiene 2 jugadores'; end if;
+  if v_match.player_a_id = v_uid then
+    select username into v_a_name from public.profiles where id = v_uid;
+    return jsonb_build_object('match_id', v_match.id, 'code', v_match.code, 'is_host', true, 'opponent_name', null::text, 'player_name', v_a_name);
+  end if;
+  update public.pvp_matches
+  set player_b_id = v_uid, team_b = coalesce(p_team, '[]'::jsonb), status = 'active'
+  where id = v_match.id;
+  insert into public.pvp_state (match_id, state, turn, action_a, action_b)
+  values (v_match.id, public.init_pvp_state(v_match.id), 0, null, null);
+  select username into v_a_name from public.profiles where id = v_match.player_a_id;
+  select username into v_b_name from public.profiles where id = v_uid;
+  return jsonb_build_object('match_id', v_match.id, 'code', v_match.code, 'is_host', false, 'opponent_name', v_a_name, 'player_name', v_b_name, 'joined', true);
+end;
+$$;
+
+-- Datos de la partida (sin el estado de combate).
+create or replace function public.get_pvp_match(p_match_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_result jsonb;
+begin
+  select jsonb_build_object(
+    'id', m.id,
+    'code', m.code,
+    'status', m.status,
+    'player_a_id', m.player_a_id,
+    'player_b_id', m.player_b_id,
+    'result', m.result,
+    'created_at', m.created_at,
+    'a_name', (select username from public.profiles where id = m.player_a_id),
+    'b_name', (select username from public.profiles where id = m.player_b_id)
+  )
+  into v_result
+  from public.pvp_matches m where m.id = p_match_id;
+  if not found then raise exception 'Partida no encontrada'; end if;
+  return v_result;
+end;
+$$;
+
+-- Estado compartido de la partida (estado + turno + acciones pendientes).
+create or replace function public.get_pvp_state(p_match_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_result jsonb;
+begin
+  select jsonb_build_object('state', s.state, 'turn', s.turn, 'action_a', s.action_a, 'action_b', s.action_b)
+  into v_result
+  from public.pvp_state s where s.match_id = p_match_id;
+  if not found then raise exception 'La partida aún no ha comenzado'; end if;
+  return v_result;
+end;
+$$;
+
+-- Registra la acción del jugador actual para el turno indicado.
+create or replace function public.submit_pvp_action(p_match_id uuid, p_action jsonb, p_turn integer)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_side text;
+  v_result jsonb;
+begin
+  if auth.uid() is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select case when m.player_a_id = auth.uid() then 'a' when m.player_b_id = auth.uid() then 'b' end
+  into v_side
+  from public.pvp_matches m where m.id = p_match_id;
+  if v_side is null then raise exception 'No participas en esta partida'; end if;
+  if v_side = 'a' then
+    update public.pvp_state set action_a = p_action, updated_at = now()
+    where match_id = p_match_id and turn = p_turn;
+  else
+    update public.pvp_state set action_b = p_action, updated_at = now()
+    where match_id = p_match_id and turn = p_turn;
+  end if;
+  if not found then raise exception 'El turno ya cambió, recarga el estado'; end if;
+  select jsonb_build_object('state', s.state, 'turn', s.turn, 'action_a', s.action_a, 'action_b', s.action_b)
+  into v_result
+  from public.pvp_state s where s.match_id = p_match_id;
+  return v_result;
+end;
+$$;
+
+-- Guarda el estado resuelto del turno y avanza al siguiente. Guardado seguro:
+-- solo se aplica si el turno aún no se ha resuelto (evita carreras entre
+-- los dos clientes, que pueden resolver localmente).
+create or replace function public.resolve_pvp_turn(p_match_id uuid, p_state jsonb, p_turn integer)
+returns boolean
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null then raise exception 'Necesitas iniciar sesión'; end if;
+  if not exists (
+    select 1 from public.pvp_matches m
+    where m.id = p_match_id and (m.player_a_id = auth.uid() or m.player_b_id = auth.uid())
+  ) then
+    raise exception 'No participas en esta partida';
+  end if;
+  update public.pvp_state
+  set state = p_state, turn = p_turn + 1, action_a = null, action_b = null, updated_at = now()
+  where match_id = p_match_id and turn = p_turn;
+  return found;
+end;
+$$;
+
+-- Marca la partida como terminada con un ganador.
+create or replace function public.finish_pvp_match(p_match_id uuid, p_result text)
+returns boolean
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null then raise exception 'Necesitas iniciar sesión'; end if;
+  if not exists (
+    select 1 from public.pvp_matches m
+    where m.id = p_match_id and (m.player_a_id = auth.uid() or m.player_b_id = auth.uid())
+  ) then
+    raise exception 'No participas en esta partida';
+  end if;
+  update public.pvp_matches set status = 'finished', result = p_result where id = p_match_id;
+  return found;
+end;
+$$;
+
+-- Rendición: el rival gana.
+create or replace function public.forfeit_pvp_match(p_match_id uuid)
+returns boolean
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_side text;
+  v_opp text;
+begin
+  if auth.uid() is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select case when m.player_a_id = auth.uid() then 'a' when m.player_b_id = auth.uid() then 'b' end
+  into v_side
+  from public.pvp_matches m where m.id = p_match_id;
+  if v_side is null then raise exception 'No participas en esta partida'; end if;
+  v_opp := case when v_side = 'a' then 'b' else 'a' end;
+  update public.pvp_matches set status = 'finished', result = v_opp where id = p_match_id;
+  update public.pvp_state
+  set state = state || jsonb_build_object('phase', 'finished', 'winner', v_opp)
+  where match_id = p_match_id;
+  return true;
+end;
+$$;
+
+-- Abandona una sala sin empezar (o una partida en curso) eliminándola.
+create or replace function public.cancel_pvp_match(p_match_id uuid)
+returns boolean
+language plpgsql security definer set search_path = public
+as $$
+begin
+  delete from public.pvp_matches
+  where id = p_match_id and (player_a_id = auth.uid() or player_b_id = auth.uid());
+  return found;
+end;
+$$;
+
+-- Seguridad PvP: solo acceso vía RPC.
+alter table public.pvp_matches enable row level security;
+alter table public.pvp_state enable row level security;
+
+revoke all on public.pvp_matches from anon, authenticated;
+revoke all on public.pvp_state from anon, authenticated;
+
+grant execute on function public.init_pvp_state to authenticated;
+grant execute on function public.create_pvp_room to authenticated;
+grant execute on function public.find_pvp_opponent to authenticated;
+grant execute on function public.join_pvp_room to authenticated;
+grant execute on function public.get_pvp_match to authenticated;
+grant execute on function public.get_pvp_state to authenticated;
+grant execute on function public.submit_pvp_action to authenticated;
+grant execute on function public.resolve_pvp_turn to authenticated;
+grant execute on function public.finish_pvp_match to authenticated;
+grant execute on function public.forfeit_pvp_match to authenticated;
+grant execute on function public.cancel_pvp_match to authenticated;

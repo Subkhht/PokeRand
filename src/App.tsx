@@ -21,10 +21,12 @@ import {
 import { getTypeEffectiveness } from './game/typesChart'
 import { isLeaderboardEnabled, submitInfiniteScore, fetchInfiniteLeaderboard, formatDuration, getCurrentUser, onAuthChange, signUpWithUsername, signIn, signOut, getUsername, isUsernameTaken, type LeaderboardEntry, type InfiniteScoreInsert } from './game/leaderboard'
 import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, cancelExchangeOffer, finishCoopSession, resetCoopSession, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange } from './game/coop'
+import { isPvpEnabled, createPvpRoom, findPvpOpponent, joinPvpRoom, getPvpMatch, getPvpState, submitPvpAction, resolvePvpTurn as resolvePvpTurnRpc, forfeitPvpMatch, cancelPvpMatch, finishPvpMatch, serializePvpPokemon, type PvpTurnSnapshot, type PvpRoomResult } from './game/pvp'
+import { resolvePvpTurn, type PvpAction } from './game/pvpBattle'
 import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'trade' | 'victory' | 'defeat' | 'coliseum_select'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'trade' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum'
 
 const STATUS_LABELS: Record<StatusType, string> = {
@@ -1558,6 +1560,41 @@ function MainApp() {
   useEffect(() => { coopMyRoleRef.current = coopMyRole }, [coopMyRole])
   useEffect(() => { coopGenRef.current = coopGen }, [coopGen])
   useEffect(() => { coopDiffRef.current = coopDiff }, [coopDiff])
+
+  // --- Modo PvP 1vs1 ---
+  const [showPvpModal, setShowPvpModal] = useState<boolean>(false)
+  const [pvpTeam, setPvpTeam] = useState<Pokemon[]>(() => {
+    try {
+      const raw = localStorage.getItem('pokerand_pvp_team')
+      return raw ? (JSON.parse(raw) as Pokemon[]) : []
+    } catch {
+      return []
+    }
+  })
+  const [showPvpTeamBuilder, setShowPvpTeamBuilder] = useState<boolean>(false)
+  const [pvpBuildTeam, setPvpBuildTeam] = useState<Pokemon[]>([])
+  const [pvpBuildSelected, setPvpBuildSelected] = useState<number | null>(null)
+  const [pvpBuildMoves, setPvpBuildMoves] = useState<Move[]>([])
+  const [pvpBuildSelectedMoveNames, setPvpBuildSelectedMoveNames] = useState<Set<string>>(new Set())
+  const [pvpBuildLoading, setPvpBuildLoading] = useState<boolean>(false)
+  const [pvpBuildSearch, setPvpBuildSearch] = useState<string>('')
+  const [pvpSearching, setPvpSearching] = useState<boolean>(false)
+  const [pvpRoomCode, setPvpRoomCode] = useState<string>('')
+  const [pvpJoinCode, setPvpJoinCode] = useState<string>('')
+  const [pvpWaitingOpponent, setPvpWaitingOpponent] = useState<boolean>(false)
+  const [pvpError, setPvpError] = useState<string>('')
+  const [pvpMatchId, setPvpMatchId] = useState<string | null>(null)
+  const pvpMatchIdRef = useRef<string | null>(null)
+  const [pvpRole, setPvpRole] = useState<'a' | 'b' | null>(null)
+  const [pvpSnapshot, setPvpSnapshot] = useState<PvpTurnSnapshot | null>(null)
+  const [pvpMyAction, setPvpMyAction] = useState<PvpAction | null>(null)
+  const [pvpMyActionTurn, setPvpMyActionTurn] = useState<number>(-1)
+  const pvpLoopRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pvpResolvingRef = useRef(false)
+  const pvpSearchingRef = useRef(false)
+  useEffect(() => { pvpSearchingRef.current = pvpSearching }, [pvpSearching])
+
+  useEffect(() => { pvpMatchIdRef.current = pvpMatchId }, [pvpMatchId])
 
   const [activeRandomEvent, setActiveRandomEvent] = useState<{ id: string; icon: string; title: string; desc: string } | null>(null)
   const routeSeedRef = useRef('')
@@ -3132,6 +3169,358 @@ function MainApp() {
       status: offer.status ? { type: offer.status.type as StatusType, turns: offer.status.turns } : undefined,
     }
   }
+
+  // --- Modo PvP 1vs1 ---
+
+  function openPvpModal(): void {
+    playClick()
+    if (!authUser) {
+      setPvpError('Para jugar PvP necesitas iniciar sesión o crear una cuenta.')
+      setShowPvpModal(true)
+      return
+    }
+    setPvpError('')
+    setShowPvpModal(true)
+  }
+
+  function openPvpTeamBuilder(): void {
+    playClick()
+    setPvpBuildTeam(pvpTeam.map(p => JSON.parse(JSON.stringify(p)) as Pokemon))
+    setPvpBuildSelected(null)
+    setPvpBuildMoves([])
+    setPvpBuildSelectedMoveNames(new Set())
+    setPvpBuildSearch('')
+    setShowPvpTeamBuilder(true)
+  }
+
+  async function loadPvpBuildMoves(id: number, existingMoveNames: string[] = []): Promise<void> {
+    setPvpBuildLoading(true)
+    setPvpBuildSelected(id)
+    setPvpBuildMoves([])
+    try {
+      const base = await buildPokemonFromApi(id, 1, 50, false, 'pvp')
+      const levelUp = (base.rawLevelUpMoves ?? []).slice(0, 40)
+      const details = (await Promise.all(levelUp.map(m => getMoveDetails(m.url)))).filter((m): m is Move => m !== null)
+      const seen = new Set<string>()
+      const unique = details.filter(m => {
+        if (seen.has(m.name)) return false
+        seen.add(m.name)
+        return true
+      })
+      setPvpBuildMoves(unique)
+      setPvpBuildSelectedMoveNames(new Set(unique.filter(m => existingMoveNames.includes(m.name)).map(m => m.name)))
+    } catch {
+      setPvpBuildMoves([])
+    } finally {
+      setPvpBuildLoading(false)
+    }
+  }
+
+  function addPvpBuildPokemon(): void {
+    if (pvpBuildSelected === null) return
+    const existing = pvpBuildTeam.find(p => p.id === pvpBuildSelected)
+    if (existing) {
+      setPvpBuildTeam(prev => prev.map(p => p.id === pvpBuildSelected
+        ? { ...existing, moves: pvpBuildMoves.filter(m => pvpBuildSelectedMoveNames.has(m.name)) }
+        : p))
+      setPvpBuildSelected(null)
+      setPvpBuildMoves([])
+      setPvpBuildSelectedMoveNames(new Set())
+      return
+    }
+    if (pvpBuildTeam.length >= 6) return
+    void (async () => {
+      try {
+        const full = await buildPokemonFromApi(pvpBuildSelected, 1, 50, false, 'pvp')
+        const chosenMoves = pvpBuildMoves.filter(m => pvpBuildSelectedMoveNames.has(m.name))
+        const pokemon: Pokemon = {
+          ...full,
+          hp: full.maxHp,
+          moves: chosenMoves,
+        }
+        setPvpBuildTeam(prev => [...prev, pokemon])
+        setPvpBuildSelected(null)
+        setPvpBuildMoves([])
+        setPvpBuildSelectedMoveNames(new Set())
+      } catch {
+        setPvpError('No se pudo añadir el Pokémon.')
+      }
+    })()
+  }
+
+  function savePvpTeam(): void {
+    if (pvpBuildTeam.length === 0) {
+      setPvpError('Tu equipo PvP no puede estar vacío.')
+      return
+    }
+    const saved = pvpBuildTeam.map(p => serializePvpPokemon(p))
+    localStorage.setItem('pokerand_pvp_team', JSON.stringify(saved))
+    setPvpTeam(saved)
+    setShowPvpTeamBuilder(false)
+    playClick()
+  }
+
+  async function startPvpOnline(): Promise<void> {
+    if (!authUser) { openLeaderboard(); return }
+    if (!isPvpEnabled()) {
+      setPvpError('El PvP no está configurado: añade tus credenciales de Supabase en el .env y ejecuta schema.sql.')
+      return
+    }
+    if (pvpTeam.length === 0) {
+      setPvpError('Primero crea tu equipo con "Hacerse el equipo".')
+      return
+    }
+    setPvpError('')
+    setPvpSearching(true)
+    const result = await findPvpOpponent(pvpTeam)
+    if (!result) {
+      setPvpSearching(false)
+      setPvpError('Error al buscar oponente. Inténtalo de nuevo.')
+      return
+    }
+    if (result.joined) {
+      startPvpBattle(result, 'b')
+      return
+    }
+    setPvpMatchId(result.match_id)
+    setPvpRoomCode(result.code ?? '')
+    setPvpWaitingOpponent(true)
+  }
+
+  async function createPvpCustom(): Promise<void> {
+    if (!authUser) { openLeaderboard(); return }
+    if (!isPvpEnabled()) {
+      setPvpError('El PvP no está configurado: añade tus credenciales de Supabase en el .env y ejecuta schema.sql.')
+      return
+    }
+    if (pvpTeam.length === 0) {
+      setPvpError('Primero crea tu equipo con "Hacerse el equipo".')
+      return
+    }
+    setPvpError('')
+    const result = await createPvpRoom(pvpTeam)
+    if (!result) {
+      setPvpError('Error al crear la sala.')
+      return
+    }
+    setPvpRoomCode(result.code ?? '')
+    setPvpMatchId(result.match_id)
+    setPvpWaitingOpponent(true)
+  }
+
+  async function joinPvpCustom(): Promise<void> {
+    if (!authUser) { openLeaderboard(); return }
+    if (!isPvpEnabled()) {
+      setPvpError('El PvP no está configurado: añade tus credenciales de Supabase en el .env y ejecuta schema.sql.')
+      return
+    }
+    if (pvpTeam.length === 0) {
+      setPvpError('Primero crea tu equipo con "Hacerse el equipo".')
+      return
+    }
+    const code = pvpJoinCode.trim().toUpperCase()
+    if (code.length < 4) {
+      setPvpError('Introduce el código de la sala.')
+      return
+    }
+    setPvpError('')
+    const result = await joinPvpRoom(code, pvpTeam)
+    if (!result) {
+      setPvpError('No se pudo entrar a la sala. Comprueba el código.')
+      return
+    }
+    startPvpBattle(result, result.is_host ? 'a' : 'b')
+  }
+
+  function startPvpBattle(result: PvpRoomResult, role: 'a' | 'b'): void {
+    setPvpRole(role)
+    setPvpMatchId(result.match_id)
+    setPvpRoomCode(result.code ?? '')
+    setPvpSnapshot(null)
+    setPvpMyAction(null)
+    setPvpMyActionTurn(-1)
+    setPvpSearching(false)
+    setPvpWaitingOpponent(false)
+    setShowPvpModal(false)
+    setScreen('pvp')
+    startBattleMusic()
+  }
+
+  function cancelPvpWaiting(): void {
+    if (pvpMatchIdRef.current && pvpWaitingOpponent) {
+      void cancelPvpMatch(pvpMatchIdRef.current)
+    }
+    setPvpWaitingOpponent(false)
+    setPvpSearching(false)
+    setPvpRoomCode('')
+    setPvpMatchId(null)
+    setPvpError('')
+  }
+
+  async function pvpSubmitMove(index: number): Promise<void> {
+    if (!pvpMatchId || !pvpSnapshot || !pvpRole) return
+    const side = pvpSnapshot.state[pvpRole]
+    const active = side.team[side.active]
+    if (!active || index < 0 || index >= active.moves.length) return
+    playClick()
+    const snap = await submitPvpAction(pvpMatchId, { kind: 'move', index }, pvpSnapshot.turn)
+    if (snap) {
+      setPvpSnapshot(snap)
+      setPvpMyAction({ kind: 'move', index })
+      setPvpMyActionTurn(snap.turn)
+    } else {
+      setPvpError('No se pudo registrar el ataque. Espera al siguiente turno.')
+    }
+  }
+
+  async function pvpSubmitSwitch(index: number): Promise<void> {
+    if (!pvpMatchId || !pvpSnapshot || !pvpRole) return
+    const target = pvpSnapshot.state[pvpRole].team[index]
+    if (!target || target.hp <= 0) return
+    playClick()
+    const snap = await submitPvpAction(pvpMatchId, { kind: 'switch', index }, pvpSnapshot.turn)
+    if (snap) {
+      setPvpSnapshot(snap)
+      setPvpMyAction({ kind: 'switch', index })
+      setPvpMyActionTurn(snap.turn)
+    } else {
+      setPvpError('No se pudo cambiar de Pokémon.')
+    }
+  }
+
+  async function pvpForfeit(): Promise<void> {
+    if (pvpMatchId) void forfeitPvpMatch(pvpMatchId)
+    pvpLeave()
+  }
+
+  function pvpLeave(): void {
+    if (pvpLoopRef.current) {
+      clearInterval(pvpLoopRef.current)
+      pvpLoopRef.current = null
+    }
+    setPvpSnapshot(null)
+    setPvpMyAction(null)
+    setPvpMyActionTurn(-1)
+    setPvpMatchId(null)
+    setPvpRole(null)
+    setPvpRoomCode('')
+    setPvpSearching(false)
+    setPvpWaitingOpponent(false)
+    setPvpError('')
+    setShowPvpModal(false)
+    setScreen('setup')
+    startMenuMusic()
+  }
+
+  // Polling mientras se espera a que el rival entre en la sala (online/custom).
+  useEffect(() => {
+    if (!pvpWaitingOpponent || !pvpMatchId) return
+    const matchId = pvpMatchId
+    const isOnline = pvpSearchingRef.current
+    let cancelled = false
+    let retries = 0
+    const timer = setInterval(async () => {
+      if (cancelled) return
+      const match = await getPvpMatch(matchId)
+      if (!match) return
+      if (match.status === 'active') {
+        cancelled = true
+        clearInterval(timer)
+        setPvpWaitingOpponent(false)
+        setPvpSearching(false)
+        startPvpBattle(
+          { match_id: matchId, code: match.code, is_host: true, opponent_name: match.b_name, player_name: match.a_name },
+          'a'
+        )
+        return
+      }
+      // Online: si llevamos un rato esperando, puede que otro jugador haya
+      // creado una sala mientras tanto (dos búsquedas simultáneas). Reintenta.
+      if (isOnline && !cancelled) {
+        retries++
+        if (retries >= 3) {
+          retries = 0
+          void cancelPvpMatch(matchId)
+          const retry = await findPvpOpponent(pvpTeam)
+          if (cancelled) return
+          if (retry?.joined) {
+            cancelled = true
+            clearInterval(timer)
+            setPvpWaitingOpponent(false)
+            startPvpBattle(retry, 'b')
+          } else if (retry) {
+            cancelled = true
+            clearInterval(timer)
+            setPvpMatchId(retry.match_id)
+            setPvpRoomCode(retry.code ?? '')
+          }
+        }
+      }
+    }, 3000)
+    return () => { cancelled = true; clearInterval(timer) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pvpWaitingOpponent, pvpMatchId])
+
+  // Bucle principal del combate PvP: lee el estado compartido y, cuando ambos
+  // jugadores han enviado su acción, resuelve el turno localmente y lo guarda.
+  useEffect(() => {
+    if (screen !== 'pvp' || !pvpMatchId) return
+    const matchId = pvpMatchId
+    let cancelled = false
+
+    const tryResolve = async (snap: PvpTurnSnapshot): Promise<void> => {
+      if (pvpResolvingRef.current) return
+      pvpResolvingRef.current = true
+      try {
+        const { state: nextState, changed } = resolvePvpTurn(snap.state, snap.action_a, snap.action_b)
+        if (changed) {
+          const ok = await resolvePvpTurnRpc(matchId, nextState, snap.turn)
+          if (ok) {
+            if (nextState.phase === 'finished' && nextState.winner) {
+              void finishPvpMatch(matchId, nextState.winner)
+            }
+            const fresh = await getPvpState(matchId)
+            if (fresh && !cancelled) {
+              setPvpSnapshot(fresh)
+              setPvpMyAction(null)
+              setPvpMyActionTurn(-1)
+            }
+          }
+        }
+      } finally {
+        pvpResolvingRef.current = false
+      }
+    }
+
+    const poll = async (): Promise<void> => {
+      if (cancelled) return
+      const snap = await getPvpState(matchId)
+      if (!snap || cancelled) return
+      setPvpSnapshot(snap)
+      const st = snap.state
+      if (st.phase === 'picking' && snap.action_a && snap.action_b) {
+        await tryResolve(snap)
+      } else if (st.phase === 'switch') {
+        const sf = st.switchFor
+        const needA = sf === 'a' || sf === 'both'
+        const needB = sf === 'b' || sf === 'both'
+        const aOk = !needA || snap.action_a?.kind === 'switch'
+        const bOk = !needB || snap.action_b?.kind === 'switch'
+        if (aOk && bOk) await tryResolve(snap)
+      }
+    }
+
+    pvpLoopRef.current = setInterval(() => { void poll() }, 2500)
+    void poll()
+    return () => {
+      cancelled = true
+      if (pvpLoopRef.current) {
+        clearInterval(pvpLoopRef.current)
+        pvpLoopRef.current = null
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, pvpMatchId])
 
   function offerLabel(ex: CoopExchange): string {
     const partner = coopMyRoleRef.current === 'a' ? ex.b_offer : ex.a_offer
@@ -5743,6 +6132,10 @@ function MainApp() {
   }
 
   function onRestartRun(): void {
+    if (screen === 'pvp') {
+      void pvpForfeit()
+      return
+    }
     if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'trade') {
       if (coopModeRef.current && coopSessionCodeRef.current) {
         void finishCoopSession(coopSessionCodeRef.current, 'lost')
@@ -6688,6 +7081,205 @@ function MainApp() {
         </div>
       )}
 
+      {screen === 'pvp' && (() => {
+        if (!pvpSnapshot || !pvpRole) {
+          return (
+            <section className="panel setup-panel" style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
+              <h2 style={{ margin: '0 0 1rem', color: '#cba3ff' }}>⚔️ PvP 1vs1</h2>
+              <p style={{ color: '#9b98cf' }}>Cargando combate...</p>
+              <button className="tiny-btn" type="button" onClick={pvpLeave} style={{ color: '#ff8a80', marginTop: '1rem' }}>✕ Abandonar</button>
+            </section>
+          )
+        }
+
+        const st = pvpSnapshot.state
+        const myRole = pvpRole
+        const oppRole = myRole === 'a' ? 'b' : 'a'
+        const my = st[myRole]
+        const opp = st[oppRole]
+        const myActive = my.team[my.active]
+        const oppActive = opp.team[opp.active]
+        const iSubmitted = pvpMyAction !== null && pvpMyActionTurn === pvpSnapshot.turn
+        const canActPicking = st.phase === 'picking' && !iSubmitted
+        const mySwitchNeeded = st.phase === 'switch' && (st.switchFor === myRole || st.switchFor === 'both') && !iSubmitted
+
+        const hpBar = (p: Pokemon | undefined) => {
+          if (!p) return null
+          const pct = Math.max(0, Math.min(100, (p.hp / Math.max(1, p.maxHp)) * 100))
+          const color = pct > 50 ? '#37d16b' : pct > 20 ? '#ffcb05' : '#ee3b2f'
+          return (
+            <div style={{ width: '100%', height: '8px', borderRadius: '4px', background: 'rgba(0,0,0,0.5)', overflow: 'hidden' }}>
+              <div style={{ width: `${pct}%`, height: '100%', background: color }} />
+            </div>
+          )
+        }
+
+        const teamColumn = (side: 'a' | 'b') => {
+          const ps = st[side]
+          const isMine = side === myRole
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div style={{ fontSize: '0.75rem', color: '#cba3ff', fontWeight: 'bold', textAlign: 'center' }}>
+                {side === 'a' ? '🔵 Jugador A' : '🔴 Jugador B'} — {ps.username ?? '?'}
+              </div>
+              {ps.team.map((p, i) => {
+                const revealed = isMine || ps.revealed?.[i]
+                const isActive = ps.active === i
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      padding: '0.3rem 0.45rem',
+                      borderRadius: '6px',
+                      border: `1px solid ${isActive ? '#ffcb05' : '#3f3f6e'}`,
+                      background: isActive ? 'rgba(255,203,5,0.1)' : 'rgba(15,23,42,0.5)',
+                      minHeight: '38px'
+                    }}
+                  >
+                    {revealed ? (
+                      <>
+                        <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '32px', height: '32px', imageRendering: 'pixelated' }} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '0.72rem', color: '#f3f1ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                          <div style={{ fontSize: '0.65rem', color: p.hp <= 0 ? '#ee3b2f' : '#7d7ab5' }}>
+                            {p.hp <= 0 ? 'Debilitado' : `Nv.${p.level} · HP ${Math.max(0, p.hp)}/${p.maxHp}`}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ color: '#7d7ab5', fontSize: '0.75rem', width: '100%', textAlign: 'center' }}>❓ ???</div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        }
+
+        if (st.phase === 'finished') {
+          const iWon = st.winner === myRole
+          return (
+            <section className="panel setup-panel" style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
+              <h2 style={{ margin: '0 0 1rem', color: iWon ? '#ffcb05' : '#ee3b2f' }}>
+                {st.winner ? (iWon ? '🏆 ¡VICTORIA!' : '💀 DERROTA') : '🤝 EMPATE'}
+              </h2>
+              <p style={{ color: '#9b98cf', marginBottom: '1rem' }}>
+                {st.winner ? `${(st.winner === 'a' ? st.a.username : st.b.username) ?? 'El rival'} ha ganado el combate.` : 'Ambos equipos quedaron debilitados.'}
+              </p>
+              <div style={{ maxHeight: '220px', overflowY: 'auto', textAlign: 'left', marginBottom: '1rem', padding: '0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
+                {st.log.slice(-12).reverse().map((line, i) => (
+                  <p key={i} style={{ margin: '0 0 0.25rem', fontSize: '0.8rem', color: '#d9d6f2' }}>{line}</p>
+                ))}
+              </div>
+              <button className="cta" type="button" onClick={pvpLeave} style={{ width: '100%' }}>Volver al menú</button>
+            </section>
+          )
+        }
+
+        return (
+          <section className="panel setup-panel" style={{ maxWidth: '980px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h2 style={{ margin: 0, color: '#cba3ff' }}>⚔️ PvP 1vs1</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{ color: '#9b98cf', fontSize: '0.8rem' }}>Turno #{pvpSnapshot.turn + 1}</span>
+                <button className="tiny-btn" type="button" onClick={() => void pvpForfeit()} style={{ color: '#ff8a80' }}>🏳️ Rendirse</button>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr 1fr', gap: '1rem', alignItems: 'start' }}>
+              {/* Jugador A (izquierda) */}
+              {teamColumn('a')}
+
+              {/* Centro: combate */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <div style={{ flex: 1, textAlign: 'center' }}>
+                    <img src={myActive?.sprite} alt={myActive?.name} onError={fallbackSprite} style={{ width: '96px', height: '96px', imageRendering: 'pixelated' }} />
+                    <div style={{ fontSize: '0.8rem', color: '#f3f1ff', fontWeight: 'bold' }}>{myActive?.name}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>Nv.{myActive?.level}</div>
+                    {myActive?.status && <div style={{ fontSize: '0.7rem', color: '#fb923c' }}>{STATUS_LABELS[myActive.status.type]}</div>}
+                    {hpBar(myActive)}
+                  </div>
+                  <div style={{ fontSize: '1.5rem', color: '#ffcb05', fontWeight: 'bold' }}>VS</div>
+                  <div style={{ flex: 1, textAlign: 'center' }}>
+                    <img src={oppActive?.sprite} alt={oppActive?.name} onError={fallbackSprite} style={{ width: '96px', height: '96px', imageRendering: 'pixelated' }} />
+                    <div style={{ fontSize: '0.8rem', color: '#f3f1ff', fontWeight: 'bold' }}>{oppActive?.name}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>Nv.{oppActive?.level}</div>
+                    {oppActive?.status && <div style={{ fontSize: '0.7rem', color: '#fb923c' }}>{STATUS_LABELS[oppActive.status.type]}</div>}
+                    {hpBar(oppActive)}
+                  </div>
+                </div>
+
+                <div style={{ maxHeight: '180px', minHeight: '90px', overflowY: 'auto', padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid #3f3f6e' }}>
+                  {st.log.length === 0 ? (
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#7d7ab5' }}>Elige un ataque para comenzar.</p>
+                  ) : (
+                    st.log.slice(-10).reverse().map((line, i) => (
+                      <p key={i} style={{ margin: '0 0 0.25rem', fontSize: '0.78rem', color: '#d9d6f2' }}>{line}</p>
+                    ))
+                  )}
+                </div>
+
+                {st.phase === 'switch' && mySwitchNeeded && (
+                  <div style={{ padding: '0.6rem', borderRadius: '8px', background: 'rgba(168,85,247,0.1)', border: '1px solid #a855f7' }}>
+                    <strong style={{ color: '#cba3ff', fontSize: '0.85rem' }}>Elige el siguiente Pokémon:</strong>
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                      {my.team.map((p, i) => (
+                        p.hp > 0 && p.id !== myActive?.id ? (
+                          <button key={i} className="tiny-btn" type="button" onClick={() => void pvpSubmitSwitch(i)}>
+                            <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '32px', height: '32px', imageRendering: 'pixelated' }} />
+                            {p.name}
+                          </button>
+                        ) : null
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {st.phase === 'picking' && canActPicking && myActive && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                    {myActive.moves.map((m, i) => (
+                      <button
+                        key={i}
+                        className="move-btn"
+                        type="button"
+                        onClick={() => void pvpSubmitMove(i)}
+                        style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid #3f3f6e', background: 'rgba(15,23,42,0.6)', color: '#d9d6f2', cursor: 'pointer' }}
+                      >
+                        <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{m.name}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>{m.type.toUpperCase()} · PWR {m.power} · {m.accuracy}%</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {(st.phase === 'picking' && !canActPicking) && (
+                  <div style={{ textAlign: 'center', padding: '0.75rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                    <p style={{ margin: 0, color: '#37d16b', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                      {iSubmitted ? '⏳ Esperando al rival...' : 'El rival está eligiendo su ataque...'}
+                    </p>
+                  </div>
+                )}
+
+                {st.phase === 'switch' && !mySwitchNeeded && (
+                  <div style={{ textAlign: 'center', padding: '0.75rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                    <p style={{ margin: 0, color: '#37d16b', fontSize: '0.9rem', fontWeight: 'bold' }}>⏳ El rival elige su siguiente Pokémon...</p>
+                  </div>
+                )}
+
+                {pvpError && <p style={{ margin: 0, textAlign: 'center', color: '#ff8a80', fontSize: '0.8rem' }}>{pvpError}</p>}
+              </div>
+
+              {/* Jugador B (derecha) */}
+              {teamColumn('b')}
+            </div>
+          </section>
+        )
+      })()}
+
       {screen === 'coliseum_select' && (
         <section className="panel setup-panel" style={{ maxWidth: '600px', margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -7142,6 +7734,21 @@ function MainApp() {
               </div>
             )}
             {coopError && <p className="error-line" style={{ marginTop: '4px' }}>{coopError}</p>}
+          </div>
+
+          <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>⚔️ PvP 1vs1</h2>
+          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
+            <button
+              className="gen-tile"
+              type="button"
+              onClick={openPvpModal}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '12px', border: '1px solid #a855f7', background: 'rgba(168,85,247,0.1)', borderRadius: '12px', cursor: 'pointer' }}
+            >
+              <span style={{ fontSize: '1.2rem', color: '#cba3ff' }}>⚔️ Jugar 1vs1</span>
+              <strong style={{ fontSize: '0.85rem', color: '#9b98cf' }}>
+                Enfréntate a otro jugador con tu equipo ({pvpTeam.length}/6) {pvpTeam.length > 0 ? '— 🛠️ Hacerse el equipo' : '— crea tu equipo primero'}
+              </strong>
+            </button>
           </div>
 
           <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>3. Desafíos de Run <span className="muted" style={{ fontSize: '0.7rem', fontWeight: 'normal' }}>(opcional)</span></h2>
@@ -8773,9 +9380,221 @@ function MainApp() {
         </div>
       )}
 
+      {/* PvP 1vs1 Modal */}
+      {showPvpModal && (
+        <div className="modal-backdrop" onClick={() => setShowPvpModal(false)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px', maxHeight: '85vh', overflow: 'auto', padding: '1.5rem' }}>
+            <h2 style={{ color: '#cba3ff', textAlign: 'center', margin: '0 0 1rem' }}>⚔️ PvP 1vs1</h2>
+
+            {!authUser ? (
+              <div style={{ textAlign: 'center', padding: '1rem', background: 'rgba(15,23,42,0.5)', borderRadius: '8px', border: '1px solid #3f3f6e' }}>
+                <p style={{ color: '#9b98cf', marginBottom: '0.75rem' }}>Para jugar PvP necesitas iniciar sesión o crear una cuenta.</p>
+                <button className="cta" type="button" onClick={() => { setShowPvpModal(false); openLeaderboard() }} style={{ width: '100%' }}>
+                  Iniciar sesión / Crear cuenta
+                </button>
+              </div>
+            ) : !isPvpEnabled() ? (
+              <div style={{ textAlign: 'center', padding: '1.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px dashed #3f3f6e' }}>
+                <p style={{ color: '#9b98cf', fontSize: '0.9rem', marginBottom: '0.5rem' }}>⚙️ El PvP aún no está configurado.</p>
+                <p style={{ color: '#7d7ab5', fontSize: '0.8rem', margin: 0 }}>
+                  Copia <strong style={{ color: '#cba3ff' }}>.env.example</strong> a <strong style={{ color: '#cba3ff' }}>.env</strong>, rellena tus credenciales de Supabase y ejecuta el esquema de <strong style={{ color: '#cba3ff' }}>supabase/schema.sql</strong>.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: '1rem', padding: '0.75rem', borderRadius: '8px', background: 'rgba(15,23,42,0.5)', border: '1px solid #3f3f6e' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <strong style={{ color: '#f3f1ff', fontSize: '0.9rem' }}>Tu equipo ({pvpTeam.length}/6)</strong>
+                    <button className="tiny-btn" type="button" onClick={openPvpTeamBuilder}>🛠️ Hacerse el equipo</button>
+                  </div>
+                  {pvpTeam.length === 0 ? (
+                    <p style={{ margin: 0, color: '#7d7ab5', fontSize: '0.8rem' }}>Aún no tienes equipo. Crea uno con los Pokémon que has capturado y elige 4 ataques por cada uno.</p>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
+                      {pvpTeam.map((p, i) => (
+                        <img key={i} src={p.sprite} alt={p.name} title={p.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {pvpWaitingOpponent ? (
+                  <div style={{ textAlign: 'center', padding: '1.5rem', background: 'rgba(168,85,247,0.08)', borderRadius: '8px', border: '1px solid #a855f7' }}>
+                    <p style={{ color: '#cba3ff', fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                      {pvpSearching ? '🔍 Buscando Oponente...' : '⏳ Esperando al rival...'}
+                    </p>
+                    {pvpRoomCode && (
+                      <p style={{ color: '#ffcb05', fontSize: '1.2rem', fontWeight: 'bold', letterSpacing: '0.2em', marginBottom: '0.5rem' }}>
+                        CÓDIGO: {pvpRoomCode}
+                      </p>
+                    )}
+                    <button className="tiny-btn" type="button" onClick={cancelPvpWaiting} style={{ color: '#ff8a80' }}>✕ Cancelar</button>
+                  </div>
+                ) : (
+                  <>
+                    <button className="cta" type="button" style={{ width: '100%', marginBottom: '0.75rem' }} onClick={() => void startPvpOnline()}>
+                      🎮 Jugar Online
+                    </button>
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button className="cta" type="button" style={{ flex: 1, background: '#7d7ab5' }} onClick={() => void createPvpCustom()}>
+                        🏟️ Crear sala
+                      </button>
+                      <input
+                        value={pvpJoinCode}
+                        onChange={(e) => setPvpJoinCode(e.target.value.toUpperCase())}
+                        maxLength={6}
+                        placeholder="CÓDIGO"
+                        style={{ width: '110px', textAlign: 'center', letterSpacing: '0.15em', padding: '8px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
+                      />
+                      <button className="cta" type="button" style={{ flex: 1, background: '#7d7ab5' }} onClick={() => void joinPvpCustom()}>
+                        🔑 Entrar
+                      </button>
+                    </div>
+                    <p style={{ textAlign: 'center', color: '#7d7ab5', fontSize: '0.75rem', marginTop: '0.5rem' }}>
+                      El jugador A crea la sala y comparte el código; el jugador B entra con él.
+                    </p>
+                  </>
+                )}
+
+                {pvpError && <p style={{ textAlign: 'center', color: '#ff8a80', fontSize: '0.85rem', marginTop: '0.5rem' }}>{pvpError}</p>}
+              </>
+            )}
+
+            <button className="cta" type="button" onClick={() => setShowPvpModal(false)} style={{ marginTop: '1rem', background: '#7d7ab5', width: '100%' }}>Cerrar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Constructor de equipo PvP */}
+      {showPvpTeamBuilder && (
+        <div className="modal-backdrop" onClick={() => setShowPvpTeamBuilder(false)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '780px', maxHeight: '88vh', overflow: 'auto', padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h2 style={{ margin: 0, color: '#ffcb05' }}>🛠️ Tu equipo PvP</h2>
+              <button className="tiny-btn" type="button" onClick={() => setShowPvpTeamBuilder(false)} style={{ color: '#ff8a80' }}>✕ Cerrar</button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem', padding: '0.6rem', background: 'rgba(15,23,42,0.5)', borderRadius: '8px', border: '1px solid #3f3f6e' }}>
+              {Array.from({ length: 6 }).map((_, i) => {
+                const p = pvpBuildTeam[i]
+                return (
+                  <div key={i} style={{ position: 'relative', width: '56px', height: '56px', borderRadius: '8px', border: p ? '1px solid #a855f7' : '1px dashed #3f3f6e', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.3)' }}>
+                    {p ? (
+                      <>
+                        <img src={p.sprite} alt={p.name} title={p.name} onError={fallbackSprite} style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPvpBuildTeam(prev => prev.filter((_, x) => x !== i))
+                            if (pvpBuildSelected === p.id) {
+                              setPvpBuildSelected(null)
+                              setPvpBuildMoves([])
+                              setPvpBuildSelectedMoveNames(new Set())
+                            }
+                          }}
+                          style={{ position: 'absolute', top: '-6px', right: '-6px', width: '18px', height: '18px', borderRadius: '50%', background: '#ee3b2f', color: '#fff', border: 'none', fontSize: '10px', lineHeight: '18px', cursor: 'pointer', padding: 0 }}
+                        >✕</button>
+                      </>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
+              <input type="text" placeholder="🔍 Buscar Pokémon..." value={pvpBuildSearch} onChange={e => setPvpBuildSearch(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto', marginBottom: '1rem' }}>
+              {Object.values(pokedex).filter(p => p.caught).filter(p => {
+                const term = pvpBuildSearch.toLowerCase().trim()
+                return !term || p.name.toLowerCase().includes(term) || String(p.id).includes(term)
+              }).sort((a, b) => a.id - b.id).map(pkmn => {
+                const inTeam = pvpBuildTeam.some(p => p.id === pkmn.id)
+                const isSelected = pvpBuildSelected === pkmn.id
+                return (
+                  <div
+                    key={pkmn.id}
+                    onClick={() => {
+                      if (!inTeam && pvpBuildTeam.length >= 6) return
+                      if (isSelected) {
+                        setPvpBuildSelected(null)
+                        setPvpBuildMoves([])
+                        setPvpBuildSelectedMoveNames(new Set())
+                      } else {
+                        void loadPvpBuildMoves(pkmn.id, inTeam ? (pvpBuildTeam.find(p => p.id === pkmn.id)?.moves.map(m => m.name) ?? []) : [])
+                      }
+                    }}
+                    style={{ border: `1px solid ${isSelected ? '#a855f7' : inTeam ? '#37d16b' : '#3f3f6e'}`, borderRadius: '8px', padding: '6px', textAlign: 'center', cursor: 'pointer', background: isSelected ? 'rgba(168,85,247,0.15)' : 'rgba(15,23,42,0.5)' }}
+                  >
+                    <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} />
+                    <div style={{ fontSize: '0.7rem', color: '#f3f1ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pkmn.name}</div>
+                    {inTeam && <div style={{ fontSize: '0.65rem', color: '#37d16b' }}>✓ En equipo</div>}
+                  </div>
+                )
+              })}
+            </div>
+
+            {pvpBuildSelected !== null && (
+              <div style={{ padding: '0.75rem', borderRadius: '8px', background: 'rgba(15,23,42,0.6)', border: '1px solid #a855f7', marginBottom: '1rem' }}>
+                <strong style={{ color: '#cba3ff', fontSize: '0.9rem' }}>Elige 4 ataques</strong>
+                <p style={{ color: '#7d7ab5', fontSize: '0.75rem', margin: '0.25rem 0 0.5rem' }}>
+                  Ataques: {pvpBuildSelectedMoveNames.size}/4 — elige entre los ataques {pvpBuildLoading ? 'cargando...' : pvpBuildMoves.length > 0 ? `que puede aprender (${pvpBuildMoves.length} disponibles)` : 'disponibles'}
+                </p>
+                {pvpBuildLoading ? (
+                  <p style={{ color: '#9b98cf', fontSize: '0.85rem' }}>Cargando ataques...</p>
+                ) : pvpBuildMoves.length === 0 ? (
+                  <p style={{ color: '#9b98cf', fontSize: '0.85rem' }}>Este Pokémon no tiene ataques de daño que aprender.</p>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.35rem', maxHeight: '200px', overflowY: 'auto' }}>
+                    {pvpBuildMoves.map((m) => {
+                      const selected = pvpBuildSelectedMoveNames.has(m.name)
+                      const disabled = !selected && pvpBuildSelectedMoveNames.size >= 4
+                      return (
+                        <div
+                          key={m.name}
+                          onClick={() => {
+                            if (selected) {
+                              const next = new Set(pvpBuildSelectedMoveNames)
+                              next.delete(m.name)
+                              setPvpBuildSelectedMoveNames(next)
+                            } else if (pvpBuildSelectedMoveNames.size < 4) {
+                              const next = new Set(pvpBuildSelectedMoveNames)
+                              next.add(m.name)
+                              setPvpBuildSelectedMoveNames(next)
+                            }
+                          }}
+                          style={{ border: `1px solid ${selected ? '#a855f7' : '#3f3f6e'}`, borderRadius: '6px', padding: '5px 8px', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, background: selected ? 'rgba(168,85,247,0.15)' : 'rgba(0,0,0,0.25)' }}
+                        >
+                          <span style={{ color: selected ? '#cba3ff' : '#d9d6f2', fontSize: '0.8rem' }}>{m.name}</span>
+                          <span style={{ color: '#7d7ab5', fontSize: '0.7rem', display: 'block' }}>PWR {m.power}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
+                  <button className="cta" type="button" disabled={pvpBuildSelectedMoveNames.size === 0 || pvpBuildLoading} onClick={addPvpBuildPokemon} style={{ fontSize: '0.85rem', padding: '6px 14px', marginTop: 0 }}>
+                    ➕ Añadir al equipo
+                  </button>
+                  <button className="tiny-btn" type="button" onClick={() => { setPvpBuildSelected(null); setPvpBuildMoves([]); setPvpBuildSelectedMoveNames(new Set()) }}>Cancelar</button>
+                </div>
+              </div>
+            )}
+
+            <button className="cta" type="button" onClick={savePvpTeam} disabled={pvpBuildTeam.length === 0} style={{ width: '100%', background: '#37d16b' }}>
+              💾 Guardar equipo ({pvpBuildTeam.length}/6)
+            </button>
+            {pvpError && <p style={{ textAlign: 'center', color: '#ff8a80', fontSize: '0.85rem', marginTop: '0.5rem' }}>{pvpError}</p>}
+          </div>
+        </div>
+      )}
+
       {/* Leaderboard Modal */}
       {showLeaderboard && (
-        <div className="modal-backdrop" onClick={() => setShowLeaderboard(false)}>
+          <div className="modal-backdrop" onClick={() => setShowLeaderboard(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
             <h2 style={{ color: '#cba3ff', textAlign: 'center', margin: '0 0 0.5rem' }}>🌍 Ranking Mundial — ♾️ Infinite</h2>
             <p style={{ textAlign: 'center', color: '#9b98cf', fontSize: '0.85rem', marginBottom: '1rem' }}>
