@@ -2783,7 +2783,11 @@ function MainApp() {
 
     // --- Gate de ritmo cooperativo: esperar a que el compañero complete el nodo ---
     if (coopModeRef.current && coopSessionCodeRef.current && currentNode) {
-      const gateResult = await waitForCoopPartner(routeIndex)
+      // Usamos currentNode.id (único en toda la run) y no routeIndex: el índice
+      // se reinicia a 0 en cada etapa, y coop_progress está indexado por nodo,
+      // por lo que con índices los jefes de etapas distintas colisionaban y el
+      // gate creía que el compañero ya había terminado.
+      const gateResult = await waitForCoopPartner(currentNode.id)
       if (gateResult === 'won' || gateResult === 'lost') {
         handleCoopSessionEnded(gateResult)
         return
@@ -9125,7 +9129,7 @@ function MainApp() {
             <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🤝</div>
             <h3 style={{ color: '#37d16b', margin: '0 0 0.5rem' }}>Esperando a tu compañero...</h3>
             <p style={{ color: '#9b98cf', margin: '0 0 1rem', fontSize: '0.9rem' }}>
-              Completaste el nodo {coopWaitingNode + 1}. Tu compañero aún no termina su parte.
+              Completaste el nodo {coopWaitingNode}. Tu compañero aún no termina su parte.
             </p>
             <div className="spin-anim" style={{ fontSize: '1.5rem', marginBottom: '0.75rem' }}>⏳</div>
             <p style={{ color: '#7d7ab5', fontSize: '0.75rem' }}>Ambos deben completar cada nodo para avanzar.</p>
