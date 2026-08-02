@@ -192,4 +192,7 @@ export interface MetaProgression {
   activeBattleMusic: string
   totalMegas: number
   totalGmax: number
+  coopRuns: number
+  coopWins: number
+  coopTrades: number
 }

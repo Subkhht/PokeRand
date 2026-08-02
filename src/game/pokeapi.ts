@@ -786,14 +786,16 @@ export async function getBalancedPokemonByGeneration(
     }
   }
 
+  // Formas regionales (Alola/Galar/Hisui/Paldea) como antes, pero respetando
+  // su nivel mínimo de aparición (no formas evolucionadas por piedra a niveles bajos).
   if (Math.random() < 0.02) {
     const formIds = await getAllFormIds()
     if (formIds.length > 0) {
       const randomId = formIds[Math.floor(Math.random() * formIds.length)]
-      return applyHardHeldItem(
-        await buildPokemonFromApi(randomId, generation, scaledLevel, shiny, difficulty),
-        difficulty, isBoss
-      )
+      const form = await buildPokemonFromApi(randomId, generation, scaledLevel, shiny, difficulty)
+      if (!(form.minAppearLevel && scaledLevel < form.minAppearLevel)) {
+        return applyHardHeldItem(form, difficulty, isBoss)
+      }
     }
   }
 

@@ -702,6 +702,14 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: 'first_gmax', name: 'Gigamax', desc: 'Gigamaxima un Pokémon por primera vez', icon: '⚡', hidden: false },
   { id: 'gmax_win', name: 'Poder Gigamax', desc: 'Gana una partida usando Gigamax', icon: '⚡', hidden: false },
   { id: 'gmax_master', name: 'Maestro Gigamax', desc: 'Gigamaxima 10 Pokémon en total', icon: '🌟', hidden: false },
+  { id: 'coop_first_run', name: 'Compañero de Viaje', desc: 'Juega tu primera partida en cooperativo', icon: '🤝', hidden: false },
+  { id: 'coop_win', name: 'Victoria Compartida', desc: 'Gana una partida en cooperativo', icon: '🏆', hidden: false },
+  { id: 'coop_wins_5', name: 'Equipo Confiable', desc: 'Gana 5 partidas cooperativas', icon: '🫱🏻‍🫲🏽', hidden: false },
+  { id: 'coop_wins_10', name: 'Equipo Legendario', desc: 'Gana 10 partidas cooperativas', icon: '👥', hidden: false },
+  { id: 'coop_first_trade', name: 'Primer Trueque', desc: 'Completa tu primer intercambio en cooperativo', icon: '🔄', hidden: false },
+  { id: 'coop_trades_5', name: 'Trueques Frecuentes', desc: 'Completa 5 intercambios en total', icon: '🤝', hidden: false },
+  { id: 'coop_trades_10', name: 'Mercader Cooperativo', desc: 'Completa 10 intercambios en total', icon: '💼', hidden: false },
+  { id: 'coop_hard_win', name: 'Dúo Imparable', desc: 'Gana una partida cooperativa en dificultad Difícil', icon: '⚡', hidden: false },
 ]
 
 const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (pokemon: Pokemon) => Partial<Pokemon> }> = [
@@ -1067,6 +1075,36 @@ function nodeTypeLabel(node: RouteNode): string {
     default:
       return node.type
   }
+}
+
+// Genera un tramo de ruta cooperativa (nodos + jefe final) con nodos de
+// intercambio en posiciones proporcionales. Usa el RNG con semilla para que
+// ambos jugadores generen exactamente el mismo tramo.
+function generateCoopRouteSegment(startId: number, totalNodes: number, rr: () => number, challenges: RunChallenges): RouteNode[] {
+  const segment: RouteNode[] = []
+  const tradePos1 = Math.max(1, Math.floor(totalNodes / 3))
+  const tradePos2 = Math.max(2, Math.floor((totalNodes * 2) / 3))
+  for (let i = 1; i < totalNodes; i++) {
+    const id = startId + i - 1
+    let type: RouteNode['type'] = 'battle'
+    if (i === tradePos1 || i === tradePos2) {
+      type = 'trade'
+    } else {
+      const r = rr()
+      if (r < 0.18 && !challenges.noShops) {
+        type = 'shop'
+      } else if (r < 0.36 && !challenges.noRests) {
+        type = 'rest'
+      } else if (r < 0.50) {
+        type = 'teamRocket'
+      } else if (r < 0.62) {
+        type = 'spin'
+      }
+    }
+    segment.push({ id, type, label: `${nodeTypeLabel({ id, type, label: '', done: false })} #${id}`, done: false })
+  }
+  segment.push({ id: startId + totalNodes - 1, type: 'boss', label: `Combate Final (#${startId + totalNodes - 1})`, done: false })
+  return segment
 }
 
 const NODE_EMOJIS: Record<string, string> = {
@@ -1469,7 +1507,7 @@ function MainApp() {
         return data
       }
     } catch {}
-    return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark', ownedMusic: [], activeMenuMusic: 'default', activeBattleMusic: 'default', totalMegas: 0, totalGmax: 0 }
+    return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark', ownedMusic: [], activeMenuMusic: 'default', activeBattleMusic: 'default', totalMegas: 0, totalGmax: 0, coopRuns: 0, coopWins: 0, coopTrades: 0 }
   })
   const [showAchievements, setShowAchievements] = useState<boolean>(false)
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null)
@@ -1951,6 +1989,16 @@ function MainApp() {
   }, [metaProgression.totalGmax])
 
   useEffect(() => {
+    if (metaProgression.coopWins >= 5) unlockAchievement('coop_wins_5')
+    if (metaProgression.coopWins >= 10) unlockAchievement('coop_wins_10')
+  }, [metaProgression.coopWins])
+
+  useEffect(() => {
+    if (metaProgression.coopTrades >= 5) unlockAchievement('coop_trades_5')
+    if (metaProgression.coopTrades >= 10) unlockAchievement('coop_trades_10')
+  }, [metaProgression.coopTrades])
+
+  useEffect(() => {
     if (winStreak >= 3) unlockAchievement('streak_3')
     if (winStreak >= 5) unlockAchievement('streak_5')
     if (winStreak >= 10) unlockAchievement('streak_10')
@@ -2316,27 +2364,7 @@ function MainApp() {
         // Ruta compartida: misma forma para ambos jugadores (misma semilla).
         // Los encuentros, tiendas y descansos siguen siendo aleatorios por jugador.
         const coopNodes = difficultyNodeCounts[coopDiffRef.current || 'medium'] || 10
-        const tradePos1 = Math.max(1, Math.floor(coopNodes / 3))
-        const tradePos2 = Math.max(2, Math.floor((coopNodes * 2) / 3))
-        for (let i = 1; i < coopNodes; i++) {
-          let type: RouteNode['type'] = 'battle'
-          if (i === tradePos1 || i === tradePos2) {
-            type = 'trade'
-          } else {
-            const r = rr()
-            if (r < 0.18 && !activeChallenges.noShops) {
-              type = 'shop'
-            } else if (r < 0.36 && !activeChallenges.noRests) {
-              type = 'rest'
-            } else if (r < 0.50) {
-              type = 'teamRocket'
-            } else if (r < 0.62) {
-              type = 'spin'
-            }
-          }
-          customRoute.push({ id: i, type, label: `${nodeTypeLabel({ id: i, type, label: '', done: false })} #${i}`, done: false })
-        }
-        customRoute.push({ id: coopNodes, type: 'boss', label: `Combate Final (#${coopNodes})`, done: false })
+        customRoute = generateCoopRouteSegment(1, coopNodes, rr, activeChallenges)
       } else if (activeChallenges.bossRush) {
         customRoute = generateBossRushRoute(totalNodes)
       } else if (effectiveDifficulty === 'infinite') {
@@ -2540,6 +2568,16 @@ function MainApp() {
       setShowEndRunModal(false)
       setScreen('route')
       startBattleMusic()
+
+      // Logros cooperativos: primera run / contador de runs
+      if (coopModeRef.current) {
+        setMetaProgression(prev => {
+          const updated = { ...prev, coopRuns: prev.coopRuns + 1 }
+          localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+          return updated
+        })
+        unlockAchievement('coop_first_run')
+      }
     } catch {
       setApiError('No se pudo cargar PokeAPI. Reintenta en unos segundos.')
     } finally {
@@ -2609,6 +2647,17 @@ function MainApp() {
 
     if (difficulty === 'medium') unlockAchievement('medium_win')
     if (metaProgression.totalWins === 0) unlockAchievement('first_try')
+
+    // Logros cooperativos: victoria compartida
+    if (coopModeRef.current) {
+      setMetaProgression(prev => {
+        const updated = { ...prev, coopWins: prev.coopWins + 1 }
+        localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+        return updated
+      })
+      unlockAchievement('coop_win')
+      if (coopDiffRef.current === 'hard') unlockAchievement('coop_hard_win')
+    }
 
     if (runChallenges.noShops) unlockAchievement('noShops_win')
     if (runChallenges.noRests) unlockAchievement('noRests_win')
@@ -2725,12 +2774,6 @@ function MainApp() {
         return
       }
 
-      // Cooperativo: sin insignias ni etapas, victoria directa.
-      if (coopModeRef.current) {
-        finalizeRunVictory()
-        return
-      }
-
       // Sistema de insignias: al derrotar un jefe, obtienes una insignia
       if (currentNode?.type === 'boss' && currentNode.id < 1000) {
         const availableBadges = GYM_BADGES.filter(b => !badges.some(h => h.id === b.id))
@@ -2740,25 +2783,37 @@ function MainApp() {
           setBadges(updatedBadges)
           setCurrentStage(updatedBadges.length + 1)
           setBattleLog((prev) => [`🏅 ¡Obtuviste la ${newBadge.name}! (${updatedBadges.length}/3)`, ...prev].slice(0, 15))
-          const stageCoins = Math.floor((difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15) / 2)
+          const diffForCoins = coopModeRef.current ? (coopDiffRef.current || 'medium') : difficulty
+          const stageCoins = Math.floor((diffForCoins === 'easy' ? 10 : diffForCoins === 'hard' ? 20 : 15) / 2)
           awardPokeCoins(stageCoins, `🏅 Bonus por completar la etapa ${updatedBadges.length} de 3`)
         }
         if (badges.length < 2) {
           // Generar nueva ruta para la siguiente etapa
-          const totalNodesPerStage = difficultyNodeCounts[difficulty]
-          const newRoute: RouteNode[] = []
+          const totalNodesPerStage = coopModeRef.current
+            ? (difficultyNodeCounts[coopDiffRef.current || 'medium'] || 10)
+            : difficultyNodeCounts[difficulty]
           const startId = route.length + 1
-          for (let i = 0; i < totalNodesPerStage - 1; i++) {
-            newRoute.push(generateRandomNodeType(startId + i, routeRandRef.current))
-          }
-          const finalNodeId = startId + totalNodesPerStage - 1
-          newRoute.push({ id: finalNodeId, label: `Jefe #${finalNodeId}`, type: 'boss', done: false })
+          const newRoute = coopModeRef.current
+            ? generateCoopRouteSegment(startId, totalNodesPerStage, routeRandRef.current, runChallenges)
+            : (() => {
+                const nr: RouteNode[] = []
+                for (let i = 0; i < totalNodesPerStage - 1; i++) {
+                  nr.push(generateRandomNodeType(startId + i, routeRandRef.current))
+                }
+                nr.push({ id: startId + totalNodesPerStage - 1, label: `Jefe #${startId + totalNodesPerStage - 1}`, type: 'boss', done: false })
+                return nr
+              })()
           setRoute(newRoute)
           setRouteIndex(0)
           setScreen('route')
           return
         }
-        // badges.length >= 2 → 3ª insignia ya entregada → ofrecer liga
+        // badges.length >= 2 → 3ª insignia ya entregada
+        if (coopModeRef.current) {
+          // Cooperativo: sin liga, victoria directa
+          finalizeRunVictory()
+          return
+        }
         if ((difficulty === 'easy' || difficulty === 'medium' || difficulty === 'hard') && currentNode && currentNode.id < 1000) {
           setLeagueOffer(true)
           return
@@ -3069,6 +3124,13 @@ function MainApp() {
 
   function applyOfferToLocal(offer: CoopTrade['offer']): void {
     if (!offer) return
+    // Logros cooperativos: intercambios completados
+    setMetaProgression(prev => {
+      const updated = { ...prev, coopTrades: prev.coopTrades + 1 }
+      localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+      return updated
+    })
+    unlockAchievement('coop_first_trade')
     if (offer.kind === 'pokemon') {
       const rebuilt = rebuildPokemonFromOffer(offer)
       if (teamRef.current.length < maxTeamSize) {
@@ -8245,7 +8307,11 @@ function MainApp() {
       {screen === 'victory' && (
         <section className="panel end-panel">
           <h2>¡Victoria!</h2>
-          <p>Has completado la ruta ({coopMode ? (difficultyNodeCounts[coopDiff] || 10) : difficultyNodeCounts[difficulty]} nodos) y derrotado al jefe final.</p>
+          <p>
+            {coopMode
+              ? `Has completado las 3 etapas cooperativas (${difficultyNodeCounts[coopDiff] || 10} rutas/etapa) y derrotado al jefe final.`
+              : `Has completado la ruta (${difficultyNodeCounts[difficulty]} nodos) y derrotado al jefe final.`}
+          </p>
 
           {victoryUnlocks && (
             <div
