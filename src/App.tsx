@@ -1550,6 +1550,7 @@ function MainApp() {
   const [coopMyOfferSubmitted, setCoopMyOfferSubmitted] = useState<boolean>(false)
   const coopSubmittedOfferRef = useRef<CoopTrade['offer'] | null>(null)
   const coopExchangeAppliedRef = useRef(false)
+  const coopSelectedPokemonRef = useRef<Pokemon | null>(null)
   const [coopExchange, setCoopExchange] = useState<CoopExchange | null>(null)
   const [coopTradeMsg, setCoopTradeMsg] = useState<string>('')
   const [coopError, setCoopError] = useState<string>('')
@@ -3563,6 +3564,9 @@ function MainApp() {
       setCoopTradeMsg('No puedes intercambiar a tu único Pokémon.')
       return
     }
+    // Guardamos la instancia exacta (no su id de especie) para retirar del
+    // equipo el Pokémon correcto aunque haya varios de la misma especie.
+    coopSelectedPokemonRef.current = p
     setCoopMyOffer(buildOfferFromPokemon(p))
     setCoopTradeMsg(`Seleccionaste a ${p.name} como oferta. Pulsa "Intercambiar".`)
   }
@@ -3583,12 +3587,17 @@ function MainApp() {
     coopSubmittedOfferRef.current = coopMyOffer
     // Retira la oferta de tu lado: ya está comprometida en el intercambio.
     if (coopMyOffer.kind === 'pokemon') {
-      const id = coopMyOffer.id
+      const target = coopSelectedPokemonRef.current
       setTeam(prev => {
-        const idx = prev.findIndex(p => p.id === id)
+        if (target) {
+          return prev.filter(p => p !== target)
+        }
+        // Fallback (no debería pasar): eliminar por id de especie.
+        const idx = prev.findIndex(p => p.id === coopMyOffer.id)
         if (idx === -1) return prev
         return prev.filter((_, i) => i !== idx)
       })
+      coopSelectedPokemonRef.current = null
     } else {
       const itemName = coopMyOffer.itemName!
       setInventory(prev => {
@@ -3610,34 +3619,50 @@ function MainApp() {
     let completed = coopExchange?.completed ?? false
     if (code && coopMyOfferSubmitted && !completed) {
       const ex = await getCoopExchange(code, routeIndex)
-      if (ex) {
-        completed = ex.completed
-        if (ex.completed && !coopExchangeAppliedRef.current) {
+      if (ex) completed = ex.completed
+    }
+    // Si el intercambio ya se completó, aplicar la oferta del compañero una
+    // sola vez (la guarda se re-comprueba tras el await para que el polling y
+    // este flujo no la apliquen dos veces).
+    if (code && coopMyOfferSubmitted && completed && !coopExchangeAppliedRef.current) {
+      const partnerOffer = await completeCoopExchange(code, routeIndex)
+      if (partnerOffer && partnerOffer.kind && !coopExchangeAppliedRef.current) {
+        coopExchangeAppliedRef.current = true
+        applyOfferToLocal(partnerOffer)
+      }
+    }
+    // Si NO se completó, devolver la oferta SOLO si la cancelación en la base
+    // de datos tiene éxito (si falla, el intercambio se completó justo ahora y
+    // la oferta ya está comprometida: no hay que devolverla para no duplicar).
+    if (coopMyOfferSubmitted && !completed && coopSubmittedOfferRef.current) {
+      const offer = coopSubmittedOfferRef.current
+      const cancelled = code ? await cancelExchangeOffer(code, routeIndex) : false
+      if (cancelled) {
+        if (offer.kind === 'pokemon') {
+          const rebuilt = rebuildPokemonFromOffer(offer)
+          if (teamRef.current.length < maxTeamSize) {
+            setTeam(prev => [...prev, rebuilt])
+          } else {
+            setPcStorage(prev => [...prev, rebuilt])
+          }
+          setCoopTradeMsg(`↩️ El intercambio no se completó. ${rebuilt.name} volvió a tu equipo.`)
+        } else {
+          setInventory(prev => [...prev, offer.itemName ?? 'Potion'])
+          setCoopTradeMsg(`↩️ El intercambio no se completó. ${offer.itemName ?? 'el objeto'} volvió a tu inventario.`)
+        }
+        coopSubmittedOfferRef.current = null
+      } else {
+        // El intercambio se completó mientras tanto: aplicar la oferta del compañero.
+        if (code && !coopExchangeAppliedRef.current) {
           const partnerOffer = await completeCoopExchange(code, routeIndex)
-          if (partnerOffer && partnerOffer.kind) {
+          if (partnerOffer && partnerOffer.kind && !coopExchangeAppliedRef.current) {
             coopExchangeAppliedRef.current = true
             applyOfferToLocal(partnerOffer)
           }
         }
       }
     }
-    if (coopMyOfferSubmitted && !completed && coopSubmittedOfferRef.current) {
-      const offer = coopSubmittedOfferRef.current
-      if (code) await cancelExchangeOffer(code, routeIndex)
-      if (offer.kind === 'pokemon') {
-        const rebuilt = rebuildPokemonFromOffer(offer)
-        if (teamRef.current.length < maxTeamSize) {
-          setTeam(prev => [...prev, rebuilt])
-        } else {
-          setPcStorage(prev => [...prev, rebuilt])
-        }
-        setCoopTradeMsg(`↩️ El intercambio no se completó. ${rebuilt.name} volvió a tu equipo.`)
-      } else {
-        setInventory(prev => [...prev, offer.itemName ?? 'Potion'])
-        setCoopTradeMsg(`↩️ El intercambio no se completó. ${offer.itemName ?? 'el objeto'} volvió a tu inventario.`)
-      }
-      coopSubmittedOfferRef.current = null
-    }
+    coopSelectedPokemonRef.current = null
     coopSubmittedOfferRef.current = null
     await completeCurrentNode()
   }
@@ -3651,13 +3676,16 @@ function MainApp() {
     const poll = async () => {
       if (cancelled) return
       const ex = await getCoopExchange(code, routeIndex)
-      if (!ex) return
+      if (cancelled || !ex) return
       setCoopExchange(ex)
       // Ambos jugadores listos → completar el intercambio. complete_exchange es
-      // idempotente: cada jugador recibe la oferta del otro una sola vez.
+      // idempotente: cada jugador recibe la oferta del otro una sola vez. La
+      // guarda se re-comprueba tras el await para que dos polls solapados (o un
+      // poll y leaveTradeNode) no apliquen la oferta dos veces.
       if (ex.a_ready && ex.b_ready && !coopExchangeAppliedRef.current) {
         const partnerOffer = await completeCoopExchange(code, routeIndex)
-        if (partnerOffer && partnerOffer.kind) {
+        if (cancelled) return
+        if (partnerOffer && partnerOffer.kind && !coopExchangeAppliedRef.current) {
           coopExchangeAppliedRef.current = true
           applyOfferToLocal(partnerOffer)
         }
@@ -3680,7 +3708,22 @@ function MainApp() {
         setCoopTradeMsg('El intercambio ya se completó, no se puede cancelar.')
         return
       }
-      await cancelExchangeOffer(code, routeIndex)
+      // Re-consultamos el estado en la base de datos: el compañero pudo haber
+      // completado el intercambio mientras tanto (el estado local puede estar
+      // desactualizado hasta 2.5s).
+      const ex = await getCoopExchange(code, routeIndex)
+      if (ex && (ex.completed || coopExchangeAppliedRef.current)) {
+        setCoopTradeMsg('El intercambio ya se completó, no se puede cancelar.')
+        return
+      }
+      // Solo devolvemos la oferta si la cancelación en la BD tiene éxito: si
+      // falla, el intercambio se completó justo ahora y la oferta ya está
+      // comprometida con el compañero (devolverla duplicaría el Pokémon).
+      const cancelled = await cancelExchangeOffer(code, routeIndex)
+      if (!cancelled) {
+        setCoopTradeMsg('El intercambio ya se completó, no se puede cancelar.')
+        return
+      }
       const offer = coopSubmittedOfferRef.current
       if (offer) {
         if (offer.kind === 'pokemon') {
@@ -3695,12 +3738,14 @@ function MainApp() {
         }
       }
       coopSubmittedOfferRef.current = null
+      coopSelectedPokemonRef.current = null
       coopExchangeAppliedRef.current = false
       setCoopMyOfferSubmitted(false)
       setCoopMyOffer(null)
       setCoopExchange(null)
       setCoopTradeMsg('↩️ Intercambio cancelado. Puedes elegir otra oferta.')
     } else {
+      coopSelectedPokemonRef.current = null
       setCoopMyOffer(null)
       setCoopTradeMsg('Selección cancelada.')
     }
@@ -3858,6 +3903,7 @@ function MainApp() {
       setCoopExchange(null)
       coopExchangeAppliedRef.current = false
       coopSubmittedOfferRef.current = null
+      coopSelectedPokemonRef.current = null
       setIsLoading(false)
       setScreen('trade')
       return
@@ -6121,6 +6167,9 @@ function MainApp() {
     setCoopSessionEndedMsg('')
     setCoopTradeMsg('')
     setCoopError('')
+    coopSubmittedOfferRef.current = null
+    coopSelectedPokemonRef.current = null
+    coopExchangeAppliedRef.current = false
     setSpinItems([])
     setSpinWinnerIndex(null)
     setSpinRevealed(false)
@@ -6698,10 +6747,10 @@ function MainApp() {
                                   {known ? evo.name : '???'}
                                 </strong>
                                 {evo.level && (
-                                  <span style={{ fontSize: '0.65rem', color: '#a855f7' }}>Nv. {evo.level}</span>
+                                  <span style={{ fontSize: '0.85rem', color: '#a855f7', fontWeight: 'bold' }}>Nv. {evo.level}</span>
                                 )}
                                 {!evo.level && evo.trigger && evo.trigger !== 'level-up' && (
-                                  <span style={{ fontSize: '0.65rem', color: '#ffcb05' }}>{evo.trigger}</span>
+                                  <span style={{ fontSize: '0.85rem', color: '#ffcb05', fontWeight: 'bold' }}>{evo.trigger}</span>
                                 )}
                               </div>
                             </div>

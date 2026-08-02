@@ -942,9 +942,9 @@ button {
   background: #12122b;
   border: 1px solid #3f3f6e;
   border-radius: 8px;
-  padding: 10px;
-  font-size: 0.9rem;
-  line-height: 1.4;
+  padding: 12px;
+  font-size: 1.05rem;
+  line-height: 1.55;
   color: #d9d6f2;
 }
 
@@ -1970,8 +1970,8 @@ button {
   }
 
   .description-box {
-    padding: 8px;
-    font-size: 0.85rem;
+    padding: 10px;
+    font-size: 0.95rem;
   }
 
   .stat-row {

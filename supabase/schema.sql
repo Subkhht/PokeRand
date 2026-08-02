@@ -541,7 +541,8 @@ $$;
 
 -- Cancela la oferta del jugador actual (al salir del nodo sin completar el
 -- intercambio) para que el intercambio no pueda completarse con una oferta
--- ya devuelta.
+-- ya devuelta. Devuelve false si el intercambio ya se completó (la oferta
+-- está comprometida con el compañero) o si no existe la fila.
 create or replace function public.cancel_exchange_offer(p_code text, p_node integer)
 returns boolean
 language plpgsql security definer set search_path = public
@@ -556,11 +557,13 @@ begin
   if v_uid = v_sess.player_a_id then
     update public.coop_exchanges
     set a_offer = null, a_ready = false, updated_at = now()
-    where code = v_sess.code and node = p_node;
+    where code = v_sess.code and node = p_node and completed = false;
+    if not found then return false; end if;
   elsif v_uid = v_sess.player_b_id then
     update public.coop_exchanges
     set b_offer = null, b_ready = false, updated_at = now()
-    where code = v_sess.code and node = p_node;
+    where code = v_sess.code and node = p_node and completed = false;
+    if not found then return false; end if;
   else
     return false;
   end if;
