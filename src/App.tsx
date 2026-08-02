@@ -1769,6 +1769,7 @@ function MainApp() {
   }
 
   function getEffectiveGen(): number {
+    if (coopModeRef.current && coopGenRef.current) return coopGenRef.current
     if (isDailyRunRef.current) return currentRunGen
     if (generation === 0) {
       const unlockedGens = generations.filter((g) => isGenUnlocked(g))
@@ -2948,19 +2949,30 @@ function MainApp() {
 
   async function restartRun(): Promise<void> {
     if (coopModeRef.current && coopSessionCodeRef.current) {
-      const exists = await resetCoopSession(coopSessionCodeRef.current)
+      let exists = await resetCoopSession(coopSessionCodeRef.current)
       setCoopSessionEndedMsg('')
       setCoopWaiting(false)
       if (!exists) {
-        // La sesión fue eliminada al terminar (ambos jugadores). Mejor volver al
-        // menú para crear una sesión nueva en vez de generar códigos distintos.
-        setCoopError('La sesión anterior terminó y fue eliminada. Crea una nueva sesión desde el menú y comparte el código.')
-        resetToSetup()
+        // La sesión fue eliminada (p. ej. esquema antiguo o cancelada). Se recrea
+        // con la misma semilla para seguir jugando sin pasar por el menú.
+        const seed = coopSeedRef.current || String(Math.random()).slice(2, 12)
+        const newCode = await createCoopSession(seed, coopGenRef.current || 1, coopDiffRef.current || 'medium')
+        if (newCode) {
+          coopSessionCodeRef.current = newCode
+          coopSeedRef.current = seed
+          setCoopSessionCode(newCode)
+          setCoopError(`🤝 Sesión recreada: ${newCode}. Compártela con tu compañero.`)
+          exists = true
+        }
+      }
+      if (exists) {
+        setVoluntaryRunEnd(false)
+        setDefeatSummary(null)
+        await startNewRun(true)
         return
       }
-      setVoluntaryRunEnd(false)
-      setDefeatSummary(null)
-      await startNewRun(true)
+      setCoopError('No se pudo reiniciar la sesión cooperativa.')
+      resetToSetup()
       return
     }
     setVoluntaryRunEnd(false)
@@ -5552,6 +5564,10 @@ function MainApp() {
   }
 
   function resetToSetup(): void {
+    // Al volver al menú principal, borra la sesión cooperativa para no dejar
+    // datos muertos en la base de datos.
+    if (coopSessionCodeRef.current) void deleteCoopSessionRpc(coopSessionCodeRef.current)
+    coopAutoStartedRef.current = false
     setScreen('setup')
     startMenuMusic()
     runStartTimeRef.current = 0
