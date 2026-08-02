@@ -48,10 +48,11 @@ export function scalePokemonForNode(base: Pokemon, _node: RouteNode, _stepIndex:
   const statMultiplier = difficulty === 'infinite' ? 2.75 : difficulty === 'hard' ? 2.5 : difficulty === 'coliseum' ? 2.5 : 2
 
   // El nivel mínimo de aparición ya se aplica en buildPokemonFromApi.
-  // Aquí NO debemos volver a subir el nivel: bloquearía bajar el nivel de un
-  // rival para igualarlo al promedio del equipo (p. ej. un salvaje de etapa alta
-  // quedaría clavado en Nv.36 contra un equipo de Nv.20).
-  const targetLevel = Math.max(1, base.level + levelDelta)
+  // Aquí solo limitamos el piso: el nivel final nunca baja del umbral de
+  // aparición (evita que un Raichu o Venusaur salga a nivel 14 tras ajustar).
+  // Seguir permitiendo bajar el nivel a un rival para igualarlo al promedio
+  // del equipo, siempre que no se pase por debajo de ese umbral.
+  const targetLevel = Math.max(base.minAppearLevel ?? 1, base.level + levelDelta)
   const hpBonus = levelDelta * hpMultiplier
   const statBonus = levelDelta * statMultiplier
 
