@@ -1341,7 +1341,8 @@ function MainApp() {
 
   // Ranking mundial (modo Infinite)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
-  const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[] | null>(null)
+  const [leaderboardByGen, setLeaderboardByGen] = useState<Record<number, LeaderboardEntry[]>>({})
+  const [leaderboardGen, setLeaderboardGen] = useState(0)
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
   const [scoreSubmitState, setScoreSubmitState] = useState<'idle' | 'submitting' | 'submitted' | 'error' | 'disabled' | 'loginRequired'>('idle')
   const [submitIsNewBest, setSubmitIsNewBest] = useState<boolean | null>(null)
@@ -5598,6 +5599,7 @@ function MainApp() {
   function openLeaderboard(): void {
     playClick()
     setShowLeaderboard(true)
+    setLeaderboardGen(0)
     void loadLeaderboard()
   }
 
@@ -5655,12 +5657,15 @@ function MainApp() {
 
   async function loadLeaderboard(): Promise<void> {
     if (!isLeaderboardEnabled()) {
-      setLeaderboardEntries([])
+      setLeaderboardByGen({})
       return
     }
     setLeaderboardLoading(true)
-    const entries = await fetchInfiniteLeaderboard(50)
-    setLeaderboardEntries(entries)
+    const gens = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    const results = await Promise.all(gens.map((g) => fetchInfiniteLeaderboard(50, g)))
+    const grouped: Record<number, LeaderboardEntry[]> = {}
+    gens.forEach((g, i) => { grouped[g] = results[i] })
+    setLeaderboardByGen(grouped)
     setLeaderboardLoading(false)
   }
 
@@ -5754,7 +5759,11 @@ function MainApp() {
 
   const pokedexList = Object.values(pokedex)
   const pokedexSeen = pokedexList.filter(p => p.seen).length
-  const pokedexCaught = pokedexList.filter(p => p.caught).length
+    const pokedexCaught = pokedexList.filter(p => p.caught).length
+
+  const leaderboardActiveEntries: LeaderboardEntry[] = leaderboardGen === 0
+    ? Object.values(leaderboardByGen).flat().sort((a, b) => (b.node - a.node) || (a.duration_seconds - b.duration_seconds))
+    : (leaderboardByGen[leaderboardGen] ?? [])
   const filteredPokedex = pokedexList.filter((pkmn) => {
     const term = pokedexSearch.toLowerCase().trim()
     if (!term) return true
@@ -8847,62 +8856,89 @@ function MainApp() {
                   Copia <strong style={{ color: '#cba3ff' }}>.env.example</strong> a <strong style={{ color: '#cba3ff' }}>.env</strong>, rellena tus credenciales de Supabase (URL + anon key) y ejecuta el esquema de <strong style={{ color: '#cba3ff' }}>supabase/schema.sql</strong>.
                 </p>
               </div>
-            ) : leaderboardLoading && !leaderboardEntries ? (
+            ) : leaderboardLoading && Object.keys(leaderboardByGen).length === 0 ? (
               <p style={{ textAlign: 'center', color: '#9b98cf' }}>Cargando ranking...</p>
-            ) : !leaderboardEntries || leaderboardEntries.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#9b98cf' }}>Aún no hay puntuaciones. ¡Sé el primero en llegar lejos en modo Infinite!</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {leaderboardEntries.map((entry, idx) => {
-                  const isMe = authUser !== null && entry.user_id === authUser.id
-                  const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}º`
-                  return (
-                    <div
-                      key={entry.id ?? idx}
+              <>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', marginBottom: '1rem' }}>
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => { playClick(); setLeaderboardGen(g) }}
                       style={{
-                        display: 'grid',
-                        gridTemplateColumns: '44px 1fr auto',
-                        gap: '0.75rem',
-                        alignItems: 'center',
-                        padding: '0.6rem 0.75rem',
-                        borderRadius: '8px',
-                        background: isMe ? 'rgba(168,85,247,0.15)' : 'rgba(15,23,42,0.5)',
-                        border: `1px solid ${isMe ? '#a855f7' : '#3f3f6e'}`
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        background: leaderboardGen === g ? 'rgba(168,85,247,0.25)' : 'transparent',
+                        border: `1px solid ${leaderboardGen === g ? '#a855f7' : '#3f3f6e'}`,
+                        color: leaderboardGen === g ? '#cba3ff' : '#9b98cf'
                       }}
                     >
-                      <div style={{ textAlign: 'center', fontWeight: 'bold', color: idx < 3 ? '#ffcb05' : '#9b98cf' }}>{medal}</div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <strong style={{ color: '#f3f1ff', fontSize: '0.9rem' }}>{entry.player_name}</strong>
-                          {isMe && <span style={{ color: '#cba3ff', fontSize: '0.7rem' }}>(tú)</span>}
-                          <span style={{ color: '#7d7ab5', fontSize: '0.75rem' }}>
-                            {entry.is_random ? `🎲 Random · Gen ${entry.generation}` : `Gen ${entry.generation}`}
-                          </span>
-                          {entry.challenges && entry.challenges.length > 0 && (
-                            <span style={{ color: '#fb923c', fontSize: '0.7rem' }}>🎲 {entry.challenges.join(', ')}</span>
-                          )}
+                      {g === 0 ? 'Todos' : `Gen ${g}`}
+                    </button>
+                  ))}
+                </div>
+
+                {leaderboardActiveEntries.length === 0 ? (
+                  <p style={{ textAlign: 'center', color: '#9b98cf' }}>
+                    {leaderboardGen === 0 ? 'Aún no hay puntuaciones. ¡Sé el primero en llegar lejos en modo Infinite!' : `Aún no hay puntuaciones en la Generación ${leaderboardGen}. ¡Sé el primero!`}
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {leaderboardActiveEntries.map((entry, idx) => {
+                      const isMe = authUser !== null && entry.user_id === authUser.id
+                      const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}º`
+                      return (
+                        <div
+                          key={entry.id ?? idx}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '44px 1fr auto',
+                            gap: '0.75rem',
+                            alignItems: 'center',
+                            padding: '0.6rem 0.75rem',
+                            borderRadius: '8px',
+                            background: isMe ? 'rgba(168,85,247,0.15)' : 'rgba(15,23,42,0.5)',
+                            border: `1px solid ${isMe ? '#a855f7' : '#3f3f6e'}`
+                          }}
+                        >
+                          <div style={{ textAlign: 'center', fontWeight: 'bold', color: idx < 3 ? '#ffcb05' : '#9b98cf' }}>{medal}</div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <strong style={{ color: '#f3f1ff', fontSize: '0.9rem' }}>{entry.player_name}</strong>
+                              {isMe && <span style={{ color: '#cba3ff', fontSize: '0.7rem' }}>(tú)</span>}
+                              <span style={{ color: '#7d7ab5', fontSize: '0.75rem' }}>
+                                {entry.is_random ? `🎲 Random · Gen ${entry.generation}` : `Gen ${entry.generation}`}
+                              </span>
+                              {entry.challenges && entry.challenges.length > 0 && (
+                                <span style={{ color: '#fb923c', fontSize: '0.7rem' }}>🎲 {entry.challenges.join(', ')}</span>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', gap: '2px', marginTop: '4px', alignItems: 'flex-end' }}>
+                              {(entry.team ?? []).map((member, mi) => (
+                                <img
+                                  key={`${entry.id}-${mi}`}
+                                  src={member.sprite}
+                                  alt={member.name}
+                                  title={`${member.name} Nv.${member.level}`}
+                                  onError={fallbackSprite}
+                                  style={{ width: '28px', height: '28px', imageRendering: 'pixelated' }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ color: '#cba3ff', fontWeight: 'bold', fontSize: '1.05rem' }}>Nodo #{entry.node}</div>
+                            <div style={{ color: '#9b98cf', fontSize: '0.75rem' }}>⏱️ {formatDuration(entry.duration_seconds)}</div>
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '2px', marginTop: '4px', alignItems: 'flex-end' }}>
-                          {(entry.team ?? []).map((member, mi) => (
-                            <img
-                              key={`${entry.id}-${mi}`}
-                              src={member.sprite}
-                              alt={member.name}
-                              title={`${member.name} Nv.${member.level}`}
-                              onError={fallbackSprite}
-                              style={{ width: '28px', height: '28px', imageRendering: 'pixelated' }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ color: '#cba3ff', fontWeight: 'bold', fontSize: '1.05rem' }}>Nodo #{entry.node}</div>
-                        <div style={{ color: '#9b98cf', fontSize: '0.75rem' }}>⏱️ {formatDuration(entry.duration_seconds)}</div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
             )}
 
             <button className="cta" onClick={() => setShowLeaderboard(false)} style={{ marginTop: '1.25rem', background: '#7d7ab5', width: '100%' }}>Cerrar</button>

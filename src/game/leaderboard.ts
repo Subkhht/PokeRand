@@ -136,12 +136,16 @@ export async function submitInfiniteScore(entry: InfiniteScoreInsert): Promise<S
   return { ok: true, isNewBest }
 }
 
-export async function fetchInfiniteLeaderboard(limit = 50): Promise<LeaderboardEntry[]> {
+export async function fetchInfiniteLeaderboard(limit = 50, generation?: number): Promise<LeaderboardEntry[]> {
   const client = await getClient()
   if (!client) return []
-  const { data, error } = await client
+  let query = client
     .from('infinite_leaderboard')
     .select('*')
+  if (generation !== undefined) {
+    query = query.eq('generation', generation)
+  }
+  const { data, error } = await query
     .order('node', { ascending: false })
     .order('duration_seconds', { ascending: true })
     .limit(limit)
