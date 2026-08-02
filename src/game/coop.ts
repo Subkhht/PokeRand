@@ -196,3 +196,14 @@ export async function completeCoopExchange(code: string, node: number): Promise<
   }
   return (data as CoopTrade['offer']) ?? null
 }
+
+export async function cancelExchangeOffer(code: string, node: number): Promise<boolean> {
+  const client = await getClient()
+  if (!client) return false
+  const { data, error } = await client.rpc('cancel_exchange_offer', { p_code: code, p_node: node })
+  if (error) {
+    console.error('cancel_exchange_offer:', error)
+    return false
+  }
+  return data === true
+}

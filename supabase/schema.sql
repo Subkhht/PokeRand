@@ -559,6 +559,35 @@ begin
 end;
 $$;
 
+-- Cancela la oferta del jugador actual (al salir del nodo sin completar el
+-- intercambio) para que el intercambio no pueda completarse con una oferta
+-- ya devuelta.
+create or replace function public.cancel_exchange_offer(p_code text, p_node integer)
+returns boolean
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_sess public.coop_sessions%rowtype;
+begin
+  if v_uid is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select * into v_sess from public.coop_sessions where code = upper(p_code);
+  if not found then return false; end if;
+  if v_uid = v_sess.player_a_id then
+    update public.coop_exchanges
+    set a_offer = null, a_ready = false, updated_at = now()
+    where code = v_sess.code and node = p_node;
+  elsif v_uid = v_sess.player_b_id then
+    update public.coop_exchanges
+    set b_offer = null, b_ready = false, updated_at = now()
+    where code = v_sess.code and node = p_node;
+  else
+    return false;
+  end if;
+  return true;
+end;
+$$;
+
 -- Completa el intercambio cuando ambos están listos y devuelve la oferta
 -- del compañero. Idempotente: ambos jugadores reciben la oferta del otro.
 create or replace function public.complete_exchange(p_code text, p_node integer)
@@ -620,4 +649,5 @@ grant execute on function public.reset_coop_session to authenticated;
 grant execute on function public.submit_exchange_offer to authenticated;
 grant execute on function public.get_exchange to authenticated;
 grant execute on function public.complete_exchange to authenticated;
+grant execute on function public.cancel_exchange_offer to authenticated;
 grant execute on function public.cancel_coop_session to authenticated;

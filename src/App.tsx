@@ -20,7 +20,7 @@ import {
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
 import { isLeaderboardEnabled, submitInfiniteScore, fetchInfiniteLeaderboard, formatDuration, getCurrentUser, onAuthChange, signUpWithUsername, signIn, signOut, getUsername, isUsernameTaken, type LeaderboardEntry, type InfiniteScoreInsert } from './game/leaderboard'
-import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, finishCoopSession, resetCoopSession, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange } from './game/coop'
+import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, cancelExchangeOffer, finishCoopSession, resetCoopSession, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange } from './game/coop'
 import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 
@@ -1501,10 +1501,12 @@ function MainApp() {
   const [coopJoinCode, setCoopJoinCode] = useState<string>('')
   const [coopWaiting, setCoopWaiting] = useState<boolean>(false)
   const [coopStarting, setCoopStarting] = useState<boolean>(false)
+  const coopAutoStartedRef = useRef(false)
   const [coopWaitingNode, setCoopWaitingNode] = useState<number>(0)
   const [coopSessionEndedMsg, setCoopSessionEndedMsg] = useState<string>('')
   const [coopMyOffer, setCoopMyOffer] = useState<CoopTrade['offer'] | null>(null)
   const [coopMyOfferSubmitted, setCoopMyOfferSubmitted] = useState<boolean>(false)
+  const coopSubmittedOfferRef = useRef<CoopTrade['offer'] | null>(null)
   const coopExchangeAppliedRef = useRef(false)
   const [coopExchange, setCoopExchange] = useState<CoopExchange | null>(null)
   const [coopTradeMsg, setCoopTradeMsg] = useState<string>('')
@@ -2870,6 +2872,7 @@ function MainApp() {
       coopMyRoleRef.current = 'a'
       coopGenRef.current = gen
       coopDiffRef.current = coopDiff
+      coopAutoStartedRef.current = false
     } finally {
       setIsLoading(false)
     }
@@ -2913,6 +2916,8 @@ function MainApp() {
       // La partida empieza automáticamente al unirse.
       setCoopStarting(true)
       await startNewRun()
+      // Mantiene la pantalla de carga unos segundos antes de entrar.
+      await sleep(2500)
     } catch {
       setCoopError('No se pudo iniciar la aventura. Reintenta.')
     } finally {
@@ -2923,6 +2928,7 @@ function MainApp() {
 
   function cancelCoopSession(): void {
     if (coopSessionCodeRef.current) void deleteCoopSessionRpc(coopSessionCodeRef.current)
+    coopAutoStartedRef.current = false
     setCoopMode(false)
     setCoopSessionCode('')
     setCoopSeed('')
@@ -2962,18 +2968,31 @@ function MainApp() {
     await startNewRun(false)
   }
 
-  // Polling mientras se crea la sesión: esperar a que el compañero se una
+  // Polling mientras se crea la sesión: cuando el compañero se une, el jugador A
+  // arranca la partida automáticamente (igual que el B al unirse).
   useEffect(() => {
     if (!coopMode || !coopSessionCode || coopMyRole !== 'a') return
     const code = coopSessionCode
     let cancelled = false
     const timer = setInterval(async () => {
-      if (cancelled) return
+      if (cancelled || coopAutoStartedRef.current) return
       const sess = await getCoopSession(code)
       if (!sess) return
-      if (sess.player_b_id) setCoopPartnerJoined(true)
+      if (sess.player_b_id) {
+        coopAutoStartedRef.current = true
+        setCoopPartnerJoined(true)
+        setCoopStarting(true)
+        try {
+          await startNewRun()
+          // Mantiene la pantalla de carga unos segundos antes de entrar.
+          await sleep(2500)
+        } finally {
+          setCoopStarting(false)
+        }
+      }
     }, 3000)
     return () => { cancelled = true; clearInterval(timer) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coopMode, coopSessionCode, coopMyRole])
 
   // Al terminar la run (victoria o derrota), cierra la sesión cooperativa para
@@ -3076,6 +3095,8 @@ function MainApp() {
       setCoopTradeMsg('No se pudo enviar tu oferta. Revisa la conexión con Supabase.')
       return
     }
+    // Guardamos la oferta para poder devolverla si el intercambio no se completa.
+    coopSubmittedOfferRef.current = coopMyOffer
     // Retira la oferta de tu lado: ya está comprometida en el intercambio.
     if (coopMyOffer.kind === 'pokemon') {
       const id = coopMyOffer.id
@@ -3096,6 +3117,45 @@ function MainApp() {
     setCoopMyOffer(null)
     setCoopMyOfferSubmitted(true)
     setCoopTradeMsg('🤝 Oferta enviada. Esperando a que tu compañero pulse "Intercambiar"...')
+  }
+
+  // Salir del nodo de intercambio: si el intercambio no se completó, devolver
+  // la oferta al jugador y cancelarla en la base de datos para que nadie la pierda.
+  async function leaveTradeNode(): Promise<void> {
+    const code = coopSessionCodeRef.current
+    let completed = coopExchange?.completed ?? false
+    if (code && coopMyOfferSubmitted && !completed) {
+      const ex = await getCoopExchange(code, routeIndex)
+      if (ex) {
+        completed = ex.completed
+        if (ex.completed && !coopExchangeAppliedRef.current) {
+          const partnerOffer = await completeCoopExchange(code, routeIndex)
+          if (partnerOffer && partnerOffer.kind) {
+            coopExchangeAppliedRef.current = true
+            applyOfferToLocal(partnerOffer)
+          }
+        }
+      }
+    }
+    if (coopMyOfferSubmitted && !completed && coopSubmittedOfferRef.current) {
+      const offer = coopSubmittedOfferRef.current
+      if (code) await cancelExchangeOffer(code, routeIndex)
+      if (offer.kind === 'pokemon') {
+        const rebuilt = rebuildPokemonFromOffer(offer)
+        if (teamRef.current.length < maxTeamSize) {
+          setTeam(prev => [...prev, rebuilt])
+        } else {
+          setPcStorage(prev => [...prev, rebuilt])
+        }
+        setCoopTradeMsg(`↩️ El intercambio no se completó. ${rebuilt.name} volvió a tu equipo.`)
+      } else {
+        setInventory(prev => [...prev, offer.itemName ?? 'Potion'])
+        setCoopTradeMsg(`↩️ El intercambio no se completó. ${offer.itemName ?? 'el objeto'} volvió a tu inventario.`)
+      }
+      coopSubmittedOfferRef.current = null
+    }
+    coopSubmittedOfferRef.current = null
+    await completeCurrentNode()
   }
 
   // Polling del intercambio en el nodo actual
@@ -3124,6 +3184,43 @@ function MainApp() {
     return () => { cancelled = true; clearInterval(timer) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, routeIndex, coopSessionCode])
+
+  // Cancelar la oferta: si ya se envió, la devuelve al jugador y la cancela en
+  // la base de datos (si el intercambio aún no se completó). Si solo estaba
+  // seleccionada, simplemente limpia la selección.
+  async function cancelCoopOffer(): Promise<void> {
+    const code = coopSessionCodeRef.current
+    if (!code) return
+    if (coopMyOfferSubmitted) {
+      if (coopExchange?.completed || coopExchangeAppliedRef.current) {
+        setCoopTradeMsg('El intercambio ya se completó, no se puede cancelar.')
+        return
+      }
+      await cancelExchangeOffer(code, routeIndex)
+      const offer = coopSubmittedOfferRef.current
+      if (offer) {
+        if (offer.kind === 'pokemon') {
+          const rebuilt = rebuildPokemonFromOffer(offer)
+          if (teamRef.current.length < maxTeamSize) {
+            setTeam(prev => [...prev, rebuilt])
+          } else {
+            setPcStorage(prev => [...prev, rebuilt])
+          }
+        } else {
+          setInventory(prev => [...prev, offer.itemName ?? 'Potion'])
+        }
+      }
+      coopSubmittedOfferRef.current = null
+      coopExchangeAppliedRef.current = false
+      setCoopMyOfferSubmitted(false)
+      setCoopMyOffer(null)
+      setCoopExchange(null)
+      setCoopTradeMsg('↩️ Intercambio cancelado. Puedes elegir otra oferta.')
+    } else {
+      setCoopMyOffer(null)
+      setCoopTradeMsg('Selección cancelada.')
+    }
+  }
 
   function pickRocketPokemon(pokemon: Pokemon): void {
     if (runChallenges.soloStarter) {
@@ -3272,6 +3369,7 @@ function MainApp() {
       setCoopMyOfferSubmitted(false)
       setCoopExchange(null)
       coopExchangeAppliedRef.current = false
+      coopSubmittedOfferRef.current = null
       setIsLoading(false)
       setScreen('trade')
       return
@@ -5498,6 +5596,7 @@ function MainApp() {
     setCoopPartnerJoined(false)
     setCoopWaiting(false)
     setCoopStarting(false)
+    coopAutoStartedRef.current = false
     setCoopSessionEndedMsg('')
     setCoopTradeMsg('')
     setCoopError('')
@@ -7594,6 +7693,15 @@ function MainApp() {
                     >
                       🤝 ¡Intercambiar! (los dos deben pulsarlo)
                     </button>
+                    <button
+                      className="secondary"
+                      type="button"
+                      disabled={!coopMyOffer}
+                      onClick={() => void cancelCoopOffer()}
+                      style={{ width: '100%', marginBottom: '0.5rem' }}
+                    >
+                      ✕ Cancelar selección
+                    </button>
                   </>
                 ) : (
                   <>
@@ -7618,10 +7726,20 @@ function MainApp() {
                         {coopExchange?.completed ? 'Compañero ✅' : (coopExchange?.a_ready && coopExchange?.b_ready ? '¡Ambos listos!' : 'Compañero ⏳')}
                       </span>
                     </div>
+                    {!coopExchange?.completed && (
+                      <button
+                        className="secondary"
+                        type="button"
+                        onClick={() => void cancelCoopOffer()}
+                        style={{ width: '100%', marginBottom: '0.5rem', color: '#ff8a80' }}
+                      >
+                        ✕ Cancelar intercambio (recuperar oferta)
+                      </button>
+                    )}
                   </>
                 )}
 
-                <button className="cta" onClick={completeCurrentNode} type="button" style={{ width: '100%' }}>
+                <button className="cta" onClick={() => void leaveTradeNode()} type="button" style={{ width: '100%' }}>
                   Salir del Nodo
                 </button>
               </div>
