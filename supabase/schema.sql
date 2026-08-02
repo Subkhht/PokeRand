@@ -434,8 +434,9 @@ $$;
 
 -- Cierra la sesión (partida terminada para uno de los jugadores).
 -- p_result: 'won' si quien termina ganó la run, 'lost' si perdió/abandonó.
--- Cuando AMBOS jugadores han terminado, la sesión se elimina (cascade a
--- progreso e intercambios) para que la base de datos no se llene.
+-- Primero marca status='finished' SIEMPRE (así el compañero que espera se
+-- libera aunque la limpieza falle). Después, como limpieza best-effort,
+-- elimina la sesión si ambos jugadores terminaron.
 create or replace function public.finish_coop_session(p_code text, p_result text)
 returns boolean
 language plpgsql security definer set search_path = public
@@ -446,26 +447,30 @@ declare
 begin
   if v_uid is null then raise exception 'Necesitas iniciar sesión'; end if;
   select * into v_sess from public.coop_sessions where code = upper(p_code);
-  if not found then
-    return false;
-  end if;
-  if v_uid = v_sess.player_a_id then
+  if not found then return false; end if;
+  if v_uid <> v_sess.player_a_id and v_uid <> v_sess.player_b_id then return false; end if;
+
+  update public.coop_sessions
+  set status = 'finished', result = p_result
+  where code = v_sess.code;
+
+  -- Limpieza best-effort: si ambos terminaron, borra la sesión. Si algo falla
+  -- (columnas antiguas, etc.), la limpieza de 24h la hará después.
+  begin
     update public.coop_sessions
-    set status = 'finished', result = p_result, finished_a = true
+    set finished_a = case when v_uid = v_sess.player_a_id then true else finished_a end,
+        finished_b = case when v_uid = v_sess.player_b_id then true else finished_b end
     where code = v_sess.code;
-  elsif v_uid = v_sess.player_b_id then
-    update public.coop_sessions
-    set status = 'finished', result = p_result, finished_b = true
-    where code = v_sess.code;
-  else
-    return false;
-  end if;
-  if exists (
-    select 1 from public.coop_sessions
-    where code = v_sess.code and finished_a and finished_b
-  ) then
-    delete from public.coop_sessions where code = v_sess.code;
-  end if;
+    if exists (
+      select 1 from public.coop_sessions
+      where code = v_sess.code and finished_a and finished_b
+    ) then
+      delete from public.coop_sessions where code = v_sess.code;
+    end if;
+  exception when others then
+    null;
+  end;
+
   return true;
 end;
 $$;

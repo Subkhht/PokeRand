@@ -1470,6 +1470,8 @@ function MainApp() {
   const [activeRandomEvent, setActiveRandomEvent] = useState<{ id: string; icon: string; title: string; desc: string } | null>(null)
   const routeSeedRef = useRef('')
   const routeRandRef = useRef<() => number>(() => Math.random())
+  const teamRef = useRef<Pokemon[]>([])
+  useEffect(() => { teamRef.current = team }, [team])
   const [traderModal, setTraderModal] = useState<boolean>(false)
   const [merchantItems, setMerchantItems] = useState<Array<{ name: string; price: number }> | null>(null)
   const [randomEventUsed, setRandomEventUsed] = useState<Set<string>>(new Set())
@@ -2735,6 +2737,7 @@ function MainApp() {
 
     try {
       let isA = coopMyRoleRef.current === 'a'
+      let polls = 0
       while (true) {
         const prog = await getCoopProgress(code, nodeIndex)
         if (!prog) {
@@ -2748,6 +2751,13 @@ function MainApp() {
         }
         const partnerReady = isA ? prog.b_ready : prog.a_ready
         if (partnerReady) return 'ready'
+        polls++
+        // Red de seguridad: si el compañero nunca responde (~5 min), continúa
+        // en solitario en vez de quedarse esperando para siempre.
+        if (polls >= 120) {
+          setBattleLog((prev) => ['🤝 Tu compañero no responde. Continúas en solitario.', ...prev].slice(0, 15))
+          return 'ready'
+        }
         await sleep(2500)
       }
     } finally {
@@ -2853,24 +2863,20 @@ function MainApp() {
       setCoopSessionEndedMsg('')
       setCoopWaiting(false)
       if (!exists) {
-        // La sesión fue eliminada al terminar (ambos jugadores). Crea una nueva
-        // automáticamente para poder seguir jugando en cooperativo.
-        const seed = String(Math.random()).slice(2, 12)
-        const newCode = await createCoopSession(seed, coopGenRef.current || 1, coopDiffRef.current || 'medium')
-        if (!newCode) {
-          setCoopError('No se pudo crear una nueva sesión. Reinicia desde el menú.')
-          return
-        }
-        setCoopSessionCode(newCode)
-        setCoopSeed(seed)
-        setCoopMyRole('a')
-        setCoopPartnerJoined(false)
-        setCoopError(`🤝 Sesión anterior terminada. Nueva sesión: ${newCode}. Compártela con tu compañero.`)
+        // La sesión fue eliminada al terminar (ambos jugadores). Mejor volver al
+        // menú para crear una sesión nueva en vez de generar códigos distintos.
+        setCoopError('La sesión anterior terminó y fue eliminada. Crea una nueva sesión desde el menú y comparte el código.')
+        resetToSetup()
+        return
       }
+      setVoluntaryRunEnd(false)
+      setDefeatSummary(null)
+      await startNewRun(true)
+      return
     }
     setVoluntaryRunEnd(false)
     setDefeatSummary(null)
-    await startNewRun(true)
+    await startNewRun(false)
   }
 
   // Polling mientras se crea la sesión: esperar a que el compañero se una
@@ -2887,11 +2893,19 @@ function MainApp() {
     return () => { cancelled = true; clearInterval(timer) }
   }, [coopMode, coopSessionCode, coopMyRole])
 
-  // Al terminar la run (victoria o derrota), cierra la sesión cooperativa
+  // Al terminar la run (victoria o derrota), cierra la sesión cooperativa para
+  // que el compañero que espera en un nodo quede liberado.
   useEffect(() => {
     if (screen !== 'victory' && screen !== 'defeat') return
-    if (!coopModeRef.current || !coopSessionCodeRef.current || !coopMyRoleRef.current) return
-    void finishCoopSession(coopSessionCodeRef.current, screen === 'victory' ? 'won' : 'lost')
+    if (!coopModeRef.current || !coopSessionCodeRef.current) return
+    const code = coopSessionCodeRef.current
+    const result = screen === 'victory' ? 'won' : 'lost'
+    void finishCoopSession(code, result).then((ok) => {
+      if (!ok) {
+        // Reintenta una vez por si la primera llamada falló.
+        setTimeout(() => { void finishCoopSession(code, result) }, 3000)
+      }
+    })
   }, [screen])
 
   function buildOfferFromPokemon(p: Pokemon): CoopTrade['offer'] {
@@ -2943,7 +2957,7 @@ function MainApp() {
     if (!offer) return
     if (offer.kind === 'pokemon') {
       const rebuilt = rebuildPokemonFromOffer(offer)
-      if (team.length < maxTeamSize) {
+      if (teamRef.current.length < maxTeamSize) {
         setTeam(prev => [...prev, rebuilt])
         setCoopTradeMsg(`🤝 ¡Intercambio completado! Recibiste a ${rebuilt.name} de tu compañero.`)
       } else {
@@ -3012,7 +3026,9 @@ function MainApp() {
       const ex = await getCoopExchange(code, routeIndex)
       if (!ex) return
       setCoopExchange(ex)
-      if (ex.completed && !coopExchangeAppliedRef.current) {
+      // Ambos jugadores listos → completar el intercambio. complete_exchange es
+      // idempotente: cada jugador recibe la oferta del otro una sola vez.
+      if (ex.a_ready && ex.b_ready && !coopExchangeAppliedRef.current) {
         const partnerOffer = await completeCoopExchange(code, routeIndex)
         if (partnerOffer && partnerOffer.kind) {
           coopExchangeAppliedRef.current = true
