@@ -5699,6 +5699,12 @@ function MainApp() {
     setDefeatSummary(null)
     setVictoryUnlocks(null)
     setIsTrainerBattle(false)
+    // Si se abandona una run diaria a mitad (p. ej. con "Volver a inicio"),
+    // se consume: no se puede repetir el Desafío del Día el mismo día.
+    if (isDailyRunRef.current) {
+      setDailyPlayed(true)
+      localStorage.setItem('pokerand_daily', dailySeed)
+    }
     isDailyRunRef.current = false
     setTrainerTeam([])
     setTrainerPokemonIndex(0)
