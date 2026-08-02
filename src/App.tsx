@@ -1607,7 +1607,7 @@ function MainApp() {
   const [pvpChoosingSwitch, setPvpChoosingSwitch] = useState<boolean>(false)
   const [pvpTimerLeft, setPvpTimerLeft] = useState<number>(0)
   const [pvpHit, setPvpHit] = useState<{ side: 'a' | 'b'; key: number } | null>(null)
-  const pvpPrevActiveRef = useRef<{ a: { id: number; hp: number } | null; b: { id: number; hp: number } | null }>({ a: null, b: null })
+  const pvpPrevTeamHpRef = useRef<{ a: number[]; b: number[] }>({ a: [], b: [] })
   const pvpTimerTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pvpLoopRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pvpResolvingRef = useRef(false)
@@ -3375,7 +3375,7 @@ function MainApp() {
     setPvpChoosingSwitch(false)
     setPvpTimerLeft(0)
     setPvpHit(null)
-    pvpPrevActiveRef.current = { a: null, b: null }
+    pvpPrevTeamHpRef.current = { a: [], b: [] }
     setPvpSearching(false)
     setPvpWaitingOpponent(false)
     setShowPvpModal(false)
@@ -3467,7 +3467,7 @@ function MainApp() {
     setPvpChoosingSwitch(false)
     setPvpTimerLeft(0)
     setPvpHit(null)
-    pvpPrevActiveRef.current = { a: null, b: null }
+    pvpPrevTeamHpRef.current = { a: [], b: [] }
     if (pvpTimerTickRef.current) {
       clearInterval(pvpTimerTickRef.current)
       pvpTimerTickRef.current = null
@@ -3565,18 +3565,22 @@ function MainApp() {
       }
     }
 
-    // Detecta golpes: si el HP del Pokémon activo bajó, animación roja + sonido.
+    // Detecta golpes: si el HP de algún Pokémon del equipo bajó, animación roja
+    // + sonido. Se compara por índice de equipo (no solo el activo) para que
+    // también detecte el golpe a un Pokémon recién sacado con un cambio.
     const detectPvpHit = (st: PvpState): void => {
       if (st.phase === 'finished') return
       for (const side of ['a', 'b'] as const) {
         const ps = st[side]
-        const cur = ps.team[ps.active]
-        const prev = pvpPrevActiveRef.current[side]
-        if (cur && prev && prev.id === cur.id && cur.hp < prev.hp) {
-          setPvpHit(prevState => ({ side, key: (prevState?.key ?? 0) + 1 }))
-          playHit()
-        }
-        pvpPrevActiveRef.current[side] = cur ? { id: cur.id, hp: cur.hp } : null
+        const prevArr = pvpPrevTeamHpRef.current[side]
+        ps.team.forEach((p, i) => {
+          const prevHp = prevArr[i]
+          if (prevHp !== undefined && p.hp < prevHp) {
+            setPvpHit(prevState => ({ side, key: (prevState?.key ?? 0) + 1 }))
+            playHit()
+          }
+          prevArr[i] = p.hp
+        })
       }
     }
 
@@ -7435,6 +7439,9 @@ function MainApp() {
                   )}
                 </div>
 
+                {/* Altura mínima fija: el panel no cambia de tamaño al realizar acciones */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', minHeight: '170px', justifyContent: 'flex-start' }}>
+
                 {st.phase === 'switch' && mySwitchNeeded && !iSubmitted && (
                   <div style={{ padding: '0.6rem', borderRadius: '8px', background: 'rgba(168,85,247,0.1)', border: '1px solid #a855f7' }}>
                     <strong style={{ color: '#cba3ff', fontSize: '0.85rem' }}>Elige el siguiente Pokémon:</strong>
@@ -7517,6 +7524,7 @@ function MainApp() {
                 )}
 
                 {pvpError && <p style={{ margin: 0, textAlign: 'center', color: '#ff8a80', fontSize: '0.8rem' }}>{pvpError}</p>}
+                </div>
               </div>
 
               {/* Columna derecha: el rival si soy A, mi equipo si soy B */}
