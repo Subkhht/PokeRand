@@ -21,7 +21,7 @@ import {
 import { getTypeEffectiveness } from './game/typesChart'
 import { isLeaderboardEnabled, submitInfiniteScore, fetchInfiniteLeaderboard, formatDuration, getCurrentUser, onAuthChange, signUpWithUsername, signIn, signOut, getUsername, isUsernameTaken, type LeaderboardEntry, type InfiniteScoreInsert } from './game/leaderboard'
 import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, cancelExchangeOffer, finishCoopSession, resetCoopSession, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange } from './game/coop'
-import { isPvpEnabled, createPvpRoom, findPvpOpponent, joinPvpRoom, getPvpMatch, getPvpState, submitPvpAction, resolvePvpTurn as resolvePvpTurnRpc, forfeitPvpMatch, cancelPvpMatch, finishPvpMatch, clearPvpAction, startPvpTimer, expirePvpTimer, serializePvpPokemon, type PvpTurnSnapshot, type PvpRoomResult } from './game/pvp'
+import { isPvpEnabled, createPvpRoom, findPvpOpponent, joinPvpRoom, getPvpMatch, getPvpState, submitPvpAction, resolvePvpTurn as resolvePvpTurnRpc, forfeitPvpMatch, cancelPvpMatch, finishPvpMatch, clearPvpAction, startPvpTimer, expirePvpTimer, serializePvpPokemon, type PvpTurnSnapshot, type PvpRoomResult, type PvpState } from './game/pvp'
 import { resolvePvpTurn, type PvpAction } from './game/pvpBattle'
 import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
@@ -1606,6 +1606,8 @@ function MainApp() {
   const [pvpMyActionTurn, setPvpMyActionTurn] = useState<number>(-1)
   const [pvpChoosingSwitch, setPvpChoosingSwitch] = useState<boolean>(false)
   const [pvpTimerLeft, setPvpTimerLeft] = useState<number>(0)
+  const [pvpHit, setPvpHit] = useState<{ side: 'a' | 'b'; key: number } | null>(null)
+  const pvpPrevActiveRef = useRef<{ a: { id: number; hp: number } | null; b: { id: number; hp: number } | null }>({ a: null, b: null })
   const pvpTimerTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pvpLoopRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pvpResolvingRef = useRef(false)
@@ -3372,6 +3374,8 @@ function MainApp() {
     setPvpMyActionTurn(-1)
     setPvpChoosingSwitch(false)
     setPvpTimerLeft(0)
+    setPvpHit(null)
+    pvpPrevActiveRef.current = { a: null, b: null }
     setPvpSearching(false)
     setPvpWaitingOpponent(false)
     setShowPvpModal(false)
@@ -3462,6 +3466,8 @@ function MainApp() {
     setPvpMyActionTurn(-1)
     setPvpChoosingSwitch(false)
     setPvpTimerLeft(0)
+    setPvpHit(null)
+    pvpPrevActiveRef.current = { a: null, b: null }
     if (pvpTimerTickRef.current) {
       clearInterval(pvpTimerTickRef.current)
       pvpTimerTickRef.current = null
@@ -3547,6 +3553,7 @@ function MainApp() {
             const fresh = await getPvpState(matchId)
             if (fresh && !cancelled) {
               setPvpSnapshot(fresh)
+              detectPvpHit(fresh.state)
               setPvpMyAction(null)
               setPvpMyActionTurn(-1)
               setPvpChoosingSwitch(false)
@@ -3558,12 +3565,28 @@ function MainApp() {
       }
     }
 
+    // Detecta golpes: si el HP del Pokémon activo bajó, animación roja + sonido.
+    const detectPvpHit = (st: PvpState): void => {
+      if (st.phase === 'finished') return
+      for (const side of ['a', 'b'] as const) {
+        const ps = st[side]
+        const cur = ps.team[ps.active]
+        const prev = pvpPrevActiveRef.current[side]
+        if (cur && prev && prev.id === cur.id && cur.hp < prev.hp) {
+          setPvpHit(prevState => ({ side, key: (prevState?.key ?? 0) + 1 }))
+          playHit()
+        }
+        pvpPrevActiveRef.current[side] = cur ? { id: cur.id, hp: cur.hp } : null
+      }
+    }
+
     const poll = async (): Promise<void> => {
       if (cancelled) return
       const snap = await getPvpState(matchId)
       if (!snap || cancelled) return
       setPvpSnapshot(snap)
       const st = snap.state
+      detectPvpHit(st)
       // Registrar en la Pokédex (silueta) los Pokémon del rival que se revelan.
       if (pvpRole && st.phase !== 'finished') {
         const oppSide = pvpRole === 'a' ? 'b' : 'a'
@@ -7367,10 +7390,12 @@ function MainApp() {
                     {(() => {
                       const pk = myOnLeft ? myActive : oppActive
                       const nm = myOnLeft ? 'Tú' : 'Rival'
+                      const side = myOnLeft ? myRole : oppRole
+                      const hit = pvpHit !== null && pvpHit.side === side
                       return (
                         <>
                           <div style={{ fontSize: '0.7rem', color: '#9b98cf', fontWeight: 'bold', marginBottom: '2px' }}>{nm}</div>
-                          <img src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '96px', height: '96px', imageRendering: 'pixelated' }} />
+                          <img key={hit ? pvpHit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '96px', height: '96px', imageRendering: 'pixelated' }} />
                           <div style={{ fontSize: '0.8rem', color: '#f3f1ff', fontWeight: 'bold' }}>{pk?.name}</div>
                           <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>Nv.{pk?.level}</div>
                           {pk?.status && <div style={{ fontSize: '0.7rem', color: '#fb923c' }}>{STATUS_LABELS[pk.status.type]}</div>}
@@ -7384,10 +7409,12 @@ function MainApp() {
                     {(() => {
                       const pk = myOnLeft ? oppActive : myActive
                       const nm = myOnLeft ? 'Rival' : 'Tú'
+                      const side = myOnLeft ? oppRole : myRole
+                      const hit = pvpHit !== null && pvpHit.side === side
                       return (
                         <>
                           <div style={{ fontSize: '0.7rem', color: '#9b98cf', fontWeight: 'bold', marginBottom: '2px' }}>{nm}</div>
-                          <img src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '96px', height: '96px', imageRendering: 'pixelated' }} />
+                          <img key={hit ? pvpHit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '96px', height: '96px', imageRendering: 'pixelated' }} />
                           <div style={{ fontSize: '0.8rem', color: '#f3f1ff', fontWeight: 'bold' }}>{pk?.name}</div>
                           <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>Nv.{pk?.level}</div>
                           {pk?.status && <div style={{ fontSize: '0.7rem', color: '#fb923c' }}>{STATUS_LABELS[pk.status.type]}</div>}

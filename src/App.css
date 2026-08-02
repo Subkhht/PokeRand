@@ -2017,3 +2017,19 @@ button {
     font-size: 0.8rem;
   }
 }
+/* PvP: destello rojo al recibir un golpe */
+@keyframes pvp-hit-flash-kf {
+  0% {
+    filter: brightness(1) drop-shadow(0 0 0 rgba(255, 60, 60, 0));
+  }
+  30% {
+    filter: brightness(1.9) sepia(1) hue-rotate(-55deg) saturate(5) drop-shadow(0 0 10px rgba(255, 60, 60, 0.95));
+  }
+  100% {
+    filter: brightness(1) drop-shadow(0 0 0 rgba(255, 60, 60, 0));
+  }
+}
+
+.pvp-hit-flash {
+  animation: pvp-hit-flash-kf 0.5s ease-out;
+}
