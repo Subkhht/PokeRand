@@ -68,6 +68,55 @@ function StatusBadge({ status, compact = false }: { status?: Pokemon['status']; 
   )
 }
 
+function CopyCodeButton({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    if (!code) return
+    try {
+      await navigator.clipboard.writeText(code)
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = code
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => { playClick(); void copy() }}
+      title={copied ? '¡Copiado!' : 'Copiar código'}
+      style={{
+        background: copied ? 'rgba(55,209,107,0.2)' : 'rgba(255,255,255,0.08)',
+        border: copied ? '1px solid rgba(55,209,107,0.5)' : '1px solid rgba(255,255,255,0.2)',
+        borderRadius: '6px',
+        padding: '6px 8px',
+        cursor: 'pointer',
+        color: copied ? '#37d16b' : '#f3f1ff',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'all 0.2s'
+      }}
+    >
+      {copied ? (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      ) : (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      )}
+    </button>
+  )
+}
+
 const difficultyNodeCounts: Record<Difficulty, number> = {
   easy: 5,
   medium: 10,
@@ -1451,6 +1500,7 @@ function MainApp() {
   const [coopPartnerJoined, setCoopPartnerJoined] = useState<boolean>(false)
   const [coopJoinCode, setCoopJoinCode] = useState<string>('')
   const [coopWaiting, setCoopWaiting] = useState<boolean>(false)
+  const [coopStarting, setCoopStarting] = useState<boolean>(false)
   const [coopWaitingNode, setCoopWaitingNode] = useState<number>(0)
   const [coopSessionEndedMsg, setCoopSessionEndedMsg] = useState<string>('')
   const [coopMyOffer, setCoopMyOffer] = useState<CoopTrade['offer'] | null>(null)
@@ -2814,6 +2864,12 @@ function MainApp() {
       setCoopSeed(seed)
       setCoopMyRole('a')
       setCoopPartnerJoined(false)
+      coopModeRef.current = true
+      coopSessionCodeRef.current = code
+      coopSeedRef.current = seed
+      coopMyRoleRef.current = 'a'
+      coopGenRef.current = gen
+      coopDiffRef.current = coopDiff
     } finally {
       setIsLoading(false)
     }
@@ -2846,8 +2902,22 @@ function MainApp() {
       setCoopGen(session.gen || 1)
       setCoopDiff((session.difficulty as 'easy' | 'medium' | 'hard') || 'medium')
       setCoopPartnerJoined(true)
+      // Fijar refs directamente: startNewRun los lee de forma síncrona antes de
+      // que los useEffect sincronicen el estado.
+      coopModeRef.current = true
+      coopSessionCodeRef.current = session.code
+      coopSeedRef.current = session.seed
+      coopMyRoleRef.current = 'b'
+      coopGenRef.current = session.gen || 1
+      coopDiffRef.current = (session.difficulty as 'easy' | 'medium' | 'hard') || 'medium'
+      // La partida empieza automáticamente al unirse.
+      setCoopStarting(true)
+      await startNewRun()
+    } catch {
+      setCoopError('No se pudo iniciar la aventura. Reintenta.')
     } finally {
       setIsLoading(false)
+      setCoopStarting(false)
     }
   }
 
@@ -5427,6 +5497,7 @@ function MainApp() {
     setCoopMyRole(null)
     setCoopPartnerJoined(false)
     setCoopWaiting(false)
+    setCoopStarting(false)
     setCoopSessionEndedMsg('')
     setCoopTradeMsg('')
     setCoopError('')
@@ -6814,8 +6885,11 @@ function MainApp() {
                     <div style={{ color: '#37d16b', fontWeight: 'bold', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>
                       🎮 Código de sesión
                     </div>
-                    <div style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '2rem', letterSpacing: '8px', textShadow: '0 2px 0 rgba(0,0,0,0.5)' }}>
-                      {coopSessionCode}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                      <span style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '2rem', letterSpacing: '8px', textShadow: '0 2px 0 rgba(0,0,0,0.5)' }}>
+                        {coopSessionCode}
+                      </span>
+                      <CopyCodeButton code={coopSessionCode} />
                     </div>
                   </div>
                   <button className="tiny-btn" type="button" onClick={cancelCoopSession} style={{ color: '#ff8a80', alignSelf: 'flex-start' }}>
@@ -7468,9 +7542,6 @@ function MainApp() {
               <div className="action-block shop-block" style={{ marginTop: '1rem' }}>
                 <div style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
                   <h3 style={{ margin: 0, color: '#37d16b' }}>🤝 Nodo de Intercambio</h3>
-                  <p style={{ margin: '0.5rem 0 0 0', color: '#9b98cf', fontSize: '0.8rem' }}>
-                    Sesión: <strong style={{ color: '#ffcb05', fontSize: '1.4rem', letterSpacing: '3px' }}>{coopSessionCode || '—'}</strong>
-                  </p>
                 </div>
 
                 {coopTradeMsg && <p style={{ color: '#ffcb05', fontSize: '0.85rem', marginBottom: '0.5rem' }}>{coopTradeMsg}</p>}
@@ -8170,6 +8241,20 @@ function MainApp() {
             </button>
           </div>
         </section>
+      )}
+
+      {/* Coop: entrando a la aventura (auto-inicio al unirse) */}
+      {coopStarting && (
+        <div className="modal-backdrop" style={{ zIndex: 10001 }}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '360px', textAlign: 'center', padding: '2rem' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🎒</div>
+            <h3 style={{ color: '#37d16b', margin: '0 0 0.5rem' }}>Entrando a la Aventura...</h3>
+            <div className="spin-anim" style={{ fontSize: '1.5rem', margin: '0.5rem 0' }}>⏳</div>
+            <p style={{ color: '#9b98cf', margin: 0, fontSize: '0.85rem' }}>
+              Generando tu run cooperativa...
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Coop: esperando al compañero */}
