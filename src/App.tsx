@@ -20,10 +20,11 @@ import {
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
 import { isLeaderboardEnabled, submitInfiniteScore, fetchInfiniteLeaderboard, formatDuration, getCurrentUser, onAuthChange, signUpWithUsername, signIn, signOut, getUsername, isUsernameTaken, type LeaderboardEntry, type InfiniteScoreInsert } from './game/leaderboard'
+import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, depositTrade, getCoopTrades, claimTrade, finishCoopSession, resetCoopSession, type CoopTrade } from './game/coop'
 import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'victory' | 'defeat' | 'coliseum_select'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'trade' | 'victory' | 'defeat' | 'coliseum_select'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum'
 
 const STATUS_LABELS: Record<StatusType, string> = {
@@ -1012,6 +1013,8 @@ function nodeTypeLabel(node: RouteNode): string {
       return 'Mega'
     case 'gmax':
       return 'G-MAX'
+    case 'trade':
+      return 'Intercambio'
     default:
       return node.type
   }
@@ -1028,6 +1031,7 @@ const NODE_EMOJIS: Record<string, string> = {
   move: '🧬',
   mega: '💎',
   gmax: '⚡',
+  trade: '🤝',
 }
 
 const NODE_TYPE_COLORS: Record<string, string> = {
@@ -1041,6 +1045,7 @@ const NODE_TYPE_COLORS: Record<string, string> = {
   move: '#56e0cd',
   mega: '#ff9ad6',
   gmax: '#9da6ff',
+  trade: '#37d16b',
 }
 
 function getNodeMapLayout(nodeCount: number): { positions: Array<{ x: number; y: number }>; width: number; height: number } {
@@ -1429,6 +1434,29 @@ function MainApp() {
     try { return localStorage.getItem('pokerand_daily') === dailySeedRef.current } catch { return false }
   })
   const isDailyRunRef = useRef(false)
+
+  // --- Modo cooperativo ---
+  const [coopMode, setCoopMode] = useState<boolean>(false)
+  const coopModeRef = useRef(false)
+  const [coopSessionCode, setCoopSessionCode] = useState<string>('')
+  const coopSessionCodeRef = useRef('')
+  const [coopSeed, setCoopSeed] = useState<string>('')
+  const coopSeedRef = useRef('')
+  const [coopMyRole, setCoopMyRole] = useState<'a' | 'b' | null>(null)
+  const coopMyRoleRef = useRef<'a' | 'b' | null>(null)
+  const [coopPartnerJoined, setCoopPartnerJoined] = useState<boolean>(false)
+  const [coopJoinCode, setCoopJoinCode] = useState<string>('')
+  const [coopWaiting, setCoopWaiting] = useState<boolean>(false)
+  const [coopWaitingNode, setCoopWaitingNode] = useState<number>(0)
+  const [coopSessionEndedMsg, setCoopSessionEndedMsg] = useState<string>('')
+  const [coopTrades, setCoopTrades] = useState<CoopTrade[]>([])
+  const [coopTradeMsg, setCoopTradeMsg] = useState<string>('')
+  const [coopError, setCoopError] = useState<string>('')
+
+  useEffect(() => { coopModeRef.current = coopMode }, [coopMode])
+  useEffect(() => { coopSessionCodeRef.current = coopSessionCode }, [coopSessionCode])
+  useEffect(() => { coopSeedRef.current = coopSeed }, [coopSeed])
+  useEffect(() => { coopMyRoleRef.current = coopMyRole }, [coopMyRole])
 
   const [activeRandomEvent, setActiveRandomEvent] = useState<{ id: string; icon: string; title: string; desc: string } | null>(null)
   const [traderModal, setTraderModal] = useState<boolean>(false)
@@ -2078,7 +2106,7 @@ function MainApp() {
   async function startNewRun(): Promise<void> {
     const dailyCfg = isDailyRunRef.current ? getDailyConfig(dailySeed, [1,2,3,4,5,6,7,8,9]) : null
     const effectiveGen = dailyCfg ? dailyCfg.generation : generation
-    const effectiveDifficulty = dailyCfg ? dailyCfg.difficulty : difficulty
+    const effectiveDifficulty = coopModeRef.current ? 'medium' : (dailyCfg ? dailyCfg.difficulty : difficulty)
 
     if (!dailyCfg) {
       if (!isGenUnlocked(effectiveGen)) {
@@ -2102,7 +2130,11 @@ function MainApp() {
 
     megaNodeSpawnedRef.current = false
 
-    setRunSeed(Math.random())
+    if (coopModeRef.current && coopSeedRef.current) {
+      setRunSeed(parseFloat(coopSeedRef.current) || Math.random())
+    } else {
+      setRunSeed(Math.random())
+    }
 
     setIsLoading(true)
     setApiError('')
@@ -2201,10 +2233,35 @@ function MainApp() {
       const totalNodes = difficultyNodeCounts[effectiveDifficulty]
       let customRoute: RouteNode[] = []
 
-      const routeRand = isDailyRunRef.current ? createSeededRandom(dailySeed) : null
+      const routeRand = coopModeRef.current
+        ? createSeededRandom(coopSeedRef.current || dailySeed)
+        : isDailyRunRef.current ? createSeededRandom(dailySeed) : null
       const rr = () => routeRand ? routeRand() : Math.random()
 
-      if (activeChallenges.bossRush) {
+      if (coopModeRef.current) {
+        // Ruta compartida: misma forma para ambos jugadores (misma semilla).
+        // Los encuentros, tiendas y descansos siguen siendo aleatorios por jugador.
+        const coopNodes = difficultyNodeCounts.medium
+        for (let i = 1; i < coopNodes; i++) {
+          let type: RouteNode['type'] = 'battle'
+          if (i === 3 || i === 6) {
+            type = 'trade'
+          } else {
+            const r = rr()
+            if (r < 0.18 && !activeChallenges.noShops) {
+              type = 'shop'
+            } else if (r < 0.36 && !activeChallenges.noRests) {
+              type = 'rest'
+            } else if (r < 0.50) {
+              type = 'teamRocket'
+            } else if (r < 0.62) {
+              type = 'spin'
+            }
+          }
+          customRoute.push({ id: i, type, label: `${nodeTypeLabel({ id: i, type, label: '', done: false })} #${i}`, done: false })
+        }
+        customRoute.push({ id: coopNodes, type: 'boss', label: `Combate Final (#${coopNodes})`, done: false })
+      } else if (activeChallenges.bossRush) {
         customRoute = generateBossRushRoute(totalNodes)
       } else if (effectiveDifficulty === 'infinite') {
         for (let i = 1; i <= 5; i++) {
@@ -2518,7 +2575,7 @@ function MainApp() {
     }
   }
 
-  function completeCurrentNode(): void {
+  async function completeCurrentNode(): Promise<void> {
     if (difficulty === 'coliseum') {
       setTeam(prev => prev.map(p => ({ ...p, hp: p.maxHp, status: undefined })))
       setBattleLog(prev => [`💊 ¡Equipo curado automáticamente!`, ...prev].slice(0, 15))
@@ -2544,6 +2601,15 @@ function MainApp() {
     setRoute((previous) =>
       previous.map((node, index) => (index === routeIndex ? { ...node, done: true } : node))
     )
+
+    // --- Gate de ritmo cooperativo: esperar a que el compañero complete el nodo ---
+    if (coopModeRef.current && coopSessionCodeRef.current && currentNode) {
+      const gateResult = await waitForCoopPartner(routeIndex)
+      if (gateResult === 'won' || gateResult === 'lost') {
+        handleCoopSessionEnded(gateResult)
+        return
+      }
+    }
 
     if (routeIndex >= route.length - 1) {
       if (difficulty === 'infinite') {
@@ -2580,6 +2646,12 @@ function MainApp() {
         awardPokeCoins(30, '👑 Victoria en COLISEUM')
         setScreen('victory')
         playVictoryFanfare()
+        return
+      }
+
+      // Cooperativo: sin insignias ni etapas, victoria directa.
+      if (coopModeRef.current) {
+        finalizeRunVictory()
         return
       }
 
@@ -2626,6 +2698,263 @@ function MainApp() {
     const progress = route.length > 0 ? (routeIndex + 1) / route.length : 0
     if (difficulty !== 'coliseum') triggerRandomEvent(progress)
     if (!activeRandomEvent) setScreen('route')
+  }
+
+  // --- Cooperativo: helpers ---
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+  async function waitForCoopPartner(nodeIndex: number): Promise<'ready' | 'won' | 'lost'> {
+    const code = coopSessionCodeRef.current
+    if (!code) return 'ready'
+
+    await markNodeReady(code, nodeIndex)
+    setCoopWaitingNode(nodeIndex)
+    setCoopWaiting(true)
+
+    try {
+      let isA = coopMyRoleRef.current === 'a'
+      while (true) {
+        const prog = await getCoopProgress(code, nodeIndex)
+        if (!prog) {
+          // Error de servidor: no bloquear al jugador
+          return 'ready'
+        }
+        if (prog.finished) {
+          // El compañero terminó la sesión. Si ganó la run, nosotros también
+          // (cooperativo). Si perdió/abandonó, la run termina para ambos.
+          return prog.result === 'won' ? 'won' : 'lost'
+        }
+        const partnerReady = isA ? prog.b_ready : prog.a_ready
+        if (partnerReady) return 'ready'
+        await sleep(2500)
+      }
+    } finally {
+      setCoopWaiting(false)
+    }
+  }
+
+  function handleCoopSessionEnded(result: 'won' | 'lost'): void {
+    if (result === 'won') {
+      setVoluntaryRunEnd(false)
+      finalizeRunVictory()
+    } else {
+      setCoopSessionEndedMsg('Tu compañero finalizó o abandonó la sesión. La run ha terminado para ambos.')
+      setScreen('defeat')
+    }
+  }
+
+  async function handleCreateCoopSession(): Promise<void> {
+    if (!authUser) {
+      setCoopError('Para jugar en cooperativo necesitas iniciar sesión o crear una cuenta.')
+      openLeaderboard()
+      return
+    }
+    if (!isCoopEnabled()) {
+      setCoopError('Cooperativo no disponible: configura Supabase en las variables de entorno.')
+      return
+    }
+    setCoopError('')
+    setIsLoading(true)
+    try {
+      isDailyRunRef.current = false
+      const seed = String(Math.random()).slice(2, 12)
+      const gen = generation
+      const code = await createCoopSession(seed, gen, 'medium')
+      if (!code) {
+        setCoopError('No se pudo crear la sesión. Revisa que las tablas existan en Supabase (schema.sql).')
+        return
+      }
+      setCoopMode(true)
+      setCoopSessionCode(code)
+      setCoopSeed(seed)
+      setCoopMyRole('a')
+      setCoopPartnerJoined(false)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function handleJoinCoopSession(): Promise<void> {
+    const codeInput = coopJoinCode.trim().toUpperCase()
+    if (codeInput.length < 4) {
+      setCoopError('Introduce el código de sesión de 6 letras.')
+      return
+    }
+    if (!authUser) {
+      setCoopError('Para jugar en cooperativo necesitas iniciar sesión o crear una cuenta.')
+      openLeaderboard()
+      return
+    }
+    setCoopError('')
+    setIsLoading(true)
+    try {
+      isDailyRunRef.current = false
+      const session = await joinCoopSession(codeInput)
+      if (!session) {
+        setCoopError('No se pudo unir a la sesión. Comprueba el código o que no esté llena.')
+        return
+      }
+      setCoopMode(true)
+      setCoopSessionCode(session.code)
+      setCoopSeed(session.seed)
+      setCoopMyRole('b')
+      setCoopPartnerJoined(true)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  function cancelCoopSession(): void {
+    setCoopMode(false)
+    setCoopSessionCode('')
+    setCoopSeed('')
+    setCoopJoinCode('')
+    setCoopMyRole(null)
+    setCoopPartnerJoined(false)
+    setCoopError('')
+  }
+
+  function abandonCoopRun(): void {
+    setCoopWaiting(false)
+    if (coopSessionCodeRef.current) void finishCoopSession(coopSessionCodeRef.current, 'lost')
+    setVoluntaryRunEnd(true)
+    setDefeatSummary(null)
+    setScreen('defeat')
+  }
+
+  async function restartRun(): Promise<void> {
+    if (coopModeRef.current && coopSessionCodeRef.current) {
+      await resetCoopSession(coopSessionCodeRef.current)
+      setCoopSessionEndedMsg('')
+      setCoopWaiting(false)
+    }
+    setVoluntaryRunEnd(false)
+    setDefeatSummary(null)
+    await startNewRun()
+  }
+
+  // Polling mientras se crea la sesión: esperar a que el compañero se una
+  useEffect(() => {
+    if (!coopMode || !coopSessionCode || coopMyRole !== 'a') return
+    const code = coopSessionCode
+    let cancelled = false
+    const timer = setInterval(async () => {
+      if (cancelled) return
+      const sess = await getCoopSession(code)
+      if (!sess) return
+      if (sess.player_b_id) setCoopPartnerJoined(true)
+    }, 3000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [coopMode, coopSessionCode, coopMyRole])
+
+  // Al terminar la run (victoria o derrota), cierra la sesión cooperativa
+  useEffect(() => {
+    if (screen !== 'victory' && screen !== 'defeat') return
+    if (!coopModeRef.current || !coopSessionCodeRef.current || !coopMyRoleRef.current) return
+    void finishCoopSession(coopSessionCodeRef.current, screen === 'victory' ? 'won' : 'lost')
+  }, [screen])
+
+  async function refreshCoopTrades(): Promise<void> {
+    if (!coopSessionCodeRef.current) return
+    const trades = await getCoopTrades(coopSessionCodeRef.current, routeIndex)
+    setCoopTrades(trades)
+  }
+
+  async function coopDepositPokemon(idx: number): Promise<void> {
+    const p = team[idx]
+    if (!p) return
+    if (team.length <= 1) {
+      setCoopTradeMsg('No puedes depositar a tu único Pokémon.')
+      return
+    }
+    if (!coopSessionCodeRef.current) return
+    const offer: CoopTrade['offer'] = {
+      kind: 'pokemon',
+      id: p.id,
+      name: p.name,
+      sprite: p.sprite,
+      level: p.level,
+      shiny: p.shiny,
+      hp: p.hp,
+      maxHp: p.maxHp,
+      attack: p.attack,
+      defense: p.defense,
+      speed: p.speed,
+      moves: p.moves.map(m => ({ name: m.name, power: m.power, type: m.type, accuracy: m.accuracy })),
+      types: p.types,
+      holdItem: p.holdItem,
+      status: p.status ? { type: p.status.type, turns: p.status.turns } : null,
+    }
+    const ok = await depositTrade(coopSessionCodeRef.current, routeIndex, offer)
+    if (ok) {
+      setTeam(prev => prev.filter((_, i) => i !== idx))
+      setActiveIndex(prev => Math.max(0, Math.min(prev, team.length - 2)))
+      setCoopTradeMsg(`📦 Depositaste a ${p.name} para tu compañero.`)
+      await refreshCoopTrades()
+    } else {
+      setCoopTradeMsg('No se pudo depositar. Revisa la conexión con Supabase.')
+    }
+  }
+
+  async function coopDepositItem(itemName: string): Promise<void> {
+    if (!coopSessionCodeRef.current) return
+    const offer: CoopTrade['offer'] = {
+      kind: 'item',
+      itemName,
+      itemIcon: ITEM_SPRITES[itemName],
+    }
+    const ok = await depositTrade(coopSessionCodeRef.current, routeIndex, offer)
+    if (ok) {
+      setInventory(prev => {
+        const out = [...prev]
+        const i = out.indexOf(itemName)
+        if (i !== -1) out.splice(i, 1)
+        return out
+      })
+      setCoopTradeMsg(`📦 Depositaste ${itemName} para tu compañero.`)
+      await refreshCoopTrades()
+    } else {
+      setCoopTradeMsg('No se pudo depositar. Revisa la conexión con Supabase.')
+    }
+  }
+
+  async function coopClaimTrade(trade: CoopTrade): Promise<void> {
+    if (!coopSessionCodeRef.current || trade.claimed) return
+    const offer = await claimTrade(trade.id)
+    if (!offer) {
+      setCoopTradeMsg('No se pudo recoger el intercambio.')
+      return
+    }
+    if (offer.kind === 'pokemon') {
+      const rebuilt: Pokemon = {
+        id: offer.id ?? 1,
+        name: offer.name ?? '???',
+        sprite: offer.sprite ?? '',
+        level: offer.level ?? 10,
+        hp: offer.hp ?? 10,
+        maxHp: offer.maxHp ?? 10,
+        attack: offer.attack ?? 10,
+        defense: offer.defense ?? 10,
+        speed: offer.speed ?? 10,
+        moves: (offer.moves ?? []).map(m => ({ ...m, description: '', accuracy: m.accuracy })),
+        types: offer.types,
+        holdItem: offer.holdItem ?? undefined,
+        shiny: offer.shiny,
+        status: offer.status ? { type: offer.status.type as StatusType, turns: offer.status.turns } : undefined,
+      }
+      if (team.length < maxTeamSize) {
+        setTeam(prev => [...prev, rebuilt])
+        setCoopTradeMsg(`🤝 Recibiste a ${rebuilt.name} de tu compañero.`)
+      } else {
+        setPcStorage(prev => [...prev, rebuilt])
+        setCoopTradeMsg(`🤝 Recibiste a ${rebuilt.name} (enviado al PC).`)
+      }
+    } else {
+      setInventory(prev => [...prev, offer.itemName ?? 'Potion'])
+      setCoopTradeMsg(`🤝 Recibiste ${offer.itemName ?? 'un objeto'} de tu compañero.`)
+    }
+    await refreshCoopTrades()
   }
 
   function pickRocketPokemon(pokemon: Pokemon): void {
@@ -2764,6 +3093,21 @@ function MainApp() {
         ].slice(0, 15))
       }
       setScreen('shop')
+      return
+    }
+
+    if (currentNode.type === 'trade') {
+      setIsLoading(true)
+      setApiError('')
+      setCoopTradeMsg('')
+      if (coopSessionCodeRef.current) {
+        const trades = await getCoopTrades(coopSessionCodeRef.current, routeIndex)
+        setCoopTrades(trades)
+      } else {
+        setCoopError('No hay sesión cooperativa activa para este nodo.')
+      }
+      setIsLoading(false)
+      setScreen('trade')
       return
     }
 
@@ -4979,6 +5323,17 @@ function MainApp() {
     setTeamRocketTeam([])
     setTeamRocketStealMessage('')
     setTeamRocketPickModal(false)
+    setCoopMode(false)
+    setCoopSessionCode('')
+    setCoopSeed('')
+    setCoopJoinCode('')
+    setCoopMyRole(null)
+    setCoopPartnerJoined(false)
+    setCoopWaiting(false)
+    setCoopSessionEndedMsg('')
+    setCoopTrades([])
+    setCoopTradeMsg('')
+    setCoopError('')
     setSpinItems([])
     setSpinWinnerIndex(null)
     setSpinRevealed(false)
@@ -4994,7 +5349,7 @@ function MainApp() {
   }
 
   function onRestartRun(): void {
-    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax') {
+    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'trade') {
       resetToSetup()
     }
   }
@@ -6272,7 +6627,7 @@ function MainApp() {
               }}
               onMouseEnter={playHover}
               type="button"
-              disabled={isLoading || dailyPlayed || !dailyConfig}
+              disabled={isLoading || dailyPlayed || !dailyConfig || coopMode}
               style={{
                 borderColor: dailyPlayed ? '#475569' : '#37d16b',
                 background: dailyPlayed ? 'rgba(15,23,42,0.6)' : 'rgba(34,197,94,0.1)',
@@ -6290,6 +6645,68 @@ function MainApp() {
             </button>
               )
             })()}
+          </div>
+
+          <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>🤝 Cooperativo</h2>
+          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
+            {!coopMode ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', border: '1px solid #3f3f6e', borderRadius: '12px', background: 'rgba(15,23,42,0.6)' }}>
+                <p style={{ margin: '0', color: '#9b98cf', fontSize: '0.8rem' }}>
+                  Juega una run compartida con un amigo: misma ruta, mismos nodos, intercambios de Pokémon y objetos. Ambos necesitan cuenta.
+                </p>
+                <button
+                  className="cta"
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => { playClick(); void handleCreateCoopSession() }}
+                  style={{ background: '#37d16b', color: '#12122b' }}
+                >
+                  ➕ Crear sesión
+                </button>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input
+                    type="text"
+                    value={coopJoinCode}
+                    onChange={(e) => setCoopJoinCode(e.target.value.toUpperCase())}
+                    placeholder="Código (6 letras)"
+                    maxLength={6}
+                    style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box', textTransform: 'uppercase' }}
+                  />
+                  <button
+                    className="secondary"
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => { playClick(); void handleJoinCoopSession() }}
+                  >
+                    🔑 Unirse
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', border: '1px solid #37d16b', borderRadius: '12px', background: 'rgba(34,197,94,0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <span style={{ color: '#37d16b', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                    🎮 Sesión: <strong style={{ color: '#ffcb05', letterSpacing: '2px' }}>{coopSessionCode}</strong>
+                  </span>
+                  <button className="tiny-btn" type="button" onClick={cancelCoopSession} style={{ color: '#ff8a80' }}>
+                    ✕ Cancelar
+                  </button>
+                </div>
+                {coopMyRole === 'a' ? (
+                  coopPartnerJoined ? (
+                    <p style={{ margin: '0', color: '#37d16b', fontSize: '0.85rem' }}>✅ ¡Tu compañero se ha unido! Pulsa "Iniciar Aventura" para empezar.</p>
+                  ) : (
+                    <p style={{ margin: '0', color: '#ffcb05', fontSize: '0.85rem' }}>⏳ Comparte el código <strong>{coopSessionCode}</strong> y espera a que tu compañero se una...</p>
+                  )
+                ) : (
+                  <p style={{ margin: '0', color: '#37d16b', fontSize: '0.85rem' }}>✅ Sesión unida. Pulsa "Iniciar Aventura" cuando tu compañero esté listo.</p>
+                )}
+                <p style={{ margin: '0', color: '#7d7ab5', fontSize: '0.75rem' }}>
+                  Misma ruta para ambos (misma semilla). Tiendas, enemigos y descansos son distintos por jugador. Al completar un nodo debes esperar a tu compañero.
+                </p>
+              </div>
+            )}
+            {coopError && <p className="error-line" style={{ marginTop: '4px' }}>{coopError}</p>}
           </div>
 
           <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>3. Desafíos de Run <span className="muted" style={{ fontSize: '0.7rem', fontWeight: 'normal' }}>(opcional)</span></h2>
@@ -6418,7 +6835,14 @@ function MainApp() {
           })()}
 
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '1.5rem' }}>
-            <button className="cta" onClick={() => { playClick(); startNewRun() }} onMouseEnter={playHover} type="button" disabled={isLoading}>
+            <button className="cta" onClick={() => {
+              playClick()
+              if (coopMode) {
+                if (!coopSessionCode) { setCoopError('Primero crea o únete a una sesión cooperativa.'); return }
+                if (coopMyRole === 'a' && !coopPartnerJoined) { setCoopError('Espera a que tu compañero se una a la sesión.'); return }
+              }
+              startNewRun()
+            }} onMouseEnter={playHover} type="button" disabled={isLoading}>
               {isLoading ? 'Cargando PokeAPI...' : "Iniciar Aventura"}
             </button>
             <button className="secondary" onClick={() => { playClick(); setShowPokedex(true) }} onMouseEnter={playHover} type="button">
@@ -6429,7 +6853,7 @@ function MainApp() {
         </section>
       )}
 
-      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax') && activePokemon && (
+      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'trade') && activePokemon && (
         <section className="roulette-layout">
           <article className="panel trainer-panel">
             <p className="muted small-tag">Trainer</p>
@@ -6910,6 +7334,82 @@ function MainApp() {
               </div>
             )}
 
+            {screen === 'trade' && (
+              <div className="action-block shop-block" style={{ marginTop: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <h3 style={{ margin: 0, color: '#37d16b' }}>🤝 Nodo de Intercambio</h3>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#9b98cf' }}>
+                    Sesión: <strong style={{ color: '#ffcb05' }}>{coopSessionCode || '—'}</strong>
+                  </span>
+                </div>
+
+                {coopTradeMsg && <p style={{ color: '#ffcb05', fontSize: '0.85rem', marginBottom: '0.5rem' }}>{coopTradeMsg}</p>}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '0.75rem' }}>
+                  <p className="label" style={{ margin: 0 }}>📦 Deposita un Pokémon para tu compañero</p>
+                  {team.map((pokemon, idx) => (
+                    <div key={`dep-${pokemon.id}-${idx}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <img src={pokemon.sprite} alt={pokemon.name} onError={fallbackSprite} style={{ width: '28px', height: '28px', imageRendering: 'pixelated' }} />
+                        <span style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{pokemon.name} <span className="muted">Nv.{pokemon.level}</span></span>
+                      </div>
+                      <button className="tiny-btn" type="button" disabled={team.length <= 1} onClick={() => void coopDepositPokemon(idx)} style={{ background: '#37d16b', color: '#12122b', fontWeight: 'bold' }}>
+                        Depositar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '0.75rem' }}>
+                  <p className="label" style={{ margin: 0 }}>🎒 Deposita un objeto</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {Array.from(new Set(inventory)).filter(i => i !== 'Mega Stone' && i !== 'Dynamax Band').map((itemName) => {
+                      const count = inventory.filter(i => i === itemName).length
+                      return (
+                        <button key={itemName} className="tiny-btn" type="button" onClick={() => void coopDepositItem(itemName)} style={{ background: '#4d9bff', color: '#fff' }}>
+                          {ITEM_SPRITES[itemName] && <img src={ITEM_SPRITES[itemName]} alt="" style={{ width: '14px', height: '14px', verticalAlign: 'middle', marginRight: '4px', imageRendering: 'pixelated' }} />}
+                          {itemName} ×{count}
+                        </button>
+                      )
+                    })}
+                    {inventory.length === 0 && <span style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No tienes objetos.</span>}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '0.75rem' }}>
+                  <p className="label" style={{ margin: 0 }}>🎁 Ofertas de tu compañero</p>
+                  {coopTrades.length === 0 ? (
+                    <p style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>Aún no hay intercambios esperándote.</p>
+                  ) : (
+                    coopTrades.map((trade) => (
+                      <div key={trade.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'rgba(74,222,128,0.1)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(74,222,128,0.3)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {trade.offer.kind === 'pokemon' ? (
+                            <>
+                              {trade.offer.sprite && <img src={trade.offer.sprite} alt="" onError={fallbackSprite} style={{ width: '28px', height: '28px', imageRendering: 'pixelated' }} />}
+                              <span style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{trade.offer.name} <span className="muted">Nv.{trade.offer.level}</span></span>
+                            </>
+                          ) : (
+                            <>
+                              {trade.offer.itemIcon && <img src={trade.offer.itemIcon} alt="" onError={fallbackSprite} style={{ width: '24px', height: '24px', imageRendering: 'pixelated' }} />}
+                              <span style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{trade.offer.itemName}</span>
+                            </>
+                          )}
+                        </div>
+                        <button className="tiny-btn" type="button" onClick={() => void coopClaimTrade(trade)} style={{ background: '#37d16b', color: '#12122b', fontWeight: 'bold' }}>
+                          Recoger
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <button className="cta" onClick={completeCurrentNode} type="button" style={{ width: '100%' }}>
+                  Salir del Nodo
+                </button>
+              </div>
+            )}
+
             {screen === 'spin' && (
               <div className="action-block spin-block">
                 <h3 style={{ margin: '0 0 0.5rem', color: '#cba3ff', textAlign: 'center' }}>🎰 ¡Ruleta del Botín!</h3>
@@ -7131,7 +7631,7 @@ function MainApp() {
                   Next node: <strong>{currentNode.label}</strong> ({nodeTypeLabel(currentNode)})
                 </p>
                 <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={enterNode} type="button" disabled={isLoading}>
-                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : currentNode.type === 'mega' ? '💎 ¡Recoger Mega Piedra!' : currentNode.type === 'gmax' ? '⚡ ¡Enfrentar G-MAX!' : 'Enter node'}
+                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : currentNode.type === 'mega' ? '💎 ¡Recoger Mega Piedra!' : currentNode.type === 'gmax' ? '⚡ ¡Enfrentar G-MAX!' : currentNode.type === 'trade' ? '🤝 Intercambiar' : 'Enter node'}
                 </button>
               </div>
             )}
@@ -7394,7 +7894,7 @@ function MainApp() {
       {screen === 'victory' && (
         <section className="panel end-panel">
           <h2>¡Victoria!</h2>
-          <p>Has completado la ruta ({difficultyNodeCounts[difficulty]} nodos) y derrotado al jefe final.</p>
+          <p>Has completado la ruta ({coopMode ? 10 : difficultyNodeCounts[difficulty]} nodos) y derrotado al jefe final.</p>
 
           {victoryUnlocks && (
             <div
@@ -7434,9 +7934,14 @@ function MainApp() {
             </div>
           )}
 
-          <button className="cta" onClick={resetToSetup} type="button">
-            Iniciar otra partida
-          </button>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '1.5rem', flexWrap: 'wrap' }}>
+            <button className="cta" onClick={resetToSetup} type="button">
+              Iniciar otra partida
+            </button>
+            <button className="cta" onClick={() => { playClick(); void restartRun() }} type="button" style={{ background: '#37d16b', color: '#12122b' }}>
+              🔄 Reiniciar
+            </button>
+          </div>
         </section>
       )}
 
@@ -7446,6 +7951,12 @@ function MainApp() {
             <h2 className="defeat-title">{voluntaryRunEnd ? '🏁 AVENTURA TERMINADA' : '💀 HAS SIDO DERROTADO'}</h2>
             <p className="muted">{voluntaryRunEnd ? 'Has decidido finalizar la aventura.' : 'Tu equipo ha quedado fuera de combate.'}</p>
           </div>
+
+          {coopSessionEndedMsg && (
+            <p style={{ margin: '0 0 1rem 0', padding: '0.6rem 0.9rem', borderRadius: '8px', background: 'rgba(255,203,5,0.12)', border: '1px solid rgba(255,203,5,0.4)', color: '#ffcb05', fontSize: '0.85rem' }}>
+              🤝 {coopSessionEndedMsg}
+            </p>
+          )}
 
           {defeatSummary && (
             <div className="defeat-details-grid" style={{ marginTop: '1rem', textAlign: 'left' }}>
@@ -7504,10 +8015,33 @@ function MainApp() {
             </div>
           )}
 
-          <button className="cta" onClick={resetToSetup} type="button" style={{ marginTop: '1.5rem' }}>
-            Intentar de nuevo
-          </button>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '1.5rem', flexWrap: 'wrap' }}>
+            <button className="cta" onClick={resetToSetup} type="button">
+              Intentar de nuevo
+            </button>
+            <button className="cta" onClick={() => { playClick(); void restartRun() }} type="button" style={{ background: '#37d16b', color: '#12122b' }}>
+              🔄 Reiniciar
+            </button>
+          </div>
         </section>
+      )}
+
+      {/* Coop: esperando al compañero */}
+      {coopWaiting && (
+        <div className="modal-backdrop" style={{ zIndex: 10000 }}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '380px', textAlign: 'center', padding: '2rem' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🤝</div>
+            <h3 style={{ color: '#37d16b', margin: '0 0 0.5rem' }}>Esperando a tu compañero...</h3>
+            <p style={{ color: '#9b98cf', margin: '0 0 1rem', fontSize: '0.9rem' }}>
+              Completaste el nodo {coopWaitingNode + 1}. Tu compañero aún no termina su parte.
+            </p>
+            <div className="spin-anim" style={{ fontSize: '1.5rem', marginBottom: '0.75rem' }}>⏳</div>
+            <p style={{ color: '#7d7ab5', fontSize: '0.75rem' }}>Ambos deben completar cada nodo para avanzar.</p>
+            <button className="tiny-btn" type="button" onClick={abandonCoopRun} style={{ color: '#ff8a80', marginTop: '0.5rem' }}>
+              ✕ Abandonar sesión
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Achievement Popup */}
