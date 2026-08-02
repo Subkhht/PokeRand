@@ -7279,15 +7279,11 @@ function MainApp() {
 
         const st = pvpSnapshot.state
         const myRole = pvpRole
-        const oppRole = myRole === 'a' ? 'b' : 'a'
         const my = st[myRole]
-        const opp = st[oppRole]
         const myActive = my.team[my.active]
-        const oppActive = opp.team[opp.active]
         const iSubmitted = pvpMyAction !== null && pvpMyActionTurn === pvpSnapshot.turn
         const canActPicking = st.phase === 'picking' && !iSubmitted
         const mySwitchNeeded = st.phase === 'switch' && (st.switchFor === myRole || st.switchFor === 'both') && !iSubmitted
-        const myOnLeft = myRole === 'a'
         const canSwitchNow = my.team.some((p, i) => i !== my.active && p.hp > 0)
 
         const hpBar = (p: Pokemon | undefined) => {
@@ -7384,17 +7380,17 @@ function MainApp() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr 1fr', gap: '1rem', alignItems: 'start' }}>
-              {/* Columna izquierda: mi equipo si soy A, el rival si soy B */}
-              {teamColumn(myOnLeft ? 'a' : 'b')}
+              {/* Columna izquierda: siempre el Jugador A */}
+              {teamColumn('a')}
 
               {/* Centro: combate */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                   <div style={{ flex: 1, textAlign: 'center' }}>
                     {(() => {
-                      const pk = myOnLeft ? myActive : oppActive
-                      const nm = myOnLeft ? 'Tú' : 'Rival'
-                      const side = myOnLeft ? myRole : oppRole
+                      const pk = st.a.team[st.a.active]
+                      const nm = myRole === 'a' ? 'Tú' : 'Rival'
+                      const side = 'a' as const
                       const hit = pvpHit !== null && pvpHit.side === side
                       return (
                         <>
@@ -7411,9 +7407,9 @@ function MainApp() {
                   <div style={{ fontSize: '1.5rem', color: '#ffcb05', fontWeight: 'bold' }}>VS</div>
                   <div style={{ flex: 1, textAlign: 'center' }}>
                     {(() => {
-                      const pk = myOnLeft ? oppActive : myActive
-                      const nm = myOnLeft ? 'Rival' : 'Tú'
-                      const side = myOnLeft ? oppRole : myRole
+                      const pk = st.b.team[st.b.active]
+                      const nm = myRole === 'b' ? 'Tú' : 'Rival'
+                      const side = 'b' as const
                       const hit = pvpHit !== null && pvpHit.side === side
                       return (
                         <>
@@ -7439,8 +7435,8 @@ function MainApp() {
                   )}
                 </div>
 
-                {/* Altura mínima fija: el panel no cambia de tamaño al realizar acciones */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', minHeight: '170px', justifyContent: 'flex-start' }}>
+                {/* Altura fija: el panel no cambia de tamaño al realizar acciones */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', height: '185px', justifyContent: 'flex-start', overflowY: 'auto' }}>
 
                 {st.phase === 'switch' && mySwitchNeeded && !iSubmitted && (
                   <div style={{ padding: '0.6rem', borderRadius: '8px', background: 'rgba(168,85,247,0.1)', border: '1px solid #a855f7' }}>
@@ -7527,8 +7523,8 @@ function MainApp() {
                 </div>
               </div>
 
-              {/* Columna derecha: el rival si soy A, mi equipo si soy B */}
-              {teamColumn(myOnLeft ? 'b' : 'a')}
+              {/* Columna derecha: siempre el Jugador B */}
+              {teamColumn('b')}
             </div>
           </section>
         )
