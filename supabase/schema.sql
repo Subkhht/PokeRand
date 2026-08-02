@@ -663,8 +663,13 @@ create table if not exists public.pvp_state (
   turn integer not null default 0,
   action_a jsonb,
   action_b jsonb,
+  timer_by text,
+  timer_until timestamptz,
   updated_at timestamptz not null default now()
 );
+
+alter table public.pvp_state add column if not exists timer_by text;
+alter table public.pvp_state add column if not exists timer_until timestamptz;
 
 -- Construye el estado inicial de la partida a partir de los equipos guardados.
 create or replace function public.init_pvp_state(p_match_id uuid)
@@ -829,7 +834,7 @@ as $$
 declare
   v_result jsonb;
 begin
-  select jsonb_build_object('state', s.state, 'turn', s.turn, 'action_a', s.action_a, 'action_b', s.action_b)
+  select jsonb_build_object('state', s.state, 'turn', s.turn, 'action_a', s.action_a, 'action_b', s.action_b, 'timer_by', s.timer_by, 'timer_until', s.timer_until)
   into v_result
   from public.pvp_state s where s.match_id = p_match_id;
   if not found then raise exception 'La partida aún no ha comenzado'; end if;
@@ -851,15 +856,17 @@ begin
   into v_side
   from public.pvp_matches m where m.id = p_match_id;
   if v_side is null then raise exception 'No participas en esta partida'; end if;
+  -- Cualquier acción realizada mientras el timer está activo lo resetea a
+  -- inactivo (el que espera deja de esperar porque el rival ya actuó).
   if v_side = 'a' then
-    update public.pvp_state set action_a = p_action, updated_at = now()
+    update public.pvp_state set action_a = p_action, timer_by = null, timer_until = null, updated_at = now()
     where match_id = p_match_id and turn = p_turn;
   else
-    update public.pvp_state set action_b = p_action, updated_at = now()
+    update public.pvp_state set action_b = p_action, timer_by = null, timer_until = null, updated_at = now()
     where match_id = p_match_id and turn = p_turn;
   end if;
   if not found then raise exception 'El turno ya cambió, recarga el estado'; end if;
-  select jsonb_build_object('state', s.state, 'turn', s.turn, 'action_a', s.action_a, 'action_b', s.action_b)
+  select jsonb_build_object('state', s.state, 'turn', s.turn, 'action_a', s.action_a, 'action_b', s.action_b, 'timer_by', s.timer_by, 'timer_until', s.timer_until)
   into v_result
   from public.pvp_state s where s.match_id = p_match_id;
   return v_result;
@@ -941,6 +948,87 @@ begin
 end;
 $$;
 
+-- Cancela la acción que el jugador actual envió en el turno indicado (si aún
+-- no se ha resuelto el turno). Permite rectificar antes de que el rival actúe.
+create or replace function public.clear_pvp_action(p_match_id uuid, p_turn integer)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_side text;
+  v_result jsonb;
+begin
+  if auth.uid() is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select case when m.player_a_id = auth.uid() then 'a' when m.player_b_id = auth.uid() then 'b' end
+  into v_side
+  from public.pvp_matches m where m.id = p_match_id;
+  if v_side is null then raise exception 'No participas en esta partida'; end if;
+  if v_side = 'a' then
+    update public.pvp_state set action_a = null, updated_at = now()
+    where match_id = p_match_id and turn = p_turn;
+  else
+    update public.pvp_state set action_b = null, updated_at = now()
+    where match_id = p_match_id and turn = p_turn;
+  end if;
+  if not found then raise exception 'El turno ya cambió, recarga el estado'; end if;
+  select jsonb_build_object('state', s.state, 'turn', s.turn, 'action_a', s.action_a, 'action_b', s.action_b, 'timer_by', s.timer_by, 'timer_until', s.timer_until)
+  into v_result
+  from public.pvp_state s where s.match_id = p_match_id;
+  return v_result;
+end;
+$$;
+
+-- Inicia la cuenta atrás de 5 minutos. El jugador que la pulsa está esperando:
+-- si el rival no actúa antes de que acabe, este jugador gana. Si el rival
+-- (o cualquier jugador) actúa, submit_pvp_action la resetea a inactiva.
+create or replace function public.start_pvp_timer(p_match_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_side text;
+  v_result jsonb;
+begin
+  if auth.uid() is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select case when m.player_a_id = auth.uid() then 'a' when m.player_b_id = auth.uid() then 'b' end
+  into v_side
+  from public.pvp_matches m where m.id = p_match_id and m.status = 'active';
+  if v_side is null then raise exception 'No participas en esta partida o no ha comenzado'; end if;
+  update public.pvp_state
+  set timer_by = v_side, timer_until = now() + interval '5 minutes', updated_at = now()
+  where match_id = p_match_id;
+  select jsonb_build_object('state', s.state, 'turn', s.turn, 'action_a', s.action_a, 'action_b', s.action_b, 'timer_by', s.timer_by, 'timer_until', s.timer_until)
+  into v_result
+  from public.pvp_state s where s.match_id = p_match_id;
+  return v_result;
+end;
+$$;
+
+-- Si la cuenta atrás venció y el rival no actuó, el que estaba esperando gana.
+-- Idempotente: devuelve false si no hay timer activo o aún no expiró.
+create or replace function public.expire_pvp_timer(p_match_id uuid)
+returns boolean
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_timer_by text;
+  v_until timestamptz;
+begin
+  if auth.uid() is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select timer_by, timer_until into v_timer_by, v_until
+  from public.pvp_state where match_id = p_match_id;
+  if v_timer_by is null or v_until is null then return false; end if;
+  if v_until > now() then return false; end if;
+  update public.pvp_matches set status = 'finished', result = v_timer_by
+  where id = p_match_id;
+  update public.pvp_state
+  set state = state || jsonb_build_object('phase', 'finished', 'winner', v_timer_by),
+      timer_by = null, timer_until = null, updated_at = now()
+  where match_id = p_match_id;
+  return true;
+end;
+$$;
+
 -- Seguridad PvP: solo acceso vía RPC.
 alter table public.pvp_matches enable row level security;
 alter table public.pvp_state enable row level security;
@@ -959,3 +1047,6 @@ grant execute on function public.resolve_pvp_turn to authenticated;
 grant execute on function public.finish_pvp_match to authenticated;
 grant execute on function public.forfeit_pvp_match to authenticated;
 grant execute on function public.cancel_pvp_match to authenticated;
+grant execute on function public.clear_pvp_action to authenticated;
+grant execute on function public.start_pvp_timer to authenticated;
+grant execute on function public.expire_pvp_timer to authenticated;

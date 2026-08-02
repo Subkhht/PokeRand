@@ -33,6 +33,8 @@ export interface PvpTurnSnapshot {
   turn: number
   action_a: { kind: 'move' | 'switch'; index: number } | null
   action_b: { kind: 'move' | 'switch'; index: number } | null
+  timer_by: 'a' | 'b' | null
+  timer_until: string | null
 }
 
 export interface PvpRoomResult {
@@ -207,6 +209,39 @@ export async function cancelPvpMatch(matchId: string): Promise<boolean> {
   const { data, error } = await client.rpc('cancel_pvp_match', { p_match_id: matchId })
   if (error) {
     console.error('cancel_pvp_match:', error)
+    return false
+  }
+  return data === true
+}
+
+export async function clearPvpAction(matchId: string, turn: number): Promise<PvpTurnSnapshot | null> {
+  const client = await getClient()
+  if (!client) return null
+  const { data, error } = await client.rpc('clear_pvp_action', { p_match_id: matchId, p_turn: turn })
+  if (error) {
+    console.error('clear_pvp_action:', error)
+    return null
+  }
+  return (data as PvpTurnSnapshot) ?? null
+}
+
+export async function startPvpTimer(matchId: string): Promise<PvpTurnSnapshot | null> {
+  const client = await getClient()
+  if (!client) return null
+  const { data, error } = await client.rpc('start_pvp_timer', { p_match_id: matchId })
+  if (error) {
+    console.error('start_pvp_timer:', error)
+    return null
+  }
+  return (data as PvpTurnSnapshot) ?? null
+}
+
+export async function expirePvpTimer(matchId: string): Promise<boolean> {
+  const client = await getClient()
+  if (!client) return false
+  const { data, error } = await client.rpc('expire_pvp_timer', { p_match_id: matchId })
+  if (error) {
+    console.error('expire_pvp_timer:', error)
     return false
   }
   return data === true
