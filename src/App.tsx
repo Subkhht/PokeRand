@@ -710,6 +710,7 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: 'coop_trades_5', name: 'Trueques Frecuentes', desc: 'Completa 5 intercambios en total', icon: '🤝', hidden: false },
   { id: 'coop_trades_10', name: 'Mercader Cooperativo', desc: 'Completa 10 intercambios en total', icon: '💼', hidden: false },
   { id: 'coop_hard_win', name: 'Dúo Imparable', desc: 'Gana una partida cooperativa en dificultad Difícil', icon: '⚡', hidden: false },
+  { id: 'meta_complete', name: 'Magnate del PokéShop', desc: 'Compra todos los objetos de la Tienda Meta', icon: '🛍️', hidden: false },
 ]
 
 const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (pokemon: Pokemon) => Partial<Pokemon> }> = [
@@ -1954,8 +1955,6 @@ function MainApp() {
     if (runStats.pokemonUsed.length >= 10) unlockAchievement('team_diversity_10')
     if (runStats.pokemonUsed.length >= 20) unlockAchievement('team_diversity_20')
     if (runStats.evolutions >= 5) unlockAchievement('evolution_master')
-    if (runStats.lowestHPEver > 0 && team.some(p => p.hp > 0 && p.hp <= p.maxHp * 0.1)) unlockAchievement('comeback')
-    if (runStats.lowestHPEver === 1) unlockAchievement('back_from_brink')
     if (metaProgression.pokeCoins >= 100) unlockAchievement('meta_100')
     if (metaProgression.pokeCoins >= 500) unlockAchievement('meta_500')
     if (metaProgression.pokeCoins >= 1000) unlockAchievement('meta_1000')
@@ -1997,6 +1996,16 @@ function MainApp() {
     if (metaProgression.coopTrades >= 5) unlockAchievement('coop_trades_5')
     if (metaProgression.coopTrades >= 10) unlockAchievement('coop_trades_10')
   }, [metaProgression.coopTrades])
+
+  useEffect(() => {
+    const allThemesOwned = THEMES.every(t => metaProgression.ownedThemes.includes(t.id))
+    const allItemsOwned = META_SHOP_ITEMS.every(item => {
+      if (item.category === 'theme') return metaProgression.ownedThemes.includes(item.id)
+      if (item.category === 'music') return metaProgression.ownedMusic.includes(item.id)
+      return metaProgression.permanentlyUnlockedItems.includes(item.id)
+    })
+    if (allThemesOwned && allItemsOwned) unlockAchievement('meta_complete')
+  }, [metaProgression.ownedThemes, metaProgression.ownedMusic, metaProgression.permanentlyUnlockedItems])
 
   useEffect(() => {
     if (winStreak >= 3) unlockAchievement('streak_3')
@@ -2257,6 +2266,13 @@ function MainApp() {
       setRunSeed(parseFloat(coopSeedRef.current) || Math.random())
     } else {
       setRunSeed(Math.random())
+    }
+
+    // En Co-op, la dificultad de la run es la de la sesión (Fácil/Intermedio/Difícil),
+    // no la del menú principal. Si no, los combates (TeamR incluido) se escalarían
+    // con la dificultad que tuviera el menú (p. ej. Infinite → multiplicadores enormes).
+    if (coopModeRef.current && coopDiffRef.current) {
+      setDifficulty(coopDiffRef.current)
     }
 
     setIsLoading(true)
@@ -3398,6 +3414,10 @@ function MainApp() {
 
   async function enterNode(): Promise<void> {
     if (!activePokemon || !currentNode) return
+
+    // El flag de batalla TeamR debe reflejar SIEMPRE el nodo actual, para que un
+    // TeamR escapado (Cuerda Huida) o un combate normal no hereden el robo/elección.
+    setIsTeamRocketBattle(currentNode.type === 'teamRocket')
 
     if (currentNode.type === 'shop') {
       const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i])
@@ -4619,6 +4639,10 @@ function MainApp() {
         playHit()
         setTimeout(() => setEnemyHitFlash(false), 400)
       }
+      // Golpe Definitivo: el ataque del jugador debilita al enemigo de un golpe.
+      if (prevEnemyHp > 0 && nextEnemy.hp <= 0) {
+        setRunStats(prev => ({ ...prev, koFirstTurn: prev.koFirstTurn + 1 }))
+      }
       playerCrits = playerHit.crits
       if (playerHit.attackerHeal > 0) {
         const healed = Math.min(nextPlayer.maxHp, nextPlayer.hp + playerHit.attackerHeal)
@@ -4763,6 +4787,20 @@ function MainApp() {
 
     // --- Enemigo derrotado ---
     if (nextEnemy.hp <= 0) {
+      // Logros de remontada: se comprueban en la victoria (antes de la curación
+      // automática por subir de nivel). Para entrenadores, solo cuando es la
+      // victoria final de todo el equipo rival.
+      const isFullWin = !isTrainerBattle || (() => {
+        const updatedTrainerTeam = trainerTeam.map((p, idx) => idx === trainerPokemonIndex ? nextEnemy : p)
+        return updatedTrainerTeam.findIndex((p, idx) => idx > trainerPokemonIndex && p.hp > 0) === -1
+      })()
+      if (isFullWin) {
+        if (nextPlayer.hp === 1) unlockAchievement('back_from_brink')
+        const aliveTeam = nextTeam.filter(p => p.hp > 0)
+        if (aliveTeam.length === 1 && aliveTeam[0].hp > 0 && aliveTeam[0].hp <= aliveTeam[0].maxHp * 0.1) {
+          unlockAchievement('comeback')
+        }
+      }
       // --- Batalla de entrenador: verificar si hay más Pokémon ---
       const baseLevelsGained = runChallenges.fixedLevel ? 0 : 1
 
@@ -5319,6 +5357,7 @@ function MainApp() {
       }
       setInventory(prev => prev.filter((_, i) => i !== itemIndex))
       setBattleLog((prev) => [`💨 ¡Usaste la Cuerda Huida y escapaste del combate!`, ...prev].slice(0, 15))
+      setIsTeamRocketBattle(false)
       completeCurrentNode()
       return
     }
