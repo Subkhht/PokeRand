@@ -985,19 +985,17 @@ function fallbackSprite(e: React.SyntheticEvent<HTMLImageElement>) {
   const img = e.currentTarget
   const src = img.src
 
-  if (src.includes('/other/showdown/')) {
-    img.src = src
-      .replace(/\/other\/showdown\/shiny\/(\d+)\.gif/, '/shiny/$1.png')
-      .replace(/\/other\/showdown\/(\d+)\.gif/, '/$1.png')
-    img.onerror = null
-    return
-  }
-
-  if (src.includes('/animated/')) {
-    img.src = src
-      .replace(/\/animated\/shiny\/(\d+)\.gif/, '/other/showdown/shiny/$1.gif')
-      .replace(/\/animated\/(\d+)\.gif/, '/other/showdown/$1.gif')
-    return
+  // Último recurso para sprites de Pokémon: sprite estático base, que existe
+  // para TODOS los IDs de PokeAPI (formas normales, alternas, mega, primal, etc.).
+  // Resuelve también los fallos de los GIF animados (Gen V) y de Showdown.
+  const idMatch = src.match(/\/(\d+)\.(png|gif)/)
+  if (idMatch && src.includes('raw.githubusercontent.com/PokeAPI')) {
+    const base = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${idMatch[1]}.png`
+    if (img.src !== base) {
+      img.src = base
+      img.onerror = null
+      return
+    }
   }
 
   img.onerror = null
