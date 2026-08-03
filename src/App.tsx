@@ -915,6 +915,11 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_cursed_blade', name: 'Cursed Blade', desc: '+35% ATK, -5 HP/turno.', price: 90, spriteKey: 'Cursed Blade', category: 'holdable' },
   { id: 'unlock_mega_node', name: 'Nodo Mega', desc: 'Desbloquea nodos de Mega Piedra en Hard/Infinite.', price: 150, spriteKey: 'Mega Stone', category: 'upgrade' },
   { id: 'unlock_gmax_node', name: 'Nodo G-MAX', desc: 'Desbloquea nodos G-MAX en Hard/Infinite.', price: 200, spriteKey: 'Dynamax Band', category: 'upgrade' },
+  { id: 'start_pokeballs_5', name: 'Inicio: +5 Poké Balls', desc: 'Empiezas cada aventura con 5 Poké Balls extra.', price: 180, spriteKey: 'Poké Ball', category: 'upgrade' },
+  { id: 'start_potion_1', name: 'Inicio: +1 Poción', desc: 'Empiezas cada aventura con 1 Poción extra.', price: 140, spriteKey: 'Potion', category: 'upgrade' },
+  { id: 'start_potion_2', name: 'Inicio: +1 Poción II', desc: 'Empiezas cada aventura con 1 Poción extra (se suma a la anterior).', price: 180, spriteKey: 'Potion', category: 'upgrade' },
+  { id: 'start_money_1', name: 'Inicio: +$100', desc: 'Empiezas cada aventura con $100 extra.', price: 120, spriteKey: 'money', category: 'upgrade' },
+  { id: 'start_money_2', name: 'Inicio: +$100 II', desc: 'Empiezas cada aventura con $100 extra (se suma a la anterior).', price: 160, spriteKey: 'money', category: 'upgrade' },
   { id: 'unlock_quick_ball', name: 'Quick Ball', desc: 'x5 en el primer turno. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Quick Ball', category: 'pokeball' },
   { id: 'unlock_timer_ball', name: 'Timer Ball', desc: 'Mejora con los turnos (hasta x4). Aparece en tiendas y descansos.', price: 35, spriteKey: 'Timer Ball', category: 'pokeball' },
   { id: 'unlock_dusk_ball', name: 'Dusk Ball', desc: 'x3 en oscuridad. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Dusk Ball', category: 'pokeball' },
@@ -1853,7 +1858,10 @@ function MainApp() {
     const challengesLocked = gen === 0
       ? !generations.every((g) => progression.completedMedium.includes(g))
       : !progression.completedMedium.includes(gen)
-    if (challengesLocked && (runChallenges.noShops || runChallenges.noRests || runChallenges.allShiny || runChallenges.allTeamRocket || runChallenges.nuzlocke || runChallenges.soloStarter || runChallenges.fixedTeam || runChallenges.noEvolution || runChallenges.noItems || runChallenges.restrictedMoves || runChallenges.firstStrike || runChallenges.fixedLevel || runChallenges.noCrits || runChallenges.typeRandomizer || runChallenges.noPurchasing || runChallenges.blindRoute || runChallenges.bossRush || runChallenges.speedrun || runChallenges.noMoney || runChallenges.doubleModifiers || runChallenges.scalingEnemies || runChallenges.noHealing || runChallenges.ironman || runChallenges.totalRandomizer || runChallenges.nuzlockeHardcore || runChallenges.challengeGauntlet || runChallenges.egglocke)) {
+    // En Cooperativo y COLISEUM los desafíos están siempre disponibles, así que
+    // no se resetean al cambiar de generación. En Infinite sí se bloquean.
+    const challengesAlwaysAvailable = coopMode || difficulty === 'coliseum'
+    if (!challengesAlwaysAvailable && challengesLocked && (runChallenges.noShops || runChallenges.noRests || runChallenges.allShiny || runChallenges.allTeamRocket || runChallenges.nuzlocke || runChallenges.soloStarter || runChallenges.fixedTeam || runChallenges.noEvolution || runChallenges.noItems || runChallenges.restrictedMoves || runChallenges.firstStrike || runChallenges.fixedLevel || runChallenges.noCrits || runChallenges.typeRandomizer || runChallenges.noPurchasing || runChallenges.blindRoute || runChallenges.bossRush || runChallenges.speedrun || runChallenges.noMoney || runChallenges.doubleModifiers || runChallenges.scalingEnemies || runChallenges.noHealing || runChallenges.ironman || runChallenges.totalRandomizer || runChallenges.nuzlockeHardcore || runChallenges.challengeGauntlet || runChallenges.egglocke)) {
       setRunChallenges({ noShops: false, noRests: false, allShiny: false, allTeamRocket: false, nuzlocke: false, soloStarter: false, fixedTeam: false, noEvolution: false, noItems: false, restrictedMoves: false, firstStrike: false, fixedLevel: false, noCrits: false, typeRandomizer: false, noPurchasing: false, blindRoute: false, bossRush: false, speedrun: false, noMoney: false, doubleModifiers: false, scalingEnemies: false, noHealing: false, ironman: false, totalRandomizer: false, nuzlockeHardcore: false, challengeGauntlet: false, egglocke: false })
     }
   }
@@ -1863,6 +1871,10 @@ function MainApp() {
     if (diff === 'infinite' && !isInfiniteUnlocked(generation)) return
     if (diff === 'coliseum' && !isColiseumUnlocked()) return
     setDifficulty(diff)
+    // Infinite no permite desafíos: al seleccionarlo se limpian los que hubiera.
+    if (diff === 'infinite' && !coopMode) {
+      setRunChallenges({ noShops: false, noRests: false, allShiny: false, allTeamRocket: false, nuzlocke: false, soloStarter: false, fixedTeam: false, noEvolution: false, noItems: false, restrictedMoves: false, firstStrike: false, fixedLevel: false, noCrits: false, typeRandomizer: false, noPurchasing: false, blindRoute: false, bossRush: false, speedrun: false, noMoney: false, doubleModifiers: false, scalingEnemies: false, noHealing: false, ironman: false, totalRandomizer: false, nuzlockeHardcore: false, challengeGauntlet: false, egglocke: false })
+    }
   }
 
   function getEffectiveGen(): number {
@@ -2556,8 +2568,20 @@ function MainApp() {
       }
       setTeam([starterWithBonus])
       setActiveIndex(0)
-      setMoney(activeChallenges.noMoney ? 0 : 100)
-      setInventory([run.item, ...Array(5).fill('Poké Ball')])
+      // Mejoras de inicio de la Tienda Meta: bolas, pociones y dinero extra.
+      const startItems = metaProgression.permanentlyUnlockedItems
+      const extraBalls = startItems.includes('start_pokeballs_5') ? 5 : 0
+      const extraPotions =
+        (startItems.includes('start_potion_1') ? 1 : 0) +
+        (startItems.includes('start_potion_2') ? 1 : 0)
+      const extraMoney =
+        ((startItems.includes('start_money_1') ? 1 : 0) +
+         (startItems.includes('start_money_2') ? 1 : 0)) * 100
+      setMoney(activeChallenges.noMoney ? 0 : 100 + extraMoney)
+      const startingItems: string[] = [run.item]
+      for (let i = 0; i < 5 + extraBalls; i++) startingItems.push('Poké Ball')
+      for (let i = 0; i < extraPotions; i++) startingItems.push('Potion')
+      setInventory(startingItems)
       setModifier(run.modifier)
       setRoute(customRoute)
       setRouteIndex(0)
@@ -4195,15 +4219,6 @@ function MainApp() {
     if (restEncounter) return
     setIsLoading(true)
     setApiError('')
-
-    const effectiveGen = getEffectiveGen()
-    const challengesUnlocked = effectiveGen === 0
-      ? generations.every((g) => progression.completedMedium.includes(g))
-      : progression.completedMedium.includes(effectiveGen)
-
-    if (!challengesUnlocked) {
-      setRunChallenges({ noShops: false, noRests: false, allShiny: false, allTeamRocket: false, nuzlocke: false, soloStarter: false, fixedTeam: false, noEvolution: false, noItems: false, restrictedMoves: false, firstStrike: false, fixedLevel: false, noCrits: false, typeRandomizer: false, noPurchasing: false, blindRoute: false, bossRush: false, speedrun: false, noMoney: false, doubleModifiers: false, scalingEnemies: false, noHealing: false, ironman: false, totalRandomizer: false, nuzlockeHardcore: false, challengeGauntlet: false, egglocke: false })
-    }
 
     try {
       if (runChallenges.egglocke) {
@@ -8003,9 +8018,16 @@ function MainApp() {
 
           <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>3. Desafíos de Run <span className="muted" style={{ fontSize: '0.7rem', fontWeight: 'normal' }}>(opcional)</span></h2>
           {(() => {
-            const challengesUnlocked = generation === 0
-              ? generations.every((g) => progression.completedMedium.includes(g))
-              : progression.completedMedium.includes(generation)
+            // En Cooperativo y COLISEUM los desafíos están siempre disponibles.
+            // En Infinite NO se permiten (siempre bloqueados). En el resto
+            // siguen el desbloqueo normal (completar la generación en Intermedio).
+            const challengesUnlocked = coopMode || difficulty === 'coliseum'
+              ? true
+              : (difficulty === 'infinite'
+                ? false
+                : (generation === 0
+                  ? generations.every((g) => progression.completedMedium.includes(g))
+                  : progression.completedMedium.includes(generation)))
 
             const challengeCategories = [
               {
@@ -8076,7 +8098,9 @@ function MainApp() {
               <div className="challenge-section" style={!challengesUnlocked ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
                 {!challengesUnlocked && (
                   <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem', color: '#fbbf24' }}>
-                    🔒 Completa la {generation === 0 ? 'todas las generaciones' : `Gen ${generation} (${generationRegions[generation]})`} en Intermedio o Difícil para desbloquear los desafíos.
+                    {difficulty === 'infinite'
+                      ? '🔒 Los desafíos no están disponibles en el modo Infinite.'
+                      : `🔒 Completa la ${generation === 0 ? 'todas las generaciones' : `Gen ${generation} (${generationRegions[generation]})`} en Intermedio o Difícil para desbloquear los desafíos.`}
                   </p>
                 )}
                 {challengeCategories.map((cat) => (
@@ -10100,7 +10124,7 @@ function MainApp() {
                         <div style={{ color: '#ff8a33', fontSize: '0.7rem' }}>Consumible</div>
                       </div>
                     </div>
-                    <div style={{ color: '#7d7ab5', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
                     {owned ? (
                       <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
                     ) : (
@@ -10132,7 +10156,7 @@ function MainApp() {
                         <div style={{ color: '#ee3b2f', fontSize: '0.7rem' }}>Poké Ball</div>
                       </div>
                     </div>
-                    <div style={{ color: '#7d7ab5', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
                     {owned ? (
                       <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
                     ) : (
@@ -10164,7 +10188,7 @@ function MainApp() {
                         <div style={{ color: '#a855f7', fontSize: '0.7rem' }}>Piedra Evolutiva</div>
                       </div>
                     </div>
-                    <div style={{ color: '#7d7ab5', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
                     {owned ? (
                       <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
                     ) : (
@@ -10196,7 +10220,7 @@ function MainApp() {
                         <div style={{ color: '#ff8a33', fontSize: '0.7rem' }}>Objeto Evolutivo</div>
                       </div>
                     </div>
-                    <div style={{ color: '#7d7ab5', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
                     {owned ? (
                       <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
                     ) : (
@@ -10212,20 +10236,24 @@ function MainApp() {
             </div>
 
             <h3 style={{ color: '#22d3ee', marginBottom: '0.5rem' }}>⚙️ Mejoras</h3>
-            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea nodos especiales en las rutas Hard/Infinite.</p>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Mejoras permanentes: empieza cada aventura con objetos y dinero extra, y desbloquea nodos especiales en rutas Hard/Infinite.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'upgrade').map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 return (
                   <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                      <span style={{ fontSize: '1.5rem' }}>⚙️</span>
+                      <span style={{ fontSize: '1.5rem' }}>
+                        {ITEM_SPRITES[item.spriteKey]
+                          ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '36px', height: '36px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
+                          : item.spriteKey === 'money' ? '💰' : '⚙️'}
+                      </span>
                       <div>
                         <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
                         <div style={{ color: '#22d3ee', fontSize: '0.7rem' }}>Mejora</div>
                       </div>
                     </div>
-                    <div style={{ color: '#7d7ab5', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
                     {owned ? (
                       <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
                     ) : (
@@ -10254,7 +10282,7 @@ function MainApp() {
                         <div style={{ color: '#ff9ad6', fontSize: '0.7rem' }}>Música</div>
                       </div>
                     </div>
-                    <div style={{ color: '#7d7ab5', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
                     {owned ? (
                       <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
                     ) : (
@@ -10286,7 +10314,7 @@ function MainApp() {
                         <div style={{ color: '#a855f7', fontSize: '0.7rem' }}>Objeto Pasivo</div>
                       </div>
                     </div>
-                    <div style={{ color: '#7d7ab5', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
                     {owned ? (
                       <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
                     ) : (
@@ -10312,10 +10340,13 @@ function MainApp() {
       {unlockPopup && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10000, background: '#1c1c3a', border: '3px solid #ffcb05', borderRadius: '8px', padding: '2rem 3rem', textAlign: 'center', boxShadow: '5px 5px 0 0 rgba(0,0,0,0.6)', animation: 'slideInRight 0.5s ease' }}>
           <div style={{ marginBottom: '0.5rem', animation: 'pulseGlow 1s infinite' }}>
-            {ITEM_SPRITES[unlockPopup.spriteKey]
-              ? <img src={ITEM_SPRITES[unlockPopup.spriteKey]} alt={unlockPopup.name} style={{ width: '80px', height: '80px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
-              : <span style={{ fontSize: '4rem' }}>📦</span>
-            }
+            {unlockPopup.spriteKey === 'money' ? (
+              <span style={{ fontSize: '4rem' }}>💰</span>
+            ) : (
+              ITEM_SPRITES[unlockPopup.spriteKey]
+                ? <img src={ITEM_SPRITES[unlockPopup.spriteKey]} alt={unlockPopup.name} style={{ width: '80px', height: '80px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
+                : <span style={{ fontSize: '4rem' }}>📦</span>
+            )}
           </div>
           <div style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '1.1rem', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.25rem' }}>¡Item Desbloqueado!</div>
           <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '1.4rem', marginBottom: '0.5rem' }}>{unlockPopup.name}</div>
