@@ -26,7 +26,7 @@ import { resolvePvpTurn, type PvpAction } from './game/pvpBattle'
 import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'trade' | 'blackmarket' | 'double' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum'
 
 const STATUS_LABELS: Record<StatusType, string> = {
@@ -290,6 +290,10 @@ const itemDescriptions: Record<string, string> = {
   'Love Ball': 'x8 si es de la misma familia evolutiva.',
   'Friend Ball': 'Una ball especial amistosa (x1).',
   'Heavy Ball': 'Mejor contra Pokémon pesados (hasta x4).',
+  'Mega Stone': 'Permite mega-evolucionar 1 vez por combate.',
+  'Dynamax Band': 'Permite gigamaximar 1 vez por combate (3 turnos).',
+  'Prisma Rojo': 'Despierta la Primal Reversion de Groudon (1 vez por combate).',
+  'Prisma Azul': 'Despierta la Primal Reversion de Kyogre (1 vez por combate).',
   'Cuerda Huida': 'Escapa de cualquier combate de la aventura.',
   'Moomoo Milk': 'Restaura 100 HP de un Pokémon.',
   'Berry Juice': 'Restaura 20 HP de un Pokémon.',
@@ -348,6 +352,8 @@ const ITEM_SPRITES: Record<string, string> = {
   'Cursed Blade': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/razor-claw.png',
   'Mega Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/key-stone.png',
   'Dynamax Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png',
+  'Prisma Rojo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/red-orb.png',
+  'Prisma Azul': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/blue-orb.png',
   'Poké Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png',
   'Great Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/great-ball.png',
   'Ultra Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ultra-ball.png',
@@ -407,6 +413,7 @@ interface HoldableItem {
   firstStrikeBonus?: number
   isMegaStone?: boolean
   isGmaxBand?: boolean
+  isPrimalOrb?: boolean
 }
 
 const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
@@ -440,6 +447,8 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Cursed Blade': { name: 'Cursed Blade', desc: '+35% Ataque, -5 HP por turno', price: 450, attackMod: 0.35, healPerTurn: -5 },
   'Mega Stone': { name: 'Mega Stone', desc: 'Permite mega-evolucionar 1 vez por combate', price: 700, isMegaStone: true },
   'Dynamax Band': { name: 'Dynamax Band', desc: 'Permite gigamaximar 1 vez por combate (3 turnos)', price: 0, isGmaxBand: true },
+  'Prisma Rojo': { name: 'Prisma Rojo', desc: 'Despierta la Primal Reversion de Groudon (1 vez por combate)', price: 0, isPrimalOrb: true },
+  'Prisma Azul': { name: 'Prisma Azul', desc: 'Despierta la Primal Reversion de Kyogre (1 vez por combate)', price: 0, isPrimalOrb: true },
   'Metal Coat': { name: 'Metal Coat', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   "King's Rock": { name: "King's Rock", desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Dragon Scale': { name: 'Dragon Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
@@ -598,6 +607,15 @@ const GMAX_FORM_IDS: Record<number, number | number[]> = {
   842: 10217, 844: 10218, 849: [10219, 10228], 851: 10220,
   858: 10221, 861: 10222, 869: 10223, 879: 10224, 884: 10225,
   892: [10226, 10227],
+}
+
+const PRIMAL_CAPABLE_IDS = new Set([
+  382, 383,
+])
+
+const PRIMAL_FORM_IDS: Record<number, number> = {
+  382: 10077,
+  383: 10078,
 }
 
 const ACHIEVEMENTS: Achievement[] = [
@@ -866,6 +884,7 @@ interface MetaShopItem {
   price: number
   spriteKey: string
   category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' | 'pokeball' | 'evolution_stone' | 'evolution_item'
+  requires?: string
 }
 
 const META_SHOP_ITEMS: MetaShopItem[] = [
@@ -915,11 +934,14 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_cursed_blade', name: 'Cursed Blade', desc: '+35% ATK, -5 HP/turno.', price: 90, spriteKey: 'Cursed Blade', category: 'holdable' },
   { id: 'unlock_mega_node', name: 'Nodo Mega', desc: 'Desbloquea nodos de Mega Piedra en Hard/Infinite.', price: 150, spriteKey: 'Mega Stone', category: 'upgrade' },
   { id: 'unlock_gmax_node', name: 'Nodo G-MAX', desc: 'Desbloquea nodos G-MAX en Hard/Infinite.', price: 200, spriteKey: 'Dynamax Band', category: 'upgrade' },
+  { id: 'unlock_primal_node', name: 'Nodo Primal', desc: 'Desbloquea nodos Primal en Hard/Infinite. Otorgan Prisma Rojo o Azul.', price: 250, spriteKey: 'Prisma Rojo', category: 'upgrade' },
+  { id: 'unlock_reroll', name: 'Reroll', desc: 'Permite rerollear la tienda 1 vez por visita.', price: 120, spriteKey: 'Mega Stone', category: 'upgrade' },
+  { id: 'unlock_reroll_2', name: 'Reroll II', desc: 'Otorga 1 reroll extra de tienda por visita.', price: 200, spriteKey: 'Mega Stone', category: 'upgrade', requires: 'unlock_reroll' },
   { id: 'start_pokeballs_5', name: 'Inicio: +5 Poké Balls', desc: 'Empiezas cada aventura con 5 Poké Balls extra.', price: 180, spriteKey: 'Poké Ball', category: 'upgrade' },
   { id: 'start_potion_1', name: 'Inicio: +1 Poción', desc: 'Empiezas cada aventura con 1 Poción extra.', price: 140, spriteKey: 'Potion', category: 'upgrade' },
-  { id: 'start_potion_2', name: 'Inicio: +1 Poción II', desc: 'Empiezas cada aventura con 1 Poción extra (se suma a la anterior).', price: 180, spriteKey: 'Potion', category: 'upgrade' },
+  { id: 'start_potion_2', name: 'Inicio: +1 Poción II', desc: 'Empiezas cada aventura con 1 Poción extra (se suma a la anterior).', price: 180, spriteKey: 'Potion', category: 'upgrade', requires: 'start_potion_1' },
   { id: 'start_money_1', name: 'Inicio: +$100', desc: 'Empiezas cada aventura con $100 extra.', price: 120, spriteKey: 'money', category: 'upgrade' },
-  { id: 'start_money_2', name: 'Inicio: +$100 II', desc: 'Empiezas cada aventura con $100 extra (se suma a la anterior).', price: 160, spriteKey: 'money', category: 'upgrade' },
+  { id: 'start_money_2', name: 'Inicio: +$100 II', desc: 'Empiezas cada aventura con $100 extra (se suma a la anterior).', price: 160, spriteKey: 'money', category: 'upgrade', requires: 'start_money_1' },
   { id: 'unlock_quick_ball', name: 'Quick Ball', desc: 'x5 en el primer turno. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Quick Ball', category: 'pokeball' },
   { id: 'unlock_timer_ball', name: 'Timer Ball', desc: 'Mejora con los turnos (hasta x4). Aparece en tiendas y descansos.', price: 35, spriteKey: 'Timer Ball', category: 'pokeball' },
   { id: 'unlock_dusk_ball', name: 'Dusk Ball', desc: 'x3 en oscuridad. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Dusk Ball', category: 'pokeball' },
@@ -1078,6 +1100,8 @@ function nodeTypeLabel(node: RouteNode): string {
       return 'Mega'
     case 'gmax':
       return 'G-MAX'
+    case 'primal':
+      return 'Primal'
     case 'trade':
       return 'Intercambio'
     case 'rival':
@@ -1141,6 +1165,7 @@ const NODE_EMOJIS: Record<string, string> = {
   move: '🧬',
   mega: '💎',
   gmax: '⚡',
+  primal: '🔮',
   trade: '🤝',
   rival: '👤',
   blackmarket: '🕶️',
@@ -1158,6 +1183,7 @@ const NODE_TYPE_COLORS: Record<string, string> = {
   move: '#56e0cd',
   mega: '#ff9ad6',
   gmax: '#9da6ff',
+  primal: '#ff8a33',
   trade: '#37d16b',
   rival: '#f472b6',
   blackmarket: '#fb923c',
@@ -1323,6 +1349,7 @@ function MainApp() {
   // Economía y Tienda
   const [money, setMoney] = useState<number>(100)
   const [shopStock, setShopStock] = useState<string[]>([])
+  const [shopRerollsUsed, setShopRerollsUsed] = useState(0)
   const [shopQty, setShopQty] = useState<Record<string, number>>({})
   const [sellQty, setSellQty] = useState<Record<string, number>>({})
 
@@ -1457,7 +1484,7 @@ function MainApp() {
   const megaNodeSpawnedRef = useRef(false)
   const [battleMegaUsed, setBattleMegaUsed] = useState(false)
   const [battleGmaxUsed, setBattleGmaxUsed] = useState(false)
-  const originalPokemonDataRef = useRef<Record<number, { sprite: string; attack: number; defense: number; speed: number }>>({})
+  const [battlePrimalUsed, setBattlePrimalUsed] = useState(false)
 
   const runStartTimeRef = useRef<number>(0)
   const pendingScoreRef = useRef<InfiniteScoreInsert | null>(null)
@@ -1713,16 +1740,15 @@ function MainApp() {
   // Reset mega/gmax state when battle ends
   useEffect(() => {
     if (screen === 'defeat' || screen === 'victory') {
-      const capturedOrigData = { ...originalPokemonDataRef.current }
-      originalPokemonDataRef.current = {}
-      setTeam(prev => prev.map((p, i) => {
+      setTeam(prev => prev.map((p) => {
         const reset = { statStages: { attack: 0, defense: 0, speed: 0 }, furiaActive: false }
-        const orig = capturedOrigData[i]
-        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined, ...orig, ...reset }
-        return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined, ...reset }
+        const orig = p.megaOrig
+        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...orig, ...reset }
+        return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...reset }
       }))
       setBattleMegaUsed(false)
       setBattleGmaxUsed(false)
+      setBattlePrimalUsed(false)
     }
   }, [screen])
 
@@ -1775,6 +1801,7 @@ function MainApp() {
   }, [metaProgression.activeTheme])
 
   function buyMetaItem(item: MetaShopItem): void {
+    if (item.requires && !metaProgression.permanentlyUnlockedItems.includes(item.requires)) return
     if (metaProgression.pokeCoins < item.price) return
     if (item.category === 'theme') {
       if (metaProgression.ownedThemes.includes(item.id)) return
@@ -2312,6 +2339,8 @@ function MainApp() {
           type = 'mega'
         } else if (rand < 0.60 && metaProgression.permanentlyUnlockedItems.includes('unlock_gmax_node')) {
           type = 'gmax'
+        } else if (rand < 0.66 && metaProgression.permanentlyUnlockedItems.includes('unlock_primal_node')) {
+          type = 'primal'
         }
       } else if (difficulty === 'medium') {
         if (rand < 0.15 && !runChallenges.noShops) {
@@ -2350,7 +2379,7 @@ function MainApp() {
     return {
       id,
       type,
-      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : type === 'mega' ? `Mega #${id}` : type === 'gmax' ? `G-MAX #${id}` : type === 'rival' ? `Rival #${id}` : type === 'blackmarket' ? `Mercado Negro #${id}` : type === 'double' ? `Doble #${id}` : `Ruta ${id}`,
+      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : type === 'mega' ? `Mega #${id}` : type === 'gmax' ? `G-MAX #${id}` : type === 'primal' ? `Primal #${id}` : type === 'rival' ? `Rival #${id}` : type === 'blackmarket' ? `Mercado Negro #${id}` : type === 'double' ? `Doble #${id}` : `Ruta ${id}`,
       done: false
     }
   }
@@ -2523,6 +2552,7 @@ function MainApp() {
         const movePositions: number[] = []
         let megaPosition: number | null = null
         let gmaxPosition: number | null = null
+        let primalPosition: number | null = null
         if (!activeChallenges.allTeamRocket) {
           if (effectiveDifficulty === 'hard') {
             const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
@@ -2550,6 +2580,11 @@ function MainApp() {
             if (available.length > 0 && metaProgression.permanentlyUnlockedItems.includes('unlock_gmax_node')) {
               const idx = Math.floor(rr() * available.length)
               gmaxPosition = available[idx]
+              available.splice(idx, 1)
+            }
+            if (available.length > 0 && metaProgression.permanentlyUnlockedItems.includes('unlock_primal_node')) {
+              const idx = Math.floor(rr() * available.length)
+              primalPosition = available[idx]
               available.splice(idx, 1)
             }
           } else if (effectiveDifficulty === 'medium') {
@@ -2583,6 +2618,8 @@ function MainApp() {
             type = 'mega'
           } else if (gmaxPosition !== null && i === gmaxPosition) {
             type = 'gmax'
+          } else if (primalPosition !== null && i === primalPosition) {
+            type = 'primal'
           } else if (activeChallenges.bossRush) {
             type = 'battle'
           } else if (activeChallenges.allTeamRocket) {
@@ -2617,7 +2654,7 @@ function MainApp() {
           customRoute.push({
             id: i,
             type,
-            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : type === 'mega' ? `Mega #${i}` : type === 'gmax' ? `G-MAX #${i}` : type === 'rival' ? `Rival #${i}` : type === 'blackmarket' ? `Mercado Negro #${i}` : type === 'double' ? `Doble #${i}` : `Ruta ${i}`,
+            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : type === 'mega' ? `Mega #${i}` : type === 'gmax' ? `G-MAX #${i}` : type === 'primal' ? `Primal #${i}` : type === 'rival' ? `Rival #${i}` : type === 'blackmarket' ? `Mercado Negro #${i}` : type === 'double' ? `Doble #${i}` : `Ruta ${i}`,
             done: false
           })
         }
@@ -2761,10 +2798,30 @@ function MainApp() {
     }
   }
 
+  function unlockDifficultyBadge(): void {
+    if (difficulty !== 'easy' && difficulty !== 'medium' && difficulty !== 'hard') return
+    const genPlayed = currentRunGen
+    const isMediumOrHard = difficulty === 'medium' || difficulty === 'hard'
+    const updatedProgression: ProgressionData = {
+      ...progression,
+      completedAny: Array.from(new Set([...progression.completedAny, genPlayed])),
+      completedMedium: isMediumOrHard
+        ? Array.from(new Set([...progression.completedMedium, genPlayed]))
+        : progression.completedMedium,
+      completedHard: difficulty === 'hard'
+        ? Array.from(new Set([...progression.completedHard, genPlayed]))
+        : progression.completedHard,
+    }
+    localStorage.setItem('pokerand_progression', JSON.stringify(updatedProgression))
+    setProgression(updatedProgression)
+    if (difficulty === 'hard') unlockAchievement('hard_win')
+    if (difficulty === 'easy') unlockAchievement('rookie')
+    if (difficulty === 'medium') unlockAchievement('medium_win')
+  }
+
   function finalizeRunVictory(): void {
     const wins = record.wins + 1
     persistRecord(wins, record.losses)
-
     // Actualizar progresión de desbloqueos
     const genPlayed = currentRunGen
     const isMediumOrHard = difficulty === 'medium' || difficulty === 'hard'
@@ -2891,14 +2948,13 @@ function MainApp() {
       speedrunTimerRef.current = null
     }
     setSpeedrunSeconds(0)
-    const restoredOrigData = { ...originalPokemonDataRef.current }
-    originalPokemonDataRef.current = {}
-    setTeam(prev => prev.map((p, i) => {
-      const orig = restoredOrigData[i]
-      if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined, ...orig }
-      return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined }
+    setTeam(prev => prev.map((p) => {
+      const orig = p.megaOrig
+      if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...orig }
+      return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined }
     }))
     setBattleGmaxUsed(false)
+    setBattlePrimalUsed(false)
     setRoute((previous) =>
       previous.map((node, index) => (index === routeIndex ? { ...node, done: true } : node))
     )
@@ -2995,6 +3051,9 @@ function MainApp() {
           return
         }
         if ((difficulty === 'easy' || difficulty === 'medium' || difficulty === 'hard') && currentNode && currentNode.id < 1000) {
+          // Llegar a la liga significa haber completado el modo: desbloquea la
+          // insignia de dificultad aunque luego pierdas en la liga.
+          unlockDifficultyBadge()
           setLeagueOffer(true)
           return
         }
@@ -4371,6 +4430,41 @@ function MainApp() {
     setBattleLog((prev) => [`📦 ${pokemon.name} fue depositado en el PC.`, ...prev].slice(0, 15))
   }
 
+  function generateShopStock(): string[] {
+    const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i])
+    const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
+    const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
+    const shuffledHoldables = [...allHoldableKeys].sort(() => 0.5 - Math.random())
+    const selectedConsumables = shuffledConsumables.slice(0, 2)
+    const selectedHoldables = shuffledHoldables.slice(0, 1)
+    const unlockedNonBasicBalls = POKEBALL_NAMES.filter(b => b !== 'Poké Ball' && isPokeballUnlocked(b))
+    const rareBalls = unlockedNonBasicBalls.length > 0
+      ? unlockedNonBasicBalls.filter(b => b !== 'Master Ball' || Math.random() < 0.15)
+      : []
+    const ballPool = ['Poké Ball', ...rareBalls]
+    const shuffledBalls = [...ballPool].sort(() => 0.5 - Math.random())
+    const selectedBalls = shuffledBalls.slice(0, 2)
+    const unlockedStones = EVOLUTION_STONES.filter(s => isEvolutionStoneUnlocked(s))
+    const selectedStone = unlockedStones.length > 0 ? [unlockedStones[Math.floor(Math.random() * unlockedStones.length)]] : []
+    const smokeBallChance = isConsumableUnlocked('Cuerda Huida') && Math.random() < 0.25 ? ['Cuerda Huida'] : []
+    return [...selectedConsumables, ...selectedHoldables, ...selectedBalls, ...selectedStone, ...smokeBallChance]
+  }
+
+  const maxShopRerolls = () => {
+    let n = 0
+    if (metaProgression.permanentlyUnlockedItems.includes('unlock_reroll')) n += 1
+    if (metaProgression.permanentlyUnlockedItems.includes('unlock_reroll_2')) n += 1
+    return n
+  }
+
+  function rerollShop(): void {
+    if (shopRerollsUsed >= maxShopRerolls()) return
+    setShopStock(generateShopStock())
+    setShopRerollsUsed(prev => prev + 1)
+    playClick()
+    setBattleLog((prev) => [`🎲 ¡Has rerolleado la tienda! (${shopRerollsUsed + 1}/${maxShopRerolls()})`, ...prev].slice(0, 15))
+  }
+
   async function enterNode(): Promise<void> {
     if (!activePokemon || !currentNode) return
 
@@ -4457,23 +4551,8 @@ function MainApp() {
     }
 
     if (currentNode.type === 'shop') {
-      const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i])
-      const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
-      const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
-      const shuffledHoldables = [...allHoldableKeys].sort(() => 0.5 - Math.random())
-      const selectedConsumables = shuffledConsumables.slice(0, 2)
-      const selectedHoldables = shuffledHoldables.slice(0, 1)
-      const unlockedNonBasicBalls = POKEBALL_NAMES.filter(b => b !== 'Poké Ball' && isPokeballUnlocked(b))
-      const rareBalls = unlockedNonBasicBalls.length > 0
-        ? unlockedNonBasicBalls.filter(b => b !== 'Master Ball' || Math.random() < 0.15)
-        : []
-      const ballPool = ['Poké Ball', ...rareBalls]
-      const shuffledBalls = [...ballPool].sort(() => 0.5 - Math.random())
-      const selectedBalls = shuffledBalls.slice(0, 2)
-      const unlockedStones = EVOLUTION_STONES.filter(s => isEvolutionStoneUnlocked(s))
-      const selectedStone = unlockedStones.length > 0 ? [unlockedStones[Math.floor(Math.random() * unlockedStones.length)]] : []
-      const smokeBallChance = isConsumableUnlocked('Cuerda Huida') && Math.random() < 0.25 ? ['Cuerda Huida'] : []
-      setShopStock([...selectedConsumables, ...selectedHoldables, ...selectedBalls, ...selectedStone, ...smokeBallChance])
+      setShopRerollsUsed(0)
+      setShopStock(generateShopStock())
       if (runChallenges.noPurchasing) {
         setBattleLog((prev) => [
           `🚫 Desafío Sin Compras: No puedes comprar nada en la tienda.`,
@@ -4509,7 +4588,7 @@ function MainApp() {
 
     if (currentNode.type === 'spin') {
       const healingPool = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i] && i !== 'Cuerda Huida')
-      const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
+      const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
       const unlockedStones = EVOLUTION_STONES.filter(s => isEvolutionStoneUnlocked(s))
       const selectedStone = unlockedStones.length > 0 ? [unlockedStones[Math.floor(Math.random() * unlockedStones.length)]] : []
       const shuffledH = [...healingPool].sort(() => 0.5 - Math.random())
@@ -4657,6 +4736,23 @@ function MainApp() {
       return
     }
 
+    if (currentNode.type === 'primal') {
+      const redHas = inventory.includes('Prisma Rojo') || team.some(p => p.holdItem === 'Prisma Rojo')
+      const blueHas = inventory.includes('Prisma Azul') || team.some(p => p.holdItem === 'Prisma Azul')
+      const orbName = Math.random() < 0.5 ? 'Prisma Rojo' : 'Prisma Azul'
+      const alreadyHas = orbName === 'Prisma Rojo' ? redHas : blueHas
+      if (!alreadyHas || difficulty === 'infinite') {
+        setInventory(prev => [...prev, orbName])
+        setBattleLog(prev => [`🔮 ¡Recibes un ${orbName}! ${orbName === 'Prisma Rojo' ? 'Groudon' : 'Kyogre'} puede equiparlo para su Primal Reversion en combate.`, ...prev].slice(0, 15))
+      } else {
+        const price = 150
+        setMetaProgression(prev => ({ ...prev, pokeCoins: prev.pokeCoins + price }))
+        setBattleLog(prev => [`🔮 Ya tienes un ${orbName}. Recibes ${price} PokéCoins en su lugar.`, ...prev].slice(0, 15))
+      }
+      setScreen('primal')
+      return
+    }
+
     if (currentNode.type === 'rest') {
     if (restEncounter) return
     setIsLoading(true)
@@ -4772,7 +4868,7 @@ function MainApp() {
         setTrainerTeam(rivalTeam)
         setTrainerPokemonIndex(0)
         setTrainerName('Rival')
-        setTrainerSprite("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='12' fill='%231c1c3a'/%3E%3Ctext x='48' y='62' font-family='Arial Black,Arial' font-size='44' font-weight='900' fill='%23f472b6' text-anchor='middle'%3ER%3C/text%3E%3Ccircle cx='48' cy='80' r='3' fill='%23f472b6'/%3E%3C/svg%3E")
+        setTrainerSprite("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='12' fill='%23ffffff'/%3E%3Ccircle cx='48' cy='36' r='17' fill='%234d9bff'/%3E%3Cpath d='M20 88 q0 -30 28 -30 q28 0 28 30' fill='%234d9bff'/%3E%3C/svg%3E")
         setTrainerBadge('')
         setEnemy({ ...rivalTeam[0], statStages: { attack: 0, defense: 0, speed: 0 } })
         setIsTeamRocketBattle(false)
@@ -4966,10 +5062,14 @@ function MainApp() {
       }
       }
 
-      setTeam(prev => prev.map(p => ({ ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined, statStages: { attack: 0, defense: 0, speed: 0 }, furiaActive: false })))
+      setTeam(prev => prev.map(p => {
+        const orig = p.megaOrig
+        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...orig, statStages: { attack: 0, defense: 0, speed: 0 }, furiaActive: false }
+        return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, statStages: { attack: 0, defense: 0, speed: 0 }, furiaActive: false }
+      }))
       setBattleMegaUsed(false)
       setBattleGmaxUsed(false)
-      originalPokemonDataRef.current = {}
+      setBattlePrimalUsed(false)
       battleStartHPRef.current = activePokemon.hp
       setBattleTurns(0)
       setScreen('battle')
@@ -5509,23 +5609,25 @@ function MainApp() {
         if (!applyToAttacker && !applyToDefender) continue
         if (applyToAttacker) {
           const statKey = sc.stat as keyof typeof attackerStages
-          const oldStage = attackerStages[statKey]
-          const newStage = Math.max(-6, Math.min(6, oldStage + sc.change))
+          const change = Number.isFinite(sc.change) ? sc.change : 0
+          const oldStage = attackerStages[statKey] ?? 0
+          const newStage = Math.max(-6, Math.min(6, oldStage + change))
           if (newStage !== oldStage) {
             attackerStages = { ...attackerStages, [statKey]: newStage }
-            const direction = sc.change > 0 ? 'subió' : 'bajó'
+            const direction = change > 0 ? 'subió' : 'bajó'
             const statName = statKey === 'attack' ? 'Ataque' : statKey === 'defense' ? 'Defensa' : 'Velocidad'
             lines.push(`${effectiveAttacker.name} ${direction} su ${statName}! (${oldStage > 0 ? '+' : ''}${oldStage} → ${newStage > 0 ? '+' : ''}${newStage})`)
           }
         } else if (applyToDefender && currentDefender.hp > 0) {
           let newStages = currentDefender.statStages ?? { attack: 0, defense: 0, speed: 0 }
           const statKey = sc.stat as keyof typeof newStages
-          const oldStage = newStages[statKey]
-          const newStage = Math.max(-6, Math.min(6, oldStage + sc.change))
+          const change = Number.isFinite(sc.change) ? sc.change : 0
+          const oldStage = newStages[statKey] ?? 0
+          const newStage = Math.max(-6, Math.min(6, oldStage + change))
           if (newStage !== oldStage) {
             newStages = { ...newStages, [statKey]: newStage }
             currentDefender = { ...currentDefender, statStages: newStages }
-            const direction = sc.change > 0 ? 'subió' : 'bajó'
+            const direction = change > 0 ? 'subió' : 'bajó'
             const statName = statKey === 'attack' ? 'Ataque' : statKey === 'defense' ? 'Defensa' : 'Velocidad'
             lines.push(`${currentDefender.name} ${direction} su ${statName}! (${oldStage > 0 ? '+' : ''}${oldStage} → ${newStage > 0 ? '+' : ''}${newStage})`)
           }
@@ -5780,9 +5882,9 @@ function MainApp() {
       const newTurns = nextPlayer.gmaxTurnsLeft - 1
       nextPlayer = { ...nextPlayer, gmaxTurnsLeft: newTurns }
       if (newTurns <= 0) {
-        const orig = originalPokemonDataRef.current[activeIndex]
+        const orig = nextPlayer.megaOrig
         if (orig) {
-          nextPlayer = { ...nextPlayer, gmaxEvolved: false, ...orig }
+          nextPlayer = { ...nextPlayer, gmaxEvolved: false, megaOrig: undefined, ...orig }
         } else {
           nextPlayer = { ...nextPlayer, gmaxEvolved: false }
         }
@@ -6232,6 +6334,7 @@ function MainApp() {
     setTeam(prev => prev.map((p, i) => i === activeIndex ? {
       ...p,
       megaEvolved: true,
+      megaOrig: { sprite: p.sprite, attack: p.attack, defense: p.defense, speed: p.speed },
       sprite: megaSprite ?? p.sprite,
       attack: Math.floor(p.attack * 1.15),
       defense: Math.floor(p.defense * 1.15),
@@ -6239,12 +6342,6 @@ function MainApp() {
     } : p))
     if (megaFormId) {
       registerInPokedex({ ...activePokemon, id: megaFormId, sprite: megaSprite ?? activePokemon.sprite })
-    }
-    originalPokemonDataRef.current[activeIndex] = {
-      sprite: activePokemon.sprite,
-      attack: activePokemon.attack,
-      defense: activePokemon.defense,
-      speed: activePokemon.speed,
     }
     setBattleMegaUsed(true)
     setMetaProgression(prev => {
@@ -6268,6 +6365,7 @@ function MainApp() {
       ...p,
       gmaxEvolved: true,
       gmaxTurnsLeft: 3,
+      megaOrig: p.megaOrig ?? { sprite: p.sprite, attack: p.attack, defense: p.defense, speed: p.speed },
       sprite: gmaxSprite ?? p.sprite,
       attack: Math.floor(p.attack * 1.15),
       defense: Math.floor(p.defense * 1.15),
@@ -6275,14 +6373,6 @@ function MainApp() {
     } : p))
     if (gmaxFormId) {
       registerInPokedex({ ...activePokemon, id: gmaxFormId, sprite: gmaxSprite ?? activePokemon.sprite })
-    }
-    if (!originalPokemonDataRef.current[activeIndex]) {
-      originalPokemonDataRef.current[activeIndex] = {
-        sprite: activePokemon.sprite,
-        attack: activePokemon.attack,
-        defense: activePokemon.defense,
-        speed: activePokemon.speed,
-      }
     }
     setBattleGmaxUsed(true)
     setMetaProgression(prev => {
@@ -6296,12 +6386,35 @@ function MainApp() {
     setBattleLog(prev => [`⚡ ¡${activePokemon.name} ha gigamaximado! Stats aumentados un 15% por 3 turnos.`, ...prev].slice(0, 15))
   }
 
+  function primalEvolveActive(): void {
+    if (!activePokemon || !activePokemon.holdItem || (activePokemon.holdItem !== 'Prisma Rojo' && activePokemon.holdItem !== 'Prisma Azul')) return
+    if (battlePrimalUsed || activePokemon.megaEvolved || activePokemon.gmaxEvolved || !PRIMAL_CAPABLE_IDS.has(activePokemon.id)) return
+    const formId = PRIMAL_FORM_IDS[activePokemon.id]
+    const primalSprite = formId
+      ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${formId}.png`
+      : null
+    setTeam(prev => prev.map((p, i) => i === activeIndex ? {
+      ...p,
+      primalEvolved: true,
+      megaOrig: { sprite: p.sprite, attack: p.attack, defense: p.defense, speed: p.speed },
+      sprite: primalSprite ?? p.sprite,
+      attack: Math.floor(p.attack * 1.15),
+      defense: Math.floor(p.defense * 1.15),
+      speed: Math.floor(p.speed * 1.15),
+    } : p))
+    if (formId) {
+      registerInPokedex({ ...activePokemon, id: formId, sprite: primalSprite ?? activePokemon.sprite })
+    }
+    setBattlePrimalUsed(true)
+    setBattleLog(prev => [`🔮 ¡${activePokemon.name} ha despertado su Primal Reversion! Stats aumentados un 15%.`, ...prev].slice(0, 15))
+  }
+
   function switchActive(index: number): void {
     const target = team[index]
     if (!target || target.hp <= 0 || index === activeIndex) return
-    const orig = originalPokemonDataRef.current[activeIndex]
+    const orig = team[activeIndex]?.megaOrig
     setTeam(prev => prev.map((p, i) => {
-      if (i === activeIndex && orig) return { ...p, megaEvolved: false, gmaxEvolved: false, gmaxTurnsLeft: undefined, ...orig }
+      if (i === activeIndex && orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...orig }
       return p
     }))
     setActiveIndex(index)
@@ -6839,7 +6952,7 @@ function MainApp() {
       void pvpForfeit()
       return
     }
-    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'trade' || screen === 'blackmarket' || screen === 'double') {
+    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double') {
       // En Co-op, "Volver a inicio" solo sale a nivel local: NO se finaliza la
       // sesión, para no interrumpir la partida del compañero (la sesión queda
       // activa y el compañero puede continuar solo).
@@ -7076,8 +7189,9 @@ function MainApp() {
                 const item = HOLDABLE_ITEMS[equipModal.itemName]
                 const isGmaxEquip = equipModal.itemName === 'Dynamax Band'
                 const isMegaEquip = equipModal.itemName === 'Mega Stone'
-                const canUseTransform = isGmaxEquip ? GMAX_CAPABLE_IDS.has(pkmn.id) : isMegaEquip ? MEGA_CAPABLE_IDS.has(pkmn.id) : false
-                const highlightGreen = canEquip && (isGmaxEquip || isMegaEquip) && canUseTransform
+                const isPrimalEquip = equipModal.itemName === 'Prisma Rojo' || equipModal.itemName === 'Prisma Azul'
+                const canUseTransform = isGmaxEquip ? GMAX_CAPABLE_IDS.has(pkmn.id) : isMegaEquip ? MEGA_CAPABLE_IDS.has(pkmn.id) : isPrimalEquip ? PRIMAL_CAPABLE_IDS.has(pkmn.id) : false
+                const highlightGreen = canEquip && (isGmaxEquip || isMegaEquip || isPrimalEquip) && canUseTransform
                 return (
                   <button
                     key={`equip-target-${idx}`}
@@ -8722,7 +8836,7 @@ function MainApp() {
         </section>
       )}
 
-      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'trade' || screen === 'blackmarket' || screen === 'double') && activePokemon && (
+      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double') && activePokemon && (
         <section className="roulette-layout">
           <article className="panel trainer-panel">
             <p className="muted small-tag">Trainer</p>
@@ -9118,6 +9232,20 @@ function MainApp() {
 
                 </div>
 
+                {maxShopRerolls() > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                    <button
+                      className="cta"
+                      type="button"
+                      onClick={rerollShop}
+                      disabled={shopRerollsUsed >= maxShopRerolls()}
+                      style={{ flex: 1, background: shopRerollsUsed < maxShopRerolls() ? '#a855f7' : '#475569', color: shopRerollsUsed < maxShopRerolls() ? '#12122b' : '#d9d6f2' }}
+                    >
+                      🎲 Reroll tienda ({shopRerollsUsed}/{maxShopRerolls()})
+                    </button>
+                  </div>
+                )}
+
                 <details style={{ marginTop: '1rem', borderTop: '1px solid #3f3f6e', paddingTop: '0.75rem' }}>
                   <summary style={{ cursor: 'pointer', color: '#ff8a80', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
                     🏷️ Vender Objetos (50% del precio)
@@ -9127,7 +9255,7 @@ function MainApp() {
                       <p style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No tienes objetos para vender.</p>
                     ) : (
                       inventoryEntries.map((entry) => {
-                        if (entry.name === 'Mega Stone' || entry.name === 'Dynamax Band') return null
+                        if (entry.name === 'Mega Stone' || entry.name === 'Dynamax Band' || entry.name === 'Prisma Rojo' || entry.name === 'Prisma Azul') return null
                         const consumable = ALL_SHOP_ITEMS[entry.name]
                         const holdable = HOLDABLE_ITEMS[entry.name]
                         if (!consumable && !holdable) return null
@@ -9233,7 +9361,7 @@ function MainApp() {
                   {inventory.length === 0 ? (
                     <p style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No tienes objetos para vender.</p>
                   ) : (
-                    Array.from(new Set(inventory)).map((itemName) => {
+                    Array.from(new Set(inventory)).filter(i => i !== 'Mega Stone' && i !== 'Dynamax Band' && i !== 'Prisma Rojo' && i !== 'Prisma Azul').map((itemName) => {
                       const count = inventory.filter(i => i === itemName).length
                       const data = ALL_SHOP_ITEMS[itemName] ?? HOLDABLE_ITEMS[itemName]
                       const value = data ? Math.max(1, Math.floor(data.price * 0.5)) : 10
@@ -9305,7 +9433,7 @@ function MainApp() {
                       })}
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '0.75rem' }}>
-                      {Array.from(new Set(inventory)).filter(i => i !== 'Mega Stone' && i !== 'Dynamax Band').map((itemName) => {
+                      {Array.from(new Set(inventory)).filter(i => i !== 'Mega Stone' && i !== 'Dynamax Band' && i !== 'Prisma Rojo' && i !== 'Prisma Azul').map((itemName) => {
                         const count = inventory.filter(i => i === itemName).length
                         const selected = coopMyOffer?.kind === 'item' && coopMyOffer.itemName === itemName
                         return (
@@ -9578,6 +9706,38 @@ function MainApp() {
               </div>
             )}
 
+            {screen === 'primal' && (
+              <div className="action-block" style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>🔮</div>
+                <h3 style={{ margin: '0 0 0.5rem', color: '#ff8a33' }}>¡Prisma Primal!</h3>
+                {inventory.includes('Prisma Rojo') || team.some(p => p.holdItem === 'Prisma Rojo') ? (
+                  <>
+                    <p style={{ margin: '0 0 0.25rem' }}>Has recibido un <strong>Prisma Rojo</strong>.</p>
+                    <p className="muted" style={{ fontSize: '0.85rem', margin: '0 0 1rem' }}>
+                      Equípalo a Groudon y durante el combate podrás activar su Primal Reversion.
+                    </p>
+                  </>
+                ) : inventory.includes('Prisma Azul') || team.some(p => p.holdItem === 'Prisma Azul') ? (
+                  <>
+                    <p style={{ margin: '0 0 0.25rem' }}>Has recibido un <strong>Prisma Azul</strong>.</p>
+                    <p className="muted" style={{ fontSize: '0.85rem', margin: '0 0 1rem' }}>
+                      Equípalo a Kyogre y durante el combate podrás activar su Primal Reversion.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ margin: '0 0 0.25rem' }}>Ya tenías ese Prisma.</p>
+                    <p className="muted" style={{ fontSize: '0.85rem', margin: '0 0 1rem' }}>
+                      Recibiste PokéCoins como compensación.
+                    </p>
+                  </>
+                )}
+                <button className="cta" onClick={() => { completeCurrentNode(); setScreen('route') }} type="button" style={{ background: '#ff8a33' }}>
+                  Continuar
+                </button>
+              </div>
+            )}
+
             {screen === 'route' && legendaryEncounter && (
               <div className="action-block">
                 <p>
@@ -9604,7 +9764,7 @@ function MainApp() {
                   Next node: <strong>{currentNode.label}</strong> ({nodeTypeLabel(currentNode)})
                 </p>
                 <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={enterNode} type="button" disabled={isLoading}>
-                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : currentNode.type === 'mega' ? '💎 ¡Recoger Mega Piedra!' : currentNode.type === 'gmax' ? '⚡ ¡Enfrentar G-MAX!' : currentNode.type === 'trade' ? '🤝 Intercambiar' : currentNode.type === 'rival' ? '👤 ¡Enfrentar al Rival!' : currentNode.type === 'blackmarket' ? '🕶️ Entrar al Mercado Negro' : currentNode.type === 'double' ? '🥊 ¡Combate Doble!' : 'Enter node'}
+                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : currentNode.type === 'mega' ? '💎 ¡Recoger Mega Piedra!' : currentNode.type === 'gmax' ? '⚡ ¡Enfrentar G-MAX!' : currentNode.type === 'primal' ? '🔮 ¡Recoger Prisma!' : currentNode.type === 'trade' ? '🤝 Intercambiar' : currentNode.type === 'rival' ? '👤 ¡Enfrentar al Rival!' : currentNode.type === 'blackmarket' ? '🕶️ Entrar al Mercado Negro' : currentNode.type === 'double' ? '🥊 ¡Combate Doble!' : 'Enter node'}
                 </button>
               </div>
             )}
@@ -9901,6 +10061,16 @@ function MainApp() {
                     style={{ marginTop: '8px', width: '100%', background: '#6b8cff' }}
                   >
                     ⚡ ¡Gigamaximar!
+                  </button>
+                )}
+                {(activePokemon.holdItem === 'Prisma Rojo' || activePokemon.holdItem === 'Prisma Azul') && !battlePrimalUsed && !activePokemon.megaEvolved && !activePokemon.gmaxEvolved && PRIMAL_CAPABLE_IDS.has(activePokemon.id) && (
+                  <button
+                    className="cta"
+                    onClick={primalEvolveActive}
+                    type="button"
+                    style={{ marginTop: '8px', width: '100%', background: '#ff8a33' }}
+                  >
+                    🔮 ¡Primal Reversion!
                   </button>
                 )}
               </div>
@@ -11052,8 +11222,9 @@ function MainApp() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'upgrade').map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                const locked = item.requires ? !metaProgression.permanentlyUnlockedItems.includes(item.requires) : false
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem', opacity: locked ? 0.5 : 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       <span style={{ fontSize: '1.5rem' }}>
                         {ITEM_SPRITES[item.spriteKey]
@@ -11068,6 +11239,8 @@ function MainApp() {
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
                     {owned ? (
                       <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                    ) : locked ? (
+                      <div style={{ color: '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold' }}>🔒 Requiere {META_SHOP_ITEMS.find(i => i.id === item.requires)?.name ?? 'mejora anterior'}</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}

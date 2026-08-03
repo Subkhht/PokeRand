@@ -444,23 +444,25 @@ function performPvpHit(
       if (!applyToAttacker && !applyToDefender) continue
       if (applyToAttacker) {
         const statKey = sc.stat as keyof typeof attackerStages
-        const oldStage = attackerStages[statKey]
-        const newStage = Math.max(-6, Math.min(6, oldStage + sc.change))
+        const change = Number.isFinite(sc.change) ? sc.change : 0
+        const oldStage = attackerStages[statKey] ?? 0
+        const newStage = Math.max(-6, Math.min(6, oldStage + change))
         if (newStage !== oldStage) {
           attackerStages = { ...attackerStages, [statKey]: newStage }
-          const direction = sc.change > 0 ? 'subió' : 'bajó'
+          const direction = change > 0 ? 'subió' : 'bajó'
           const statName = statKey === 'attack' ? 'Ataque' : statKey === 'defense' ? 'Defensa' : 'Velocidad'
           lines.push(`${effectiveAttacker.name} ${direction} su ${statName}! (${oldStage > 0 ? '+' : ''}${oldStage} → ${newStage > 0 ? '+' : ''}${newStage})`)
         }
       } else if (applyToDefender && currentDefender.hp > 0) {
         let newStages = currentDefender.statStages ?? { attack: 0, defense: 0, speed: 0 }
         const statKey = sc.stat as keyof typeof newStages
-        const oldStage = newStages[statKey]
-        const newStage = Math.max(-6, Math.min(6, oldStage + sc.change))
+        const change = Number.isFinite(sc.change) ? sc.change : 0
+        const oldStage = newStages[statKey] ?? 0
+        const newStage = Math.max(-6, Math.min(6, oldStage + change))
         if (newStage !== oldStage) {
           newStages = { ...newStages, [statKey]: newStage }
           currentDefender = { ...currentDefender, statStages: newStages }
-          const direction = sc.change > 0 ? 'subió' : 'bajó'
+          const direction = change > 0 ? 'subió' : 'bajó'
           const statName = statKey === 'attack' ? 'Ataque' : statKey === 'defense' ? 'Defensa' : 'Velocidad'
           lines.push(`${currentDefender.name} ${direction} su ${statName}! (${oldStage > 0 ? '+' : ''}${oldStage} → ${newStage > 0 ? '+' : ''}${newStage})`)
         }

@@ -63,7 +63,9 @@ export interface Pokemon {
   shiny?: boolean
   megaEvolved?: boolean
   gmaxEvolved?: boolean
+  primalEvolved?: boolean
   gmaxTurnsLeft?: number
+  megaOrig?: { sprite: string; attack: number; defense: number; speed: number }
   status?: StatusCondition
   statStages?: { attack: number; defense: number; speed: number }
   furiaActive?: boolean
@@ -71,7 +73,7 @@ export interface Pokemon {
 
 export interface RouteNode {
   id: number
-  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'trade' | 'rival' | 'blackmarket' | 'double'
+  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'rival' | 'blackmarket' | 'double'
   label: string
   done: boolean
 }
