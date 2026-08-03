@@ -7790,22 +7790,22 @@ function MainApp() {
       {screen === 'pvp' && (() => {
         if (!pvpSnapshot || !pvpRole) {
           return (
-            <section className="panel setup-panel" style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
-              <h2 style={{ margin: '0 0 1rem', color: '#cba3ff' }}>⚔️ PvP 1vs1</h2>
+            <section className="panel setup-panel" style={{ maxWidth: '780px', minHeight: '440px', margin: '0 auto', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <h2 style={{ margin: '0 0 1.2rem', color: '#cba3ff', fontSize: '1.6rem' }}>⚔️ PvP 1vs1</h2>
               {pvpWaitingOpponent ? (
                 <>
-                  <p style={{ color: '#cba3ff', fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>⏳ Esperando al rival para la revancha...</p>
+                  <p style={{ color: '#cba3ff', fontSize: '1.35rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>⏳ Esperando al rival para la revancha...</p>
                   {pvpRoomCode && (
-                    <p style={{ color: '#ffcb05', fontSize: '1.2rem', fontWeight: 'bold', letterSpacing: '0.2em', marginBottom: '0.5rem' }}>
+                    <p style={{ color: '#ffcb05', fontSize: '1.5rem', fontWeight: 'bold', letterSpacing: '0.2em', marginBottom: '0.75rem' }}>
                       CÓDIGO: {pvpRoomCode}
                     </p>
                   )}
-                  <button className="tiny-btn" type="button" onClick={cancelPvpWaiting} style={{ color: '#ff8a80', marginTop: '1rem' }}>✕ Cancelar</button>
+                  <button className="cta" type="button" onClick={cancelPvpWaiting} style={{ color: '#ff8a80', marginTop: '1rem', maxWidth: '260px', alignSelf: 'center' }}>✕ Cancelar</button>
                 </>
               ) : (
                 <>
-                  <p style={{ color: '#9b98cf' }}>Cargando combate...</p>
-                  <button className="tiny-btn" type="button" onClick={pvpLeave} style={{ color: '#ff8a80', marginTop: '1rem' }}>✕ Abandonar</button>
+                  <p style={{ color: '#9b98cf', fontSize: '1.15rem' }}>Cargando combate...</p>
+                  <button className="cta" type="button" onClick={pvpLeave} style={{ color: '#ff8a80', marginTop: '1rem', maxWidth: '260px', alignSelf: 'center' }}>✕ Abandonar</button>
                 </>
               )}
             </section>
@@ -7826,7 +7826,7 @@ function MainApp() {
           const pct = Math.max(0, Math.min(100, (p.hp / Math.max(1, p.maxHp)) * 100))
           const color = pct > 50 ? '#37d16b' : pct > 20 ? '#ffcb05' : '#ee3b2f'
           return (
-            <div style={{ width: '100%', height: '8px', borderRadius: '4px', background: 'rgba(0,0,0,0.5)', overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: '12px', borderRadius: '6px', background: 'rgba(0,0,0,0.5)', overflow: 'hidden' }}>
               <div style={{ width: `${pct}%`, height: '100%', background: color }} />
             </div>
           )
@@ -7836,8 +7836,8 @@ function MainApp() {
           const ps = st[side]
           const isMine = side === myRole
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <div style={{ fontSize: '0.75rem', color: '#cba3ff', fontWeight: 'bold', textAlign: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ fontSize: '0.9rem', color: '#cba3ff', fontWeight: 'bold', textAlign: 'center' }}>
                 {side === 'a' ? '🔵 Jugador A' : '🔴 Jugador B'} — {ps.username ?? '?'}
                 <span style={{ color: '#ffcb05', fontWeight: 'bold', marginLeft: '4px' }}>· Elo {side === 'a' ? (myRole === 'a' ? pvpMyElo : pvpOppElo) : (myRole === 'b' ? pvpMyElo : pvpOppElo)}</span>
               </div>
@@ -7850,26 +7850,26 @@ function MainApp() {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.4rem',
-                      padding: '0.3rem 0.45rem',
-                      borderRadius: '6px',
+                      gap: '0.5rem',
+                      padding: '0.4rem 0.55rem',
+                      borderRadius: '8px',
                       border: `1px solid ${isActive ? '#ffcb05' : '#3f3f6e'}`,
                       background: isActive ? 'rgba(255,203,5,0.1)' : 'rgba(15,23,42,0.5)',
-                      minHeight: '38px'
+                      minHeight: '48px'
                     }}
                   >
                     {revealed ? (
                       <>
-                        <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '32px', height: '32px', imageRendering: 'pixelated' }} />
+                        <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '42px', height: '42px', imageRendering: 'pixelated' }} />
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: '0.72rem', color: '#f3f1ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                          <div style={{ fontSize: '0.65rem', color: p.hp <= 0 ? '#ee3b2f' : '#7d7ab5' }}>
+                          <div style={{ fontSize: '0.85rem', color: '#f3f1ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                          <div style={{ fontSize: '0.75rem', color: p.hp <= 0 ? '#ee3b2f' : '#7d7ab5' }}>
                             {p.hp <= 0 ? 'Debilitado' : `Nv.${p.level} · HP ${Math.max(0, p.hp)}/${p.maxHp}`}
                           </div>
                         </div>
                       </>
                     ) : (
-                      <div style={{ color: '#7d7ab5', fontSize: '0.75rem', width: '100%', textAlign: 'center' }}>❓ ???</div>
+                      <div style={{ color: '#7d7ab5', fontSize: '0.85rem', width: '100%', textAlign: 'center' }}>❓ ???</div>
                     )}
                   </div>
                 )
@@ -7881,59 +7881,59 @@ function MainApp() {
         if (st.phase === 'finished') {
           const iWon = st.winner === myRole
           return (
-            <section className="panel setup-panel" style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
-              <h2 style={{ margin: '0 0 1rem', color: iWon ? '#ffcb05' : '#ee3b2f' }}>
+            <section className="panel setup-panel" style={{ maxWidth: '780px', minHeight: '440px', margin: '0 auto', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <h2 style={{ margin: '0 0 1rem', color: iWon ? '#ffcb05' : '#ee3b2f', fontSize: '1.7rem' }}>
                 {st.winner ? (iWon ? '🏆 ¡VICTORIA!' : '💀 DERROTA') : '🤝 EMPATE'}
               </h2>
-              <p style={{ color: '#9b98cf', marginBottom: '1rem' }}>
+              <p style={{ color: '#9b98cf', marginBottom: '1rem', fontSize: '1.05rem' }}>
                 {st.winner ? `${(st.winner === 'a' ? st.a.username : st.b.username) ?? 'El rival'} ha ganado el combate.` : 'Ambos equipos quedaron debilitados.'}
               </p>
               {pvpEloRewarded && (
                 <div style={{ marginBottom: '1rem', padding: '0.6rem', borderRadius: '8px', background: 'rgba(255,203,5,0.1)', border: '1px solid #ffcb05' }}>
-                  <p style={{ margin: 0, color: '#ffcb05', fontSize: '1rem', fontWeight: 'bold' }}>
+                  <p style={{ margin: 0, color: '#ffcb05', fontSize: '1.05rem', fontWeight: 'bold' }}>
                     {iWon ? `🎉 +${pvpEloGain ?? 0} Elo` : `Tus puntos Elo: ${pvpMyElo}`}
                   </p>
-                  <p style={{ margin: '0.25rem 0 0', color: '#9b98cf', fontSize: '0.8rem' }}>
+                  <p style={{ margin: '0.25rem 0 0', color: '#9b98cf', fontSize: '0.85rem' }}>
                     Elo del rival: {pvpOppElo}
                   </p>
                 </div>
               )}
-              <div style={{ maxHeight: '220px', overflowY: 'auto', textAlign: 'left', marginBottom: '1rem', padding: '0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
+              <div style={{ maxHeight: '240px', overflowY: 'auto', textAlign: 'left', marginBottom: '1rem', padding: '0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
                 {st.log.slice(-12).reverse().map((line, i) => (
-                  <p key={i} style={{ margin: '0 0 0.25rem', fontSize: '0.8rem', color: '#d9d6f2' }}>{line}</p>
+                  <p key={i} style={{ margin: '0 0 0.25rem', fontSize: '0.85rem', color: '#d9d6f2' }}>{line}</p>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="cta" type="button" onClick={() => void pvpRematch()} style={{ flex: 1 }}>⚔️ Revancha</button>
-                <button className="cta" type="button" onClick={pvpLeave} style={{ flex: 1, background: '#7d7ab5' }}>Volver al menú</button>
+                <button className="cta" type="button" onClick={() => void pvpRematch()} style={{ flex: 1, fontSize: '1.05rem' }}>⚔️ Revancha</button>
+                <button className="cta" type="button" onClick={pvpLeave} style={{ flex: 1, background: '#7d7ab5', fontSize: '1.05rem' }}>Volver al menú</button>
               </div>
             </section>
           )
         }
 
-        return (
-          <section className="panel setup-panel" style={{ maxWidth: '980px', margin: '0 auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <h2 style={{ margin: 0, color: '#cba3ff' }}>⚔️ PvP 1vs1</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span style={{ color: '#9b98cf', fontSize: '0.8rem' }}>Turno #{pvpSnapshot.turn + 1}</span>
-                {pvpSnapshot.timer_by && pvpSnapshot.timer_until ? (
-                  <span style={{ color: pvpTimerLeft <= 60 ? '#ff8a80' : '#ffcb05', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                    ⏱️ {Math.floor(pvpTimerLeft / 60)}:{String(pvpTimerLeft % 60).padStart(2, '0')}
-                  </span>
-                ) : (
-                  <button className="tiny-btn" type="button" onClick={() => void pvpStartTimer()} style={{ color: '#ffcb05' }}>⏱️ Cuenta atrás (5 min)</button>
-                )}
-                <button className="tiny-btn" type="button" onClick={() => void pvpForfeit()} style={{ color: '#ff8a80' }}>🏳️ Rendirse</button>
+          return (
+            <section className="panel setup-panel" style={{ maxWidth: '1280px', margin: '0 auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h2 style={{ margin: 0, color: '#cba3ff', fontSize: '1.5rem' }}>⚔️ PvP 1vs1</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <span style={{ color: '#9b98cf', fontSize: '0.9rem' }}>Turno #{pvpSnapshot.turn + 1}</span>
+                  {pvpSnapshot.timer_by && pvpSnapshot.timer_until ? (
+                    <span style={{ color: pvpTimerLeft <= 60 ? '#ff8a80' : '#ffcb05', fontSize: '0.95rem', fontWeight: 'bold' }}>
+                      ⏱️ {Math.floor(pvpTimerLeft / 60)}:{String(pvpTimerLeft % 60).padStart(2, '0')}
+                    </span>
+                  ) : (
+                    <button className="tiny-btn" type="button" onClick={() => void pvpStartTimer()} style={{ color: '#ffcb05' }}>⏱️ Cuenta atrás (5 min)</button>
+                  )}
+                  <button className="tiny-btn" type="button" onClick={() => void pvpForfeit()} style={{ color: '#ff8a80' }}>🏳️ Rendirse</button>
+                </div>
               </div>
-            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr 1fr', gap: '1rem', alignItems: 'start' }}>
               {/* Columna izquierda: siempre el Jugador A */}
               {teamColumn('a')}
 
               {/* Centro: combate */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', minHeight: '620px' }}>
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                   <div style={{ flex: 1, textAlign: 'center' }}>
                     {(() => {
@@ -7943,17 +7943,17 @@ function MainApp() {
                       const hit = pvpHit !== null && pvpHit.side === side
                       return (
                         <>
-                          <div style={{ fontSize: '0.7rem', color: '#9b98cf', fontWeight: 'bold', marginBottom: '2px' }}>{nm}</div>
-                          <img key={hit ? pvpHit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '96px', height: '96px', imageRendering: 'pixelated' }} />
-                          <div style={{ fontSize: '0.8rem', color: '#f3f1ff', fontWeight: 'bold' }}>{pk?.name}</div>
-                          <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>Nv.{pk?.level}</div>
-                          {pk?.status && <div style={{ fontSize: '0.7rem', color: '#fb923c' }}>{STATUS_LABELS[pk.status.type]}</div>}
+                          <div style={{ fontSize: '0.8rem', color: '#9b98cf', fontWeight: 'bold', marginBottom: '2px' }}>{nm}</div>
+                          <img key={hit ? pvpHit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '128px', height: '128px', imageRendering: 'pixelated' }} />
+                          <div style={{ fontSize: '0.95rem', color: '#f3f1ff', fontWeight: 'bold' }}>{pk?.name}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#7d7ab5' }}>Nv.{pk?.level}</div>
+                          {pk?.status && <div style={{ fontSize: '0.8rem', color: '#fb923c' }}>{STATUS_LABELS[pk.status.type]}</div>}
                           {hpBar(pk)}
                         </>
                       )
                     })()}
                   </div>
-                  <div style={{ fontSize: '1.5rem', color: '#ffcb05', fontWeight: 'bold' }}>VS</div>
+                  <div style={{ fontSize: '2.2rem', color: '#ffcb05', fontWeight: 'bold' }}>VS</div>
                   <div style={{ flex: 1, textAlign: 'center' }}>
                     {(() => {
                       const pk = st.b.team[st.b.active]
@@ -7962,11 +7962,11 @@ function MainApp() {
                       const hit = pvpHit !== null && pvpHit.side === side
                       return (
                         <>
-                          <div style={{ fontSize: '0.7rem', color: '#9b98cf', fontWeight: 'bold', marginBottom: '2px' }}>{nm}</div>
-                          <img key={hit ? pvpHit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '96px', height: '96px', imageRendering: 'pixelated' }} />
-                          <div style={{ fontSize: '0.8rem', color: '#f3f1ff', fontWeight: 'bold' }}>{pk?.name}</div>
-                          <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>Nv.{pk?.level}</div>
-                          {pk?.status && <div style={{ fontSize: '0.7rem', color: '#fb923c' }}>{STATUS_LABELS[pk.status.type]}</div>}
+                          <div style={{ fontSize: '0.8rem', color: '#9b98cf', fontWeight: 'bold', marginBottom: '2px' }}>{nm}</div>
+                          <img key={hit ? pvpHit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '128px', height: '128px', imageRendering: 'pixelated' }} />
+                          <div style={{ fontSize: '0.95rem', color: '#f3f1ff', fontWeight: 'bold' }}>{pk?.name}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#7d7ab5' }}>Nv.{pk?.level}</div>
+                          {pk?.status && <div style={{ fontSize: '0.8rem', color: '#fb923c' }}>{STATUS_LABELS[pk.status.type]}</div>}
                           {hpBar(pk)}
                         </>
                       )
@@ -7974,27 +7974,27 @@ function MainApp() {
                   </div>
                 </div>
 
-                <div style={{ maxHeight: '180px', minHeight: '90px', overflowY: 'auto', padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid #3f3f6e' }}>
+                <div style={{ maxHeight: '220px', minHeight: '120px', overflowY: 'auto', padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid #3f3f6e' }}>
                   {st.log.length === 0 ? (
-                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#7d7ab5' }}>Elige un ataque para comenzar.</p>
+                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#7d7ab5' }}>Elige un ataque para comenzar.</p>
                   ) : (
                     st.log.slice(-10).reverse().map((line, i) => (
-                      <p key={i} style={{ margin: '0 0 0.25rem', fontSize: '0.78rem', color: '#d9d6f2' }}>{line}</p>
+                      <p key={i} style={{ margin: '0 0 0.25rem', fontSize: '0.85rem', color: '#d9d6f2' }}>{line}</p>
                     ))
                   )}
                 </div>
 
-                {/* Altura fija: el panel no cambia de tamaño al realizar acciones */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', height: '185px', justifyContent: 'flex-start', overflowY: 'auto' }}>
+                {/* Altura fija: el panel no cambia de tamaño al realizar acciones ni al esperar al rival */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', height: '240px', minHeight: '240px', justifyContent: 'flex-start', overflowY: 'auto' }}>
 
                 {st.phase === 'switch' && mySwitchNeeded && !iSubmitted && (
-                  <div style={{ padding: '0.6rem', borderRadius: '8px', background: 'rgba(168,85,247,0.1)', border: '1px solid #a855f7' }}>
-                    <strong style={{ color: '#cba3ff', fontSize: '0.85rem' }}>Elige el siguiente Pokémon:</strong>
+                  <div style={{ padding: '0.7rem', borderRadius: '8px', background: 'rgba(168,85,247,0.1)', border: '1px solid #a855f7' }}>
+                    <strong style={{ color: '#cba3ff', fontSize: '0.95rem' }}>Elige el siguiente Pokémon:</strong>
                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
                       {my.team.map((p, i) => (
                         p.hp > 0 && p.id !== myActive?.id ? (
                           <button key={i} className="tiny-btn" type="button" onClick={() => void pvpSubmitSwitch(i)}>
-                            <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '32px', height: '32px', imageRendering: 'pixelated' }} />
+                            <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
                             {p.name}
                           </button>
                         ) : null
@@ -8041,35 +8041,35 @@ function MainApp() {
                         )
                       })}
                     </div>
-                    <button className="tiny-btn" type="button" disabled={!canSwitchNow} onClick={() => setPvpChoosingSwitch(true)} style={{ width: '100%' }}>
+                    <button className="cta" type="button" disabled={!canSwitchNow} onClick={() => setPvpChoosingSwitch(true)} style={{ width: '100%', padding: '0.55rem 0.75rem', fontSize: '0.95rem' }}>
                       🔁 Cambiar de Pokémon
                     </button>
                   </>
                 )}
 
                 {st.phase === 'picking' && canActPicking && myActive && pvpChoosingSwitch && (
-                  <div style={{ padding: '0.6rem', borderRadius: '8px', background: 'rgba(56,189,248,0.08)', border: '1px solid #38bdf8' }}>
+                  <div style={{ padding: '0.7rem', borderRadius: '8px', background: 'rgba(56,189,248,0.08)', border: '1px solid #38bdf8' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                      <strong style={{ color: '#7dd3fc', fontSize: '0.85rem' }}>Cambiar de Pokémon:</strong>
+                      <strong style={{ color: '#7dd3fc', fontSize: '0.95rem' }}>Cambiar de Pokémon:</strong>
                       <button className="tiny-btn" type="button" onClick={() => setPvpChoosingSwitch(false)}>← Volver a ataques</button>
                     </div>
                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                       {my.team.map((p, i) => (
                         p.hp > 0 && i !== my.active ? (
                           <button key={i} className="tiny-btn" type="button" onClick={() => void pvpSubmitSwitch(i)}>
-                            <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '32px', height: '32px', imageRendering: 'pixelated' }} />
+                            <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
                             {p.name}
                           </button>
                         ) : null
                       ))}
-                      {!canSwitchNow && <span style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No hay otros Pokémon disponibles.</span>}
+                      {!canSwitchNow && <span style={{ color: '#7d7ab5', fontSize: '0.85rem' }}>No hay otros Pokémon disponibles.</span>}
                     </div>
                   </div>
                 )}
 
                 {iSubmitted && (
-                  <div style={{ textAlign: 'center', padding: '0.75rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
-                    <p style={{ margin: '0 0 0.5rem', color: '#37d16b', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                  <div style={{ textAlign: 'center', padding: '0.9rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                    <p style={{ margin: '0 0 0.6rem', color: '#37d16b', fontSize: '1rem', fontWeight: 'bold' }}>
                       ⏳ Esperando al rival...
                     </p>
                     <button className="tiny-btn" type="button" onClick={() => void pvpCancelAction()} style={{ color: '#ff8a80' }}>
@@ -8079,18 +8079,18 @@ function MainApp() {
                 )}
 
                 {!iSubmitted && st.phase === 'picking' && !canActPicking && (
-                  <div style={{ textAlign: 'center', padding: '0.75rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
-                    <p style={{ margin: 0, color: '#37d16b', fontSize: '0.9rem', fontWeight: 'bold' }}>El rival está eligiendo su ataque...</p>
+                  <div style={{ textAlign: 'center', padding: '0.9rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                    <p style={{ margin: 0, color: '#37d16b', fontSize: '1rem', fontWeight: 'bold' }}>El rival está eligiendo su ataque...</p>
                   </div>
                 )}
 
                 {st.phase === 'switch' && !mySwitchNeeded && !iSubmitted && (
-                  <div style={{ textAlign: 'center', padding: '0.75rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
-                    <p style={{ margin: 0, color: '#37d16b', fontSize: '0.9rem', fontWeight: 'bold' }}>⏳ El rival elige su siguiente Pokémon...</p>
+                  <div style={{ textAlign: 'center', padding: '0.9rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                    <p style={{ margin: 0, color: '#37d16b', fontSize: '1rem', fontWeight: 'bold' }}>⏳ El rival elige su siguiente Pokémon...</p>
                   </div>
                 )}
 
-                {pvpError && <p style={{ margin: 0, textAlign: 'center', color: '#ff8a80', fontSize: '0.8rem' }}>{pvpError}</p>}
+                {pvpError && <p style={{ margin: 0, textAlign: 'center', color: '#ff8a80', fontSize: '0.85rem' }}>{pvpError}</p>}
                 </div>
               </div>
 
