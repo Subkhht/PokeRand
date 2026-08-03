@@ -2443,6 +2443,7 @@ function MainApp() {
         setRouteIndex(0)
         setMoney(0)
         setInventory([])
+        setPcStorage([])
         setModifier(null)
         setModifier2(null)
         setBadges([])
@@ -2666,6 +2667,8 @@ function MainApp() {
       setRestEncounter(null)
       setDefeatSummary(null)
       setVictoryUnlocks(null)
+      // Nueva partida: se limpia el PC para no arrastrar Pokémon de la run anterior.
+      setPcStorage([])
       setEggInventory([])
       setSpeedrunSeconds(0)
       if (speedrunTimerRef.current) {
@@ -3681,18 +3684,8 @@ function MainApp() {
           const ok = await resolvePvpTurnRpc(matchId, nextState, snap.turn)
           if (ok) {
             if (nextState.phase === 'finished' && nextState.winner) {
-              void finishPvpMatch(matchId, nextState.winner)
-              // Elo: se otorga una sola vez al ganador (la RPC es idempotente).
-              if (nextState.winner === pvpRole && !pvpEloRewardedRef.current) {
-                pvpEloRewardedRef.current = true
-                setPvpEloRewarded(true)
-                void awardPvpElo(matchId).then((points) => {
-                  if (typeof points === 'number') {
-                    setPvpEloGain(points)
-                    setPvpMyElo(prev => prev + points)
-                  }
-                })
-              }
+              // Esperamos a que finish_pvp_match confirme el resultado en servidor.
+              await finishPvpMatch(matchId, nextState.winner)
             }
             const fresh = await getPvpState(matchId)
             if (fresh && !cancelled) {
@@ -3735,6 +3728,18 @@ function MainApp() {
       setPvpSnapshot(snap)
       const st = snap.state
       detectPvpHit(st)
+      // Otorgar Elo cuando la partida termina y gané (reintenta cada poll hasta
+      // que award_pvp_elo confirme; evita la carrera con finish_pvp_match).
+      if (pvpRole && st.phase === 'finished' && st.winner === pvpRole && !pvpEloRewardedRef.current) {
+        void awardPvpElo(matchId).then((points) => {
+          if (typeof points === 'number') {
+            pvpEloRewardedRef.current = true
+            setPvpEloRewarded(true)
+            setPvpEloGain(points)
+            setPvpMyElo(prev => prev + points)
+          }
+        })
+      }
       // Registrar en la Pokédex (silueta) los Pokémon del rival que se revelan.
       if (pvpRole && st.phase !== 'finished') {
         const oppSide = pvpRole === 'a' ? 'b' : 'a'
@@ -3749,17 +3754,6 @@ function MainApp() {
         if (!isNaN(until) && until <= Date.now()) {
           const ok = await expirePvpTimer(matchId)
           if (ok) {
-            // El ganador por tiempo es quien inició la cuenta atrás.
-            if (snap.timer_by === pvpRole && !pvpEloRewardedRef.current) {
-              pvpEloRewardedRef.current = true
-              setPvpEloRewarded(true)
-              void awardPvpElo(matchId).then((points) => {
-                if (typeof points === 'number') {
-                  setPvpEloGain(points)
-                  setPvpMyElo(prev => prev + points)
-                }
-              })
-            }
             const fresh = await getPvpState(matchId)
             if (fresh && !cancelled) setPvpSnapshot(fresh)
           }
@@ -6836,9 +6830,9 @@ function MainApp() {
       return
     }
     if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'trade' || screen === 'blackmarket' || screen === 'double') {
-      if (coopModeRef.current && coopSessionCodeRef.current) {
-        void finishCoopSession(coopSessionCodeRef.current, 'lost')
-      }
+      // En Co-op, "Volver a inicio" solo sale a nivel local: NO se finaliza la
+      // sesión, para no interrumpir la partida del compañero (la sesión queda
+      // activa y el compañero puede continuar solo).
       resetToSetup()
     }
   }
