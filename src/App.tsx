@@ -935,8 +935,8 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_mega_node', name: 'Nodo Mega', desc: 'Desbloquea nodos de Mega Piedra en Hard/Infinite.', price: 150, spriteKey: 'Mega Stone', category: 'upgrade' },
   { id: 'unlock_gmax_node', name: 'Nodo G-MAX', desc: 'Desbloquea nodos G-MAX en Hard/Infinite.', price: 200, spriteKey: 'Dynamax Band', category: 'upgrade' },
   { id: 'unlock_primal_node', name: 'Nodo Primal', desc: 'Desbloquea nodos Primal en Hard/Infinite. Otorgan Prisma Rojo o Azul.', price: 250, spriteKey: 'Prisma Rojo', category: 'upgrade' },
-  { id: 'unlock_reroll', name: 'Reroll', desc: 'Permite rerollear la tienda 1 vez por visita.', price: 120, spriteKey: 'Mega Stone', category: 'upgrade' },
-  { id: 'unlock_reroll_2', name: 'Reroll II', desc: 'Otorga 1 reroll extra de tienda por visita.', price: 200, spriteKey: 'Mega Stone', category: 'upgrade', requires: 'unlock_reroll' },
+  { id: 'unlock_reroll', name: 'Reroll', desc: 'Permite rerollear la tienda 1 vez por visita.', price: 120, spriteKey: 'dice', category: 'upgrade' },
+  { id: 'unlock_reroll_2', name: 'Reroll II', desc: 'Otorga 1 reroll extra de tienda por visita.', price: 200, spriteKey: 'dice', category: 'upgrade', requires: 'unlock_reroll' },
   { id: 'start_pokeballs_5', name: 'Inicio: +5 Poké Balls', desc: 'Empiezas cada aventura con 5 Poké Balls extra.', price: 180, spriteKey: 'Poké Ball', category: 'upgrade' },
   { id: 'start_potion_1', name: 'Inicio: +1 Poción', desc: 'Empiezas cada aventura con 1 Poción extra.', price: 140, spriteKey: 'Potion', category: 'upgrade' },
   { id: 'start_potion_2', name: 'Inicio: +1 Poción II', desc: 'Empiezas cada aventura con 1 Poción extra (se suma a la anterior).', price: 180, spriteKey: 'Potion', category: 'upgrade', requires: 'start_potion_1' },
@@ -11229,7 +11229,7 @@ function MainApp() {
                       <span style={{ fontSize: '1.5rem' }}>
                         {ITEM_SPRITES[item.spriteKey]
                           ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '36px', height: '36px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
-                          : item.spriteKey === 'money' ? '💰' : '⚙️'}
+                          : item.spriteKey === 'money' ? '💰' : item.spriteKey === 'dice' ? '🎲' : '⚙️'}
                       </span>
                       <div>
                         <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
