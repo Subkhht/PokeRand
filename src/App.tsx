@@ -1094,14 +1094,23 @@ function nodeTypeLabel(node: RouteNode): string {
 // Genera un tramo de ruta cooperativa (nodos + jefe final) con nodos de
 // intercambio en posiciones proporcionales. Usa el RNG con semilla para que
 // ambos jugadores generen exactamente el mismo tramo.
-function generateCoopRouteSegment(startId: number, totalNodes: number, rr: () => number, challenges: RunChallenges): RouteNode[] {
+function generateCoopRouteSegment(startId: number, totalNodes: number, rr: () => number, challenges: RunChallenges, difficulty: Difficulty = 'medium'): RouteNode[] {
   const segment: RouteNode[] = []
-  const tradePos1 = Math.max(1, Math.floor(totalNodes / 3))
-  const tradePos2 = Math.max(2, Math.floor((totalNodes * 2) / 3))
+  let tradeCount = 2
+  if (difficulty === 'hard') tradeCount = 4
+  else if (difficulty === 'easy') tradeCount = 1
+  const tradePositions = new Set<number>()
+  if (difficulty === 'easy') {
+    tradePositions.add(Math.min(totalNodes - 1, Math.ceil(totalNodes / 2)))
+  } else {
+    for (let t = 1; t <= tradeCount; t++) {
+      tradePositions.add(Math.max(1, Math.floor((totalNodes * t) / (tradeCount + 1))))
+    }
+  }
   for (let i = 1; i < totalNodes; i++) {
     const id = startId + i - 1
     let type: RouteNode['type'] = 'battle'
-    if (i === tradePos1 || i === tradePos2) {
+    if (tradePositions.has(i)) {
       type = 'trade'
     } else {
       const r = rr()
@@ -2504,7 +2513,7 @@ function MainApp() {
         // Ruta compartida: misma forma para ambos jugadores (misma semilla).
         // Los encuentros, tiendas y descansos siguen siendo aleatorios por jugador.
         const coopNodes = difficultyNodeCounts[coopDiffRef.current || 'medium'] || 10
-        customRoute = generateCoopRouteSegment(1, coopNodes, rr, activeChallenges)
+        customRoute = generateCoopRouteSegment(1, coopNodes, rr, activeChallenges, coopDiffRef.current || 'medium')
       } else if (activeChallenges.bossRush) {
         customRoute = generateBossRushRoute(totalNodes)
       } else if (effectiveDifficulty === 'infinite') {
@@ -2968,7 +2977,7 @@ function MainApp() {
             : difficultyNodeCounts[difficulty]
           const startId = route.length + 1
           const newRoute = coopModeRef.current
-            ? generateCoopRouteSegment(startId, totalNodesPerStage, routeRandRef.current, runChallenges)
+            ? generateCoopRouteSegment(startId, totalNodesPerStage, routeRandRef.current, runChallenges, coopDiffRef.current || 'medium')
             : (() => {
                 const nr: RouteNode[] = []
                 for (let i = 0; i < totalNodesPerStage - 1; i++) {
