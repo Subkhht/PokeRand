@@ -785,7 +785,7 @@ const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (p
 const RANDOM_EVENTS = [
   {
     id: 'legendary_appears',
-    weight: 3,
+    weight: 1,
     icon: '🐉',
     title: '¡Pokémon Legendario!',
     desc: 'Un Pokémon poderoso aparece delante de ti. ¿Capturarlo?',
@@ -1646,8 +1646,8 @@ function MainApp() {
   const [pvpChoosingSwitch, setPvpChoosingSwitch] = useState<boolean>(false)
   const [pvpTimerLeft, setPvpTimerLeft] = useState<number>(0)
   const [pvpHit, setPvpHit] = useState<{ side: 'a' | 'b'; key: number } | null>(null)
-  const [pvpMyElo, setPvpMyElo] = useState<number>(1000)
-  const [pvpOppElo, setPvpOppElo] = useState<number>(1000)
+  const [pvpMyElo, setPvpMyElo] = useState<number>(0)
+  const [pvpOppElo, setPvpOppElo] = useState<number>(0)
   const [pvpEloGain, setPvpEloGain] = useState<number | null>(null)
   const [pvpEloRewarded, setPvpEloRewarded] = useState<boolean>(false)
   const pvpEloRewardedRef = useRef(false)
@@ -5902,6 +5902,10 @@ function MainApp() {
           const itemOk = !updatedPokemon.heldItemRequired || updatedPokemon.holdItem === updatedPokemon.heldItemRequired
           if (itemOk) {
             try {
+              // El objeto que el Pokémon necesita para evolucionar a su forma
+              // especial (p. ej. Gorra de Ash para Greninja-Ash). Solo se
+              // consume si esta evolución es exactamente la del objeto.
+              const requiredItem = updatedPokemon.heldItemRequired
               const evolved = await evolvePokemon(updatedPokemon)
               if (evolved) {
                 const consumedItem = updatedPokemon.holdItem
@@ -5911,7 +5915,7 @@ function MainApp() {
                 setEvoPopup({ oldSprite: updatedPokemon.sprite, newSprite: finalEvolved.sprite, oldName: updatedPokemon.name, newName: finalEvolved.name })
                 setTimeout(() => setEvoPopup(null), 2000)
                 updatedPokemon = finalEvolved
-                if (consumedItem && updatedPokemon.heldItemRequired) {
+                if (consumedItem && requiredItem && consumedItem === requiredItem) {
                   updatedPokemon = { ...updatedPokemon, holdItem: undefined }
                   logs.push(`✅ ${consumedItem} fue consumido en la evolución.`)
                 }
@@ -10108,7 +10112,7 @@ function MainApp() {
 
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '1.5rem', flexWrap: 'wrap' }}>
             <button className="cta" onClick={resetToSetup} type="button">
-              Intentar de nuevo
+              Volver al menú principal
             </button>
             <button className="cta" onClick={() => { playClick(); void restartRun() }} type="button" style={{ background: '#37d16b', color: '#12122b' }}>
               🔄 Reiniciar

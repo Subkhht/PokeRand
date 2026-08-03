@@ -818,8 +818,8 @@ begin
     'created_at', m.created_at,
     'a_name', (select username from public.profiles where id = m.player_a_id),
     'b_name', (select username from public.profiles where id = m.player_b_id),
-    'a_elo', coalesce((select e.elo from public.pvp_elo e where e.user_id = m.player_a_id), 1000),
-    'b_elo', coalesce((select e.elo from public.pvp_elo e where e.user_id = m.player_b_id), 1000)
+    'a_elo', coalesce((select e.elo from public.pvp_elo e where e.user_id = m.player_a_id), 0),
+    'b_elo', coalesce((select e.elo from public.pvp_elo e where e.user_id = m.player_b_id), 0)
   )
   into v_result
   from public.pvp_matches m where m.id = p_match_id;
@@ -1033,14 +1033,14 @@ $$;
 
 -- ============================================================================
 -- ELO PvP
--- Ranking de jugadores con puntos Elo (mínimo 1000). Se otorgan al ganador
+-- Ranking de jugadores con puntos Elo (empiezan en 0). Se otorgan al ganador
 -- cuando termina la partida, según cuántos de sus Pokémon quedaron debilitados:
 --   0 debilitados → +20, 1 → +18, 2 → +16, 3 → +14, 4 → +12, 5+ → +10
 -- ============================================================================
 
 create table if not exists public.pvp_elo (
   user_id uuid primary key references public.profiles(id) on delete cascade,
-  elo integer not null default 1000,
+  elo integer not null default 0,
   wins integer not null default 0,
   updated_at timestamptz not null default now()
 );
@@ -1057,7 +1057,7 @@ declare
 begin
   if auth.uid() is null then raise exception 'Necesitas iniciar sesión'; end if;
   select * into v_row from public.pvp_elo where user_id = auth.uid();
-  if not found then return jsonb_build_object('elo', 1000, 'wins', 0); end if;
+  if not found then return jsonb_build_object('elo', 0, 'wins', 0); end if;
   return jsonb_build_object('elo', v_row.elo, 'wins', v_row.wins);
 end;
 $$;
