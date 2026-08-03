@@ -441,6 +441,18 @@ export function stopMusic(): void {
   currentTrack = 'none'
 }
 
+// Desbloquea el audio tras la primera interacción del usuario (los navegadores
+// bloquean el autoplay con sonido hasta que hay un gesto del usuario).
+export function unlockAudio(): void {
+  const ac = getCtx()
+  if (ac.state === 'suspended') {
+    void ac.resume()
+  }
+  if (!musicPlaying || ac.state === 'suspended') {
+    startMenuMusic()
+  }
+}
+
 export function setVolume(v: number): void {
   masterVolume = Math.max(0, Math.min(1, v))
   if (musicGain && ctx) {

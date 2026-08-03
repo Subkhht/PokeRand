@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef, Component, type ReactNode, type CSSProperties } from 'react'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
-import { playHover, playClick, playHit, playEvolution, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, isMusicMuted, setMusicMuted } from './game/sound'
+import { playHover, playClick, playHit, playEvolution, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -1733,6 +1733,20 @@ function MainApp() {
   const inventoryEntries = useMemo(() => groupInventory(inventory), [inventory])
 
   useEffect(() => { startMenuMusic() }, [])
+
+  // Desbloquear el audio en la primera interacción (los navegadores bloquean el
+  // autoplay con sonido hasta que el usuario hace clic/toca/teclea).
+  useEffect(() => {
+    const unlock = () => unlockAudio()
+    window.addEventListener('pointerdown', unlock)
+    window.addEventListener('touchstart', unlock)
+    window.addEventListener('keydown', unlock)
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('touchstart', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
 
   // Restaurar sesión de Supabase y reaccionar a cambios de login/logout
   useEffect(() => {
