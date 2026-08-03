@@ -901,7 +901,13 @@ function findEvolutionForSpecies(chainNode: EvolutionChainNode, speciesName: str
       const trigger = details?.trigger?.name ?? 'level-up'
       const evoLevel = minLevel ?? (trigger === 'trade' ? 35 : 45)
       const heldItem = details?.held_item?.name ?? null
-      const evolvedName = regionalSuffix ? chainNode.evolves_to[0].species.name + regionalSuffix : chainNode.evolves_to[0].species.name
+      // La API ya devuelve el nombre con sufijo regional para las formas
+      // regionales (p. ej. dugtrio-alola). Solo se añade el sufijo si el nombre
+      // evolucionado NO lo lleva (caso de cadenas compartidas con la forma base).
+      const rawEvolvedName = chainNode.evolves_to[0].species.name
+      const evolvedName = regionalSuffix && !rawEvolvedName.endsWith(regionalSuffix)
+        ? rawEvolvedName + regionalSuffix
+        : rawEvolvedName
       return { speciesName: evolvedName, level: evoLevel, trigger, heldItem }
     }
   }
@@ -994,7 +1000,11 @@ function findStoneEvolution(chainNode: EvolutionChainNode, speciesName: string, 
       const allDetails = evo.evolution_details || []
       for (const details of allDetails) {
         if (details?.trigger?.name === 'use-item' && details?.item?.name === stoneItemName) {
-          const evolvedName = regionalSuffix ? evo.species.name + regionalSuffix : evo.species.name
+          // No duplicar el sufijo regional si la API ya lo incluye.
+          const rawEvolvedName = evo.species.name
+          const evolvedName = regionalSuffix && !rawEvolvedName.endsWith(regionalSuffix)
+            ? rawEvolvedName + regionalSuffix
+            : rawEvolvedName
           return { speciesName: evolvedName, level: null, trigger: 'use-item' }
         }
       }
