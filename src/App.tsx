@@ -1460,6 +1460,7 @@ function MainApp() {
   const [doubleActives, setDoubleActives] = useState<number[]>([])
   const [doubleMoves, setDoubleMoves] = useState<Array<{ moveIdx: number; target: number } | null>>([null, null])
   const [doubleActiveSlot, setDoubleActiveSlot] = useState<number>(0)
+  const [doubleChoosingSwitch, setDoubleChoosingSwitch] = useState(false)
   const [doubleLog, setDoubleLog] = useState<string[]>([])
   const [doubleFinished, setDoubleFinished] = useState<boolean>(false)
   const [doubleHits, setDoubleHits] = useState<Array<{ kind: 'enemy' | 'player'; index: number; key: number }>>([])
@@ -4295,6 +4296,85 @@ function MainApp() {
     return { attacker, defender: { ...defender, hp: newHp }, log }
   }
 
+  function doubleEnemyCounterattack(
+    teamCopy: Pokemon[],
+    actives: number[],
+    enemies: Pokemon[],
+    log: string[],
+    hits: Array<{ kind: 'enemy' | 'player'; index: number; key: number }>
+  ): void {
+    for (let e = 0; e < 2; e++) {
+      const enemy = enemies[e]
+      if (!enemy || enemy.hp <= 0) continue
+      const aliveTargets = actives.filter(ti => {
+        const p = teamCopy[ti]
+        return p && p.hp > 0
+      })
+      if (aliveTargets.length === 0) break
+      const targetIdx = aliveTargets[Math.floor(Math.random() * aliveTargets.length)]
+      const move = enemy.moves[Math.floor(Math.random() * enemy.moves.length)]
+      const before = teamCopy[targetIdx].hp
+      const hit = performDoubleHit(enemy, teamCopy[targetIdx], move)
+      enemies[e] = hit.attacker
+      teamCopy[targetIdx] = hit.defender
+      log.push(...hit.log)
+      if (hit.defender.hp < before) {
+        doubleHitKeyRef.current += 1
+        hits.push({ kind: 'player', index: actives.indexOf(targetIdx), key: doubleHitKeyRef.current })
+        playHit()
+      }
+      if (hit.defender.hp <= 0) log.push(`💀 ${hit.defender.name} se debilitó.`)
+    }
+  }
+
+  function doubleAutoSwitchAfterFaint(teamCopy: Pokemon[], actives: number[], log: string[]): number[] {
+    const nextActives = [...actives]
+    for (let i = 0; i < 2; i++) {
+      const ti = nextActives[i]
+      if (teamCopy[ti] && teamCopy[ti].hp > 0) continue
+      const alive = teamCopy
+        .map((p, idx) => ({ p, idx }))
+        .filter(x => x.p.hp > 0 && !nextActives.includes(x.idx))
+      if (alive.length > 0) {
+        nextActives[i] = alive[0].idx
+        log.push(`🔁 Sale ${teamCopy[nextActives[i]].name}!`)
+      }
+    }
+    return nextActives
+  }
+
+  function doubleCheckEnd(teamCopy: Pokemon[], enemies: Pokemon[], log: string[]): void {
+    const allEnemiesFainted = enemies.every(p => p.hp <= 0)
+    const allPlayerFainted = teamCopy.every(p => p.hp <= 0)
+
+    if (allEnemiesFainted) {
+      const baseMoney = Math.floor(40 + enemies.reduce((s, p) => s + p.level, 0) * 4)
+      const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoney * (modifier?.moneyMultiplier ?? 1))
+      if (!runChallenges.noMoney) setMoney(prev => prev + moneyReward)
+      setBattleLog(prev => [`🥊 ¡Ganaste el combate doble! +$${moneyReward}.`, ...prev].slice(0, 15))
+      setDoubleFinished(true)
+      return
+    }
+    if (allPlayerFainted) {
+      setDoubleFinished(true)
+      const losses = record.losses + 1
+      persistRecord(record.wins, losses)
+      handleInfiniteRunDefeat(teamCopy)
+      if (isDailyRunRef.current) {
+        setDailyPlayed(true)
+        localStorage.setItem('pokerand_daily', dailySeed)
+      }
+      setDefeatSummary({
+        finalTeam: teamCopy,
+        battleLog: [...log],
+        enemy: enemies.find(p => p.hp > 0) ?? null,
+        lastNodeLabel: currentNode?.label
+      })
+      setScreen('defeat')
+      playDefeatMusic()
+    }
+  }
+
   function resolveDoubleTurn(): void {
     if (doubleFinished) return
     const enemies = [...doubleEnemies]
@@ -4327,42 +4407,10 @@ function MainApp() {
     }
 
     // Los enemigos vivos contraatacan (objetivo aleatorio entre los activos vivos).
-    for (let e = 0; e < 2; e++) {
-      const enemy = enemies[e]
-      if (!enemy || enemy.hp <= 0) continue
-      const aliveTargets = actives.filter(ti => {
-        const p = teamCopy[ti]
-        return p && p.hp > 0
-      })
-      if (aliveTargets.length === 0) break
-      const targetIdx = aliveTargets[Math.floor(Math.random() * aliveTargets.length)]
-      const move = enemy.moves[Math.floor(Math.random() * enemy.moves.length)]
-      const before = teamCopy[targetIdx].hp
-      const hit = performDoubleHit(enemy, teamCopy[targetIdx], move)
-      enemies[e] = hit.attacker
-      teamCopy[targetIdx] = hit.defender
-      log.push(...hit.log)
-      if (hit.defender.hp < before) {
-        doubleHitKeyRef.current += 1
-        hits.push({ kind: 'player', index: actives.indexOf(targetIdx), key: doubleHitKeyRef.current })
-        playHit()
-      }
-      if (hit.defender.hp <= 0) log.push(`💀 ${hit.defender.name} se debilitó.`)
-    }
+    doubleEnemyCounterattack(teamCopy, actives, enemies, log, hits)
 
     // Auto-cambio: si un activo se debilitó, entra el siguiente vivo del equipo.
-    const nextActives = [...actives]
-    for (let i = 0; i < 2; i++) {
-      const ti = nextActives[i]
-      if (teamCopy[ti] && teamCopy[ti].hp > 0) continue
-      const alive = teamCopy
-        .map((p, idx) => ({ p, idx }))
-        .filter(x => x.p.hp > 0 && !nextActives.includes(x.idx))
-      if (alive.length > 0) {
-        nextActives[i] = alive[0].idx
-        log.push(`🔁 Sale ${teamCopy[nextActives[i]].name}!`)
-      }
-    }
+    const nextActives = doubleAutoSwitchAfterFaint(teamCopy, actives, log)
 
     setTeam(teamCopy)
     setDoubleActives(nextActives)
@@ -4370,36 +4418,37 @@ function MainApp() {
     setDoubleMoves([null, null])
     setDoubleLog(log.slice(-40))
     setDoubleHits(hits)
+    setDoubleChoosingSwitch(false)
 
-    const allEnemiesFainted = enemies.every(p => p.hp <= 0)
-    const allPlayerFainted = teamCopy.every(p => p.hp <= 0)
+    doubleCheckEnd(teamCopy, enemies, log)
+  }
 
-    if (allEnemiesFainted) {
-      const baseMoney = Math.floor(40 + enemies.reduce((s, p) => s + p.level, 0) * 4)
-      const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoney * (modifier?.moneyMultiplier ?? 1))
-      if (!runChallenges.noMoney) setMoney(prev => prev + moneyReward)
-      setBattleLog(prev => [`🥊 ¡Ganaste el combate doble! +$${moneyReward}.`, ...prev].slice(0, 15))
-      setDoubleFinished(true)
-      return
-    }
-    if (allPlayerFainted) {
-      setDoubleFinished(true)
-      const losses = record.losses + 1
-      persistRecord(record.wins, losses)
-      handleInfiniteRunDefeat(teamCopy)
-      if (isDailyRunRef.current) {
-        setDailyPlayed(true)
-        localStorage.setItem('pokerand_daily', dailySeed)
-      }
-      setDefeatSummary({
-        finalTeam: teamCopy,
-        battleLog: [...log],
-        enemy: enemies.find(p => p.hp > 0) ?? null,
-        lastNodeLabel: currentNode?.label
-      })
-      setScreen('defeat')
-      playDefeatMusic()
-    }
+  function doubleSwitchPokemon(slot: number, teamIdx: number): void {
+    if (doubleFinished) return
+    if (doubleActives[slot] === teamIdx) return
+    const enemies = [...doubleEnemies]
+    const teamCopy = team.map(p => ({ ...p }))
+    const actives = [...doubleActives]
+    const log = [...doubleLog]
+    const hits: Array<{ kind: 'enemy' | 'player'; index: number; key: number }> = []
+
+    // El cambio gasta el turno: el Pokémon que entra no ataca y los enemigos atacan.
+    actives[slot] = teamIdx
+    log.push(`🔁 ¡${teamCopy[teamIdx].name} entró en combate!`)
+
+    doubleEnemyCounterattack(teamCopy, actives, enemies, log, hits)
+
+    const nextActives = doubleAutoSwitchAfterFaint(teamCopy, actives, log)
+
+    setTeam(teamCopy)
+    setDoubleActives(nextActives)
+    setDoubleEnemies(enemies)
+    setDoubleMoves([null, null])
+    setDoubleLog(log.slice(-40))
+    setDoubleHits(hits)
+    setDoubleChoosingSwitch(false)
+
+    doubleCheckEnd(teamCopy, enemies, log)
   }
 
   function doubleLeave(): void {
@@ -4537,6 +4586,7 @@ function MainApp() {
         setDoubleEnemies(enemies)
         setDoubleMoves([null, null])
         setDoubleActiveSlot(0)
+        setDoubleChoosingSwitch(false)
         setDoubleLog([`🥊 ¡Combate Doble! ${enemies[0].name} y ${enemies[1].name} te desafían.`])
         setDoubleHits([])
         doubleHitKeyRef.current = 0
@@ -9878,8 +9928,30 @@ function MainApp() {
                       const slot = doubleActiveSlot
                       const teamIdx = doubleActives[slot]
                       const pokemon = team[teamIdx]
+                      const canSwitchNow = team.some((p, idx) => p.hp > 0 && !doubleActives.includes(idx))
                       if (!pokemon || pokemon.hp <= 0) {
                         return <p style={{ margin: '0 0 0.5rem', color: '#7d7ab5', fontSize: '0.8rem', textAlign: 'center' }}>Este Pokémon está debilitado.</p>
+                      }
+                      if (doubleChoosingSwitch) {
+                        const backups = team.map((p, idx) => ({ p, idx })).filter(x => x.p.hp > 0 && !doubleActives.includes(x.idx))
+                        return (
+                          <div style={{ padding: '0.6rem', borderRadius: '8px', background: 'rgba(56,189,248,0.08)', border: '1px solid #38bdf8', marginBottom: '0.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                              <strong style={{ color: '#7dd3fc', fontSize: '0.85rem' }}>Cambiar de Pokémon:</strong>
+                              <button className="tiny-btn" type="button" onClick={() => setDoubleChoosingSwitch(false)}>← Volver a ataques</button>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                              {backups.map(({ p, idx }) => (
+                                <button key={idx} className="tiny-btn" type="button" onClick={() => doubleSwitchPokemon(slot, idx)}>
+                                  <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
+                                  {p.name}
+                                </button>
+                              ))}
+                              {backups.length === 0 && <span style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No hay Pokémon disponibles.</span>}
+                            </div>
+                            <p style={{ margin: '0.5rem 0 0', color: '#7d7ab5', fontSize: '0.75rem' }}>El cambio gasta el turno: el Pokémon que entra no ataca y los enemigos sí.</p>
+                          </div>
+                        )
                       }
                       const sel = doubleMoves[slot]
                       return (
@@ -9919,6 +9991,16 @@ function MainApp() {
                               Listo: {pokemon.name} usará <strong>{pokemon.moves[sel.moveIdx]?.name}</strong> contra <strong>{doubleEnemies[sel.target]?.name}</strong>.
                             </p>
                           )}
+                          {canSwitchNow && (
+                            <button
+                              className="tiny-btn"
+                              type="button"
+                              onClick={() => setDoubleChoosingSwitch(true)}
+                              style={{ width: '100%', marginBottom: '0.5rem', background: '#2a2a55', color: '#7dd3fc', border: '1px solid #38bdf8' }}
+                            >
+                              🔁 Cambiar de Pokémon (gasta turno)
+                            </button>
+                          )}
                         </>
                       )
                     })()}
@@ -9927,7 +10009,7 @@ function MainApp() {
                       className="cta"
                       type="button"
                       onClick={resolveDoubleTurn}
-                      disabled={doubleActives[0] === undefined || !doubleMoves[0] || (doubleActives[1] !== undefined && !doubleMoves[1])}
+                      disabled={doubleChoosingSwitch || doubleActives[0] === undefined || !doubleMoves[0] || (doubleActives[1] !== undefined && !doubleMoves[1])}
                       style={{ width: '100%', background: (doubleActives[0] !== undefined && doubleMoves[0] && (doubleActives[1] === undefined || doubleMoves[1])) ? '#facc15' : '#475569', color: (doubleActives[0] !== undefined && doubleMoves[0] && (doubleActives[1] === undefined || doubleMoves[1])) ? '#12122b' : '#d9d6f2' }}
                     >
                       🥊 ¡Atacar!
