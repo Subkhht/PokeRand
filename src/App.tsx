@@ -869,12 +869,20 @@ const RANDOM_EVENTS = [
 
 const THEMES: Array<{ id: string; name: string; desc: string; price: number; colors: Record<string, string> }> = [
   { id: 'dark', name: 'Oscuro (Default)', desc: 'El tema clásico oscuro', price: 0, colors: { bg: '#12122b', surface: '#1c1c3a', border: '#3f3f6e', text: '#f8fafc', accent: '#4d9bff', muted: '#9b98cf' } },
-  { id: 'retro', name: 'Retro Game Boy', desc: 'Verde y negro clásico', price: 50, colors: { bg: '#0f380f', surface: '#1a5c1a', border: '#306230', text: '#9bbc0f', accent: '#9bbc0f', muted: '#306230' } },
-  { id: 'light', name: 'Claro', desc: 'Tema blanco limpio', price: 40, colors: { bg: '#f1f5f9', surface: '#ffffff', border: '#d9d6f2', text: '#1c1c3a', accent: '#2563eb', muted: '#9b98cf' } },
+  { id: 'retro', name: 'Retro Game Boy', desc: 'Verde y negro clásico', price: 50, colors: { bg: '#0f380f', surface: '#1b4d1b', border: '#3a7a3a', text: '#c8e08a', accent: '#9bbc0f', muted: '#7ca35c' } },
+  { id: 'light', name: 'Claro', desc: 'Tema blanco limpio', price: 40, colors: { bg: '#eef3fa', surface: '#ffffff', border: '#cbd5e1', text: '#0f172a', accent: '#2563eb', muted: '#64748b' } },
   { id: 'neon', name: 'Neón Cyberpunk', desc: 'Rosa neón y negro', price: 75, colors: { bg: '#0a0a0f', surface: '#1a1a2e', border: '#e94560', text: '#f3f1ff', accent: '#e94560', muted: '#7c7c9a' } },
   { id: 'crimson', name: 'Carmesí', desc: 'Rojo oscuro y dorado', price: 75, colors: { bg: '#1a0000', surface: '#2d0a0a', border: '#8b0000', text: '#ffd700', accent: '#ff4444', muted: '#8b4513' } },
   { id: 'ocean', name: 'Océano Profundo', desc: 'Azules y turquesa', price: 60, colors: { bg: '#001220', surface: '#001f3f', border: '#0074D9', text: '#f3f1ff', accent: '#7FDBFF', muted: '#39CCCC' } },
   { id: 'forest', name: 'Bosque Encantado', desc: 'Verdes y tierra', price: 60, colors: { bg: '#0d1f0d', surface: '#1a2e1a', border: '#2d5a27', text: '#d4edda', accent: '#28a745', muted: '#6b8e23' } },
+  { id: 'sunset', name: 'Atardecer', desc: 'Naranjas y rojos cálidos', price: 70, colors: { bg: '#1a0f00', surface: '#3a2205', border: '#7c4a03', text: '#ffe4b5', accent: '#ff8c42', muted: '#c9a06b' } },
+  { id: 'aurora', name: 'Aurora Polar', desc: 'Verdes y azules boreales', price: 75, colors: { bg: '#02130f', surface: '#06231b', border: '#0e4d3a', text: '#d0fff0', accent: '#4dffc2', muted: '#6fb3a0' } },
+  { id: 'sakura', name: 'Flores de Cerezo', desc: 'Rosas suaves y cálidos', price: 65, colors: { bg: '#2a0f1e', surface: '#431331', border: '#7a2455', text: '#ffe3f1', accent: '#ff6fb5', muted: '#d48ab3' } },
+  { id: 'ice', name: 'Glaciar', desc: 'Azules y blanco hielo', price: 65, colors: { bg: '#0b1a2e', surface: '#12294a', border: '#2c5f8a', text: '#e8f4ff', accent: '#9be8ff', muted: '#8aa7c9' } },
+  { id: 'desert', name: 'Desierto', desc: 'Arena y ámbar', price: 60, colors: { bg: '#1a1405', surface: '#2e2410', border: '#6b5620', text: '#f8edd0', accent: '#ffc94d', muted: '#c0a86a' } },
+  { id: 'matrix', name: 'Matrix', desc: 'Verde neón sobre negro', price: 85, colors: { bg: '#000000', surface: '#0a1a0a', border: '#0f3d0f', text: '#a4f7a4', accent: '#22ff22', muted: '#2f6b2f' } },
+  { id: 'midnight', name: 'Medianoche', desc: 'Azul profundo y plata', price: 70, colors: { bg: '#070b18', surface: '#101a30', border: '#2a3f6b', text: '#dbe6ff', accent: '#7aa2ff', muted: '#77839e' } },
+  { id: 'candy', name: 'Caramelo', desc: 'Rosa chicle y vibrantes', price: 75, colors: { bg: '#1e0f1e', surface: '#3a1b33', border: '#7a3a63', text: '#ffe6f5', accent: '#ff77dd', muted: '#c98aa8' } },
 ]
 
 interface MetaShopItem {
@@ -942,6 +950,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'start_potion_2', name: 'Inicio: +1 Poción II', desc: 'Empiezas cada aventura con 1 Poción extra (se suma a la anterior).', price: 180, spriteKey: 'Potion', category: 'upgrade', requires: 'start_potion_1' },
   { id: 'start_money_1', name: 'Inicio: +$100', desc: 'Empiezas cada aventura con $100 extra.', price: 120, spriteKey: 'money', category: 'upgrade' },
   { id: 'start_money_2', name: 'Inicio: +$100 II', desc: 'Empiezas cada aventura con $100 extra (se suma a la anterior).', price: 160, spriteKey: 'money', category: 'upgrade', requires: 'start_money_1' },
+  { id: 'start_revive_1', name: 'Inicio: +1 Revive', desc: 'Empiezas cada aventura con 1 Revive extra.', price: 200, spriteKey: 'Revive', category: 'upgrade' },
   { id: 'unlock_quick_ball', name: 'Quick Ball', desc: 'x5 en el primer turno. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Quick Ball', category: 'pokeball' },
   { id: 'unlock_timer_ball', name: 'Timer Ball', desc: 'Mejora con los turnos (hasta x4). Aparece en tiendas y descansos.', price: 35, spriteKey: 'Timer Ball', category: 'pokeball' },
   { id: 'unlock_dusk_ball', name: 'Dusk Ball', desc: 'x3 en oscuridad. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Dusk Ball', category: 'pokeball' },
@@ -1583,6 +1592,16 @@ function MainApp() {
     } catch {}
     return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark', ownedMusic: [], activeMenuMusic: 'default', activeBattleMusic: 'default', totalMegas: 0, totalGmax: 0, coopRuns: 0, coopWins: 0, coopTrades: 0 }
   })
+
+  const [secretModalOpen, setSecretModalOpen] = useState(false)
+  const [secretPassword, setSecretPassword] = useState('')
+  const [secretUnlocked, setSecretUnlocked] = useState(false)
+  const [secretMsg, setSecretMsg] = useState<{ text: string; error: boolean } | null>(null)
+  const secretKeyBufferRef = useRef('')
+  const [secretAddOpen, setSecretAddOpen] = useState(false)
+  const [secretPokemonQuery, setSecretPokemonQuery] = useState('')
+  const [secretAddLoading, setSecretAddLoading] = useState(false)
+  const [secretAddError, setSecretAddError] = useState('')
   const [showAchievements, setShowAchievements] = useState<boolean>(false)
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null)
   const [shinyNextEncounter, setShinyNextEncounter] = useState<boolean>(false)
@@ -1799,6 +1818,75 @@ function MainApp() {
     }
     document.body.style.color = theme.colors.text
   }, [metaProgression.activeTheme])
+
+  // Código secreto: escribir "adminsub" abre el modal de contraseña del modo secreto.
+  useEffect(() => {
+    const SECRET = 'adminsub'
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return
+      const key = e.key.toLowerCase()
+      if (key.length === 1) {
+        secretKeyBufferRef.current = (secretKeyBufferRef.current + key).slice(-SECRET.length)
+        if (secretKeyBufferRef.current === SECRET) {
+          secretKeyBufferRef.current = ''
+          setSecretPassword('')
+          setSecretMsg(null)
+          setSecretModalOpen(true)
+        }
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  function submitSecretPassword(): void {
+    if (secretPassword === 'admin123') {
+      setSecretUnlocked(true)
+      setSecretModalOpen(false)
+      setSecretPassword('')
+      setSecretMsg({ text: '🔓 ¡Has desbloqueado el modo secreto!', error: false })
+      setTimeout(() => setSecretMsg(null), 2500)
+    } else {
+      setSecretModalOpen(false)
+      setSecretPassword('')
+      setSecretMsg({ text: '❌ Te has equivocado', error: true })
+      setTimeout(() => setSecretMsg(null), 2000)
+    }
+  }
+
+  function addSecretCoins(): void {
+    setMetaProgression(prev => {
+      const updated = { ...prev, pokeCoins: prev.pokeCoins + 100 }
+      localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+      return updated
+    })
+  }
+
+  async function secretAddPokemon(): Promise<void> {
+    const query = secretPokemonQuery.trim()
+    if (!query) return
+    setSecretAddLoading(true)
+    setSecretAddError('')
+    try {
+      const level = activePokemon?.level ?? team[0]?.level ?? 50
+      const pokemon = await buildPokemonFromApi(query, getEffectiveGen(), level, false)
+      registerInPokedex(pokemon)
+      const withStages: Pokemon = { ...pokemon, statStages: { attack: 0, defense: 0, speed: 0 }, hp: pokemon.maxHp }
+      if (team.length < maxTeamSize) {
+        setTeam(prev => [...prev, withStages])
+      } else {
+        setPcStorage(prev => [...prev, withStages])
+      }
+      setBattleLog(prev => [`🔓 Modo secreto: añadiste a ${pokemon.name} Nv.${pokemon.level}${team.length >= maxTeamSize ? ' (al PC)' : ''}.`, ...prev].slice(0, 15))
+      setSecretPokemonQuery('')
+      setSecretAddOpen(false)
+    } catch {
+      setSecretAddError('No se encontró ese Pokémon en PokeAPI. Usa un ID o un nombre válido (ej. 25, pikachu).')
+    } finally {
+      setSecretAddLoading(false)
+    }
+  }
 
   function buyMetaItem(item: MetaShopItem): void {
     if (item.requires && !metaProgression.permanentlyUnlockedItems.includes(item.requires)) return
@@ -2695,6 +2783,7 @@ function MainApp() {
       const startingItems: string[] = [run.item]
       for (let i = 0; i < 5 + extraBalls; i++) startingItems.push('Poké Ball')
       for (let i = 0; i < extraPotions; i++) startingItems.push('Potion')
+      if (startItems.includes('start_revive_1')) startingItems.push('Revive')
       setInventory(startingItems)
       setModifier(run.modifier)
       setRoute(customRoute)
@@ -7108,6 +7197,17 @@ function MainApp() {
         <div className="record-box">
           {winStreak >= 2 && <span style={{ color: '#ff8a33', fontWeight: 'bold', marginRight: '0.5rem' }}>🔥 {winStreak}</span>}
           <span style={{ color: '#ffcb05', fontWeight: 'bold' }}>🪙 {metaProgression.pokeCoins}</span>
+          {secretUnlocked && (
+            <button
+              className="tiny-btn"
+              type="button"
+              onClick={addSecretCoins}
+              title="Modo secreto: +100 PokéCoins"
+              style={{ marginLeft: '0.4rem', color: '#ffcb05', background: '#2a2a55', fontWeight: 'bold', padding: '2px 8px' }}
+            >
+              +
+            </button>
+          )}
           <span style={{ color: '#ffcb05', fontWeight: 'bold', marginLeft: '0.5rem' }}>💵 ${money}</span>
           <span style={{ color: '#10b981', fontWeight: 'bold' }}>W {record.wins}</span>
           <span style={{ color: '#ee3b2f', fontWeight: 'bold' }}>L {record.losses}</span>
@@ -10244,6 +10344,16 @@ function MainApp() {
                   <li key={`${line}-${index}`}>{line}</li>
                 ))}
               </ul>
+              {secretUnlocked && (
+                <button
+                  className="tiny-btn"
+                  type="button"
+                  onClick={() => setSecretAddOpen(true)}
+                  style={{ width: '100%', marginTop: '0.5rem', color: '#ffcb05', background: '#2a2a55', border: '1px solid #ffcb05', fontWeight: 'bold' }}
+                >
+                  ➕ Añadir Pokémon
+                </button>
+              )}
             </div>
           </article>
         </section>
@@ -11408,6 +11518,65 @@ function MainApp() {
             <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
               <button className="cta" onClick={() => setShowMetaShop(false)}>Cerrar Tienda</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Añadir Pokémon (Modo Secreto) */}
+      {secretAddOpen && (
+        <div className="modal-backdrop" onClick={() => setSecretAddOpen(false)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', padding: '1.5rem', textAlign: 'center' }}>
+            <h3 style={{ color: '#ffcb05', margin: '0 0 0.75rem' }}>➕ Añadir Pokémon (Modo Secreto)</h3>
+            <p style={{ color: '#9b98cf', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+              Escribe un ID o nombre de PokeAPI (ej. 25 o pikachu). Se añadirá al nivel del Pokémon activo.
+            </p>
+            <input
+              type="text"
+              value={secretPokemonQuery}
+              onChange={(e) => setSecretPokemonQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void secretAddPokemon() }}
+              placeholder="ID o nombre (ej. 25, pikachu, charizard-mega-y)"
+              autoFocus
+              style={authInputStyle}
+            />
+            {secretAddError && <p style={{ color: '#ff8a80', fontSize: '0.8rem', marginTop: '0.5rem' }}>{secretAddError}</p>}
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+              <button className="cta" type="button" onClick={() => void secretAddPokemon()} disabled={secretAddLoading} style={{ flex: 1 }}>
+                {secretAddLoading ? 'Añadiendo...' : 'Añadir'}
+              </button>
+              <button className="cta" type="button" onClick={() => { setSecretAddOpen(false); setSecretAddError('') }} style={{ flex: 1, background: '#7d7ab5' }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Modo Secreto */}
+      {secretModalOpen && (
+        <div className="modal-backdrop" onClick={() => { setSecretModalOpen(false); setSecretPassword('') }}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '360px', padding: '1.5rem', textAlign: 'center' }}>
+            <h3 style={{ color: '#cba3ff', margin: '0 0 0.75rem' }}>🔒 Modo Secreto</h3>
+            <p style={{ color: '#9b98cf', fontSize: '0.85rem', marginBottom: '0.75rem' }}>Introduce la contraseña:</p>
+            <input
+              type="password"
+              value={secretPassword}
+              onChange={(e) => setSecretPassword(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') submitSecretPassword() }}
+              autoFocus
+              style={authInputStyle}
+            />
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+              <button className="cta" type="button" onClick={submitSecretPassword} style={{ flex: 1 }}>Confirmar</button>
+              <button className="cta" type="button" onClick={() => { setSecretModalOpen(false); setSecretPassword('') }} style={{ flex: 1, background: '#7d7ab5' }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mensaje del Modo Secreto */}
+      {secretMsg && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.55)', pointerEvents: 'none' }}>
+          <div style={{ padding: '1.5rem 2.5rem', borderRadius: '10px', background: '#1c1c3a', border: `2px solid ${secretMsg.error ? '#ff8a80' : '#37d16b'}`, color: secretMsg.error ? '#ff8a80' : '#37d16b', fontSize: '1.3rem', fontWeight: 'bold', textAlign: 'center', boxShadow: '5px 5px 0 rgba(0,0,0,0.5)', animation: 'slideInRight 0.3s ease' }}>
+            {secretMsg.text}
           </div>
         </div>
       )}
