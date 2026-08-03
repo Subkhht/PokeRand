@@ -10,6 +10,14 @@ export interface PvpMatchInfo {
   result: 'a' | 'b' | null
   a_name: string | null
   b_name: string | null
+  a_elo: number
+  b_elo: number
+}
+
+export interface PvpEloEntry {
+  player_name: string
+  elo: number
+  wins: number
 }
 
 export interface PvpPlayerState {
@@ -81,7 +89,7 @@ export function serializePvpPokemon(p: Pokemon): Pokemon {
     types: p.types ?? [],
     baseStatTotal: p.baseStatTotal,
     shiny: p.shiny,
-    moves: p.moves.map((m: Move): Move => ({ ...m })),
+    moves: p.moves.map((m: Move): Move => ({ ...m, pp: m.pp ?? 10, maxPp: m.maxPp ?? 10 })),
   }
 }
 
@@ -245,4 +253,49 @@ export async function expirePvpTimer(matchId: string): Promise<boolean> {
     return false
   }
   return data === true
+}
+
+export async function getPvpElo(): Promise<{ elo: number; wins: number } | null> {
+  const client = await getClient()
+  if (!client) return null
+  const { data, error } = await client.rpc('get_pvp_elo')
+  if (error) {
+    console.error('get_pvp_elo:', error)
+    return null
+  }
+  return (data as { elo: number; wins: number }) ?? null
+}
+
+export async function getPvpEloLeaderboard(): Promise<PvpEloEntry[]> {
+  const client = await getClient()
+  if (!client) return []
+  const { data, error } = await client.rpc('get_pvp_elo_leaderboard')
+  if (error) {
+    console.error('get_pvp_elo_leaderboard:', error)
+    return []
+  }
+  return (data as PvpEloEntry[]) ?? []
+}
+
+export async function awardPvpElo(matchId: string): Promise<number | null> {
+  const client = await getClient()
+  if (!client) return null
+  const { data, error } = await client.rpc('award_pvp_elo', { p_match_id: matchId })
+  if (error) {
+    console.error('award_pvp_elo:', error)
+    return null
+  }
+  const points = (data as { points?: number } | null)?.points
+  return typeof points === 'number' ? points : null
+}
+
+export async function rematchPvpRoom(code: string, team: Pokemon[]): Promise<PvpRoomResult | null> {
+  const client = await getClient()
+  if (!client) return null
+  const { data, error } = await client.rpc('rematch_pvp_room', { p_code: code, p_team: team.map(serializePvpPokemon) })
+  if (error) {
+    console.error('rematch_pvp_room:', error)
+    return null
+  }
+  return (data as PvpRoomResult) ?? null
 }

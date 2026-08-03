@@ -20,13 +20,13 @@ import {
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
 import { isLeaderboardEnabled, submitInfiniteScore, fetchInfiniteLeaderboard, formatDuration, getCurrentUser, onAuthChange, signUpWithUsername, signIn, signOut, getUsername, isUsernameTaken, type LeaderboardEntry, type InfiniteScoreInsert } from './game/leaderboard'
-import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, cancelExchangeOffer, finishCoopSession, resetCoopSession, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange } from './game/coop'
-import { isPvpEnabled, createPvpRoom, findPvpOpponent, joinPvpRoom, getPvpMatch, getPvpState, submitPvpAction, resolvePvpTurn as resolvePvpTurnRpc, forfeitPvpMatch, cancelPvpMatch, finishPvpMatch, clearPvpAction, startPvpTimer, expirePvpTimer, serializePvpPokemon, type PvpTurnSnapshot, type PvpRoomResult, type PvpState } from './game/pvp'
+import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, cancelExchangeOffer, sendCoopChat, getCoopChat, finishCoopSession, resetCoopSession, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange, type CoopChatMessage } from './game/coop'
+import { isPvpEnabled, createPvpRoom, findPvpOpponent, joinPvpRoom, getPvpMatch, getPvpState, submitPvpAction, resolvePvpTurn as resolvePvpTurnRpc, forfeitPvpMatch, cancelPvpMatch, finishPvpMatch, clearPvpAction, startPvpTimer, expirePvpTimer, getPvpElo, getPvpEloLeaderboard, awardPvpElo, rematchPvpRoom, serializePvpPokemon, type PvpTurnSnapshot, type PvpRoomResult, type PvpState, type PvpEloEntry } from './game/pvp'
 import { resolvePvpTurn, type PvpAction } from './game/pvpBattle'
 import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'trade' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'trade' | 'blackmarket' | 'double' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum'
 
 const STATUS_LABELS: Record<StatusType, string> = {
@@ -1080,6 +1080,12 @@ function nodeTypeLabel(node: RouteNode): string {
       return 'G-MAX'
     case 'trade':
       return 'Intercambio'
+    case 'rival':
+      return 'Rival'
+    case 'blackmarket':
+      return 'Mercado Negro'
+    case 'double':
+      return 'Combate Doble'
     default:
       return node.type
   }
@@ -1127,6 +1133,9 @@ const NODE_EMOJIS: Record<string, string> = {
   mega: '💎',
   gmax: '⚡',
   trade: '🤝',
+  rival: '👤',
+  blackmarket: '🕶️',
+  double: '🥊',
 }
 
 const NODE_TYPE_COLORS: Record<string, string> = {
@@ -1141,6 +1150,9 @@ const NODE_TYPE_COLORS: Record<string, string> = {
   mega: '#ff9ad6',
   gmax: '#9da6ff',
   trade: '#37d16b',
+  rival: '#f472b6',
+  blackmarket: '#fb923c',
+  double: '#facc15',
 }
 
 function getNodeMapLayout(nodeCount: number): { positions: Array<{ x: number; y: number }>; width: number; height: number } {
@@ -1348,6 +1360,8 @@ function MainApp() {
 
   // Ranking mundial (modo Infinite)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
+  const [leaderboardTab, setLeaderboardTab] = useState<'infinite' | 'elo'>('infinite')
+  const [pvpEloLeaderboard, setPvpEloLeaderboard] = useState<PvpEloEntry[]>([])
   const [leaderboardByGen, setLeaderboardByGen] = useState<Record<number, LeaderboardEntry[]>>({})
   const [leaderboardGen, setLeaderboardGen] = useState(0)
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
@@ -1384,6 +1398,7 @@ function MainApp() {
 
   // Team Rocket
   const [isTeamRocketBattle, setIsTeamRocketBattle] = useState<boolean>(false)
+  const [isRivalBattle, setIsRivalBattle] = useState<boolean>(false)
   const [teamRocketFainted, setTeamRocketFainted] = useState<boolean>(false)
   const [teamRocketTeam, setTeamRocketTeam] = useState<Pokemon[]>([])
   const [teamRocketStealMessage, setTeamRocketStealMessage] = useState<string>('')
@@ -1400,6 +1415,20 @@ function MainApp() {
   const [pokeRandAnimating, setPokeRandAnimating] = useState<boolean>(false)
   const [pokeRandWinnerIndex, setPokeRandWinnerIndex] = useState<number | null>(null)
   const [pokeRandRevealed, setPokeRandRevealed] = useState<boolean>(false)
+
+  // Mercado Negro
+  const [blackMarketItems, setBlackMarketItems] = useState<string[]>([])
+  const [blackMarketPokemon, setBlackMarketPokemon] = useState<Pokemon[]>([])
+
+  // Combate Doble (2 vs 2)
+  const [doubleEnemies, setDoubleEnemies] = useState<Pokemon[]>([])
+  const [doubleActives, setDoubleActives] = useState<number[]>([])
+  const [doubleMoves, setDoubleMoves] = useState<Array<{ moveIdx: number; target: number } | null>>([null, null])
+  const [doubleActiveSlot, setDoubleActiveSlot] = useState<number>(0)
+  const [doubleLog, setDoubleLog] = useState<string[]>([])
+  const [doubleFinished, setDoubleFinished] = useState<boolean>(false)
+  const [doubleHits, setDoubleHits] = useState<Array<{ kind: 'enemy' | 'player'; index: number; key: number }>>([])
+  const doubleHitKeyRef = useRef(0)
 
   // Move node (intercambio de movimientos)
   const [moveOptions, setMoveOptions] = useState<Move[]>([])
@@ -1559,6 +1588,11 @@ function MainApp() {
   const [coopExchange, setCoopExchange] = useState<CoopExchange | null>(null)
   const [coopTradeMsg, setCoopTradeMsg] = useState<string>('')
   const [coopError, setCoopError] = useState<string>('')
+  const [coopChatOpen, setCoopChatOpen] = useState<boolean>(false)
+  const [coopChatMsgs, setCoopChatMsgs] = useState<CoopChatMessage[]>([])
+  const [coopChatText, setCoopChatText] = useState<string>('')
+  const coopChatLastRef = useRef<string | null>(null)
+  const coopChatPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => { coopModeRef.current = coopMode }, [coopMode])
   useEffect(() => { coopSessionCodeRef.current = coopSessionCode }, [coopSessionCode])
@@ -1612,6 +1646,11 @@ function MainApp() {
   const [pvpChoosingSwitch, setPvpChoosingSwitch] = useState<boolean>(false)
   const [pvpTimerLeft, setPvpTimerLeft] = useState<number>(0)
   const [pvpHit, setPvpHit] = useState<{ side: 'a' | 'b'; key: number } | null>(null)
+  const [pvpMyElo, setPvpMyElo] = useState<number>(1000)
+  const [pvpOppElo, setPvpOppElo] = useState<number>(1000)
+  const [pvpEloGain, setPvpEloGain] = useState<number | null>(null)
+  const [pvpEloRewarded, setPvpEloRewarded] = useState<boolean>(false)
+  const pvpEloRewardedRef = useRef(false)
   const pvpPrevTeamHpRef = useRef<{ a: number[]; b: number[] }>({ a: [], b: [] })
   const pvpTimerTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pvpLoopRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -2288,10 +2327,24 @@ function MainApp() {
         }
       }
     }
+    // Nuevos nodos con baja probabilidad (no en COLISEUM): el rival recurrente
+    // aparece cada ~6 nodos, el Mercado Negro y el Combate Doble son raros.
+    if (difficulty !== 'coliseum' && (type === 'battle' || type === 'teamRocket')) {
+      const r2 = rng()
+      if (id % 6 === 0 && r2 < 0.5) {
+        type = 'rival'
+      } else if (r2 < 0.03) {
+        type = 'blackmarket'
+      } else if (r2 < 0.06) {
+        type = 'double'
+      } else if (r2 < 0.09) {
+        type = 'rival'
+      }
+    }
     return {
       id,
       type,
-      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : type === 'mega' ? `Mega #${id}` : type === 'gmax' ? `G-MAX #${id}` : `Ruta ${id}`,
+      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : type === 'mega' ? `Mega #${id}` : type === 'gmax' ? `G-MAX #${id}` : type === 'rival' ? `Rival #${id}` : type === 'blackmarket' ? `Mercado Negro #${id}` : type === 'double' ? `Doble #${id}` : `Ruta ${id}`,
       done: false
     }
   }
@@ -2538,10 +2591,26 @@ function MainApp() {
             }
           }
 
+          // Nodos nuevos en Medio y Difícil (misma probabilidad baja que Infinite):
+          // el Rival recurrente aparece cada ~6 nodos, el Mercado Negro y el
+          // Combate Doble son raros.
+          if ((effectiveDifficulty === 'medium' || effectiveDifficulty === 'hard') && (type === 'battle' || type === 'teamRocket')) {
+            const r2 = rr()
+            if (i % 6 === 0 && r2 < 0.5) {
+              type = 'rival'
+            } else if (r2 < 0.03) {
+              type = 'blackmarket'
+            } else if (r2 < 0.06) {
+              type = 'double'
+            } else if (r2 < 0.09) {
+              type = 'rival'
+            }
+          }
+
           customRoute.push({
             id: i,
             type,
-            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : type === 'mega' ? `Mega #${i}` : type === 'gmax' ? `G-MAX #${i}` : `Ruta ${i}`,
+            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : type === 'mega' ? `Mega #${i}` : type === 'gmax' ? `G-MAX #${i}` : type === 'rival' ? `Rival #${i}` : type === 'blackmarket' ? `Mercado Negro #${i}` : type === 'double' ? `Doble #${i}` : `Ruta ${i}`,
             done: false
           })
         }
@@ -3399,7 +3468,19 @@ function MainApp() {
     setPvpChoosingSwitch(false)
     setPvpTimerLeft(0)
     setPvpHit(null)
+    setPvpEloGain(null)
+    setPvpEloRewarded(false)
+    pvpEloRewardedRef.current = false
     pvpPrevTeamHpRef.current = { a: [], b: [] }
+    // Cargar Elo propio y del rival para mostrarlo durante la partida.
+    void getPvpElo().then((r) => { if (r) setPvpMyElo(r.elo) })
+    if (result.match_id) {
+      void getPvpMatch(result.match_id).then((m) => {
+        if (!m) return
+        if (role === 'a') { setPvpMyElo(m.a_elo); setPvpOppElo(m.b_elo) }
+        else { setPvpMyElo(m.b_elo); setPvpOppElo(m.a_elo) }
+      })
+    }
     setPvpSearching(false)
     setPvpWaitingOpponent(false)
     setShowPvpModal(false)
@@ -3423,6 +3504,7 @@ function MainApp() {
     const side = pvpSnapshot.state[pvpRole]
     const active = side.team[side.active]
     if (!active || index < 0 || index >= active.moves.length) return
+    if ((active.moves[index].pp ?? 0) <= 0) return
     playClick()
     const snap = await submitPvpAction(pvpMatchId, { kind: 'move', index }, pvpSnapshot.turn)
     if (snap) {
@@ -3475,6 +3557,30 @@ function MainApp() {
     }
   }
 
+  // Revancha: reutiliza el código de la partida anterior para que el mismo
+  // rival pueda volver a jugar contra ti.
+  async function pvpRematch(): Promise<void> {
+    if (!pvpRoomCode || pvpTeam.length === 0) return
+    playClick()
+    setPvpError('')
+    const result = await rematchPvpRoom(pvpRoomCode, pvpTeam)
+    if (!result) {
+      setPvpError('No se pudo crear la revancha.')
+      return
+    }
+    if (result.joined) {
+      startPvpBattle(result, 'b')
+    } else {
+      setPvpMatchId(result.match_id)
+      setPvpRoomCode(result.code ?? '')
+      setPvpSnapshot(null)
+      setPvpEloGain(null)
+      setPvpEloRewarded(false)
+      pvpEloRewardedRef.current = false
+      setPvpWaitingOpponent(true)
+    }
+  }
+
   async function pvpForfeit(): Promise<void> {
     if (pvpMatchId) void forfeitPvpMatch(pvpMatchId)
     pvpLeave()
@@ -3491,6 +3597,9 @@ function MainApp() {
     setPvpChoosingSwitch(false)
     setPvpTimerLeft(0)
     setPvpHit(null)
+    setPvpEloGain(null)
+    setPvpEloRewarded(false)
+    pvpEloRewardedRef.current = false
     pvpPrevTeamHpRef.current = { a: [], b: [] }
     if (pvpTimerTickRef.current) {
       clearInterval(pvpTimerTickRef.current)
@@ -3573,6 +3682,17 @@ function MainApp() {
           if (ok) {
             if (nextState.phase === 'finished' && nextState.winner) {
               void finishPvpMatch(matchId, nextState.winner)
+              // Elo: se otorga una sola vez al ganador (la RPC es idempotente).
+              if (nextState.winner === pvpRole && !pvpEloRewardedRef.current) {
+                pvpEloRewardedRef.current = true
+                setPvpEloRewarded(true)
+                void awardPvpElo(matchId).then((points) => {
+                  if (typeof points === 'number') {
+                    setPvpEloGain(points)
+                    setPvpMyElo(prev => prev + points)
+                  }
+                })
+              }
             }
             const fresh = await getPvpState(matchId)
             if (fresh && !cancelled) {
@@ -3629,6 +3749,17 @@ function MainApp() {
         if (!isNaN(until) && until <= Date.now()) {
           const ok = await expirePvpTimer(matchId)
           if (ok) {
+            // El ganador por tiempo es quien inició la cuenta atrás.
+            if (snap.timer_by === pvpRole && !pvpEloRewardedRef.current) {
+              pvpEloRewardedRef.current = true
+              setPvpEloRewarded(true)
+              void awardPvpElo(matchId).then((points) => {
+                if (typeof points === 'number') {
+                  setPvpEloGain(points)
+                  setPvpMyElo(prev => prev + points)
+                }
+              })
+            }
             const fresh = await getPvpState(matchId)
             if (fresh && !cancelled) setPvpSnapshot(fresh)
           }
@@ -3853,6 +3984,44 @@ function MainApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, routeIndex, coopSessionCode])
 
+  // Chat rápido del cooperativo: envía mensajes y emojis, y los recoge cada 3s.
+  async function coopSendChat(text: string): Promise<void> {
+    const code = coopSessionCodeRef.current
+    const msg = text.trim()
+    if (!code || !msg) return
+    const ok = await sendCoopChat(code, msg)
+    if (ok) {
+      setCoopChatText('')
+      coopChatLastRef.current = new Date().toISOString()
+    }
+  }
+
+  useEffect(() => {
+    if (!coopMode || !coopSessionCode || !coopChatOpen) return
+    const code = coopSessionCode
+    let cancelled = false
+    const poll = async () => {
+      if (cancelled) return
+      const msgs = await getCoopChat(code, coopChatLastRef.current)
+      if (cancelled) return
+      if (msgs.length > 0) {
+        const last = msgs[msgs.length - 1]
+        coopChatLastRef.current = last.created_at
+        setCoopChatMsgs(prev => [...prev, ...msgs].slice(-60))
+      }
+    }
+    void poll()
+    coopChatPollRef.current = setInterval(() => void poll(), 3000)
+    return () => {
+      cancelled = true
+      if (coopChatPollRef.current) {
+        clearInterval(coopChatPollRef.current)
+        coopChatPollRef.current = null
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coopMode, coopSessionCode, coopChatOpen])
+
   // Cancelar la oferta: si ya se envió, la devuelve al jugador y la cancela en
   // la base de datos (si el intercambio aún no se completó). Si solo estaba
   // seleccionada, simplemente limpia la selección.
@@ -3984,6 +4153,201 @@ function MainApp() {
     }
   }
 
+  // --- Mercado Negro: comprar objetos baratos, vender y comprar Pokémon ---
+  function blackMarketItemPrice(itemName: string): number {
+    const data = ALL_SHOP_ITEMS[itemName] ?? HOLDABLE_ITEMS[itemName]
+    if (!data) return 0
+    return Math.max(1, Math.floor(data.price * 0.85))
+  }
+
+  function blackMarketBuyItem(itemName: string): void {
+    const price = blackMarketItemPrice(itemName)
+    if (money < price) return
+    playClick()
+    setMoney((prev) => prev - price)
+    setInventory((prev) => [...prev, itemName])
+    setBattleLog((prev) => [`🕶️ Compraste ${itemName} en el mercado negro por $${price}.`, ...prev].slice(0, 15))
+  }
+
+  function blackMarketSellItem(itemName: string): void {
+    playClick()
+    setInventory((prev) => {
+      const idx = prev.indexOf(itemName)
+      if (idx === -1) return prev
+      const out = [...prev]
+      out.splice(idx, 1)
+      return out
+    })
+    const data = ALL_SHOP_ITEMS[itemName] ?? HOLDABLE_ITEMS[itemName]
+    const value = data ? Math.max(1, Math.floor(data.price * 0.5)) : 10
+    setMoney((prev) => prev + value)
+    setBattleLog((prev) => [`🕶️ Vendiste ${itemName} por $${value}.`, ...prev].slice(0, 15))
+  }
+
+  function blackMarketBuyPokemon(idx: number): void {
+    if (runChallenges.soloStarter || runChallenges.fixedTeam) {
+      setBattleLog((prev) => ['🚫 No puedes modificar tu equipo con este desafío.', ...prev].slice(0, 15))
+      return
+    }
+    const pokemon = blackMarketPokemon[idx]
+    if (!pokemon) return
+    const price = 100 + pokemon.level * 15
+    if (money < price) return
+    playClick()
+    setMoney((prev) => prev - price)
+    const purchased = { ...pokemon, hp: pokemon.maxHp, statStages: { attack: 0, defense: 0, speed: 0 } }
+    registerInPokedex(purchased)
+    if (team.length < maxTeamSize) {
+      setTeam((prev) => [...prev, purchased])
+    } else {
+      setPcStorage((prev) => [...prev, purchased])
+    }
+    setBattleLog((prev) => [`🕶️ Compraste a ${pokemon.name} (Nv.${pokemon.level}) por $${price}.`, ...prev].slice(0, 15))
+  }
+
+  // --- Combate Doble (2 vs 2) ---
+  function doubleSelectMove(slot: number, moveIdx: number): void {
+    setDoubleMoves(prev => {
+      const next = [...prev]
+      next[slot] = next[slot] ? { ...next[slot]!, moveIdx } : { moveIdx, target: 0 }
+      return next
+    })
+  }
+
+  function doubleSelectTarget(slot: number, target: number): void {
+    setDoubleMoves(prev => {
+      const next = [...prev]
+      next[slot] = next[slot] ? { ...next[slot]!, target } : { moveIdx: 0, target }
+      return next
+    })
+  }
+
+  function performDoubleHit(attacker: Pokemon, defender: Pokemon, move: Move): { attacker: Pokemon; defender: Pokemon; log: string[] } {
+    if (move.accuracy != null && move.accuracy < 100 && Math.random() * 100 >= move.accuracy) {
+      return { attacker, defender, log: [`${attacker.name} usó ${move.name} pero falló.`] }
+    }
+    const defTypes = defender.types ?? []
+    const { effectiveness, message } = getTypeEffectiveness(move.type, defTypes[0] || 'normal', defTypes[1])
+    const stab = (attacker.types ?? []).some(t => t === move.type) ? 1.5 : 1
+    const result = applyDamage(attacker, defender, move)
+    const damage = Math.max(1, Math.floor(result.damage * effectiveness * stab))
+    const newHp = Math.max(0, defender.hp - damage)
+    const log = [`${attacker.name} usa ${move.name}: ${damage} de daño${message ? ` (${message})` : ''}.`]
+    return { attacker, defender: { ...defender, hp: newHp }, log }
+  }
+
+  function resolveDoubleTurn(): void {
+    if (doubleFinished) return
+    const enemies = [...doubleEnemies]
+    const teamCopy = team.map(p => ({ ...p }))
+    const actives = [...doubleActives]
+    const log = [...doubleLog]
+    const hits: Array<{ kind: 'enemy' | 'player'; index: number; key: number }> = []
+
+    // Los Pokémon del jugador atacan primero (cada uno a su objetivo).
+    for (let i = 0; i < 2; i++) {
+      const sel = doubleMoves[i]
+      const teamIdx = actives[i]
+      if (teamIdx === undefined || !sel) continue
+      const attacker = teamCopy[teamIdx]
+      if (!attacker || attacker.hp <= 0) continue
+      const move = attacker.moves[sel.moveIdx]
+      const target = enemies[sel.target]
+      if (!move || !target || target.hp <= 0) continue
+      const before = target.hp
+      const hit = performDoubleHit(attacker, target, move)
+      teamCopy[teamIdx] = hit.attacker
+      enemies[sel.target] = hit.defender
+      log.push(...hit.log)
+      if (hit.defender.hp < before) {
+        doubleHitKeyRef.current += 1
+        hits.push({ kind: 'enemy', index: sel.target, key: doubleHitKeyRef.current })
+        playHit()
+      }
+      if (hit.defender.hp <= 0) log.push(`💀 ${hit.defender.name} se debilitó.`)
+    }
+
+    // Los enemigos vivos contraatacan (objetivo aleatorio entre los activos vivos).
+    for (let e = 0; e < 2; e++) {
+      const enemy = enemies[e]
+      if (!enemy || enemy.hp <= 0) continue
+      const aliveTargets = actives.filter(ti => {
+        const p = teamCopy[ti]
+        return p && p.hp > 0
+      })
+      if (aliveTargets.length === 0) break
+      const targetIdx = aliveTargets[Math.floor(Math.random() * aliveTargets.length)]
+      const move = enemy.moves[Math.floor(Math.random() * enemy.moves.length)]
+      const before = teamCopy[targetIdx].hp
+      const hit = performDoubleHit(enemy, teamCopy[targetIdx], move)
+      enemies[e] = hit.attacker
+      teamCopy[targetIdx] = hit.defender
+      log.push(...hit.log)
+      if (hit.defender.hp < before) {
+        doubleHitKeyRef.current += 1
+        hits.push({ kind: 'player', index: actives.indexOf(targetIdx), key: doubleHitKeyRef.current })
+        playHit()
+      }
+      if (hit.defender.hp <= 0) log.push(`💀 ${hit.defender.name} se debilitó.`)
+    }
+
+    // Auto-cambio: si un activo se debilitó, entra el siguiente vivo del equipo.
+    const nextActives = [...actives]
+    for (let i = 0; i < 2; i++) {
+      const ti = nextActives[i]
+      if (teamCopy[ti] && teamCopy[ti].hp > 0) continue
+      const alive = teamCopy
+        .map((p, idx) => ({ p, idx }))
+        .filter(x => x.p.hp > 0 && !nextActives.includes(x.idx))
+      if (alive.length > 0) {
+        nextActives[i] = alive[0].idx
+        log.push(`🔁 Sale ${teamCopy[nextActives[i]].name}!`)
+      }
+    }
+
+    setTeam(teamCopy)
+    setDoubleActives(nextActives)
+    setDoubleEnemies(enemies)
+    setDoubleMoves([null, null])
+    setDoubleLog(log.slice(-40))
+    setDoubleHits(hits)
+
+    const allEnemiesFainted = enemies.every(p => p.hp <= 0)
+    const allPlayerFainted = teamCopy.every(p => p.hp <= 0)
+
+    if (allEnemiesFainted) {
+      const baseMoney = Math.floor(40 + enemies.reduce((s, p) => s + p.level, 0) * 4)
+      const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoney * (modifier?.moneyMultiplier ?? 1))
+      if (!runChallenges.noMoney) setMoney(prev => prev + moneyReward)
+      setBattleLog(prev => [`🥊 ¡Ganaste el combate doble! +$${moneyReward}.`, ...prev].slice(0, 15))
+      setDoubleFinished(true)
+      return
+    }
+    if (allPlayerFainted) {
+      setDoubleFinished(true)
+      const losses = record.losses + 1
+      persistRecord(record.wins, losses)
+      handleInfiniteRunDefeat(teamCopy)
+      if (isDailyRunRef.current) {
+        setDailyPlayed(true)
+        localStorage.setItem('pokerand_daily', dailySeed)
+      }
+      setDefeatSummary({
+        finalTeam: teamCopy,
+        battleLog: [...log],
+        enemy: enemies.find(p => p.hp > 0) ?? null,
+        lastNodeLabel: currentNode?.label
+      })
+      setScreen('defeat')
+      playDefeatMusic()
+    }
+  }
+
+  function doubleLeave(): void {
+    setBattleLog(prev => [`🥊 Combate doble completado.`, ...prev].slice(0, 15))
+    completeCurrentNode()
+  }
+
   function depositToPC(teamIndex: number): void {
     const pokemon = team[teamIndex]
     if (!pokemon) return
@@ -4013,6 +4377,84 @@ function MainApp() {
     // El flag de batalla TeamR debe reflejar SIEMPRE el nodo actual, para que un
     // TeamR escapado (Cuerda Huida) o un combate normal no hereden el robo/elección.
     setIsTeamRocketBattle(currentNode.type === 'teamRocket')
+    setIsRivalBattle(currentNode.type === 'rival')
+
+    if (currentNode.type === 'blackmarket') {
+      // Mercado Negro: vende objetos/Pokémon y compra objetos baratos y Pokémon.
+      const blackItems = [...Object.keys(ALL_SHOP_ITEMS)].filter(i => isConsumableUnlocked(i))
+      const shuffledItems = [...blackItems].sort(() => 0.5 - Math.random())
+      setBlackMarketItems(shuffledItems.slice(0, 6))
+      setBlackMarketPokemon([])
+      setIsLoading(true)
+      setApiError('')
+      try {
+        const targetGen = getEffectiveGen()
+        const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
+        const targetLevel = difficulty === 'infinite' ? getMaxTeamLevel() : avgPlayerLevel
+        const fetches = Array.from({ length: 4 }, () =>
+          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, coopModeRef.current ? targetLevel : undefined)
+            .then((base) => {
+              const levelDiff = targetLevel - base.level
+              let scaled = scalePokemonForNode(base, currentNode, routeIndex, levelDiff, difficulty)
+              if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
+              return scaled
+            })
+        )
+        const list = await Promise.all(fetches)
+        setBlackMarketPokemon(list)
+      } catch {
+        setApiError('No se pudo generar el catálogo del mercado negro.')
+      } finally {
+        setIsLoading(false)
+      }
+      setScreen('blackmarket')
+      return
+    }
+
+    if (currentNode.type === 'double') {
+      setIsLoading(true)
+      setApiError('')
+      try {
+        const targetGen = getEffectiveGen()
+        const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
+        const targetLevel = difficulty === 'infinite' ? getMaxTeamLevel() : avgPlayerLevel + 1
+        const fetches = Array.from({ length: 2 }, (_, idx) =>
+          getBalancedPokemonByGeneration(targetGen, routeIndex + idx, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, coopModeRef.current ? targetLevel : undefined)
+            .then((base) => {
+              const levelDiff = targetLevel - base.level
+              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff, difficulty)
+              if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
+              if (runChallenges.totalRandomizer) {
+                scaled = {
+                  ...scaled,
+                  attack: scaled.attack + Math.floor(Math.random() * 20) - 10,
+                  defense: scaled.defense + Math.floor(Math.random() * 20) - 10,
+                  speed: scaled.speed + Math.floor(Math.random() * 20) - 10,
+                }
+              }
+              return { ...scaled, statStages: { attack: 0, defense: 0, speed: 0 } }
+            })
+        )
+        const enemies = await Promise.all(fetches)
+        enemies.forEach(p => seenInPokedex(p))
+        // Los 2 primeros Pokémon vivos del equipo son los que participan.
+        const aliveIdx = team.map((p, i) => (p.hp > 0 ? i : -1)).filter(i => i >= 0)
+        setDoubleActives(aliveIdx.slice(0, 2))
+        setDoubleEnemies(enemies)
+        setDoubleMoves([null, null])
+        setDoubleActiveSlot(0)
+        setDoubleLog([`🥊 ¡Combate Doble! ${enemies[0].name} y ${enemies[1].name} te desafían.`])
+        setDoubleHits([])
+        doubleHitKeyRef.current = 0
+        setDoubleFinished(false)
+        setScreen('double')
+      } catch {
+        setApiError('No se pudo preparar el combate doble.')
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
 
     if (currentNode.type === 'shop') {
       const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i])
@@ -4298,7 +4740,49 @@ function MainApp() {
 
       const extraEnemyLevels = runChallenges.scalingEnemies ? routeIndex : 0
 
-      if (isTeamRocket) {
+      if (currentNode.type === 'rival') {
+        // Rival recurrente: escala contigo y da más dinero que el resto.
+        const progress = routeIndex / Math.max(1, route.length - 1)
+        const teamSize = Math.max(2, Math.min(6, 2 + Math.floor(progress * 4)))
+        const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
+        const fetches = Array.from({ length: teamSize }, (_, idx) => {
+          const targetLevel = difficulty === 'infinite'
+            ? getMaxTeamLevel() + trainerMemberLevelOffset(idx, teamSize, true, difficulty)
+            : avgPlayerLevel + trainerMemberLevelOffset(idx, teamSize, true, difficulty)
+          const baseStepIndex = difficulty === 'infinite' ? Math.max(0, targetLevel - 10) : routeIndex
+          return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, coopModeRef.current ? targetLevel : undefined)
+            .then((base) => {
+              const levelDiff = targetLevel - base.level
+              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels, difficulty)
+              if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
+              if (runChallenges.totalRandomizer) {
+                scaled = {
+                  ...scaled,
+                  attack: scaled.attack + Math.floor(Math.random() * 20) - 10,
+                  defense: scaled.defense + Math.floor(Math.random() * 20) - 10,
+                  speed: scaled.speed + Math.floor(Math.random() * 20) - 10,
+                }
+              }
+              return scaled
+            })
+        })
+        const rivalTeam = await Promise.all(fetches)
+        rivalTeam.forEach(p => seenInPokedex(p))
+        setIsTrainerBattle(true)
+        setTrainerTeam(rivalTeam)
+        setTrainerPokemonIndex(0)
+        setTrainerName('Rival')
+        setTrainerSprite("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='12' fill='%231c1c3a'/%3E%3Ctext x='48' y='62' font-family='Arial Black,Arial' font-size='44' font-weight='900' fill='%23f472b6' text-anchor='middle'%3ER%3C/text%3E%3Ccircle cx='48' cy='80' r='3' fill='%23f472b6'/%3E%3C/svg%3E")
+        setTrainerBadge('')
+        setEnemy({ ...rivalTeam[0], statStages: { attack: 0, defense: 0, speed: 0 } })
+        setIsTeamRocketBattle(false)
+        setIsRivalBattle(true)
+        setBattleLog((prev) => [
+          `👤 ¡Tu Rival aparece para desafiarte! Tiene ${teamSize} Pokémon.`,
+          `Envía a ${rivalTeam[0].name} Nv.${rivalTeam[0].level}.`,
+          ...prev
+        ])
+      } else if (isTeamRocket) {
         const progress = routeIndex / Math.max(1, route.length - 1)
         // El tamaño del equipo escala con el progreso: 1-2 al inicio hasta 5-6 al final.
         const teamSize = Math.max(1, Math.min(6, 1 + Math.floor(progress * 4) + Math.floor(Math.random() * 2)))
@@ -5454,7 +5938,9 @@ function MainApp() {
       const hardMoneyPenalty = difficulty === 'hard' ? 0.6 : difficulty === 'infinite' ? 0.55 : 1
       const trainerMoneyPenalty = isTeamRocketBattle ? 0.4 : (isTrainerBattle && currentNode?.type !== 'boss') ? 0.5 : 1
       const wildMoneyPenalty = (!isTrainerBattle && currentNode?.type === 'battle') ? 0.7 : 1
-      const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoneyReward * (modifier?.moneyMultiplier ?? 1) * hardMoneyPenalty * trainerMoneyPenalty * wildMoneyPenalty)
+      // El Rival recurrente da bastante más dinero que el resto.
+      const rivalMoneyBonus = isRivalBattle ? 2.2 : 1
+      const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoneyReward * (modifier?.moneyMultiplier ?? 1) * hardMoneyPenalty * trainerMoneyPenalty * wildMoneyPenalty * rivalMoneyBonus)
       if (!runChallenges.noMoney) setMoney((prev) => prev + moneyReward)
 
       setRunStats(prev => ({
@@ -6187,6 +6673,9 @@ function MainApp() {
     setShowLeaderboard(true)
     setLeaderboardGen(0)
     void loadLeaderboard()
+    if (isLeaderboardEnabled()) {
+      void getPvpEloLeaderboard().then((rows) => setPvpEloLeaderboard(rows ?? []))
+    }
   }
 
   function friendlyAuthError(msg: string): string {
@@ -6317,6 +6806,16 @@ function MainApp() {
     coopSubmittedOfferRef.current = null
     coopSelectedPokemonRef.current = null
     coopExchangeAppliedRef.current = false
+    setBlackMarketItems([])
+    setBlackMarketPokemon([])
+    setDoubleEnemies([])
+    setDoubleActives([])
+    setDoubleMoves([null, null])
+    setDoubleActiveSlot(0)
+    setDoubleLog([])
+    setDoubleFinished(false)
+    setDoubleHits([])
+    doubleHitKeyRef.current = 0
     setSpinItems([])
     setSpinWinnerIndex(null)
     setSpinRevealed(false)
@@ -6336,7 +6835,7 @@ function MainApp() {
       void pvpForfeit()
       return
     }
-    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'trade') {
+    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'trade' || screen === 'blackmarket' || screen === 'double') {
       if (coopModeRef.current && coopSessionCodeRef.current) {
         void finishCoopSession(coopSessionCodeRef.current, 'lost')
       }
@@ -7286,8 +7785,22 @@ function MainApp() {
           return (
             <section className="panel setup-panel" style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
               <h2 style={{ margin: '0 0 1rem', color: '#cba3ff' }}>⚔️ PvP 1vs1</h2>
-              <p style={{ color: '#9b98cf' }}>Cargando combate...</p>
-              <button className="tiny-btn" type="button" onClick={pvpLeave} style={{ color: '#ff8a80', marginTop: '1rem' }}>✕ Abandonar</button>
+              {pvpWaitingOpponent ? (
+                <>
+                  <p style={{ color: '#cba3ff', fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>⏳ Esperando al rival para la revancha...</p>
+                  {pvpRoomCode && (
+                    <p style={{ color: '#ffcb05', fontSize: '1.2rem', fontWeight: 'bold', letterSpacing: '0.2em', marginBottom: '0.5rem' }}>
+                      CÓDIGO: {pvpRoomCode}
+                    </p>
+                  )}
+                  <button className="tiny-btn" type="button" onClick={cancelPvpWaiting} style={{ color: '#ff8a80', marginTop: '1rem' }}>✕ Cancelar</button>
+                </>
+              ) : (
+                <>
+                  <p style={{ color: '#9b98cf' }}>Cargando combate...</p>
+                  <button className="tiny-btn" type="button" onClick={pvpLeave} style={{ color: '#ff8a80', marginTop: '1rem' }}>✕ Abandonar</button>
+                </>
+              )}
             </section>
           )
         }
@@ -7319,6 +7832,7 @@ function MainApp() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <div style={{ fontSize: '0.75rem', color: '#cba3ff', fontWeight: 'bold', textAlign: 'center' }}>
                 {side === 'a' ? '🔵 Jugador A' : '🔴 Jugador B'} — {ps.username ?? '?'}
+                <span style={{ color: '#ffcb05', fontWeight: 'bold', marginLeft: '4px' }}>· Elo {side === 'a' ? (myRole === 'a' ? pvpMyElo : pvpOppElo) : (myRole === 'b' ? pvpMyElo : pvpOppElo)}</span>
               </div>
               {ps.team.map((p, i) => {
                 const revealed = isMine || ps.revealed?.[i]
@@ -7367,12 +7881,25 @@ function MainApp() {
               <p style={{ color: '#9b98cf', marginBottom: '1rem' }}>
                 {st.winner ? `${(st.winner === 'a' ? st.a.username : st.b.username) ?? 'El rival'} ha ganado el combate.` : 'Ambos equipos quedaron debilitados.'}
               </p>
+              {pvpEloRewarded && (
+                <div style={{ marginBottom: '1rem', padding: '0.6rem', borderRadius: '8px', background: 'rgba(255,203,5,0.1)', border: '1px solid #ffcb05' }}>
+                  <p style={{ margin: 0, color: '#ffcb05', fontSize: '1rem', fontWeight: 'bold' }}>
+                    {iWon ? `🎉 +${pvpEloGain ?? 0} Elo` : `Tus puntos Elo: ${pvpMyElo}`}
+                  </p>
+                  <p style={{ margin: '0.25rem 0 0', color: '#9b98cf', fontSize: '0.8rem' }}>
+                    Elo del rival: {pvpOppElo}
+                  </p>
+                </div>
+              )}
               <div style={{ maxHeight: '220px', overflowY: 'auto', textAlign: 'left', marginBottom: '1rem', padding: '0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
                 {st.log.slice(-12).reverse().map((line, i) => (
                   <p key={i} style={{ margin: '0 0 0.25rem', fontSize: '0.8rem', color: '#d9d6f2' }}>{line}</p>
                 ))}
               </div>
-              <button className="cta" type="button" onClick={pvpLeave} style={{ width: '100%' }}>Volver al menú</button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="cta" type="button" onClick={() => void pvpRematch()} style={{ flex: 1 }}>⚔️ Revancha</button>
+                <button className="cta" type="button" onClick={pvpLeave} style={{ flex: 1, background: '#7d7ab5' }}>Volver al menú</button>
+              </div>
             </section>
           )
         }
@@ -7471,19 +7998,41 @@ function MainApp() {
 
                 {st.phase === 'picking' && canActPicking && myActive && !pvpChoosingSwitch && (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
-                      {myActive.moves.map((m, i) => (
-                        <button
-                          key={i}
-                          className="move-btn"
-                          type="button"
-                          onClick={() => void pvpSubmitMove(i)}
-                          style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid #3f3f6e', background: 'rgba(15,23,42,0.6)', color: '#d9d6f2', cursor: 'pointer' }}
-                        >
-                          <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{m.name}</div>
-                          <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>{m.type.toUpperCase()} · PWR {m.power} · {m.accuracy}%</div>
-                        </button>
-                      ))}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                      {myActive.moves.map((m, i) => {
+                        const pp = m.pp ?? 0
+                        const outOfPp = pp <= 0
+                        return (
+                          <button
+                            key={i}
+                            className="move-btn"
+                            type="button"
+                            disabled={outOfPp}
+                            onClick={() => void pvpSubmitMove(i)}
+                            style={{
+                              padding: '0.65rem 0.75rem',
+                              borderRadius: '10px',
+                              border: '1px solid #3f3f6e',
+                              background: 'rgba(15,23,42,0.6)',
+                              color: '#d9d6f2',
+                              cursor: outOfPp ? 'not-allowed' : 'pointer',
+                              opacity: outOfPp ? 0.45 : 1,
+                              letterSpacing: '0.02em',
+                              textAlign: 'left',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.3rem',
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            <div style={{ fontSize: '0.88rem', fontWeight: 'bold', color: outOfPp ? '#7d7ab5' : '#f3f1ff' }}>{m.name}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#9b98cf' }}>{m.type.toUpperCase()} · PWR {m.power} · {m.accuracy}%</div>
+                            <div style={{ fontSize: '0.68rem', color: outOfPp ? '#ee3b2f' : '#7dd3fc' }}>
+                              {outOfPp ? 'SIN PP' : `PP ${pp}/${m.maxPp ?? 10}`}
+                            </div>
+                          </button>
+                        )
+                      })}
                     </div>
                     <button className="tiny-btn" type="button" disabled={!canSwitchNow} onClick={() => setPvpChoosingSwitch(true)} style={{ width: '100%' }}>
                       🔁 Cambiar de Pokémon
@@ -8169,7 +8718,7 @@ function MainApp() {
         </section>
       )}
 
-      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'trade') && activePokemon && (
+      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'trade' || screen === 'blackmarket' || screen === 'double') && activePokemon && (
         <section className="roulette-layout">
           <article className="panel trainer-panel">
             <p className="muted small-tag">Trainer</p>
@@ -8650,6 +9199,78 @@ function MainApp() {
               </div>
             )}
 
+            {screen === 'blackmarket' && (
+              <div className="action-block shop-block" style={{ marginTop: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <h3 style={{ margin: 0, color: '#fb923c' }}>🕶️ Mercado Negro</h3>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#7ceb95' }}>Dinero: ${money}</span>
+                </div>
+                <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Objetos a precios reducidos, vende lo que no uses y compra Pokémon acordes a tu nivel.</p>
+
+                <h4 style={{ color: '#fb923c', margin: '0 0 0.4rem', fontSize: '0.9rem' }}>🛒 Comprar objetos (-15%)</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '1rem' }}>
+                  {blackMarketItems.map((itemName) => {
+                    const price = blackMarketItemPrice(itemName)
+                    const canBuy = money >= price
+                    return (
+                      <div key={itemName} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {ITEM_SPRITES[itemName] && <img src={ITEM_SPRITES[itemName]} alt={itemName} style={{ width: '26px', height: '26px', imageRendering: 'pixelated' }} />}
+                          <strong style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{itemName}</strong>
+                        </div>
+                        <button className="tiny-btn" type="button" disabled={!canBuy} onClick={() => blackMarketBuyItem(itemName)} style={{ color: canBuy ? '#fb923c' : '#7d7ab5' }}>🪙 ${price}</button>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <h4 style={{ color: '#fb923c', margin: '0 0 0.4rem', fontSize: '0.9rem' }}>💸 Vender objetos</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '1rem' }}>
+                  {inventory.length === 0 ? (
+                    <p style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No tienes objetos para vender.</p>
+                  ) : (
+                    Array.from(new Set(inventory)).map((itemName) => {
+                      const count = inventory.filter(i => i === itemName).length
+                      const data = ALL_SHOP_ITEMS[itemName] ?? HOLDABLE_ITEMS[itemName]
+                      const value = data ? Math.max(1, Math.floor(data.price * 0.5)) : 10
+                      return (
+                        <div key={itemName} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '6px' }}>
+                          <span style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{itemName} ×{count}</span>
+                          <button className="tiny-btn" type="button" onClick={() => blackMarketSellItem(itemName)} style={{ color: '#37d16b' }}>Vender ${value}</button>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+
+                <h4 style={{ color: '#fb923c', margin: '0 0 0.4rem', fontSize: '0.9rem' }}>🐾 Comprar Pokémon</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {blackMarketPokemon.length === 0 ? (
+                    <p style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>Cargando Pokémon...</p>
+                  ) : (
+                    blackMarketPokemon.map((p, idx) => {
+                      const price = 100 + p.level * 15
+                      const canBuy = money >= price
+                      return (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15,23,42,0.5)', padding: '6px 10px', borderRadius: '6px', border: '1px solid #3f3f6e' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '32px', height: '32px', imageRendering: 'pixelated' }} />
+                            <div>
+                              <strong style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{p.name} <span style={{ color: '#7d7ab5' }}>Nv.{p.level}</span></strong>
+                              <div style={{ fontSize: '0.7rem', color: '#9b98cf' }}>{p.types?.join(' / ')}</div>
+                            </div>
+                          </div>
+                          <button className="tiny-btn" type="button" disabled={!canBuy} onClick={() => blackMarketBuyPokemon(idx)} style={{ color: canBuy ? '#fb923c' : '#7d7ab5' }}>🪙 ${price}</button>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+
+                <button className="cta" onClick={completeCurrentNode} type="button" style={{ width: '100%', marginTop: '1rem' }}>Salir del Mercado Negro</button>
+              </div>
+            )}
+
             {screen === 'trade' && (
               <div className="action-block shop-block" style={{ marginTop: '1rem' }}>
                 <div style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
@@ -8979,7 +9600,7 @@ function MainApp() {
                   Next node: <strong>{currentNode.label}</strong> ({nodeTypeLabel(currentNode)})
                 </p>
                 <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={enterNode} type="button" disabled={isLoading}>
-                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : currentNode.type === 'mega' ? '💎 ¡Recoger Mega Piedra!' : currentNode.type === 'gmax' ? '⚡ ¡Enfrentar G-MAX!' : currentNode.type === 'trade' ? '🤝 Intercambiar' : 'Enter node'}
+                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : currentNode.type === 'mega' ? '💎 ¡Recoger Mega Piedra!' : currentNode.type === 'gmax' ? '⚡ ¡Enfrentar G-MAX!' : currentNode.type === 'trade' ? '🤝 Intercambiar' : currentNode.type === 'rival' ? '👤 ¡Enfrentar al Rival!' : currentNode.type === 'blackmarket' ? '🕶️ Entrar al Mercado Negro' : currentNode.type === 'double' ? '🥊 ¡Combate Doble!' : 'Enter node'}
                 </button>
               </div>
             )}
@@ -9018,6 +9639,130 @@ function MainApp() {
                 <button className="cta" onClick={enterNode} type="button" disabled={isLoading}>
                   {isLoading ? 'Searching encounter...' : 'Enter rest'}
                 </button>
+              </div>
+            )}
+
+            {screen === 'double' && (
+              <div className="action-block" style={{ marginTop: '1rem' }}>
+                <h3 style={{ margin: '0 0 0.75rem', color: '#facc15', textAlign: 'center' }}>🥊 Combate Doble</h3>
+
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '0.75rem' }}>
+                  {doubleEnemies.map((enemy, idx) => {
+                    const hit = doubleHits.find(h => h.kind === 'enemy' && h.index === idx)
+                    return (
+                      <div key={idx} style={{ textAlign: 'center', flex: 1, maxWidth: 180, opacity: enemy.hp <= 0 ? 0.35 : 1 }}>
+                        <img key={hit ? hit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={{ width: 72, height: 72, imageRendering: 'pixelated' }} />
+                        <div style={{ fontSize: '0.8rem', color: '#f3f1ff', fontWeight: 'bold' }}>{enemy.name}{enemy.hp <= 0 ? ' (debilitado)' : ''}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>HP {Math.max(0, enemy.hp)}/{enemy.maxHp}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '0.75rem' }}>
+                  {doubleActives.map((teamIdx, slot) => {
+                    const pokemon = team[teamIdx]
+                    if (!pokemon) return null
+                    const hit = doubleHits.find(h => h.kind === 'player' && h.index === slot)
+                    return (
+                      <div key={slot} style={{ textAlign: 'center', flex: 1, maxWidth: 180 }}>
+                        <img key={hit ? hit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={pokemon.sprite} alt={pokemon.name} onError={fallbackSprite} style={{ width: 72, height: 72, imageRendering: 'pixelated' }} />
+                        <div style={{ fontSize: '0.8rem', color: '#ffcb05', fontWeight: 'bold' }}>{pokemon.name}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>HP {Math.max(0, pokemon.hp)}/{pokemon.maxHp}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div style={{ maxHeight: '110px', overflowY: 'auto', padding: '0.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid #3f3f6e', marginBottom: '0.75rem' }}>
+                  {doubleLog.map((line, i) => (
+                    <p key={i} style={{ margin: '0 0 0.2rem', fontSize: '0.78rem', color: '#d9d6f2' }}>{line}</p>
+                  ))}
+                </div>
+
+                {doubleFinished ? (
+                  <button className="cta" type="button" onClick={doubleLeave} style={{ width: '100%' }}>Continuar</button>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      {doubleActives.map((teamIdx, slot) => {
+                        const pokemon = team[teamIdx]
+                        if (!pokemon) return null
+                        const sel = doubleMoves[slot]
+                        return (
+                          <button
+                            key={slot}
+                            className="tiny-btn"
+                            type="button"
+                            onClick={() => setDoubleActiveSlot(slot)}
+                            style={{ flex: 1, background: doubleActiveSlot === slot ? '#a855f7' : '#2a2a55', color: '#fff', border: doubleActiveSlot === slot ? '2px solid #cba3ff' : '2px solid transparent' }}
+                          >
+                            {pokemon.name}{sel ? ' ✓' : ''}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {(() => {
+                      const slot = doubleActiveSlot
+                      const teamIdx = doubleActives[slot]
+                      const pokemon = team[teamIdx]
+                      if (!pokemon || pokemon.hp <= 0) {
+                        return <p style={{ margin: '0 0 0.5rem', color: '#7d7ab5', fontSize: '0.8rem', textAlign: 'center' }}>Este Pokémon está debilitado.</p>
+                      }
+                      const sel = doubleMoves[slot]
+                      return (
+                        <>
+                          <p style={{ margin: '0 0 0.3rem', color: '#9b98cf', fontSize: '0.8rem' }}>1️⃣ Elige un movimiento:</p>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.6rem' }}>
+                            {pokemon.moves.map((m, mi) => (
+                              <button
+                                key={mi}
+                                className="tiny-btn"
+                                type="button"
+                                onClick={() => doubleSelectMove(slot, mi)}
+                                style={{ background: sel?.moveIdx === mi ? '#a855f7' : '#2a2a55', color: '#fff', border: sel?.moveIdx === mi ? '2px solid #cba3ff' : '2px solid transparent' }}
+                              >
+                                {m.name} ({m.type})
+                              </button>
+                            ))}
+                          </div>
+                          <p style={{ margin: '0 0 0.3rem', color: '#9b98cf', fontSize: '0.8rem' }}>2️⃣ Elige el objetivo:</p>
+                          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.6rem' }}>
+                            {doubleEnemies.map((enemy, ei) => (
+                              enemy.hp > 0 ? (
+                                <button
+                                  key={ei}
+                                  className="tiny-btn"
+                                  type="button"
+                                  onClick={() => doubleSelectTarget(slot, ei)}
+                                  style={{ flex: 1, background: sel?.target === ei ? '#ee3b2f' : '#2a2a55', color: '#fff', border: sel?.target === ei ? '2px solid #ff8a80' : '2px solid transparent' }}
+                                >
+                                  🎯 {enemy.name}
+                                </button>
+                              ) : null
+                            ))}
+                          </div>
+                          {sel && (
+                            <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#7dd3fc', textAlign: 'center' }}>
+                              Listo: {pokemon.name} usará <strong>{pokemon.moves[sel.moveIdx]?.name}</strong> contra <strong>{doubleEnemies[sel.target]?.name}</strong>.
+                            </p>
+                          )}
+                        </>
+                      )
+                    })()}
+
+                    <button
+                      className="cta"
+                      type="button"
+                      onClick={resolveDoubleTurn}
+                      disabled={doubleActives[0] === undefined || !doubleMoves[0] || (doubleActives[1] !== undefined && !doubleMoves[1])}
+                      style={{ width: '100%', background: (doubleActives[0] !== undefined && doubleMoves[0] && (doubleActives[1] === undefined || doubleMoves[1])) ? '#facc15' : '#475569', color: (doubleActives[0] !== undefined && doubleMoves[0] && (doubleActives[1] === undefined || doubleMoves[1])) ? '#12122b' : '#d9d6f2' }}
+                    >
+                      🥊 ¡Atacar!
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
@@ -9896,9 +10641,34 @@ function MainApp() {
       {showLeaderboard && (
           <div className="modal-backdrop" onClick={() => setShowLeaderboard(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
-            <h2 style={{ color: '#cba3ff', textAlign: 'center', margin: '0 0 0.5rem' }}>🌍 Ranking Mundial — ♾️ Infinite</h2>
+            <h2 style={{ color: '#cba3ff', textAlign: 'center', margin: '0 0 0.75rem' }}>
+              {leaderboardTab === 'infinite' ? '🌍 Ranking Mundial — ♾️ Infinite' : '⚔️ Ranking Elo PvP'}
+            </h2>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '1rem' }}>
+              {([['infinite', '♾️ Infinite'], ['elo', '⚔️ Elo PvP']] as const).map(([tab, label]) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => { playClick(); setLeaderboardTab(tab) }}
+                  style={{
+                    padding: '6px 16px',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    background: leaderboardTab === tab ? 'rgba(168,85,247,0.25)' : 'rgba(15,23,42,0.5)',
+                    border: `1px solid ${leaderboardTab === tab ? '#a855f7' : '#3f3f6e'}`,
+                    color: leaderboardTab === tab ? '#cba3ff' : '#9b98cf'
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <p style={{ textAlign: 'center', color: '#9b98cf', fontSize: '0.85rem', marginBottom: '1rem' }}>
-              Los entrenadores se ordenan por el nodo más lejano alcanzado. Si empatan, gana el que tardó menos.
+              {leaderboardTab === 'infinite'
+                ? 'Los entrenadores se ordenan por el nodo más lejano alcanzado. Si empatan, gana el que tardó menos.'
+                : 'Los entrenadores se ordenan por puntos Elo. Se ganan al vencer en PvP: cuantos más Pokémon tuyos sobrevivan, más Elo obtienes.'}
             </p>
 
             {isLeaderboardEnabled() && (
@@ -9974,6 +10744,42 @@ function MainApp() {
               )
             )}
 
+            {leaderboardTab === 'elo' ? (
+              pvpEloLeaderboard.length === 0 ? (
+                <p style={{ textAlign: 'center', color: '#9b98cf' }}>Aún no hay jugadores con Elo. ¡Juega partidas de PvP para aparecer aquí!</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {pvpEloLeaderboard.map((entry, idx) => {
+                    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}º`
+                    return (
+                      <div
+                        key={`${entry.player_name}-${idx}`}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '44px 1fr auto',
+                          gap: '0.75rem',
+                          alignItems: 'center',
+                          padding: '0.6rem 0.75rem',
+                          borderRadius: '8px',
+                          background: 'rgba(15,23,42,0.5)',
+                          border: '1px solid #3f3f6e'
+                        }}
+                      >
+                        <div style={{ textAlign: 'center', fontWeight: 'bold', color: idx < 3 ? '#ffcb05' : '#9b98cf' }}>{medal}</div>
+                        <div style={{ minWidth: 0 }}>
+                          <strong style={{ color: '#f3f1ff', fontSize: '0.9rem' }}>{entry.player_name}</strong>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '1.05rem' }}>Elo {entry.elo}</div>
+                          <div style={{ color: '#9b98cf', fontSize: '0.75rem' }}>{entry.wins} victorias</div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            ) : (
+            <>
             {!isLeaderboardEnabled() ? (
               <div style={{ textAlign: 'center', padding: '1.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px dashed #3f3f6e' }}>
                 <p style={{ color: '#9b98cf', fontSize: '0.9rem', marginBottom: '0.5rem' }}>⚙️ El ranking aún no está configurado.</p>
@@ -10064,6 +10870,8 @@ function MainApp() {
                   </div>
                 )}
               </>
+            )}
+            </>
             )}
 
             <button className="cta" onClick={() => setShowLeaderboard(false)} style={{ marginTop: '1.25rem', background: '#7d7ab5', width: '100%' }}>Cerrar</button>
@@ -10352,6 +11160,52 @@ function MainApp() {
           <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '1.4rem', marginBottom: '0.5rem' }}>{unlockPopup.name}</div>
           <div style={{ color: '#9b98cf', fontSize: '0.9rem' }}>Ahora puede aparecer en las aventuras</div>
         </div>
+      )}
+
+      {/* Chat rápido cooperativo */}
+      {coopMode && coopSessionCode && (
+        <>
+          {coopChatOpen && (
+            <div style={{ position: 'fixed', bottom: '74px', right: '16px', zIndex: 9000, width: '300px', maxWidth: 'calc(100vw - 32px)', background: '#1c1c3a', border: '2px solid #37d16b', borderRadius: '10px', boxShadow: '4px 4px 0 rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'rgba(55,209,107,0.15)', borderBottom: '1px solid rgba(55,209,107,0.3)' }}>
+                <strong style={{ color: '#37d16b', fontSize: '0.85rem' }}>🤝 Chat con tu compañero</strong>
+                <button className="tiny-btn" type="button" onClick={() => setCoopChatOpen(false)} style={{ padding: '2px 8px', color: '#ff8a80' }}>✕</button>
+              </div>
+              <div style={{ height: '220px', overflowY: 'auto', padding: '0.5rem 0.6rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                {coopChatMsgs.length === 0 && <p style={{ margin: 0, color: '#7d7ab5', fontSize: '0.75rem' }}>Aún no hay mensajes.</p>}
+                {coopChatMsgs.map((m, i) => (
+                  <div key={i} style={{ background: 'rgba(15,23,42,0.5)', borderRadius: '6px', padding: '0.35rem 0.5rem' }}>
+                    <span style={{ color: '#37d16b', fontSize: '0.7rem', fontWeight: 'bold' }}>{m.username ?? '?'}: </span>
+                    <span style={{ color: '#f3f1ff', fontSize: '0.8rem' }}>{m.message}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', padding: '0.35rem 0.6rem', borderTop: '1px solid #3f3f6e' }}>
+                {['👍', '❤️', '🔥', '😂', '😮', '💀', '🙏', '⚔️', '🤝', '👏', '😢', '😤'].map((e) => (
+                  <button key={e} className="tiny-btn" type="button" onClick={() => void coopSendChat(e)} style={{ padding: '2px 6px', fontSize: '0.9rem' }}>{e}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '0.4rem', padding: '0.5rem 0.6rem', borderTop: '1px solid #3f3f6e' }}>
+                <input
+                  value={coopChatText}
+                  onChange={(e) => setCoopChatText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void coopSendChat(coopChatText) }}
+                  maxLength={120}
+                  placeholder="Escribe un mensaje..."
+                  style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', border: '1px solid #3f3f6e', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.8rem', outline: 'none', boxSizing: 'border-box' }}
+                />
+                <button className="cta" type="button" onClick={() => void coopSendChat(coopChatText)} style={{ padding: '6px 12px', fontSize: '0.8rem', marginTop: 0 }}>Enviar</button>
+              </div>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setCoopChatOpen(o => !o)}
+            style={{ position: 'fixed', bottom: '16px', right: '16px', zIndex: 9001, width: '46px', height: '46px', borderRadius: '50%', background: '#1c1c3a', border: '2px solid #37d16b', color: '#37d16b', fontSize: '1.3rem', cursor: 'pointer', boxShadow: '3px 3px 0 rgba(0,0,0,0.5)' }}
+          >
+            💬
+          </button>
+        </>
       )}
 
     </main>

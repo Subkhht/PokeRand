@@ -207,3 +207,34 @@ export async function cancelExchangeOffer(code: string, node: number): Promise<b
   }
   return data === true
 }
+
+export interface CoopChatMessage {
+  message: string
+  created_at: string
+  username: string | null
+}
+
+export async function sendCoopChat(code: string, message: string): Promise<boolean> {
+  const client = await getClient()
+  if (!client) return false
+  const { error } = await client.rpc('send_coop_chat', { p_code: code, p_message: message })
+  if (error) {
+    console.error('send_coop_chat:', error)
+    return false
+  }
+  return true
+}
+
+export async function getCoopChat(code: string, after?: string | null): Promise<CoopChatMessage[]> {
+  const client = await getClient()
+  if (!client) return []
+  const { data, error } = await client.rpc('get_coop_chat', {
+    p_code: code,
+    p_after: after ?? null,
+  })
+  if (error) {
+    console.error('get_coop_chat:', error)
+    return []
+  }
+  return (data as CoopChatMessage[]) ?? []
+}

@@ -167,7 +167,8 @@ export function resolvePvpTurn(
     // velocidad, porque el cambio ocurre primero).
     const moveSide: 'a' | 'b' = switchA ? 'b' : 'a'
     const movePokemon = moveSide === 'a' ? a.team[a.active] : b.team[b.active]
-    const move = moveSide === 'a' ? activeA.moves[actionA.index] : activeB.moves[actionB.index]
+    const moveIdx = moveSide === 'a' ? actionA.index : actionB.index
+    const move = moveSide === 'a' ? activeA.moves[moveIdx] : activeB.moves[moveIdx]
     if (move) {
       const tick = processStatusTick(movePokemon)
       log.push(...tick.log)
@@ -175,7 +176,12 @@ export function resolvePvpTurn(
       let curDef = moveSide === 'a' ? b.team[b.active] : a.team[a.active]
       if (!tick.skipTurn) {
         const hit = performPvpHit(curMove, curDef, move)
-        curMove = hit.updatedAttacker
+        curMove = {
+          ...hit.updatedAttacker,
+          moves: hit.updatedAttacker.moves.map((m, i) =>
+            i === moveIdx ? { ...m, pp: Math.max(0, (m.pp ?? 1) - 1) } : m
+          ),
+        }
         curDef = hit.updatedDefender
         log.push(...hit.lines)
       }
@@ -188,8 +194,10 @@ export function resolvePvpTurn(
   }
 
   // 2) Ambos atacan: orden por prioridad y luego velocidad.
-  const moveA = activeA.moves[actionA.index]
-  const moveB = activeB.moves[actionB.index]
+  const idxA = actionA.index
+  const idxB = actionB.index
+  const moveA = activeA.moves[idxA]
+  const moveB = activeB.moves[idxB]
   if (!moveA || !moveB) return { state, changed: false }
 
   const tickA = processStatusTick(activeA)
@@ -225,9 +233,17 @@ export function resolvePvpTurn(
     const attacker = attackerSide === 'a' ? curA : curB
     const defender = defenderSide === 'a' ? curA : curB
     const move = attackerSide === 'a' ? moveA : moveB
+    const moveIdx = attackerSide === 'a' ? idxA : idxB
     const hit = performPvpHit(attacker, defender, move)
-    if (attackerSide === 'a') curA = hit.updatedAttacker
-    else curB = hit.updatedAttacker
+    // Consume PP del movimiento usado.
+    const withPp = {
+      ...hit.updatedAttacker,
+      moves: hit.updatedAttacker.moves.map((m, i) =>
+        i === moveIdx ? { ...m, pp: Math.max(0, (m.pp ?? 1) - 1) } : m
+      ),
+    }
+    if (attackerSide === 'a') curA = withPp
+    else curB = withPp
     if (defenderSide === 'a') curA = hit.updatedDefender
     else curB = hit.updatedDefender
     log.push(...hit.lines)

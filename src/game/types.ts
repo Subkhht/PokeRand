@@ -30,6 +30,8 @@ export interface Move {
   statChanges?: StatChange[]
   statChance?: number
   metaCategory?: string
+  pp?: number
+  maxPp?: number
 }
 
 export interface RawLevelUpMove {
@@ -69,7 +71,7 @@ export interface Pokemon {
 
 export interface RouteNode {
   id: number
-  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'trade'
+  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'trade' | 'rival' | 'blackmarket' | 'double'
   label: string
   done: boolean
 }

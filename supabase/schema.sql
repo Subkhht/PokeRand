@@ -817,7 +817,9 @@ begin
     'result', m.result,
     'created_at', m.created_at,
     'a_name', (select username from public.profiles where id = m.player_a_id),
-    'b_name', (select username from public.profiles where id = m.player_b_id)
+    'b_name', (select username from public.profiles where id = m.player_b_id),
+    'a_elo', coalesce((select e.elo from public.pvp_elo e where e.user_id = m.player_a_id), 1000),
+    'b_elo', coalesce((select e.elo from public.pvp_elo e where e.user_id = m.player_b_id), 1000)
   )
   into v_result
   from public.pvp_matches m where m.id = p_match_id;
@@ -1029,12 +1031,214 @@ begin
 end;
 $$;
 
+-- ============================================================================
+-- ELO PvP
+-- Ranking de jugadores con puntos Elo (mínimo 1000). Se otorgan al ganador
+-- cuando termina la partida, según cuántos de sus Pokémon quedaron debilitados:
+--   0 debilitados → +20, 1 → +18, 2 → +16, 3 → +14, 4 → +12, 5+ → +10
+-- ============================================================================
+
+create table if not exists public.pvp_elo (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  elo integer not null default 1000,
+  wins integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.pvp_matches add column if not exists elo_awarded boolean not null default false;
+
+-- Elo del jugador actual.
+create or replace function public.get_pvp_elo()
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_row public.pvp_elo%rowtype;
+begin
+  if auth.uid() is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select * into v_row from public.pvp_elo where user_id = auth.uid();
+  if not found then return jsonb_build_object('elo', 1000, 'wins', 0); end if;
+  return jsonb_build_object('elo', v_row.elo, 'wins', v_row.wins);
+end;
+$$;
+
+-- Tabla de posiciones Elo (top 50).
+create or replace function public.get_pvp_elo_leaderboard()
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_result jsonb;
+begin
+  if auth.uid() is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select coalesce(jsonb_agg(row_to_json(t)::jsonb), '[]'::jsonb)
+  into v_result
+  from (
+    select p.username as player_name, e.elo, e.wins
+    from public.pvp_elo e
+    join public.profiles p on p.id = e.user_id
+    order by e.elo desc, e.wins desc
+    limit 50
+  ) t;
+  return v_result;
+end;
+$$;
+
+-- Otorga Elo al ganador de una partida terminada. Idempotente: solo se aplica
+-- la primera vez (flag elo_awarded). Devuelve los puntos otorgados.
+create or replace function public.award_pvp_elo(p_match_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_match public.pvp_matches%rowtype;
+  v_state public.pvp_state%rowtype;
+  v_winner text;
+  v_team jsonb;
+  v_fainted integer := 0;
+  v_points integer;
+  v_winner_id uuid;
+begin
+  if auth.uid() is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select * into v_match from public.pvp_matches where id = p_match_id;
+  if not found then raise exception 'Partida no encontrada'; end if;
+  if v_match.elo_awarded then return null; end if;
+  if v_match.status <> 'finished' or v_match.result is null then return null; end if;
+  v_winner := v_match.result;
+  v_winner_id := case when v_winner = 'a' then v_match.player_a_id else v_match.player_b_id end;
+  select * into v_state from public.pvp_state where match_id = p_match_id;
+  v_team := case when v_winner = 'a' then v_state.state->'a'->'team' else v_state.state->'b'->'team' end;
+  select count(*) into v_fainted
+  from jsonb_array_elements(coalesce(v_team, '[]'::jsonb)) p
+  where coalesce((p->>'hp')::int, 1) <= 0;
+  v_points := case
+    when v_fainted <= 0 then 20
+    when v_fainted = 1 then 18
+    when v_fainted = 2 then 16
+    when v_fainted = 3 then 14
+    when v_fainted = 4 then 12
+    else 10
+  end;
+  update public.pvp_matches set elo_awarded = true where id = p_match_id;
+  insert into public.pvp_elo (user_id, elo, wins)
+  values (v_winner_id, v_points, 1)
+  on conflict (user_id) do update set
+    elo = public.pvp_elo.elo + v_points,
+    wins = public.pvp_elo.wins + 1,
+    updated_at = now();
+  return jsonb_build_object('points', v_points);
+end;
+$$;
+
+-- Revancha: reutiliza el mismo código. Si hay una sala en espera con ese
+-- código, se une; si no, la crea (así el primero se queda esperando).
+create unique index if not exists pvp_matches_waiting_code_idx
+  on public.pvp_matches (code) where status = 'waiting' and player_b_id is null;
+
+create or replace function public.rematch_pvp_room(p_code text, p_team jsonb)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_code text := upper(p_code);
+  v_match public.pvp_matches%rowtype;
+  v_a_name text;
+  v_b_name text;
+begin
+  if v_uid is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select * into v_match from public.pvp_matches
+  where code = v_code and status = 'waiting' and player_b_id is null and player_a_id <> v_uid
+  limit 1;
+  if not found then
+    begin
+      insert into public.pvp_matches (code, player_a_id, team_a, status)
+      values (v_code, v_uid, coalesce(p_team, '[]'::jsonb), 'waiting')
+      returning * into v_match;
+    exception when unique_violation then
+      select * into v_match from public.pvp_matches
+      where code = v_code and status = 'waiting' and player_b_id is null and player_a_id <> v_uid
+      limit 1;
+      if not found then raise exception 'No se pudo preparar la revancha'; end if;
+    end;
+  end if;
+  if v_match.player_a_id = v_uid then
+    select username into v_a_name from public.profiles where id = v_uid;
+    return jsonb_build_object('match_id', v_match.id, 'code', v_match.code, 'is_host', true, 'opponent_name', null::text, 'player_name', v_a_name, 'joined', false);
+  end if;
+  update public.pvp_matches
+  set player_b_id = v_uid, team_b = coalesce(p_team, '[]'::jsonb), status = 'active'
+  where id = v_match.id;
+  insert into public.pvp_state (match_id, state, turn, action_a, action_b)
+  values (v_match.id, public.init_pvp_state(v_match.id), 0, null, null);
+  select username into v_a_name from public.profiles where id = v_match.player_a_id;
+  select username into v_b_name from public.profiles where id = v_uid;
+  return jsonb_build_object('match_id', v_match.id, 'code', v_match.code, 'is_host', false, 'opponent_name', v_a_name, 'player_name', v_b_name, 'joined', true);
+end;
+$$;
+
+-- ============================================================================
+-- CHAT CO-OP
+-- Mensajes rápidos entre compañeros usando el código de sesión.
+-- ============================================================================
+
+create table if not exists public.coop_chat (
+  id uuid primary key default gen_random_uuid(),
+  code text not null,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  message text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists coop_chat_code_idx on public.coop_chat (code, created_at);
+
+create or replace function public.send_coop_chat(p_code text, p_message text)
+returns boolean
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null then raise exception 'Necesitas iniciar sesión'; end if;
+  if p_message is null or length(p_message) = 0 then return false; end if;
+  if length(p_message) > 200 then p_message := left(p_message, 200); end if;
+  insert into public.coop_chat (code, user_id, message)
+  values (upper(p_code), auth.uid(), p_message);
+  return true;
+end;
+$$;
+
+create or replace function public.get_coop_chat(p_code text, p_after timestamptz default null)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_result jsonb;
+begin
+  if auth.uid() is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select coalesce(jsonb_agg(row_to_json(t)::jsonb), '[]'::jsonb)
+  into v_result
+  from (
+    select c.message, c.created_at, u.username
+    from public.coop_chat c
+    join public.profiles u on u.id = c.user_id
+    where c.code = upper(p_code)
+      and (p_after is null or c.created_at > p_after)
+    order by c.created_at asc
+    limit 100
+  ) t;
+  return v_result;
+end;
+$$;
+
 -- Seguridad PvP: solo acceso vía RPC.
 alter table public.pvp_matches enable row level security;
 alter table public.pvp_state enable row level security;
+alter table public.pvp_elo enable row level security;
+alter table public.coop_chat enable row level security;
 
 revoke all on public.pvp_matches from anon, authenticated;
 revoke all on public.pvp_state from anon, authenticated;
+revoke all on public.pvp_elo from anon, authenticated;
+revoke all on public.coop_chat from anon, authenticated;
 
 grant execute on function public.init_pvp_state to authenticated;
 grant execute on function public.create_pvp_room to authenticated;
@@ -1050,3 +1254,9 @@ grant execute on function public.cancel_pvp_match to authenticated;
 grant execute on function public.clear_pvp_action to authenticated;
 grant execute on function public.start_pvp_timer to authenticated;
 grant execute on function public.expire_pvp_timer to authenticated;
+grant execute on function public.get_pvp_elo to authenticated;
+grant execute on function public.get_pvp_elo_leaderboard to authenticated;
+grant execute on function public.award_pvp_elo to authenticated;
+grant execute on function public.rematch_pvp_room to authenticated;
+grant execute on function public.send_coop_chat to authenticated;
+grant execute on function public.get_coop_chat to authenticated;
