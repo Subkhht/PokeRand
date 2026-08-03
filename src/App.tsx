@@ -2185,18 +2185,15 @@ function MainApp() {
       case 'legendary_appears': {
         const legendaryIds = [144,145,146,150,151,243,244,245,249,250,251,377,378,379,380,381,382,383,384,385,480,481,482,483,484,485,486,487,488,491,492,493,494,638,639,640,641,642,643,644,645,646,647,648,649]
         const id = legendaryIds[Math.floor(Math.random() * legendaryIds.length)]
-        const legendaryLevel = difficulty === 'infinite'
-          ? getMaxTeamLevel() + (Math.floor(Math.random() * 3) - 1)
-          : current.level + 5
-        const legendaryData = await buildPokemonFromApi(id, 1, legendaryLevel)
+        const legendaryData = await buildPokemonFromApi(id, 1, current.level)
         const legendary: Pokemon = {
           ...legendaryData,
-          level: current.level + 5,
-          hp: current.maxHp + 40,
-          maxHp: current.maxHp + 40,
-          attack: current.attack + 20,
-          defense: current.defense + 10,
-          speed: current.speed + 10,
+          level: current.level,
+          hp: current.maxHp + 20,
+          maxHp: current.maxHp + 20,
+          attack: current.attack + 10,
+          defense: current.defense + 5,
+          speed: current.speed + 5,
         }
         setTeam(prev => prev.map(p => p.hp <= 0 ? p : { ...p, hp: p.maxHp }))
         setBattleLog(prev => [`🐉 ¡Un Pokémon legendario apareció! Fue un encuentro de descanso. Todo el equipo vivo se ha curado.`, ...prev])
