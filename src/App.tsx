@@ -4750,6 +4750,7 @@ function MainApp() {
           gmaxEvolved: true,
           gmaxTurnsLeft: 3,
           sprite: gmaxSprite,
+          holdItem: null,
           attack: Math.floor(scaled.attack * gmaxMultiplier),
           defense: Math.floor(scaled.defense * gmaxMultiplier),
           speed: Math.floor(scaled.speed * gmaxMultiplier),
@@ -4846,6 +4847,7 @@ function MainApp() {
       const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, coopModeRef.current ? restTargetLevel : undefined)
       const levelDiff = restTargetLevel - restPokemonBase.level
       const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, levelDiff, difficulty)
+      generatedEncounter.holdItem = null
       if (shinyNextEncounter) {
         generatedEncounter.shiny = true
         generatedEncounter.sprite = makeShinySprite(generatedEncounter.sprite, generatedEncounter.id)
@@ -5094,7 +5096,7 @@ function MainApp() {
             speed: generatedEnemy.speed + Math.floor(Math.random() * 20) - 10,
           }
         }
-        generatedEnemy = { ...generatedEnemy, statStages: { attack: 0, defense: 0, speed: 0 } }
+        generatedEnemy = { ...generatedEnemy, holdItem: null, statStages: { attack: 0, defense: 0, speed: 0 } }
         setIsTrainerBattle(false)
         setTrainerTeam([])
         setTrainerPokemonIndex(0)
