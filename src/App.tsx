@@ -1333,6 +1333,7 @@ function MainApp() {
   const [coliseumTempTeam, setColiseumTempTeam] = useState<Pokemon[]>([])
   const [coliseumSeed, setColiseumSeed] = useState(0)
   const [coliseumSearch, setColiseumSearch] = useState('')
+  const preColiseumChallengesRef = useRef<RunChallenges | null>(null)
   const [activeIndex, setActiveIndex] = useState<number>(0)
   const [enemy, setEnemy] = useState<Pokemon | null>(null)
   const [route, setRoute] = useState<RouteNode[]>([])
@@ -2468,6 +2469,7 @@ function MainApp() {
 
       // --- COLISEUM: skip starter, go to team selection ---
       if (effectiveDifficulty === 'coliseum') {
+        preColiseumChallengesRef.current = { ...runChallenges }
         activeChallenges = { ...activeChallenges, fixedLevel: true, noEvolution: true, noMoney: true, noShops: true, noRests: true }
         setRunChallenges(activeChallenges)
         const coliseumRoute: RouteNode[] = []
@@ -6862,6 +6864,13 @@ function MainApp() {
   }
 
   function resetToSetup(): void {
+    // Si venimos de COLISEUM, restaura los desafíos que tenía el jugador antes
+    // de que el modo los forzara (Nivel Fijo etc.), para que no se hereden en
+    // otras partidas.
+    if (preColiseumChallengesRef.current) {
+      setRunChallenges(preColiseumChallengesRef.current)
+      preColiseumChallengesRef.current = null
+    }
     // Al volver al menú principal, borra la sesión cooperativa para no dejar
     // datos muertos en la base de datos.
     if (coopSessionCodeRef.current) void deleteCoopSessionRpc(coopSessionCodeRef.current)
@@ -8216,7 +8225,7 @@ function MainApp() {
         <section className="panel setup-panel" style={{ maxWidth: '600px', margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
             <h2 style={{ margin: 0, color: '#ffcb05' }}>👑 COLISEUM</h2>
-            <button className="tiny-btn" onClick={() => { playClick(); setColiseumTempTeam([]); setRunChallenges({ noShops: false, noRests: false, allShiny: false, allTeamRocket: false, nuzlocke: false, soloStarter: false, fixedTeam: false, noEvolution: false, noItems: false, restrictedMoves: false, firstStrike: false, fixedLevel: false, noCrits: false, typeRandomizer: false, noPurchasing: false, blindRoute: false, bossRush: false, speedrun: false, noMoney: false, doubleModifiers: false, scalingEnemies: false, noHealing: false, ironman: false, totalRandomizer: false, nuzlockeHardcore: false, challengeGauntlet: false, egglocke: false }); setScreen('setup'); stopMusic() }} type="button" style={{ color: '#ff8a80' }}>
+            <button className="tiny-btn" onClick={() => { playClick(); preColiseumChallengesRef.current = null; setColiseumTempTeam([]); setRunChallenges({ noShops: false, noRests: false, allShiny: false, allTeamRocket: false, nuzlocke: false, soloStarter: false, fixedTeam: false, noEvolution: false, noItems: false, restrictedMoves: false, firstStrike: false, fixedLevel: false, noCrits: false, typeRandomizer: false, noPurchasing: false, blindRoute: false, bossRush: false, speedrun: false, noMoney: false, doubleModifiers: false, scalingEnemies: false, noHealing: false, ironman: false, totalRandomizer: false, nuzlockeHardcore: false, challengeGauntlet: false, egglocke: false }); setScreen('setup'); stopMusic() }} type="button" style={{ color: '#ff8a80' }}>
               ✕ Salir
             </button>
           </div>
