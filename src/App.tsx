@@ -4830,11 +4830,11 @@ function MainApp() {
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const gmaxId = Array.from(GMAX_CAPABLE_IDS)[Math.floor(Math.random() * GMAX_CAPABLE_IDS.size)]
         const gmaxTargetLevel = difficulty === 'infinite'
-          ? getMaxTeamLevel() + 1 + Math.floor(Math.random() * 2)
-          : avgPlayerLevel + 1
-        const base = await buildPokemonFromApi(gmaxId, targetGen, gmaxTargetLevel, false, difficulty)
+          ? getMaxTeamLevel() + 2
+          : avgPlayerLevel + 2
+        const base = await buildPokemonFromApi(gmaxId, targetGen, gmaxTargetLevel, false, difficulty, true)
         const gmaxLevelDelta = modifier?.enemyLevelDelta ?? 0
-        let scaled = scalePokemonForNode(base, currentNode, routeIndex, gmaxLevelDelta, difficulty)
+        let scaled = scalePokemonForNode({ ...base, minAppearLevel: undefined }, currentNode, routeIndex, gmaxLevelDelta, difficulty)
         if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
         if (runChallenges.totalRandomizer) {
           scaled = {

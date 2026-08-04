@@ -511,9 +511,10 @@ export async function buildPokemonFromApi(
   _generation: number,
   targetLevel: number = 10,
   shiny: boolean = false,
-  difficulty: string = 'medium'
+  difficulty: string = 'medium',
+  bypassMinAppearLevel: boolean = false
 ): Promise<Pokemon> {
-  const cacheKey = `${identifier}_lvl${targetLevel}_${difficulty}_r${runSeed}`
+  const cacheKey = `${identifier}_lvl${targetLevel}_${difficulty}_b${bypassMinAppearLevel ? 1 : 0}_r${runSeed}`
   const cached = pokemonCache.get(cacheKey)
   if (cached) {
     const result = { ...cached, hp: cached.maxHp }
@@ -573,7 +574,10 @@ export async function buildPokemonFromApi(
   }
   pokemon.minAppearLevel = evoInfo.minAppearLevel ?? undefined
 
-  if (pokemon.minAppearLevel && targetLevel < pokemon.minAppearLevel) {
+  // La forma G-MAX puede saltarse el umbral mínimo de aparición: es una forma
+  // especial que se enfrenta al nivel del jugador, no depende de la cadena
+  // evolutiva real (así un G-MAX Charizard puede aparecer a nivel 20).
+  if (!bypassMinAppearLevel && pokemon.minAppearLevel && targetLevel < pokemon.minAppearLevel) {
     const diff = pokemon.minAppearLevel - targetLevel
     pokemon.level = pokemon.minAppearLevel
     pokemon.maxHp += diff * 4
