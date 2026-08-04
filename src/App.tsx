@@ -4605,7 +4605,7 @@ function MainApp() {
     setBattleLog((prev) => [`📦 ${pokemon.name} fue depositado en el PC.`, ...prev].slice(0, 15))
   }
 
-  function generateShopStock(): string[] {
+  function generateShopStock(excludeStone?: string): string[] {
     const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i])
     const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
     const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
@@ -4619,7 +4619,12 @@ function MainApp() {
     const ballPool = ['Poké Ball', ...rareBalls]
     const shuffledBalls = [...ballPool].sort(() => 0.5 - Math.random())
     const selectedBalls = shuffledBalls.slice(0, 2)
-    const unlockedStones = EVOLUTION_STONES.filter(s => isEvolutionStoneUnlocked(s))
+    let unlockedStones = EVOLUTION_STONES.filter(s => isEvolutionStoneUnlocked(s))
+    if (excludeStone) {
+      // Al rerollear evitamos repetir la misma piedra (si hay otra disponible).
+      const others = unlockedStones.filter(s => s !== excludeStone)
+      unlockedStones = others.length > 0 ? others : unlockedStones
+    }
     const selectedStone = unlockedStones.length > 0 ? [unlockedStones[Math.floor(Math.random() * unlockedStones.length)]] : []
     const smokeBallChance = isConsumableUnlocked('Cuerda Huida') && Math.random() < 0.25 ? ['Cuerda Huida'] : []
     return [...selectedConsumables, ...selectedHoldables, ...selectedBalls, ...selectedStone, ...smokeBallChance]
@@ -4634,7 +4639,8 @@ function MainApp() {
 
   function rerollShop(): void {
     if (shopRerollsUsed >= maxShopRerolls()) return
-    setShopStock(generateShopStock())
+    const currentStone = shopStock.find(n => EVOLUTION_STONE_UNLOCK_IDS[n])
+    setShopStock(generateShopStock(currentStone))
     setShopRerollsUsed(prev => prev + 1)
     playClick()
     setBattleLog((prev) => [`🎲 ¡Has rerolleado la tienda! (${shopRerollsUsed + 1}/${maxShopRerolls()})`, ...prev].slice(0, 15))
