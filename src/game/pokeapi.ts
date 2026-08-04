@@ -921,9 +921,9 @@ function findPreEvolutionLevel(chainNode: EvolutionChainNode, speciesName: strin
   if (matchName(chainNode.species.name)) return null
 
   for (const evo of chainNode.evolves_to || []) {
-    const subName = getBaseName(evo.species.name)
-    const evoMatch = (name: string) => name.toLowerCase() === speciesName.toLowerCase() || name.toLowerCase() === subName.toLowerCase()
-    if (evoMatch(evo.species.name)) {
+    // ¿Este nodo evoluciona DIRECTAMENTE al Pokémon objetivo? matchName usa el
+    // nombre base del objetivo (maneja formas regionales), no el del propio evo.
+    if (matchName(evo.species.name)) {
       const details = evo.evolution_details?.[0]
       const minLevel = details?.min_level ?? null
       const trigger = details?.trigger?.name ?? 'level-up'

@@ -4638,7 +4638,7 @@ function MainApp() {
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const targetLevel = difficulty === 'infinite' ? getMaxTeamLevel() : avgPlayerLevel
         const fetches = Array.from({ length: 4 }, () =>
-          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, coopModeRef.current ? targetLevel : undefined)
+          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
               let scaled = scalePokemonForNode(base, currentNode, routeIndex, levelDiff, difficulty)
@@ -4665,7 +4665,7 @@ function MainApp() {
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const targetLevel = difficulty === 'infinite' ? getMaxTeamLevel() : avgPlayerLevel + 1
         const fetches = Array.from({ length: 2 }, (_, idx) =>
-          getBalancedPokemonByGeneration(targetGen, routeIndex + idx, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, coopModeRef.current ? targetLevel : undefined)
+          getBalancedPokemonByGeneration(targetGen, routeIndex + idx, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
               let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff, difficulty)
@@ -4765,7 +4765,7 @@ function MainApp() {
           const targetLevel = difficulty === 'infinite'
             ? getMaxTeamLevel() + 1 + Math.floor(Math.random() * 2)
             : avgPlayerLevel + Math.floor(Math.random() * 3) - 1
-          return getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, coopModeRef.current ? targetLevel : undefined)
+          return getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
               const scaled = scalePokemonForNode(base, currentNode, routeIndex, levelDiff, difficulty)
@@ -4827,11 +4827,13 @@ function MainApp() {
       setApiError('')
       try {
         const targetGen = getEffectiveGen()
+        const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const gmaxId = Array.from(GMAX_CAPABLE_IDS)[Math.floor(Math.random() * GMAX_CAPABLE_IDS.size)]
-        const base = await buildPokemonFromApi(gmaxId, targetGen, 1, false, difficulty)
-        const gmaxLevelDelta = difficulty === 'infinite'
-          ? getMaxTeamLevel() + 1 + Math.floor(Math.random() * 2) - base.level
-          : (modifier?.enemyLevelDelta ?? 0)
+        const gmaxTargetLevel = difficulty === 'infinite'
+          ? getMaxTeamLevel() + 1 + Math.floor(Math.random() * 2)
+          : avgPlayerLevel + 1
+        const base = await buildPokemonFromApi(gmaxId, targetGen, gmaxTargetLevel, false, difficulty)
+        const gmaxLevelDelta = modifier?.enemyLevelDelta ?? 0
         let scaled = scalePokemonForNode(base, currentNode, routeIndex, gmaxLevelDelta, difficulty)
         if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
         if (runChallenges.totalRandomizer) {
@@ -4947,7 +4949,7 @@ function MainApp() {
       const restTargetLevel = difficulty === 'infinite'
         ? getMaxTeamLevel() + (Math.floor(Math.random() * 3) - 1)
         : avgPlayerLevel - 2 + Math.floor(Math.random() * 3) - 1
-      const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, coopModeRef.current ? restTargetLevel : undefined)
+      const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, restTargetLevel)
       const levelDiff = restTargetLevel - restPokemonBase.level
       const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, levelDiff, difficulty)
       generatedEncounter.holdItem = null
@@ -5001,7 +5003,7 @@ function MainApp() {
             ? getMaxTeamLevel() + trainerMemberLevelOffset(idx, teamSize, true, difficulty)
             : avgPlayerLevel + trainerMemberLevelOffset(idx, teamSize, true, difficulty)
           const baseStepIndex = difficulty === 'infinite' ? Math.max(0, targetLevel - 10) : routeIndex
-          return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, coopModeRef.current ? targetLevel : undefined)
+          return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
               let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels, difficulty)
@@ -5046,7 +5048,7 @@ function MainApp() {
           // En Infinite, genera al rival directamente a su nivel objetivo para que
           // respete etapas evolutivas y movimientos según el nivel. En Co-op, igual.
           const baseStepIndex = difficulty === 'infinite' ? Math.max(0, targetLevel - 10) : routeIndex
-          return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, coopModeRef.current ? targetLevel : undefined)
+          return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
               let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
@@ -5112,7 +5114,7 @@ function MainApp() {
                 // respete etapas evolutivas y movimientos según el nivel. En Co-op,
                 // igual: la especie debe ser coherente con el nivel objetivo real.
                 const baseStepIndex = difficulty === 'infinite' ? Math.max(0, targetLevel - 10) : routeIndex
-                return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? badges.length : -1, badges.length, coopModeRef.current ? targetLevel : undefined)
+                return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? badges.length : -1, badges.length, targetLevel)
                   .then((base) => {
                     const levelDiff = targetLevel - base.level
                     let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
@@ -5186,7 +5188,7 @@ function MainApp() {
         const targetLevel = difficulty === 'infinite'
           ? getMaxTeamLevel() + (Math.floor(Math.random() * 3) - 1)
           : avgPlayerLevel + wildLevelOffset
-        const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, coopModeRef.current ? targetLevel : undefined)
+        const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
         const levelDiff = targetLevel - enemyBase.level
         let generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
         generatedEnemy = balanceWildPokemonToTeam(generatedEnemy, team, difficulty)

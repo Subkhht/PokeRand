@@ -53,8 +53,13 @@ export function scalePokemonForNode(base: Pokemon, _node: RouteNode, _stepIndex:
   // Seguir permitiendo bajar el nivel a un rival para igualarlo al promedio
   // del equipo, siempre que no se pase por debajo de ese umbral.
   const targetLevel = Math.max(base.minAppearLevel ?? 1, base.level + levelDelta)
-  const hpBonus = levelDelta * hpMultiplier
-  const statBonus = levelDelta * statMultiplier
+  // Usamos el cambio de nivel REAL (no el delta pedido) para las stats: si el
+  // nivel queda limitado por el umbral mínimo de aparición de la evolución,
+  // las stats no deben reducirse (ej. un Charizard Nv.36 no baja sus stats por
+  // un delta negativo aunque el rival sea de nivel menor).
+  const actualLevelDelta = targetLevel - base.level
+  const hpBonus = actualLevelDelta * hpMultiplier
+  const statBonus = actualLevelDelta * statMultiplier
 
   return {
     ...base,
