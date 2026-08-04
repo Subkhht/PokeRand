@@ -198,6 +198,8 @@ const EVOLUTION_ITEM_REVERSE: Record<string, string> = {
   'prism-scale': 'Prism Scale',
   'sachet': 'Sachet',
   'whipped-dream': 'Whipped Dream',
+  'auspicious-armor': 'Auspicious Armor',
+  'malicious-armor': 'Malicious Armor',
 }
 
 export function getEvolutionItemDisplayName(pokeApiName: string): string {

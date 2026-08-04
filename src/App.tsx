@@ -240,6 +240,8 @@ const EVOLUTION_STONE_ITEM_NAMES: Record<string, string> = {
   'Dawn Stone': 'dawn-stone',
   'Ice Stone': 'ice-stone',
   'Gorra de Ash': 'gorra-de-ash',
+  'Auspicious Armor': 'auspicious-armor',
+  'Malicious Armor': 'malicious-armor',
 }
 
 const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
@@ -256,6 +258,8 @@ const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
   'Sachet': 'unlock_sachet',
   'Whipped Dream': 'unlock_whipped_dream',
   'Gorra de Ash': 'unlock_gorra_de_ash',
+  'Auspicious Armor': 'unlock_auspicious_armor',
+  'Malicious Armor': 'unlock_malicious_armor',
 }
 
 const itemDescriptions: Record<string, string> = {
@@ -300,6 +304,8 @@ const itemDescriptions: Record<string, string> = {
   'Fresh Water': 'Restaura 30 HP de un Pokémon.',
   'Soda Pop': 'Restaura 40 HP de un Pokémon.',
   'Lemonade': 'Restaura 60 HP de un Pokémon.',
+  'Auspicious Armor': 'Armadura que evoluciona a Charcadet en Armarouge.',
+  'Malicious Armor': 'Armadura que evoluciona a Charcadet en Ceruledge.',
 }
 
 const ITEM_SPRITES: Record<string, string> = {
@@ -986,6 +992,8 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_sachet', name: 'Sachet', desc: 'Evoluciona a Aromatisse. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Sachet', category: 'evolution_item' },
   { id: 'unlock_whipped_dream', name: 'Whipped Dream', desc: 'Evoluciona a Slurpuff. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Whipped Dream', category: 'evolution_item' },
   { id: 'unlock_gorra_de_ash', name: 'Gorra de Ash', desc: 'Evoluciona a Greninja en Greninja-Ash. Aparece con el Comerciante Misterioso.', price: 50, spriteKey: 'Gorra de Ash', category: 'evolution_item' },
+  { id: 'unlock_auspicious_armor', name: 'Auspicious Armor', desc: 'Evoluciona a Charcadet en Armarouge. Aparece con el Comerciante Misterioso.', price: 50, spriteKey: 'Auspicious Armor', category: 'evolution_item' },
+  { id: 'unlock_malicious_armor', name: 'Malicious Armor', desc: 'Evoluciona a Charcadet en Ceruledge. Aparece con el Comerciante Misterioso.', price: 50, spriteKey: 'Malicious Armor', category: 'evolution_item' },
   { id: 'music_menu_chill', name: 'Menú Relax', desc: 'Música de menú relajante y ambiental.', price: 40, spriteKey: 'Potion', category: 'music' },
   { id: 'music_battle_epic', name: 'Batalla Épica', desc: 'Música de batalla más intensa y rápida.', price: 60, spriteKey: 'Potion', category: 'music' },
 ]
@@ -6699,7 +6707,7 @@ function MainApp() {
       return
     }
 
-    if (EVOLUTION_STONE_UNLOCK_IDS[itemName] || itemName === 'Gorra de Ash') {
+    if (EVOLUTION_STONE_UNLOCK_IDS[itemName] || itemName === 'Gorra de Ash' || itemName === 'Auspicious Armor' || itemName === 'Malicious Armor') {
       const candidates = team.filter(p => p.hp > 0)
       if (candidates.length === 0) {
         setBattleLog((prev) => ['No tienes Pokémon en pie para usar la piedra.', ...prev].slice(0, 15))
@@ -11440,7 +11448,7 @@ function MainApp() {
             </div>
 
             <h3 style={{ color: '#ff8a33', marginBottom: '0.5rem' }}>🔧 Objetos Evolutivos</h3>
-            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Objetos para evolucionar Pokémon por intercambio. Aparecen con el Comerciante Misterioso.</p>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Objetos para evolucionar Pokémon. Aparecen con el Comerciante Misterioso.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'evolution_item').map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
