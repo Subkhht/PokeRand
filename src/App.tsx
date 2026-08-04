@@ -1637,6 +1637,7 @@ function MainApp() {
     try { return localStorage.getItem('pokerand_daily') === dailySeedRef.current } catch { return false }
   })
   const isDailyRunRef = useRef(false)
+  const preDailyDifficultyRef = useRef<Difficulty | null>(null)
 
   // --- Modo cooperativo ---
   const [coopMode, setCoopMode] = useState<boolean>(false)
@@ -2513,6 +2514,12 @@ function MainApp() {
     const dailyCfg = isDailyRunRef.current ? getDailyConfig(dailySeed, [1,2,3,4,5,6,7,8,9]) : null
     const effectiveGen = coopModeRef.current ? (coopGenRef.current || generation) : (dailyCfg ? dailyCfg.generation : generation)
     const effectiveDifficulty = coopModeRef.current ? (coopDiffRef.current || 'medium') : (dailyCfg ? dailyCfg.difficulty : difficulty)
+    // El Desafío Diario tiene su propia dificultad (no la del menú): se aplica
+    // durante la run y se restaura al volver al menú.
+    if (isDailyRunRef.current && dailyCfg) {
+      preDailyDifficultyRef.current = difficulty
+      setDifficulty(dailyCfg.difficulty)
+    }
     // Semilla de la ruta: se guarda para poder "reiniciar" con los mismos nodos.
     const routeSeed = coopModeRef.current
       ? (coopSeedRef.current || String(Math.random()).slice(2, 12))
@@ -7088,6 +7095,10 @@ function MainApp() {
       localStorage.setItem('pokerand_daily', dailySeed)
     }
     isDailyRunRef.current = false
+    if (preDailyDifficultyRef.current) {
+      setDifficulty(preDailyDifficultyRef.current)
+      preDailyDifficultyRef.current = null
+    }
     setTrainerTeam([])
     setTrainerPokemonIndex(0)
     setTrainerName('')
