@@ -1272,6 +1272,29 @@ function groupInventory(items: string[]): Array<{ name: string; count: number; d
   }))
 }
 
+// Calcula el tamaño de equipo de TeamR/Rival. En rutas finitas escala con el
+// progreso (2 → 6). En Infinite la ruta crece sin límite, así que escala de
+// forma monótona con los nodos completados para evitar picos y caídas en cada
+// lote de 5 nodos nuevos.
+function trainerTeamSize(routeIndex: number, routeLength: number, difficulty: string): number {
+  if (difficulty === 'infinite') {
+    return Math.max(2, Math.min(6, 2 + Math.floor((routeIndex + 1) / 5)))
+  }
+  const progress = routeIndex / Math.max(1, routeLength - 1)
+  return Math.max(2, Math.min(6, 2 + Math.floor(progress * 4)))
+}
+
+// Tamaño máximo de equipo para entrenadores normales (1 → 6). Igual que
+// trainerTeamSize: monótono en Infinite para evitar picos por el crecimiento
+// ilimitado de la ruta, y mantiene el rango 1..6 junto con su variación aleatoria.
+function trainerMaxSize(routeIndex: number, routeLength: number, difficulty: string): number {
+  if (difficulty === 'infinite') {
+    return Math.min(6, 1 + Math.floor(routeIndex / 5))
+  }
+  const progress = routeIndex / Math.max(1, routeLength - 1)
+  return Math.max(1, Math.min(6, Math.floor(progress * 6) + 1))
+}
+
 // Reparte los niveles de un equipo de entrenador dentro de los rangos conocidos
 // por dificultad, para que no todos los Pokémon tengan el mismo nivel.
 // El primer Pokémon (líder) es el más fuerte y el resto baja progresivamente.
@@ -4995,8 +5018,7 @@ function MainApp() {
 
       if (currentNode.type === 'rival') {
         // Rival recurrente: escala contigo y da más dinero que el resto.
-        const progress = routeIndex / Math.max(1, route.length - 1)
-        const teamSize = Math.max(2, Math.min(6, 2 + Math.floor(progress * 4)))
+        const teamSize = trainerTeamSize(routeIndex, route.length, difficulty)
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const fetches = Array.from({ length: teamSize }, (_, idx) => {
           const targetLevel = difficulty === 'infinite'
@@ -5036,9 +5058,8 @@ function MainApp() {
           ...prev
         ])
       } else if (isTeamRocket) {
-        const progress = routeIndex / Math.max(1, route.length - 1)
-        // El tamaño del equipo escala con el progreso: 1-2 al inicio hasta 5-6 al final.
-        const teamSize = Math.max(1, Math.min(6, 1 + Math.floor(progress * 4) + Math.floor(Math.random() * 2)))
+        // El tamaño del equipo escala igual que el Rival (2 → 6).
+        const teamSize = trainerTeamSize(routeIndex, route.length, difficulty)
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
 
         const fetches = Array.from({ length: teamSize }, (_, idx) => {
@@ -5088,9 +5109,8 @@ function MainApp() {
         const willBeTrainer = isBoss || Math.random() < 0.5
 
       if (willBeTrainer) {
-        const progress = routeIndex / Math.max(1, route.length - 1)
         const isLeague = currentNode.id >= 1000
-        const maxSize = isBoss ? 6 : Math.max(1, Math.min(6, Math.floor(progress * 6) + 1))
+        const maxSize = isBoss ? 6 : trainerMaxSize(routeIndex, route.length, difficulty)
         const teamSize = isBoss ? maxSize : Math.max(1, Math.min(maxSize, 1 + Math.floor(Math.random() * maxSize)))
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
 
