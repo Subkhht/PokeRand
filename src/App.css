@@ -2033,3 +2033,58 @@ button {
 .pvp-hit-flash {
   animation: pvp-hit-flash-kf 0.5s ease-out;
 }
+
+/* ---- Casino: minijuegos ---- */
+@keyframes casinoFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes casinoSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes casinoBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+@keyframes casinoPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.94); }
+}
+@keyframes casinoFlipIn {
+  from { opacity: 0; transform: rotateY(90deg) scale(0.7); }
+  to { opacity: 1; transform: rotateY(0) scale(1); }
+}
+@keyframes casinoMatch {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.18); }
+  100% { transform: scale(0.94); }
+}
+@keyframes casinoWhackPop {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes casinoDiceShake {
+  0% { transform: rotate(-8deg) translateY(-2px); }
+  50% { transform: rotate(8deg) translateY(2px); }
+  100% { transform: rotate(-8deg) translateY(-2px); }
+}
+@keyframes casinoDiceLand {
+  0% { transform: scale(1.4) rotate(0deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+@keyframes casinoReelSpin {
+  0% { transform: translateY(-6px); }
+  100% { transform: translateY(6px); }
+}
+@keyframes casinoReelStop {
+  0% { transform: translateY(10px); }
+  100% { transform: translateY(0); }
+}
+@keyframes casinoNumberPop {
+  0% { transform: scale(0.5); }
+  60% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+

@@ -23,10 +23,12 @@ import { isLeaderboardEnabled, submitInfiniteScore, fetchInfiniteLeaderboard, fo
 import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, cancelExchangeOffer, sendCoopChat, getCoopChat, finishCoopSession, resetCoopSession, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange, type CoopChatMessage } from './game/coop'
 import { isPvpEnabled, createPvpRoom, findPvpOpponent, joinPvpRoom, getPvpMatch, getPvpState, submitPvpAction, resolvePvpTurn as resolvePvpTurnRpc, forfeitPvpMatch, cancelPvpMatch, finishPvpMatch, clearPvpAction, startPvpTimer, expirePvpTimer, getPvpElo, getPvpEloLeaderboard, awardPvpElo, rematchPvpRoom, serializePvpPokemon, type PvpTurnSnapshot, type PvpRoomResult, type PvpState, type PvpEloEntry } from './game/pvp'
 import { resolvePvpTurn, type PvpAction } from './game/pvpBattle'
+import CasinoMinigame from './minigames/CasinoMinigame'
+import MinigamePractice from './minigames/MinigamePractice'
 import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum'
 
 const STATUS_LABELS: Record<StatusType, string> = {
@@ -949,6 +951,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_mega_node', name: 'Nodo Mega', desc: 'Desbloquea nodos de Mega Piedra en Hard/Infinite.', price: 150, spriteKey: 'Mega Stone', category: 'upgrade' },
   { id: 'unlock_gmax_node', name: 'Nodo G-MAX', desc: 'Desbloquea nodos G-MAX en Hard/Infinite.', price: 200, spriteKey: 'Dynamax Band', category: 'upgrade' },
   { id: 'unlock_primal_node', name: 'Nodo Primal', desc: 'Desbloquea nodos Primal en Hard/Infinite. Otorgan Prisma Rojo o Azul.', price: 250, spriteKey: 'Prisma Rojo', category: 'upgrade' },
+  { id: 'unlock_casino_node', name: 'Nodo Casino', desc: 'Desbloquea nodos Casino en Hard/Infinite. Juega al Pachinko para ganar premios según tu puntuación.', price: 220, spriteKey: 'money', category: 'upgrade' },
   { id: 'unlock_reroll', name: 'Reroll', desc: 'Permite rerollear la tienda 1 vez por visita.', price: 120, spriteKey: 'dice', category: 'upgrade' },
   { id: 'unlock_reroll_2', name: 'Reroll II', desc: 'Otorga 1 reroll extra de tienda por visita.', price: 200, spriteKey: 'dice', category: 'upgrade', requires: 'unlock_reroll' },
   { id: 'start_pokeballs_5', name: 'Inicio: +5 Poké Balls', desc: 'Empiezas cada aventura con 5 Poké Balls extra.', price: 180, spriteKey: 'Poké Ball', category: 'upgrade' },
@@ -1125,6 +1128,8 @@ function nodeTypeLabel(node: RouteNode): string {
       return 'Mercado Negro'
     case 'double':
       return 'Combate Doble'
+    case 'casino':
+      return 'Casino'
     default:
       return node.type
   }
@@ -1185,6 +1190,7 @@ const NODE_EMOJIS: Record<string, string> = {
   rival: '👤',
   blackmarket: '🕶️',
   double: '🥊',
+  casino: '🃏',
 }
 
 const NODE_TYPE_COLORS: Record<string, string> = {
@@ -1203,6 +1209,7 @@ const NODE_TYPE_COLORS: Record<string, string> = {
   rival: '#f472b6',
   blackmarket: '#fb923c',
   double: '#facc15',
+  casino: '#f0abfc',
 }
 
 function getNodeMapLayout(nodeCount: number): { positions: Array<{ x: number; y: number }>; width: number; height: number } {
@@ -1495,6 +1502,11 @@ function MainApp() {
   const [blackMarketItems, setBlackMarketItems] = useState<string[]>([])
   const [blackMarketPokemon, setBlackMarketPokemon] = useState<Pokemon[]>([])
 
+  // Casino (Pachinko)
+  const [casinoScore, setCasinoScore] = useState<number | null>(null)
+  const [casinoReward, setCasinoReward] = useState<{ label: string; money: number; item: string | null } | null>(null)
+  const [casinoPlayed, setCasinoPlayed] = useState<boolean>(false)
+
   // Combate Doble (2 vs 2)
   const [doubleEnemies, setDoubleEnemies] = useState<Pokemon[]>([])
   const [doubleActives, setDoubleActives] = useState<number[]>([])
@@ -1634,6 +1646,7 @@ function MainApp() {
   const [secretAddLoading, setSecretAddLoading] = useState(false)
   const [secretAddError, setSecretAddError] = useState('')
   const [showAchievements, setShowAchievements] = useState<boolean>(false)
+  const [showMinigamePractice, setShowMinigamePractice] = useState<boolean>(false)
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null)
   const [shinyNextEncounter, setShinyNextEncounter] = useState<boolean>(false)
   const dailySeed = (() => {
@@ -2475,6 +2488,8 @@ function MainApp() {
           type = 'gmax'
         } else if (rand < 0.66 && metaProgression.permanentlyUnlockedItems.includes('unlock_primal_node')) {
           type = 'primal'
+        } else if (rand < 0.72 && metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node')) {
+          type = 'casino'
         }
       } else if (difficulty === 'medium') {
         if (rand < 0.15 && !runChallenges.noShops) {
@@ -2513,7 +2528,7 @@ function MainApp() {
     return {
       id,
       type,
-      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : type === 'mega' ? `Mega #${id}` : type === 'gmax' ? `G-MAX #${id}` : type === 'primal' ? `Primal #${id}` : type === 'rival' ? `Rival #${id}` : type === 'blackmarket' ? `Mercado Negro #${id}` : type === 'double' ? `Doble #${id}` : `Ruta ${id}`,
+      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : type === 'mega' ? `Mega #${id}` : type === 'gmax' ? `G-MAX #${id}` : type === 'primal' ? `Primal #${id}` : type === 'casino' ? `Casino #${id}` : type === 'rival' ? `Rival #${id}` : type === 'blackmarket' ? `Mercado Negro #${id}` : type === 'double' ? `Doble #${id}` : `Ruta ${id}`,
       done: false
     }
   }
@@ -2694,6 +2709,7 @@ function MainApp() {
         let megaPosition: number | null = null
         let gmaxPosition: number | null = null
         let primalPosition: number | null = null
+        let casinoPosition: number | null = null
         if (!activeChallenges.allTeamRocket) {
           if (effectiveDifficulty === 'hard') {
             const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
@@ -2726,6 +2742,11 @@ function MainApp() {
             if (available.length > 0 && metaProgression.permanentlyUnlockedItems.includes('unlock_primal_node')) {
               const idx = Math.floor(rr() * available.length)
               primalPosition = available[idx]
+              available.splice(idx, 1)
+            }
+            if (available.length > 0 && metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node')) {
+              const idx = Math.floor(rr() * available.length)
+              casinoPosition = available[idx]
               available.splice(idx, 1)
             }
           } else if (effectiveDifficulty === 'medium') {
@@ -2761,6 +2782,8 @@ function MainApp() {
             type = 'gmax'
           } else if (primalPosition !== null && i === primalPosition) {
             type = 'primal'
+          } else if (casinoPosition !== null && i === casinoPosition) {
+            type = 'casino'
           } else if (activeChallenges.bossRush) {
             type = 'battle'
           } else if (activeChallenges.allTeamRocket) {
@@ -2795,7 +2818,7 @@ function MainApp() {
           customRoute.push({
             id: i,
             type,
-            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : type === 'mega' ? `Mega #${i}` : type === 'gmax' ? `G-MAX #${i}` : type === 'primal' ? `Primal #${i}` : type === 'rival' ? `Rival #${i}` : type === 'blackmarket' ? `Mercado Negro #${i}` : type === 'double' ? `Doble #${i}` : `Ruta ${i}`,
+            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : type === 'mega' ? `Mega #${i}` : type === 'gmax' ? `G-MAX #${i}` : type === 'primal' ? `Primal #${i}` : type === 'casino' ? `Casino #${i}` : type === 'rival' ? `Rival #${i}` : type === 'blackmarket' ? `Mercado Negro #${i}` : type === 'double' ? `Doble #${i}` : `Ruta ${i}`,
             done: false
           })
         }
@@ -4830,6 +4853,14 @@ function MainApp() {
       return
     }
 
+    if (currentNode.type === 'casino') {
+      setCasinoScore(null)
+      setCasinoReward(null)
+      setCasinoPlayed(false)
+      setScreen('casino')
+      return
+    }
+
     if (currentNode.type === 'move') {
       setIsLoading(true)
       setApiError('')
@@ -5398,6 +5429,63 @@ function MainApp() {
       `🎲 ¡PokeRand: decidiste no capturar al Pokémon.`,
       ...prev
     ].slice(0, 15))
+    completeCurrentNode()
+    setScreen('route')
+  }
+
+  function casinoRewardForScore(score: number): { label: string; money: number; item: string | null } {
+    const unlockedItems = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i))
+    const unlockedHoldables = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked)
+    const unlockedStones = EVOLUTION_STONES.filter(s => isEvolutionStoneUnlocked(s))
+    if (score >= 800) {
+      const rareItems = unlockedItems.filter(i => i === 'Master Ball' || i === 'Max Revive' || i === 'Full Restore' || i === 'Full Elixir')
+      const pool = [...(rareItems.length > 0 ? rareItems : ['Ultra Ball']), ...(unlockedHoldables.length > 0 ? [unlockedHoldables[Math.floor(Math.random() * unlockedHoldables.length)]] : [])]
+      const item = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : 'Ultra Ball'
+      return { label: '🏆 ¡JACKPOT!', money: 600, item }
+    }
+    if (score >= 400) {
+      const goodItems = ['Ultra Ball', 'Hyper Potion', 'Revive', 'Max Revive', 'Elixir'].filter(i => unlockedItems.includes(i))
+      const holdable = unlockedHoldables.length > 0 ? [unlockedHoldables[Math.floor(Math.random() * unlockedHoldables.length)]] : []
+      const pool = [...goodItems, ...holdable]
+      const item = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null
+      return { label: '🎉 ¡Gran premio!', money: 300, item }
+    }
+    if (score >= 200) {
+      const goodItems = ['Great Ball', 'Super Potion', 'Lum Berry', 'Full Heal'].filter(i => unlockedItems.includes(i))
+      const stone = unlockedStones.length > 0 ? [unlockedStones[Math.floor(Math.random() * unlockedStones.length)]] : []
+      const pool = [...goodItems, ...stone]
+      const item = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null
+      return { label: '✨ ¡Buen premio!', money: 150, item }
+    }
+    const basicItems = ['Poké Ball', 'Potion', 'Oran Berry'].filter(i => unlockedItems.includes(i))
+    const item = basicItems.length > 0 ? basicItems[Math.floor(Math.random() * basicItems.length)] : null
+    return { label: '💸 Consolación', money: 60, item }
+  }
+
+  function casinoComplete(score: number): void {
+    if (casinoPlayed) return
+    setCasinoPlayed(true)
+    const reward = casinoRewardForScore(score)
+    setCasinoScore(score)
+    setCasinoReward(reward)
+  }
+
+  function claimCasinoReward(): void {
+    if (casinoScore === null || casinoReward === null) return
+    const { money: rewardMoney, item } = casinoReward
+    const grantedMoney = runChallenges.noMoney ? 0 : rewardMoney
+    if (!runChallenges.noMoney) setMoney(prev => prev + grantedMoney)
+    if (item) setInventory(prev => [...prev, item])
+    setBattleLog((prev) => [
+      `🃏 Casino: ${casinoReward.label} +$${grantedMoney}${item ? ` y ${item}.` : '.'}`,
+      ...prev
+    ].slice(0, 15))
+    completeCurrentNode()
+    setScreen('route')
+  }
+
+  function skipCasino(): void {
+    setBattleLog((prev) => [`🃏 Saliste del Casino sin reclamar el premio.`, ...prev].slice(0, 15))
     completeCurrentNode()
     setScreen('route')
   }
@@ -7146,6 +7234,9 @@ function MainApp() {
     setSpinWinnerIndex(null)
     setSpinRevealed(false)
     setSpinAnimating(false)
+    setCasinoScore(null)
+    setCasinoReward(null)
+    setCasinoPlayed(false)
     setEggInventory([])
     setPcStorage([])
     setSpeedrunSeconds(0)
@@ -7161,7 +7252,7 @@ function MainApp() {
       void pvpForfeit()
       return
     }
-    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double') {
+    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double' || screen === 'casino') {
       // En Co-op, "Volver a inicio" solo sale a nivel local: NO se finaliza la
       // sesión, para no interrumpir la partida del compañero (la sesión queda
       // activa y el compañero puede continuar solo).
@@ -7194,6 +7285,9 @@ function MainApp() {
     const formattedId = `#${String(pkmn.id).padStart(3, '0')}`
     return pkmn.name.toLowerCase().includes(term) || String(pkmn.id).includes(term) || formattedId.includes(term)
   })
+
+  const startMoneyBonus = ((metaProgression.permanentlyUnlockedItems.includes('start_money_1') ? 1 : 0) +
+    (metaProgression.permanentlyUnlockedItems.includes('start_money_2') ? 1 : 0)) * 100
 
   const toggleMusicMuted = (): void => {
     playClick()
@@ -7250,6 +7344,11 @@ function MainApp() {
           <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowAchievements(!showAchievements) }}>
             Logros
           </button>
+          {metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node') && (
+            <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowMinigamePractice(true) }}>
+              🎮 Minijuegos
+            </button>
+          )}
           <button className="tiny-btn" type="button" onClick={onRestartRun}>
             Volver a inicio
           </button>
@@ -7269,7 +7368,7 @@ function MainApp() {
               +
             </button>
           )}
-          <span style={{ color: '#ffcb05', fontWeight: 'bold', marginLeft: '0.5rem' }}>💵 ${money}</span>
+          <span style={{ color: '#ffcb05', fontWeight: 'bold', marginLeft: '0.5rem' }}>💵 ${screen === 'setup' ? 100 + startMoneyBonus : money}</span>
           <span style={{ color: '#10b981', fontWeight: 'bold' }}>W {record.wins}</span>
           <span style={{ color: '#ee3b2f', fontWeight: 'bold' }}>L {record.losses}</span>
         </div>
@@ -9056,7 +9155,7 @@ function MainApp() {
         </section>
       )}
 
-      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double') && activePokemon && (
+      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double' || screen === 'casino') && activePokemon && (
         <section className="roulette-layout">
           <article className="panel trainer-panel">
             <p className="muted small-tag">Trainer</p>
@@ -9839,6 +9938,39 @@ function MainApp() {
               </div>
             )}
 
+            {screen === 'casino' && (
+              <div className="action-block casino-block">
+                <h3 style={{ margin: '0 0 0.5rem', color: '#f0abfc', textAlign: 'center' }}>🃏 ¡Casino!</h3>
+                <p className="muted" style={{ textAlign: 'center', margin: '0 0 0.5rem' }}>
+                  Se elegirá un minijuego al azar. Cuanto mayor sea tu puntuación, mejor la recompensa.
+                </p>
+                <CasinoMinigame onComplete={casinoComplete} />
+                {casinoScore !== null && casinoReward && (
+                  <div style={{ textAlign: 'center', marginTop: '0.75rem', padding: '0.75rem', border: '1px solid rgba(240, 171, 252, 0.4)', borderRadius: '10px', background: 'rgba(240, 171, 252, 0.08)' }}>
+                    <p style={{ color: '#f0abfc', fontWeight: 'bold', fontSize: '1.1rem', margin: '0 0 0.25rem' }}>
+                      {casinoReward.label}
+                    </p>
+                    <p style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '1rem', margin: '0 0 0.25rem' }}>
+                      +${runChallenges.noMoney ? 0 : casinoReward.money}
+                    </p>
+                    {casinoReward.item && (
+                      <p style={{ color: '#f3f1ff', fontSize: '0.9rem', margin: '0 0 0.5rem' }}>
+                        + {casinoReward.item}
+                      </p>
+                    )}
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                      <button className="cta" onClick={claimCasinoReward} type="button" style={{ background: '#f0abfc', color: '#1a1033' }}>
+                        🎁 Reclamar premio
+                      </button>
+                      <button className="secondary" onClick={skipCasino} type="button">
+                        Salir sin premio
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {screen === 'move' && (
               <div className="action-block">
                 <h3 style={{ margin: '0 0 0.5rem', color: '#f3f1ff', textAlign: 'center' }}>📝 ¡Move Tutor!</h3>
@@ -9984,7 +10116,7 @@ function MainApp() {
                   Next node: <strong>{currentNode.label}</strong> ({nodeTypeLabel(currentNode)})
                 </p>
                 <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={enterNode} type="button" disabled={isLoading}>
-                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : currentNode.type === 'mega' ? '💎 ¡Recoger Mega Piedra!' : currentNode.type === 'gmax' ? '⚡ ¡Enfrentar G-MAX!' : currentNode.type === 'primal' ? '🔮 ¡Recoger Prisma!' : currentNode.type === 'trade' ? '🤝 Intercambiar' : currentNode.type === 'rival' ? '👤 ¡Enfrentar al Rival!' : currentNode.type === 'blackmarket' ? '🕶️ Entrar al Mercado Negro' : currentNode.type === 'double' ? '🥊 ¡Combate Doble!' : 'Enter node'}
+                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : currentNode.type === 'mega' ? '💎 ¡Recoger Mega Piedra!' : currentNode.type === 'gmax' ? '⚡ ¡Enfrentar G-MAX!' : currentNode.type === 'primal' ? '🔮 ¡Recoger Prisma!' : currentNode.type === 'trade' ? '🤝 Intercambiar' : currentNode.type === 'rival' ? '👤 ¡Enfrentar al Rival!' : currentNode.type === 'blackmarket' ? '🕶️ Entrar al Mercado Negro' : currentNode.type === 'double' ? '🥊 ¡Combate Doble!' : currentNode.type === 'casino' ? '🃏 ¡Jugar al Casino!' : 'Enter node'}
                 </button>
               </div>
             )}
@@ -10778,6 +10910,10 @@ function MainApp() {
             </div>
           </div>
         </div>
+      )}
+
+      {showMinigamePractice && (
+        <MinigamePractice onClose={() => setShowMinigamePractice(false)} />
       )}
 
       {/* Run Stats on Victory */}
