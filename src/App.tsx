@@ -121,6 +121,241 @@ function CopyCodeButton({ code }: { code: string }) {
   )
 }
 
+function SetupBanner() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    let raf = 0
+    let last = performance.now()
+
+    interface FloatItem { x: number; y: number; r: number; vx: number; vy: number; type: number; rot: number }
+    const items: FloatItem[] = Array.from({ length: 16 }, (_, i) => ({
+      x: Math.random(),
+      y: Math.random(),
+      r: 9 + Math.random() * 14,
+      vx: (Math.random() - 0.5) * 0.05,
+      vy: -0.03 - Math.random() * 0.05,
+      type: i % 3,
+      rot: Math.random() * Math.PI * 2,
+    }))
+
+    const resize = (): void => {
+      const rect = canvas.getBoundingClientRect()
+      const dpr = window.devicePixelRatio || 1
+      const w = Math.max(1, Math.floor(rect.width * dpr))
+      const h = Math.max(1, Math.floor(rect.height * dpr))
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w
+        canvas.height = h
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      }
+    }
+    resize()
+
+    const drawPokeball = (x: number, y: number, r: number, rot: number): void => {
+      ctx.save()
+      ctx.translate(x, y)
+      ctx.rotate(rot)
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI); ctx.fillStyle = '#f8fafc'; ctx.fill()
+      ctx.beginPath(); ctx.arc(0, 0, r, Math.PI, 0); ctx.fillStyle = '#ee3b2f'; ctx.fill()
+      ctx.fillStyle = '#1a1a2e'; ctx.fillRect(-r, -r * 0.12, r * 2, r * 0.24)
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.18, 0, Math.PI * 2); ctx.fillStyle = '#f8fafc'; ctx.fill()
+      ctx.restore()
+    }
+
+    const drawCoin = (x: number, y: number, r: number): void => {
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2)
+      ctx.fillStyle = '#ffcb05'; ctx.fill()
+      ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 2; ctx.stroke()
+      ctx.font = `bold ${r}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillStyle = '#7a5200'; ctx.fillText('$', x, y + 1)
+    }
+
+    const drawStar = (x: number, y: number, r: number, rot: number): void => {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(rot)
+      ctx.beginPath()
+      for (let i = 0; i < 5; i++) {
+        const a1 = (i * Math.PI * 2) / 5 - Math.PI / 2
+        const a2 = a1 + Math.PI / 5
+        ctx.lineTo(Math.cos(a1) * r, Math.sin(a1) * r)
+        ctx.lineTo(Math.cos(a2) * r * 0.45, Math.sin(a2) * r * 0.45)
+      }
+      ctx.closePath()
+      ctx.fillStyle = '#f0abfc'; ctx.fill()
+      ctx.restore()
+    }
+
+    const loop = (now: number): void => {
+      resize()
+      const w = canvas.clientWidth
+      const h = canvas.clientHeight
+      if (w === 0 || h === 0) { raf = requestAnimationFrame(loop); return }
+      const dt = Math.min((now - last) / 1000, 1 / 30)
+      last = now
+      const t = now / 1000
+      ctx.clearRect(0, 0, w, h)
+      const g = ctx.createLinearGradient(0, 0, 0, h)
+      g.addColorStop(0, '#2a1a4e')
+      g.addColorStop(0.6, '#241a52')
+      g.addColorStop(1, '#1a1033')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, w, h)
+
+      for (let i = 0; i < 26; i++) {
+        const sx = (i * 97.3) % w
+        const sy = (i * 53.7) % h
+        const a = 0.25 + 0.35 * Math.sin(t * 1.5 + i)
+        ctx.beginPath(); ctx.arc(sx, sy, 1.3, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(240, 235, 255, ${a})`; ctx.fill()
+      }
+
+      for (const it of items) {
+        it.x += it.vx * dt
+        it.y += it.vy * dt
+        it.rot += dt * 0.8
+        if (it.y < -20) { it.y = 1.05; it.x = Math.random() }
+        if (it.x < -0.05) it.x = 1.05
+        if (it.x > 1.05) it.x = -0.05
+        const px = it.x * w
+        const py = it.y * h
+        if (it.type === 0) drawPokeball(px, py, it.r, it.rot)
+        else if (it.type === 1) drawCoin(px, py, it.r * 0.8)
+        else drawStar(px, py, it.r, it.rot)
+      }
+
+      const glow = ctx.createLinearGradient(0, h - 6, 0, h)
+      glow.addColorStop(0, 'rgba(240,171,252,0.0)')
+      glow.addColorStop(1, 'rgba(240,171,252,0.45)')
+      ctx.fillStyle = glow
+      ctx.fillRect(0, h - 6, w, 6)
+
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  return <canvas ref={canvasRef} className="setup-hero-canvas" />
+}
+
+function drawPokeballSprite(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, rot: number): void {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(rot)
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI); ctx.fillStyle = '#f8fafc'; ctx.fill()
+  ctx.beginPath(); ctx.arc(0, 0, r, Math.PI, 0); ctx.fillStyle = '#ee3b2f'; ctx.fill()
+  ctx.fillStyle = '#1a1a2e'; ctx.fillRect(-r, -r * 0.12, r * 2, r * 0.24)
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.18, 0, Math.PI * 2); ctx.fillStyle = '#f8fafc'; ctx.fill()
+  ctx.restore()
+}
+
+function drawCoinSprite(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2)
+  ctx.fillStyle = '#ffcb05'; ctx.fill()
+  ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 2; ctx.stroke()
+  ctx.font = `bold ${r}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillStyle = '#7a5200'; ctx.fillText('$', x, y + 1)
+}
+
+function drawStarSprite(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, rot: number): void {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot)
+  ctx.beginPath()
+  for (let i = 0; i < 5; i++) {
+    const a1 = (i * Math.PI * 2) / 5 - Math.PI / 2
+    const a2 = a1 + Math.PI / 5
+    ctx.lineTo(Math.cos(a1) * r, Math.sin(a1) * r)
+    ctx.lineTo(Math.cos(a2) * r * 0.45, Math.sin(a2) * r * 0.45)
+  }
+  ctx.closePath()
+  ctx.fillStyle = '#f0abfc'; ctx.fill()
+  ctx.restore()
+}
+
+function TopbarCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    let raf = 0
+    let last = performance.now()
+
+    interface FloatItem { x: number; y: number; r: number; vx: number; type: number; rot: number }
+    const items: FloatItem[] = Array.from({ length: 12 }, (_, i) => ({
+      x: Math.random(),
+      y: 0.15 + Math.random() * 0.7,
+      r: 5 + Math.random() * 8,
+      vx: (0.015 + Math.random() * 0.04) * (i % 2 === 0 ? 1 : -1),
+      type: i % 3,
+      rot: Math.random() * Math.PI * 2,
+    }))
+
+    const resize = (): void => {
+      const rect = canvas.getBoundingClientRect()
+      const dpr = window.devicePixelRatio || 1
+      const w = Math.max(1, Math.floor(rect.width * dpr))
+      const h = Math.max(1, Math.floor(rect.height * dpr))
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w
+        canvas.height = h
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      }
+    }
+    resize()
+
+    const loop = (now: number): void => {
+      resize()
+      const w = canvas.clientWidth
+      const h = canvas.clientHeight
+      if (w === 0 || h === 0) { raf = requestAnimationFrame(loop); return }
+      const dt = Math.min((now - last) / 1000, 1 / 30)
+      last = now
+      const t = now / 1000
+      ctx.clearRect(0, 0, w, h)
+
+      const g = ctx.createLinearGradient(0, 0, 0, h)
+      g.addColorStop(0, 'rgba(42, 26, 78, 0.35)')
+      g.addColorStop(1, 'rgba(26, 16, 51, 0.6)')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, w, h)
+
+      for (let i = 0; i < 18; i++) {
+        const sx = (i * 83.7 + t * 12) % w
+        const sy = (i * 47.3) % h
+        const a = 0.2 + 0.3 * Math.sin(t * 1.6 + i)
+        ctx.beginPath(); ctx.arc(sx, sy, 1.1, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(240, 235, 255, ${a})`; ctx.fill()
+      }
+
+      ctx.globalAlpha = 0.55
+      for (const it of items) {
+        it.x += it.vx * dt
+        it.rot += dt * 0.7
+        if (it.x > 1.05) it.x = -0.05
+        if (it.x < -0.05) it.x = 1.05
+        const px = it.x * w
+        const py = it.y * h
+        if (it.type === 0) drawPokeballSprite(ctx, px, py, it.r, it.rot)
+        else if (it.type === 1) drawCoinSprite(ctx, px, py, it.r * 0.8)
+        else drawStarSprite(ctx, px, py, it.r, it.rot)
+      }
+      ctx.globalAlpha = 1
+
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  return <canvas ref={canvasRef} className="topbar-canvas" />
+}
+
 const difficultyNodeCounts: Record<Difficulty, number> = {
   easy: 5,
   medium: 10,
@@ -2552,6 +2787,15 @@ function MainApp() {
       label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : type === 'mega' ? `Mega #${id}` : type === 'gmax' ? `G-MAX #${id}` : type === 'primal' ? `Primal #${id}` : type === 'casino' ? `Casino #${id}` : type === 'rival' ? `Rival #${id}` : type === 'blackmarket' ? `Mercado Negro #${id}` : type === 'double' ? `Doble #${id}` : `Ruta ${id}`,
       done: false
     }
+  }
+
+  function handleStartRunClick(): void {
+    playClick()
+    if (coopMode) {
+      if (!coopSessionCode) { setCoopError('Primero crea o únete a una sesión cooperativa.'); return }
+      if (coopMyRole === 'a' && !coopPartnerJoined) { setCoopError('Espera a que tu compañero se una a la sesión.'); return }
+    }
+    startNewRun()
   }
 
   async function startNewRun(sameRoute = false): Promise<void> {
@@ -7333,6 +7577,7 @@ function MainApp() {
   return (
     <main className="app-shell">
       <header className="topbar">
+        <TopbarCanvas />
         <div className="left-toolbar">
           <button
             className="tiny-btn"
@@ -8642,18 +8887,29 @@ function MainApp() {
 
       {screen === 'setup' && (
         <section className="panel setup-panel">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2 style={{ margin: 0, fontSize: '0.75rem' }}>1. Selecciona la Generación</h2>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button className="cta" type="button" onClick={() => { playClick(); startNewRun() }} onMouseEnter={playHover} disabled={isLoading} style={{ padding: '6px 10px', fontSize: '0.8rem', marginTop: 0 }}>
-                {isLoading ? '...' : 'Iniciar Aventura'}
-              </button>
-              <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowMetaShop(true) }}>
-                🪙 Tienda Meta ({metaProgression.pokeCoins} 🪙)
-              </button>
+          <div className="setup-hero">
+            <SetupBanner />
+            <div className="setup-hero-overlay">
+              <div>
+                <h1 className="setup-hero-title">¡Bienvenido!</h1>
+                <p className="setup-hero-sub">Elige tu generación y dificultad para comenzar la aventura.</p>
+              </div>
+              <div className="setup-hero-actions">
+                <button className="cta setup-start" type="button" onClick={handleStartRunClick} onMouseEnter={playHover} disabled={isLoading}>
+                  {isLoading ? 'Cargando...' : '🚀 Iniciar Aventura'}
+                </button>
+                <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowMetaShop(true) }}>
+                  🪙 Tienda Meta ({metaProgression.pokeCoins} 🪙)
+                </button>
+              </div>
             </div>
           </div>
-          <div className="generation-grid">
+
+          <div className="setup-grid">
+            <div className="setup-col">
+              <div className="setup-card">
+                <h2 className="setup-card-title"><span className="setup-step">1</span> Selecciona la Generación</h2>
+                <div className="generation-grid">
             {generations.map((gen) => {
               const unlocked = isGenUnlocked(gen)
               const hardUnlocked = isHardUnlocked(gen)
@@ -8769,9 +9025,13 @@ function MainApp() {
               )
             })()}
           </div>
+              </div>
+            </div>
 
-          <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>2. Selecciona la Dificultad</h2>
-          <div className="generation-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="setup-col">
+              <div className="setup-card">
+                <h2 className="setup-card-title"><span className="setup-step">2</span> Selecciona la Dificultad</h2>
+          <div className="generation-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
             {(['easy', 'medium', 'hard'] as Difficulty[]).map((diff) => {
               const isHard = diff === 'hard'
               const hardUnlocked = isHardUnlocked(generation)
@@ -8924,9 +9184,11 @@ function MainApp() {
               )
             })()}
           </div>
+              </div>
 
-          <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>🤝 Cooperativo</h2>
-          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
+              <div className="setup-card">
+                <h2 className="setup-card-title">🤝 Cooperativo</h2>
+          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0' }}>
             {!coopMode ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', border: '1px solid #3f3f6e', borderRadius: '12px', background: 'rgba(15,23,42,0.6)' }}>
                 <p style={{ margin: '0', color: '#9b98cf', fontSize: '0.8rem' }}>
@@ -9018,11 +9280,17 @@ function MainApp() {
                 </p>
               </div>
             )}
-            {coopError && <p className="error-line" style={{ marginTop: '4px' }}>{coopError}</p>}
+              {coopError && <p className="error-line" style={{ marginTop: '4px' }}>{coopError}</p>}
+          </div>
+              </div>
+            </div>
           </div>
 
-          <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>⚔️ PvP 1vs1</h2>
-          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
+          <div className="setup-grid">
+            <div className="setup-col">
+              <div className="setup-card">
+                <h2 className="setup-card-title">⚔️ PvP 1vs1</h2>
+          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0' }}>
             <button
               className="gen-tile"
               type="button"
@@ -9035,8 +9303,12 @@ function MainApp() {
               </strong>
             </button>
           </div>
+              </div>
+            </div>
 
-          <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>3. Desafíos de Run <span className="muted" style={{ fontSize: '0.7rem', fontWeight: 'normal' }}>(opcional)</span></h2>
+            <div className="setup-col">
+              <div className="setup-card">
+                <h2 className="setup-card-title"><span className="setup-step">3</span> Desafíos de Run <span className="muted" style={{ fontSize: '0.6rem', fontWeight: 'normal' }}>(opcional)</span></h2>
           {(() => {
             // En Cooperativo y COLISEUM los desafíos están siempre disponibles.
             // En Infinite NO se permiten (siempre bloqueados). En el resto
@@ -9169,23 +9441,21 @@ function MainApp() {
               </div>
             )
           })()}
-
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '1.5rem' }}>
-            <button className="cta" onClick={() => {
-              playClick()
-              if (coopMode) {
-                if (!coopSessionCode) { setCoopError('Primero crea o únete a una sesión cooperativa.'); return }
-                if (coopMyRole === 'a' && !coopPartnerJoined) { setCoopError('Espera a que tu compañero se una a la sesión.'); return }
-              }
-              startNewRun()
-            }} onMouseEnter={playHover} type="button" disabled={isLoading}>
-              {isLoading ? 'Cargando PokeAPI...' : "Iniciar Aventura"}
-            </button>
-            <button className="secondary" onClick={() => { playClick(); setShowPokedex(true) }} onMouseEnter={playHover} type="button">
-              📖 Abrir Pokédex
-            </button>
+              </div>
+            </div>
           </div>
-          {apiError && <p className="error-line">{apiError}</p>}
+
+          <div className="setup-footer">
+            <button className="cta setup-start" onClick={handleStartRunClick} onMouseEnter={playHover} type="button" disabled={isLoading}>
+              {isLoading ? 'Cargando PokeAPI...' : '🚀 Iniciar Aventura'}
+            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button className="secondary" onClick={() => { playClick(); setShowPokedex(true) }} onMouseEnter={playHover} type="button">
+                📖 Abrir Pokédex
+              </button>
+            </div>
+            {apiError && <p className="error-line">{apiError}</p>}
+          </div>
         </section>
       )}
 
