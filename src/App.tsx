@@ -356,6 +356,90 @@ function TopbarCanvas() {
   return <canvas ref={canvasRef} className="topbar-canvas" />
 }
 
+function ResetLoadingScreen() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    let raf = 0
+    const start = performance.now()
+    const DURATION = 1500
+
+    const resize = (): void => {
+      const rect = canvas.getBoundingClientRect()
+      const dpr = window.devicePixelRatio || 1
+      const w = Math.max(1, Math.floor(rect.width * dpr))
+      const h = Math.max(1, Math.floor(rect.height * dpr))
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w
+        canvas.height = h
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      }
+    }
+    resize()
+
+    const loop = (now: number): void => {
+      resize()
+      const w = canvas.clientWidth
+      const h = canvas.clientHeight
+      if (w === 0 || h === 0) { raf = requestAnimationFrame(loop); return }
+      const elapsed = now - start
+      const prog = Math.min(1, elapsed / DURATION)
+      const t = now / 1000
+
+      ctx.clearRect(0, 0, w, h)
+      const g = ctx.createLinearGradient(0, 0, 0, h)
+      g.addColorStop(0, '#2a1a4e')
+      g.addColorStop(1, '#1a1033')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, w, h)
+
+      for (let i = 0; i < 20; i++) {
+        const sx = (i * 83.7) % w
+        const sy = (i * 47.3) % h
+        const a = 0.25 + 0.35 * Math.sin(t * 1.5 + i)
+        ctx.beginPath(); ctx.arc(sx, sy, 1.2, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(240, 235, 255, ${a})`; ctx.fill()
+      }
+
+      const cx = w / 2
+      const cy = h / 2 - 34
+      ctx.beginPath(); ctx.arc(cx, cy, 46, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'
+      ctx.fill()
+      ctx.beginPath(); ctx.arc(cx, cy, 46, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(240,171,252,0.4)'
+      ctx.lineWidth = 3
+      ctx.stroke()
+      drawPokeballSprite(ctx, cx, cy, 30, t * 2.6)
+
+      const barW = Math.min(240, w - 80)
+      const barX = (w - barW) / 2
+      const barY = cy + 58
+      ctx.fillStyle = 'rgba(0,0,0,0.45)'
+      ctx.fillRect(barX, barY, barW, 12)
+      ctx.fillStyle = '#34d399'
+      ctx.fillRect(barX, barY, barW * prog, 12)
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)'
+      ctx.lineWidth = 1
+      ctx.strokeRect(barX, barY, barW, 12)
+      ctx.font = 'bold 13px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillStyle = '#f3f1ff'
+      ctx.fillText(`${Math.round(prog * 100)}%`, w / 2, barY + 34)
+
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  return <canvas ref={canvasRef} className="reset-loading-canvas" />
+}
+
 const difficultyNodeCounts: Record<Difficulty, number> = {
   easy: 5,
   medium: 10,
@@ -1885,6 +1969,7 @@ function MainApp() {
   const [secretAddError, setSecretAddError] = useState('')
   const [showAchievements, setShowAchievements] = useState<boolean>(false)
   const [showMinigamePractice, setShowMinigamePractice] = useState<boolean>(false)
+  const [showResetModal, setShowResetModal] = useState<boolean>(false)
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null)
   const [shinyNextEncounter, setShinyNextEncounter] = useState<boolean>(false)
   const dailySeed = (() => {
@@ -2974,7 +3059,7 @@ function MainApp() {
         let megaPosition: number | null = null
         let gmaxPosition: number | null = null
         let primalPosition: number | null = null
-        let casinoPosition: number | null = null
+        const casinoPositions: number[] = []
         if (!activeChallenges.allTeamRocket) {
           if (effectiveDifficulty === 'hard') {
             const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
@@ -3009,10 +3094,12 @@ function MainApp() {
               primalPosition = available[idx]
               available.splice(idx, 1)
             }
-            if (available.length > 0 && metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node')) {
-              const idx = Math.floor(rr() * available.length)
-              casinoPosition = available[idx]
-              available.splice(idx, 1)
+            if (metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node')) {
+              while (casinoPositions.length < 2 && available.length > 0) {
+                const idx = Math.floor(rr() * available.length)
+                casinoPositions.push(available[idx])
+                available.splice(idx, 1)
+              }
             }
           } else if (effectiveDifficulty === 'medium') {
             const available = Array.from({ length: totalNodes - 2 }, (_, k) => k + 2)
@@ -3047,7 +3134,7 @@ function MainApp() {
             type = 'gmax'
           } else if (primalPosition !== null && i === primalPosition) {
             type = 'primal'
-          } else if (casinoPosition !== null && i === casinoPosition) {
+          } else if (casinoPositions.includes(i)) {
             type = 'casino'
           } else if (activeChallenges.bossRush) {
             type = 'battle'
@@ -3467,6 +3554,23 @@ function MainApp() {
                   nr.push(generateRandomNodeType(startId + i, routeRandRef.current))
                 }
                 nr.push({ id: startId + totalNodesPerStage - 1, label: `Jefe #${startId + totalNodesPerStage - 1}`, type: 'boss', done: false })
+                // En dificultad Difícil, garantizar 2 nodos de Casino por etapa.
+                if (
+                  difficulty === 'hard' &&
+                  !runChallenges.allTeamRocket &&
+                  metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node') &&
+                  nr.length > 2
+                ) {
+                  const candidates = nr.map((_, idx) => idx).filter(idx => idx < nr.length - 1 && nr[idx].type !== 'boss')
+                  const rr = routeRandRef.current
+                  let placed = 0
+                  while (placed < 2 && candidates.length > 0) {
+                    const idx = Math.floor(rr() * candidates.length)
+                    const pos = candidates.splice(idx, 1)[0]
+                    nr[pos] = { ...nr[pos], id: nr[pos].id, type: 'casino', label: `Casino #${nr[pos].id}`, done: false }
+                    placed++
+                  }
+                }
                 return nr
               })()
           setRoute(newRoute)
@@ -7538,6 +7642,40 @@ function MainApp() {
     }
   }
 
+  // Tecla R dentro de una aventura: muestra un modal de carga y resetea la run
+  // con nodos nuevos (empieza de cero pero mantiene generación/dificultad/desafíos).
+  const resetPendingRef = useRef(false)
+  const startNewRunRef = useRef(startNewRun)
+  startNewRunRef.current = startNewRun
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key.toLowerCase() !== 'r' || e.ctrlKey || e.metaKey || e.altKey) return
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (document.querySelector('.modal-backdrop')) return
+      if (coopModeRef.current) return
+      if (isDailyRunRef.current) return
+      const adventure =
+        screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' ||
+        screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' ||
+        screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double' ||
+        screen === 'casino'
+      if (!adventure) return
+      if (resetPendingRef.current) return
+      resetPendingRef.current = true
+      playClick()
+      setShowResetModal(true)
+      setTimeout(() => {
+        setShowResetModal(false)
+        resetPendingRef.current = false
+        void startNewRunRef.current(false)
+      }, 1500)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [screen])
+
   function closeOptions(): void {
     const wasInBattle = optionsBeganInBattle.current
     optionsBeganInBattle.current = false
@@ -10907,9 +11045,11 @@ function MainApp() {
             <button className="cta" onClick={resetToSetup} type="button">
               Iniciar otra partida
             </button>
-            <button className="cta" onClick={() => { playClick(); void restartRun() }} type="button" style={{ background: '#37d16b', color: '#12122b' }}>
-              🔄 Reiniciar
-            </button>
+            {!isDailyRunRef.current && (
+              <button className="cta" onClick={() => { playClick(); void restartRun() }} type="button" style={{ background: '#37d16b', color: '#12122b' }}>
+                🔄 Reiniciar
+              </button>
+            )}
           </div>
         </section>
       )}
@@ -10988,9 +11128,11 @@ function MainApp() {
             <button className="cta" onClick={resetToSetup} type="button">
               Volver al menú principal
             </button>
-            <button className="cta" onClick={() => { playClick(); void restartRun() }} type="button" style={{ background: '#37d16b', color: '#12122b' }}>
-              🔄 Reiniciar
-            </button>
+            {!isDailyRunRef.current && (
+              <button className="cta" onClick={() => { playClick(); void restartRun() }} type="button" style={{ background: '#37d16b', color: '#12122b' }}>
+                🔄 Reiniciar
+              </button>
+            )}
           </div>
         </section>
       )}
@@ -11231,6 +11373,55 @@ function MainApp() {
             </div>
             <div style={{ textAlign: 'center', marginTop: '1rem' }}>
               <button className="cta" onClick={() => setShowAchievements(false)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de reset (tecla R) */}
+      {showResetModal && (
+        <div className="modal-backdrop" style={{ cursor: 'wait' }}>
+          <div
+            style={{
+              position: 'relative',
+              width: 'min(90vw, 400px)',
+              height: '270px',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              border: '3px solid #f0abfc',
+              boxShadow: '0 0 40px rgba(240,171,252,0.5)',
+              animation: 'casinoFadeIn 0.2s ease',
+            }}
+          >
+            <ResetLoadingScreen />
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                paddingBottom: '18px',
+                pointerEvents: 'none',
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  color: '#f0abfc',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  fontFamily: 'var(--font-title)',
+                }}
+              >
+                Reiniciando run...
+              </p>
+              <p style={{ margin: '4px 0 0', color: '#9b98cf', fontSize: '0.8rem' }}>
+                Generando nuevos nodos
+              </p>
             </div>
           </div>
         </div>
