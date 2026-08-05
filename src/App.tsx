@@ -627,118 +627,118 @@ const PRIMAL_FORM_IDS: Record<number, number> = {
 }
 
 const ACHIEVEMENTS: Achievement[] = [
-  { id: 'first_win', name: 'Primera Victoria', desc: 'Gana tu primera partida', icon: '🏆', hidden: false },
-  { id: 'streak_3', name: 'En Racha', desc: 'Gana 3 partidas seguidas', icon: '🔥', hidden: false },
-  { id: 'streak_5', name: 'Incombustible', desc: 'Gana 5 partidas seguidas', icon: '🌋', hidden: false },
-  { id: 'streak_10', name: 'Leyenda Viva', desc: 'Gana 10 partidas seguidas', icon: '👑', hidden: false },
-  { id: 'nuzlocke_win', name: 'Superviviente', desc: 'Gana una partida con Nuzlocke', icon: '💀', hidden: false },
-  { id: 'solo_win', name: 'Uno Contra Todos', desc: 'Gana con solo 1 Pokémon en el equipo', icon: '⭐', hidden: false },
-  { id: 'speedrun_win', name: 'Relámpago', desc: 'Gana una partida con Speedrun activo', icon: '⚡', hidden: false },
-  { id: 'no_item_win', name: 'Purista', desc: 'Gana sin usar items', icon: '🚫', hidden: false },
-  { id: 'ironman_win', name: 'Invencible', desc: 'Gana una partida Ironman', icon: '🛡️', hidden: false },
-  { id: 'perfect_battle', name: 'Flawless', desc: 'Gana un combate sin recibir daño', icon: '✨', hidden: false },
-  { id: 'one_shot', name: 'Golpe Definitivo', desc: 'Derrota a un Pokémon enemigo en 1 golpe', icon: '💥', hidden: false },
-  { id: 'comeback', name: 'Resurgir', desc: 'Gana un combate con solo 1 Pokémon con ≤10% HP', icon: '❤️‍🔥', hidden: false },
-  { id: 'collector_10', name: 'Coleccionista', desc: 'Captura 10 Pokémon en una partida', icon: '📦', hidden: false },
-  { id: 'collector_25', name: 'Maestro Pokédex', desc: 'Captura 25 Pokémon en una partida', icon: '📖', hidden: false },
-  { id: 'rich', name: 'Magnate', desc: 'Acumula $999 en una partida', icon: '💰', hidden: false },
-  { id: 'crit_master', name: 'Crítico Nato', desc: 'Lanza 5 golpes críticos en una partida', icon: '🎯', hidden: false },
-  { id: 'all_gens', name: 'Viajero Multiversal', desc: 'Gana al menos 1 partida en cada generación', icon: '🌍', hidden: false },
-  { id: 'infinite_20', name: 'Infinito y Más Allá', desc: 'Llega al nodo 20 en modo Infinite', icon: '🚀', hidden: false },
-  { id: 'shiny_catch', name: 'Afortunado', desc: 'Captura un Pokémon shiny', icon: '✨', hidden: false },
-  { id: 'legendary_catch', name: 'Cazador de Leyendas', desc: 'Captura un Pokémon con BST ≥ 600', icon: '🐉', hidden: false },
-  { id: 'daily_3', name: 'Habitual', desc: 'Juega desafíos diarios', icon: '📅', hidden: false },
-  { id: 'meta_100', name: 'Inversor', desc: 'Acumula 100 PokéCoins', icon: '🪙', hidden: false },
-  { id: 'boss_rush_win', name: 'Rush Total', desc: 'Gana una partida Boss Rush', icon: '🏆', hidden: false },
-  { id: 'hard_win', name: 'Veterano', desc: 'Gana una partida en dificultad Hard', icon: '🎖️', hidden: false },
-  { id: 'gauntlet_win', name: 'Gauntlet Master', desc: 'Gana una partida Challenge Gauntlet', icon: '🎯', hidden: false },
-  { id: 'synergy_master', name: 'Maestro de Sinergias', desc: 'Activa una sinergia de items', icon: '🔗', hidden: false },
-  { id: 'super_effective_10', name: 'Tierra de Nadie', desc: 'Landa 10 golpes supereficaces en una partida', icon: '🌿', hidden: false },
-  { id: 'big_spender', name: 'Derrochador', desc: 'Gasta $500 en tiendas en una partida', icon: '💸', hidden: false },
-  { id: 'rookie', name: 'Novato', desc: 'Gana una partida en dificultad Fácil', icon: '🐣', hidden: false },
-  { id: 'infinite_50', name: 'Sin Límites', desc: 'Llega al nodo 50 en modo Infinite', icon: '🌌', hidden: false },
-  { id: 'full_team', name: 'Equipo Completo', desc: 'Gana con 6 Pokémon en el equipo', icon: '🤝', hidden: false },
-  { id: 'battle_20', name: 'Veterano de Guerra', desc: 'Gana 20 combates en una partida', icon: '⚔️', hidden: false },
-  { id: 'item_user_10', name: 'Experimentado', desc: 'Usa 10 objetos en una partida', icon: '🧪', hidden: false },
-  { id: 'gambler', name: 'Jugador', desc: 'Gana un nodo Spin', icon: '🎰', hidden: false },
-  { id: 'pokeRand_master', name: 'Maestro Aleatorio', desc: 'Gana un nodo PokeRand', icon: '🎲', hidden: false },
-  { id: 'streak_15', name: 'Racha Imparable', desc: 'Gana 15 partidas seguidas', icon: '🔥', hidden: false },
-  { id: 'streak_20', name: 'Leyenda de Racha', desc: 'Gana 20 partidas seguidas', icon: '🔥', hidden: false },
-  { id: 'streak_25', name: 'Dios de la Racha', desc: 'Gana 25 partidas seguidas', icon: '🔥', hidden: false },
-  { id: 'battle_50', name: 'Comandante', desc: 'Gana 50 combates en una partida', icon: '⚔️', hidden: false },
-  { id: 'battle_100', name: 'General', desc: 'Gana 100 combates en una partida', icon: '⚔️', hidden: false },
-  { id: 'battle_200', name: 'Estratega', desc: 'Gana 200 combates en una partida', icon: '⚔️', hidden: false },
-  { id: 'battle_500', name: 'Conquistador', desc: 'Gana 500 combates en una partida', icon: '⚔️', hidden: false },
-  { id: 'damage_1000', name: 'Aprendiz de Daño', desc: 'Inflige 1000 de daño en una partida', icon: '💥', hidden: false },
-  { id: 'damage_5000', name: 'Especialista en Daño', desc: 'Inflige 5000 de daño en una partida', icon: '💥', hidden: false },
-  { id: 'damage_10000', name: 'Maestro del Daño', desc: 'Inflige 10000 de daño en una partida', icon: '💥', hidden: false },
-  { id: 'damage_50000', name: 'Dios del Daño', desc: 'Inflige 50000 de daño en una partida', icon: '💥', hidden: false },
-  { id: 'tank_500', name: 'Escudo Humano', desc: 'Recibe 500 de daño en una partida', icon: '🛡️', hidden: false },
-  { id: 'tank_1000', name: 'Muro Viviente', desc: 'Recibe 1000 de daño en una partida', icon: '🛡️', hidden: false },
-  { id: 'crit_10', name: 'Crítico Frecuente', desc: 'Lanza 10 golpes críticos en una partida', icon: '🎯', hidden: false },
-  { id: 'crit_20', name: 'Crítico Experto', desc: 'Lanza 20 golpes críticos en una partida', icon: '🎯', hidden: false },
-  { id: 'crit_50', name: 'Crítico Legendario', desc: 'Lanza 50 golpes críticos en una partida', icon: '🎯', hidden: false },
-  { id: 'super_effective_25', name: 'Eficaz Mejorado', desc: 'Acierta 25 golpes supereficaces', icon: '🌿', hidden: false },
-  { id: 'super_effective_50', name: 'Súper Eficaz', desc: 'Acierta 50 golpes supereficaces', icon: '🌿', hidden: false },
-  { id: 'super_effective_100', name: 'Maestro de Tipos', desc: 'Acierta 100 golpes supereficaces', icon: '🌿', hidden: false },
-  { id: 'one_shot_5', name: 'Fulminante', desc: 'Derrota 5 Pokémon de 1 golpe', icon: '💥', hidden: false },
-  { id: 'one_shot_10', name: 'Aniquilador', desc: 'Derrota 10 Pokémon de 1 golpe', icon: '💥', hidden: false },
-  { id: 'collector_50', name: 'Acumulador', desc: 'Captura 50 Pokémon en una partida', icon: '📦', hidden: false },
-  { id: 'item_user_25', name: 'Dependiente', desc: 'Usa 25 objetos en una partida', icon: '🧪', hidden: false },
-  { id: 'item_user_50', name: 'Farmacéutico', desc: 'Usa 50 objetos en una partida', icon: '🧪', hidden: false },
-  { id: 'rich_5000', name: 'Millonario', desc: 'Acumula $5000 en una partida', icon: '💰', hidden: false },
-  { id: 'rich_10000', name: 'Magnate Global', desc: 'Acumula $10000 en una partida', icon: '💰', hidden: false },
-  { id: 'rich_50000', name: 'Croesus', desc: 'Acumula $50000 en una partida', icon: '💰', hidden: false },
-  { id: 'spender_1000', name: 'Gastador', desc: 'Gasta $1000 en tiendas en una partida', icon: '💸', hidden: false },
-  { id: 'spender_5000', name: 'Derrochador Élite', desc: 'Gasta $5000 en tiendas en una partida', icon: '💸', hidden: false },
-  { id: 'nodes_30', name: 'Explorador', desc: 'Limpia 30 nodos en una partida', icon: '🚶', hidden: false },
-  { id: 'nodes_50', name: 'Aventurero', desc: 'Limpia 50 nodos en una partida', icon: '🚶', hidden: false },
-  { id: 'nodes_100', name: 'Leyenda del Camino', desc: 'Limpia 100 nodos en una partida', icon: '🚶', hidden: false },
-  { id: 'infinite_100', name: 'Infinito Profundo', desc: 'Llega al nodo 100 en modo Infinite', icon: '🌌', hidden: false },
-  { id: 'total_wins_5', name: 'Victorioso', desc: 'Gana 5 partidas en total', icon: '🏆', hidden: false },
-  { id: 'total_wins_10', name: 'Campeón Recurrente', desc: 'Gana 10 partidas en total', icon: '🏆', hidden: false },
-  { id: 'total_wins_25', name: 'Leyenda Viva', desc: 'Gana 25 partidas en total', icon: '🏆', hidden: false },
-  { id: 'total_wins_50', name: 'Inmortal', desc: 'Gana 50 partidas en total', icon: '🏆', hidden: false },
-  { id: 'total_runs_10', name: 'Jugador Dedicado', desc: 'Juega 10 partidas en total', icon: '🎮', hidden: false },
-  { id: 'total_runs_25', name: 'Veterano', desc: 'Juega 25 partidas en total', icon: '🎮', hidden: false },
-  { id: 'total_runs_50', name: 'Adicto', desc: 'Juega 50 partidas en total', icon: '🎮', hidden: false },
-  { id: 'meta_500', name: 'Coleccionista de Monedas', desc: 'Acumula 500 PokéCoins', icon: '🪙', hidden: false },
-  { id: 'meta_1000', name: 'Inversor Mayorista', desc: 'Acumula 1000 PokéCoins', icon: '🪙', hidden: false },
-  { id: 'meta_5000', name: 'Tiburón Financiero', desc: 'Acumula 5000 PokéCoins', icon: '🪙', hidden: false },
-  { id: 'medium_win', name: 'Competente', desc: 'Gana en dificultad Media', icon: '🥈', hidden: false },
-  { id: 'noShops_win', name: 'Ermitaño', desc: 'Gana con el desafío Sin Tiendas', icon: '🏪', hidden: false },
-  { id: 'noRests_win', name: 'Insomne', desc: 'Gana con el desafío Sin Descanso', icon: '🛌', hidden: false },
-  { id: 'allShiny_win', name: 'Brillante', desc: 'Gana con el desafío Todos Shiny', icon: '✨', hidden: false },
-  { id: 'noMoney_win', name: 'Pobreza', desc: 'Gana con el desafío Sin Dinero', icon: '💸', hidden: false },
-  { id: 'egglocke_win', name: 'Criador', desc: 'Gana con el desafío Egglocke', icon: '🥚', hidden: false },
-  { id: 'nuzlockeHC_win', name: 'Superviviente Extremo', desc: 'Gana con Nuzlocke Hardcore', icon: '💀', hidden: false },
-  { id: 'noHeal_win', name: 'Autosuficiente', desc: 'Gana con el desafío Sin Curación', icon: '🚑', hidden: false },
-  { id: 'allTeamRocket_win', name: 'Team Rocket Forever', desc: 'Gana con el desafío Todo Team Rocket', icon: '🔴', hidden: false },
-  { id: 'triple_challenge', name: 'Tres Retos', desc: 'Gana con 3 desafíos activos', icon: '🎯', hidden: false },
-  { id: 'challenge_mania', name: 'Manía de Retos', desc: 'Gana con 5+ desafíos activos', icon: '🎯', hidden: false },
-  { id: 'team_diversity_10', name: 'Versátil', desc: 'Usa 10 Pokémon diferentes en una partida', icon: '🔄', hidden: false },
-  { id: 'team_diversity_20', name: 'Polivalente', desc: 'Usa 20 Pokémon diferentes en una partida', icon: '🔄', hidden: false },
-  { id: 'total_turns_500', name: 'Paciente', desc: 'Juega 500 turnos en una partida', icon: '⌛', hidden: false },
-  { id: 'total_turns_1000', name: 'Táctico', desc: 'Juega 1000 turnos en una partida', icon: '⌛', hidden: false },
-  { id: 'back_from_brink', name: 'Al Límite', desc: 'Gana un combate con 1 HP restante', icon: '❤️‍🔥', hidden: false },
-  { id: 'first_try', name: 'Novato con Suerte', desc: 'Gana tu primera partida', icon: '🍀', hidden: false },
-  { id: 'hoarder_15', name: 'Acaparador', desc: 'Ten 15 objetos en el inventario', icon: '📦', hidden: false },
-  { id: 'evolution_master', name: 'Evolucionador', desc: 'Evoluciona 5 Pokémon en una partida', icon: '🌀', hidden: false },
-  { id: 'first_mega', name: 'Mega Evolución', desc: 'Mega-evoluciona un Pokémon por primera vez', icon: '💎', hidden: false },
-  { id: 'mega_win', name: 'Poder Mega', desc: 'Gana una partida usando megaevolución', icon: '💎', hidden: false },
-  { id: 'mega_master', name: 'Maestro Mega', desc: 'Mega-evoluciona 10 Pokémon en total', icon: '🔮', hidden: false },
-  { id: 'first_gmax', name: 'Gigamax', desc: 'Gigamaxima un Pokémon por primera vez', icon: '⚡', hidden: false },
-  { id: 'gmax_win', name: 'Poder Gigamax', desc: 'Gana una partida usando Gigamax', icon: '⚡', hidden: false },
-  { id: 'gmax_master', name: 'Maestro Gigamax', desc: 'Gigamaxima 10 Pokémon en total', icon: '🌟', hidden: false },
-  { id: 'coop_first_run', name: 'Compañero de Viaje', desc: 'Juega tu primera partida en cooperativo', icon: '🤝', hidden: false },
-  { id: 'coop_win', name: 'Victoria Compartida', desc: 'Gana una partida en cooperativo', icon: '🏆', hidden: false },
-  { id: 'coop_wins_5', name: 'Equipo Confiable', desc: 'Gana 5 partidas cooperativas', icon: '🫱🏻‍🫲🏽', hidden: false },
-  { id: 'coop_wins_10', name: 'Equipo Legendario', desc: 'Gana 10 partidas cooperativas', icon: '👥', hidden: false },
-  { id: 'coop_first_trade', name: 'Primer Trueque', desc: 'Completa tu primer intercambio en cooperativo', icon: '🔄', hidden: false },
-  { id: 'coop_trades_5', name: 'Trueques Frecuentes', desc: 'Completa 5 intercambios en total', icon: '🤝', hidden: false },
-  { id: 'coop_trades_10', name: 'Mercader Cooperativo', desc: 'Completa 10 intercambios en total', icon: '💼', hidden: false },
-  { id: 'coop_hard_win', name: 'Dúo Imparable', desc: 'Gana una partida cooperativa en dificultad Difícil', icon: '⚡', hidden: false },
-  { id: 'meta_complete', name: 'Magnate del PokéShop', desc: 'Compra todos los objetos de la Tienda Meta', icon: '🛍️', hidden: false },
+  { id: 'first_win', name: 'Primera Victoria', desc: 'Gana tu primera partida', icon: '🏆', hidden: false, reward: 15 },
+  { id: 'streak_3', name: 'En Racha', desc: 'Gana 3 partidas seguidas', icon: '🔥', hidden: false, reward: 25 },
+  { id: 'streak_5', name: 'Incombustible', desc: 'Gana 5 partidas seguidas', icon: '🌋', hidden: false, reward: 40 },
+  { id: 'streak_10', name: 'Leyenda Viva', desc: 'Gana 10 partidas seguidas', icon: '👑', hidden: false, reward: 60 },
+  { id: 'nuzlocke_win', name: 'Superviviente', desc: 'Gana una partida con Nuzlocke', icon: '💀', hidden: false, reward: 60 },
+  { id: 'solo_win', name: 'Uno Contra Todos', desc: 'Gana con solo 1 Pokémon en el equipo', icon: '⭐', hidden: false, reward: 100 },
+  { id: 'speedrun_win', name: 'Relámpago', desc: 'Gana una partida con Speedrun activo', icon: '⚡', hidden: false, reward: 60 },
+  { id: 'no_item_win', name: 'Purista', desc: 'Gana sin usar items', icon: '🚫', hidden: false, reward: 60 },
+  { id: 'ironman_win', name: 'Invencible', desc: 'Gana una partida Ironman', icon: '🛡️', hidden: false, reward: 60 },
+  { id: 'perfect_battle', name: 'Flawless', desc: 'Gana un combate sin recibir daño', icon: '✨', hidden: false, reward: 40 },
+  { id: 'one_shot', name: 'Golpe Definitivo', desc: 'Derrota a un Pokémon enemigo en 1 golpe', icon: '💥', hidden: false, reward: 15 },
+  { id: 'comeback', name: 'Resurgir', desc: 'Gana un combate con solo 1 Pokémon con ≤10% HP', icon: '❤️‍🔥', hidden: false, reward: 25 },
+  { id: 'collector_10', name: 'Coleccionista', desc: 'Captura 10 Pokémon en una partida', icon: '📦', hidden: false, reward: 15 },
+  { id: 'collector_25', name: 'Maestro Pokédex', desc: 'Captura 25 Pokémon en una partida', icon: '📖', hidden: false, reward: 40 },
+  { id: 'rich', name: 'Magnate', desc: 'Acumula $999 en una partida', icon: '💰', hidden: false, reward: 25 },
+  { id: 'crit_master', name: 'Crítico Nato', desc: 'Lanza 5 golpes críticos en una partida', icon: '🎯', hidden: false, reward: 25 },
+  { id: 'all_gens', name: 'Viajero Multiversal', desc: 'Gana al menos 1 partida en cada generación', icon: '🌍', hidden: false, reward: 40 },
+  { id: 'infinite_20', name: 'Infinito y Más Allá', desc: 'Llega al nodo 20 en modo Infinite', icon: '🚀', hidden: false, reward: 40 },
+  { id: 'shiny_catch', name: 'Afortunado', desc: 'Captura un Pokémon shiny', icon: '✨', hidden: false, reward: 25 },
+  { id: 'legendary_catch', name: 'Cazador de Leyendas', desc: 'Captura un Pokémon con BST ≥ 600', icon: '🐉', hidden: false, reward: 40 },
+  { id: 'daily_3', name: 'Habitual', desc: 'Juega desafíos diarios', icon: '📅', hidden: false, reward: 15 },
+  { id: 'meta_100', name: 'Inversor', desc: 'Acumula 100 PokéCoins', icon: '🪙', hidden: false, reward: 25 },
+  { id: 'boss_rush_win', name: 'Rush Total', desc: 'Gana una partida Boss Rush', icon: '🏆', hidden: false, reward: 25 },
+  { id: 'hard_win', name: 'Veterano', desc: 'Gana una partida en dificultad Hard', icon: '🎖️', hidden: false, reward: 25 },
+  { id: 'gauntlet_win', name: 'Gauntlet Master', desc: 'Gana una partida Challenge Gauntlet', icon: '🎯', hidden: false, reward: 40 },
+  { id: 'synergy_master', name: 'Maestro de Sinergias', desc: 'Activa una sinergia de items', icon: '🔗', hidden: false, reward: 15 },
+  { id: 'super_effective_10', name: 'Tierra de Nadie', desc: 'Landa 10 golpes supereficaces en una partida', icon: '🌿', hidden: false, reward: 15 },
+  { id: 'big_spender', name: 'Derrochador', desc: 'Gasta $500 en tiendas en una partida', icon: '💸', hidden: false, reward: 15 },
+  { id: 'rookie', name: 'Novato', desc: 'Gana una partida en dificultad Fácil', icon: '🐣', hidden: false, reward: 15 },
+  { id: 'infinite_50', name: 'Sin Límites', desc: 'Llega al nodo 50 en modo Infinite', icon: '🌌', hidden: false, reward: 60 },
+  { id: 'full_team', name: 'Equipo Completo', desc: 'Gana con 6 Pokémon en el equipo', icon: '🤝', hidden: false, reward: 15 },
+  { id: 'battle_20', name: 'Veterano de Guerra', desc: 'Gana 20 combates en una partida', icon: '⚔️', hidden: false, reward: 25 },
+  { id: 'item_user_10', name: 'Experimentado', desc: 'Usa 10 objetos en una partida', icon: '🧪', hidden: false, reward: 15 },
+  { id: 'gambler', name: 'Jugador', desc: 'Gana un nodo Spin', icon: '🎰', hidden: false, reward: 15 },
+  { id: 'pokeRand_master', name: 'Maestro Aleatorio', desc: 'Gana un nodo PokeRand', icon: '🎲', hidden: false, reward: 15 },
+  { id: 'streak_15', name: 'Racha Imparable', desc: 'Gana 15 partidas seguidas', icon: '🔥', hidden: false, reward: 100 },
+  { id: 'streak_20', name: 'Leyenda de Racha', desc: 'Gana 20 partidas seguidas', icon: '🔥', hidden: false, reward: 200 },
+  { id: 'streak_25', name: 'Dios de la Racha', desc: 'Gana 25 partidas seguidas', icon: '🔥', hidden: false, reward: 250 },
+  { id: 'battle_50', name: 'Comandante', desc: 'Gana 50 combates en una partida', icon: '⚔️', hidden: false, reward: 40 },
+  { id: 'battle_100', name: 'General', desc: 'Gana 100 combates en una partida', icon: '⚔️', hidden: false, reward: 60 },
+  { id: 'battle_200', name: 'Estratega', desc: 'Gana 200 combates en una partida', icon: '⚔️', hidden: false, reward: 100 },
+  { id: 'battle_500', name: 'Conquistador', desc: 'Gana 500 combates en una partida', icon: '⚔️', hidden: false, reward: 250 },
+  { id: 'damage_1000', name: 'Aprendiz de Daño', desc: 'Inflige 1000 de daño en una partida', icon: '💥', hidden: false, reward: 25 },
+  { id: 'damage_5000', name: 'Especialista en Daño', desc: 'Inflige 5000 de daño en una partida', icon: '💥', hidden: false, reward: 40 },
+  { id: 'damage_10000', name: 'Maestro del Daño', desc: 'Inflige 10000 de daño en una partida', icon: '💥', hidden: false, reward: 60 },
+  { id: 'damage_50000', name: 'Dios del Daño', desc: 'Inflige 50000 de daño en una partida', icon: '💥', hidden: false, reward: 100 },
+  { id: 'tank_500', name: 'Escudo Humano', desc: 'Recibe 500 de daño en una partida', icon: '🛡️', hidden: false, reward: 25 },
+  { id: 'tank_1000', name: 'Muro Viviente', desc: 'Recibe 1000 de daño en una partida', icon: '🛡️', hidden: false, reward: 40 },
+  { id: 'crit_10', name: 'Crítico Frecuente', desc: 'Lanza 10 golpes críticos en una partida', icon: '🎯', hidden: false, reward: 40 },
+  { id: 'crit_20', name: 'Crítico Experto', desc: 'Lanza 20 golpes críticos en una partida', icon: '🎯', hidden: false, reward: 60 },
+  { id: 'crit_50', name: 'Crítico Legendario', desc: 'Lanza 50 golpes críticos en una partida', icon: '🎯', hidden: false, reward: 100 },
+  { id: 'super_effective_25', name: 'Eficaz Mejorado', desc: 'Acierta 25 golpes supereficaces', icon: '🌿', hidden: false, reward: 25 },
+  { id: 'super_effective_50', name: 'Súper Eficaz', desc: 'Acierta 50 golpes supereficaces', icon: '🌿', hidden: false, reward: 40 },
+  { id: 'super_effective_100', name: 'Maestro de Tipos', desc: 'Acierta 100 golpes supereficaces', icon: '🌿', hidden: false, reward: 60 },
+  { id: 'one_shot_5', name: 'Fulminante', desc: 'Derrota 5 Pokémon de 1 golpe', icon: '💥', hidden: false, reward: 40 },
+  { id: 'one_shot_10', name: 'Aniquilador', desc: 'Derrota 10 Pokémon de 1 golpe', icon: '💥', hidden: false, reward: 60 },
+  { id: 'collector_50', name: 'Acumulador', desc: 'Captura 50 Pokémon en una partida', icon: '📦', hidden: false, reward: 60 },
+  { id: 'item_user_25', name: 'Dependiente', desc: 'Usa 25 objetos en una partida', icon: '🧪', hidden: false, reward: 25 },
+  { id: 'item_user_50', name: 'Farmacéutico', desc: 'Usa 50 objetos en una partida', icon: '🧪', hidden: false, reward: 40 },
+  { id: 'rich_5000', name: 'Millonario', desc: 'Acumula $5000 en una partida', icon: '💰', hidden: false, reward: 40 },
+  { id: 'rich_10000', name: 'Magnate Global', desc: 'Acumula $10000 en una partida', icon: '💰', hidden: false, reward: 60 },
+  { id: 'rich_50000', name: 'Croesus', desc: 'Acumula $50000 en una partida', icon: '💰', hidden: false, reward: 100 },
+  { id: 'spender_1000', name: 'Gastador', desc: 'Gasta $1000 en tiendas en una partida', icon: '💸', hidden: false, reward: 40 },
+  { id: 'spender_5000', name: 'Derrochador Élite', desc: 'Gasta $5000 en tiendas en una partida', icon: '💸', hidden: false, reward: 60 },
+  { id: 'nodes_30', name: 'Explorador', desc: 'Limpia 30 nodos en una partida', icon: '🚶', hidden: false, reward: 25 },
+  { id: 'nodes_50', name: 'Aventurero', desc: 'Limpia 50 nodos en una partida', icon: '🚶', hidden: false, reward: 40 },
+  { id: 'nodes_100', name: 'Leyenda del Camino', desc: 'Limpia 100 nodos en una partida', icon: '🚶', hidden: false, reward: 60 },
+  { id: 'infinite_100', name: 'Infinito Profundo', desc: 'Llega al nodo 100 en modo Infinite', icon: '🌌', hidden: false, reward: 100 },
+  { id: 'total_wins_5', name: 'Victorioso', desc: 'Gana 5 partidas en total', icon: '🏆', hidden: false, reward: 25 },
+  { id: 'total_wins_10', name: 'Campeón Recurrente', desc: 'Gana 10 partidas en total', icon: '🏆', hidden: false, reward: 25 },
+  { id: 'total_wins_25', name: 'Leyenda Viva', desc: 'Gana 25 partidas en total', icon: '🏆', hidden: false, reward: 60 },
+  { id: 'total_wins_50', name: 'Inmortal', desc: 'Gana 50 partidas en total', icon: '🏆', hidden: false, reward: 60 },
+  { id: 'total_runs_10', name: 'Jugador Dedicado', desc: 'Juega 10 partidas en total', icon: '🎮', hidden: false, reward: 15 },
+  { id: 'total_runs_25', name: 'Veterano', desc: 'Juega 25 partidas en total', icon: '🎮', hidden: false, reward: 25 },
+  { id: 'total_runs_50', name: 'Adicto', desc: 'Juega 50 partidas en total', icon: '🎮', hidden: false, reward: 60 },
+  { id: 'meta_500', name: 'Coleccionista de Monedas', desc: 'Acumula 500 PokéCoins', icon: '🪙', hidden: false, reward: 40 },
+  { id: 'meta_1000', name: 'Inversor Mayorista', desc: 'Acumula 1000 PokéCoins', icon: '🪙', hidden: false, reward: 60 },
+  { id: 'meta_5000', name: 'Tiburón Financiero', desc: 'Acumula 5000 PokéCoins', icon: '🪙', hidden: false, reward: 100 },
+  { id: 'medium_win', name: 'Competente', desc: 'Gana en dificultad Media', icon: '🥈', hidden: false, reward: 15 },
+  { id: 'noShops_win', name: 'Ermitaño', desc: 'Gana con el desafío Sin Tiendas', icon: '🏪', hidden: false, reward: 100 },
+  { id: 'noRests_win', name: 'Insomne', desc: 'Gana con el desafío Sin Descanso', icon: '🛌', hidden: false, reward: 100 },
+  { id: 'allShiny_win', name: 'Brillante', desc: 'Gana con el desafío Todos Shiny', icon: '✨', hidden: false, reward: 40 },
+  { id: 'noMoney_win', name: 'Pobreza', desc: 'Gana con el desafío Sin Dinero', icon: '💸', hidden: false, reward: 100 },
+  { id: 'egglocke_win', name: 'Criador', desc: 'Gana con el desafío Egglocke', icon: '🥚', hidden: false, reward: 100 },
+  { id: 'nuzlockeHC_win', name: 'Superviviente Extremo', desc: 'Gana con Nuzlocke Hardcore', icon: '💀', hidden: false, reward: 100 },
+  { id: 'noHeal_win', name: 'Autosuficiente', desc: 'Gana con el desafío Sin Curación', icon: '🚑', hidden: false, reward: 100 },
+  { id: 'allTeamRocket_win', name: 'Team Rocket Forever', desc: 'Gana con el desafío Todo Team Rocket', icon: '🔴', hidden: false, reward: 100 },
+  { id: 'triple_challenge', name: 'Tres Retos', desc: 'Gana con 3 desafíos activos', icon: '🎯', hidden: false, reward: 100 },
+  { id: 'challenge_mania', name: 'Manía de Retos', desc: 'Gana con 5+ desafíos activos', icon: '🎯', hidden: false, reward: 200 },
+  { id: 'team_diversity_10', name: 'Versátil', desc: 'Usa 10 Pokémon diferentes en una partida', icon: '🔄', hidden: false, reward: 25 },
+  { id: 'team_diversity_20', name: 'Polivalente', desc: 'Usa 20 Pokémon diferentes en una partida', icon: '🔄', hidden: false, reward: 40 },
+  { id: 'total_turns_500', name: 'Paciente', desc: 'Juega 500 turnos en una partida', icon: '⌛', hidden: false, reward: 25 },
+  { id: 'total_turns_1000', name: 'Táctico', desc: 'Juega 1000 turnos en una partida', icon: '⌛', hidden: false, reward: 40 },
+  { id: 'back_from_brink', name: 'Al Límite', desc: 'Gana un combate con 1 HP restante', icon: '❤️‍🔥', hidden: false, reward: 25 },
+  { id: 'first_try', name: 'Novato con Suerte', desc: 'Gana tu primera partida', icon: '🍀', hidden: false, reward: 15 },
+  { id: 'hoarder_15', name: 'Acaparador', desc: 'Ten 15 objetos en el inventario', icon: '📦', hidden: false, reward: 25 },
+  { id: 'evolution_master', name: 'Evolucionador', desc: 'Evoluciona 5 Pokémon en una partida', icon: '🌀', hidden: false, reward: 15 },
+  { id: 'first_mega', name: 'Mega Evolución', desc: 'Mega-evoluciona un Pokémon por primera vez', icon: '💎', hidden: false, reward: 15 },
+  { id: 'mega_win', name: 'Poder Mega', desc: 'Gana una partida usando megaevolución', icon: '💎', hidden: false, reward: 25 },
+  { id: 'mega_master', name: 'Maestro Mega', desc: 'Mega-evoluciona 10 Pokémon en total', icon: '🔮', hidden: false, reward: 40 },
+  { id: 'first_gmax', name: 'Gigamax', desc: 'Gigamaxima un Pokémon por primera vez', icon: '⚡', hidden: false, reward: 15 },
+  { id: 'gmax_win', name: 'Poder Gigamax', desc: 'Gana una partida usando Gigamax', icon: '⚡', hidden: false, reward: 25 },
+  { id: 'gmax_master', name: 'Maestro Gigamax', desc: 'Gigamaxima 10 Pokémon en total', icon: '🌟', hidden: false, reward: 60 },
+  { id: 'coop_first_run', name: 'Compañero de Viaje', desc: 'Juega tu primera partida en cooperativo', icon: '🤝', hidden: false, reward: 15 },
+  { id: 'coop_win', name: 'Victoria Compartida', desc: 'Gana una partida en cooperativo', icon: '🏆', hidden: false, reward: 25 },
+  { id: 'coop_wins_5', name: 'Equipo Confiable', desc: 'Gana 5 partidas cooperativas', icon: '🫱🏻‍🫲🏽', hidden: false, reward: 40 },
+  { id: 'coop_wins_10', name: 'Equipo Legendario', desc: 'Gana 10 partidas cooperativas', icon: '👥', hidden: false, reward: 60 },
+  { id: 'coop_first_trade', name: 'Primer Trueque', desc: 'Completa tu primer intercambio en cooperativo', icon: '🔄', hidden: false, reward: 15 },
+  { id: 'coop_trades_5', name: 'Trueques Frecuentes', desc: 'Completa 5 intercambios en total', icon: '🤝', hidden: false, reward: 40 },
+  { id: 'coop_trades_10', name: 'Mercader Cooperativo', desc: 'Completa 10 intercambios en total', icon: '💼', hidden: false, reward: 60 },
+  { id: 'coop_hard_win', name: 'Dúo Imparable', desc: 'Gana una partida cooperativa en dificultad Difícil', icon: '⚡', hidden: false, reward: 60 },
+  { id: 'meta_complete', name: 'Magnate del PokéShop', desc: 'Compra todos los objetos de la Tienda Meta', icon: '🛍️', hidden: false, reward: 250 },
 ]
 
 const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (pokemon: Pokemon) => Partial<Pokemon> }> = [
@@ -1477,6 +1477,7 @@ function MainApp() {
   const [enemyHitFlash, setEnemyHitFlash] = useState(false)
 
   const battleStartHPRef = useRef<number>(0)
+  const battleMinHpRef = useRef<number>(0)
 
   // Team Rocket
   const [isTeamRocketBattle, setIsTeamRocketBattle] = useState<boolean>(false)
@@ -1620,6 +1621,8 @@ function MainApp() {
       return saved ? JSON.parse(saved) : {}
     } catch { return {} }
   })
+  const achievementsRef = useRef<AchievementState>(achievements)
+  achievementsRef.current = achievements
   const [metaProgression, setMetaProgression] = useState<MetaProgression>(() => {
     try {
       const saved = localStorage.getItem('pokerand_meta')
@@ -2193,14 +2196,32 @@ function MainApp() {
   }
 
   function unlockAchievement(id: string): void {
+    const achievement = ACHIEVEMENTS.find(a => a.id === id)
     setAchievements(prev => {
       if (prev[id]?.unlocked) return prev
-      const updated = { ...prev, [id]: { unlocked: true, date: new Date().toISOString() } }
-      localStorage.setItem('pokerand_achievements', JSON.stringify(updated))
-      const achievement = ACHIEVEMENTS.find(a => a.id === id)
-      if (achievement) setNewAchievement(achievement)
-      return updated
+      return { ...prev, [id]: { unlocked: true, date: new Date().toISOString() } }
     })
+    if (achievementsRef.current[id]?.unlocked) return
+    const updated = { ...achievementsRef.current, [id]: { unlocked: true, date: new Date().toISOString() } }
+    achievementsRef.current = updated
+    localStorage.setItem('pokerand_achievements', JSON.stringify(updated))
+    if (achievement) setNewAchievement(achievement)
+  }
+
+  function claimAchievement(id: string): void {
+    const achievement = ACHIEVEMENTS.find(a => a.id === id)
+    if (!achievement) return
+    const entry = achievementsRef.current[id]
+    if (!entry?.unlocked || entry.claimed) return
+    const updated = { ...achievementsRef.current, [id]: { ...entry, claimed: true } }
+    achievementsRef.current = updated
+    localStorage.setItem('pokerand_achievements', JSON.stringify(updated))
+    setAchievements(prev => {
+      if (!prev[id]?.unlocked || prev[id]?.claimed) return prev
+      return { ...prev, [id]: { ...prev[id], claimed: true } }
+    })
+    awardPokeCoins(achievement.reward, `Logro: ${achievement.name}`)
+    setBattleLog(prev => [`🏅 Reclamaste la recompensa de "${achievement.name}" (+${achievement.reward} PokéCoins)`, ...prev].slice(0, 15))
   }
 
   useEffect(() => {
@@ -5300,6 +5321,7 @@ function MainApp() {
       setBattleGmaxUsed(false)
       setBattlePrimalUsed(false)
       battleStartHPRef.current = activePokemon.hp
+      battleMinHpRef.current = activePokemon.hp
       setBattleTurns(0)
       setScreen('battle')
 
@@ -5757,7 +5779,7 @@ function MainApp() {
     defender: Pokemon,
     move: Move,
     isEnemyHit: boolean
-  ): { updatedDefender: Pokemon; updatedAttacker: Pokemon; lines: string[]; attackerHeal: number; crits: number } {
+  ): { updatedDefender: Pokemon; updatedAttacker: Pokemon; lines: string[]; attackerHeal: number; crits: number; superEffective: boolean } {
     const enemyBoost = isEnemyHit ? modifier?.enemyAttackDelta ?? 0 : 0
 
     const attackerItem = attacker.holdItem ? HOLDABLE_ITEMS[attacker.holdItem] : null
@@ -5813,6 +5835,7 @@ function MainApp() {
           lines: [`${attacker.name} usó ${effectiveMove.name} pero falló.`],
           attackerHeal: 0,
           crits: 0,
+          superEffective: false,
         }
       }
     }
@@ -5971,6 +5994,7 @@ function MainApp() {
       lines,
       attackerHeal,
       crits: totalCrits,
+      superEffective: effectiveness > 1 && totalDamage > 0,
     }
   }
 
@@ -6102,6 +6126,9 @@ function MainApp() {
       if (prevEnemyHp > 0 && nextEnemy.hp <= 0) {
         setRunStats(prev => ({ ...prev, koFirstTurn: prev.koFirstTurn + 1 }))
       }
+      if (playerHit.superEffective) {
+        setRunStats(prev => ({ ...prev, superEffectiveHits: prev.superEffectiveHits + 1 }))
+      }
       playerCrits = playerHit.crits
       if (playerHit.attackerHeal > 0) {
         const healed = Math.min(nextPlayer.maxHp, nextPlayer.hp + playerHit.attackerHeal)
@@ -6179,6 +6206,7 @@ function MainApp() {
     }
 
     // --- Track run stats ---
+    battleMinHpRef.current = Math.min(battleMinHpRef.current, nextPlayer.hp)
     setRunStats(prev => {
       const playerDmg = Math.max(0, activePokemon.hp - nextPlayer.hp)
       const enemyDmg = Math.max(0, enemy.hp - nextEnemy.hp)
@@ -6255,7 +6283,9 @@ function MainApp() {
       })()
       if (isFullWin) {
         if (nextPlayer.hp === 1) unlockAchievement('back_from_brink')
-        const aliveTeam = nextTeam.filter(p => p.hp > 0)
+        const finalTeam = [...nextTeam]
+        finalTeam[activeIndex] = nextPlayer
+        const aliveTeam = finalTeam.filter(p => p.hp > 0)
         if (aliveTeam.length === 1 && aliveTeam[0].hp > 0 && aliveTeam[0].hp <= aliveTeam[0].maxHp * 0.1) {
           unlockAchievement('comeback')
         }
@@ -6506,7 +6536,7 @@ function MainApp() {
       }
 
       // --- Batalla salvaje → victoria directa ---
-      if (nextPlayer.hp >= battleStartHPRef.current) {
+      if (battleStartHPRef.current > 0 && battleMinHpRef.current >= battleStartHPRef.current) {
         unlockAchievement('perfect_battle')
       }
       logMsg = `🌿 Derrotaste al ${nextEnemy.name} salvaje y ganaste $${moneyReward}. ¡Equipo fortalecido!`
@@ -6668,7 +6698,6 @@ function MainApp() {
       return updated
     })
     unlockAchievement('first_gmax')
-    unlockAchievement('gmax_master')
     setBattleLog(prev => [`⚡ ¡${activePokemon.name} ha gigamaximado! Stats aumentados un 15% por 3 turnos.`, ...prev].slice(0, 15))
   }
 
@@ -6764,6 +6793,7 @@ function MainApp() {
       setTeam(prev => prev.map((p, i) => i === teamIndex ? evolved : p))
       setRunStats(prev => ({ ...prev, evolutions: prev.evolutions + 1 }))
       setInventory(prev => prev.filter((_, i) => i !== stoneEvoModal.stoneIndex))
+      setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
       setBattleLog((prev) => [`✨ ¡${targetPokemon.name} evolucionó en ${evolved.name} con ${stoneEvoModal.stoneName}!`, ...prev].slice(0, 15))
     } catch {
       setApiError('Error al procesar la evolución.')
@@ -6832,6 +6862,7 @@ function MainApp() {
         return
       }
       setInventory(prev => prev.filter((_, i) => i !== itemIndex))
+      setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
       setBattleLog((prev) => [`💨 ¡Usaste la Cuerda Huida y escapaste del combate!`, ...prev].slice(0, 15))
       setIsTeamRocketBattle(false)
       completeCurrentNode()
@@ -6912,6 +6943,7 @@ function MainApp() {
       previous.map((pokemon, index) => (index === activeIndex ? updatedPokemon : pokemon))
     )
     setInventory((previous) => previous.filter((_, index) => index !== itemIndex))
+    setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
     setBattleLog((prev) => [`Usaste ${itemName} en ${activePokemon.name}.`, ...prev].slice(0, 15))
   }
 
@@ -6926,6 +6958,7 @@ function MainApp() {
 
     setTeam((prev) => prev.map((p, idx) => (idx === targetIndex ? revivedPkmn : p)))
     setInventory((prev) => prev.filter((_, idx) => idx !== itemIndex))
+    setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
     setBattleLog((prev) => [`¡${revivedPkmn.name} ha sido revivido con ${revivedPkmn.hp} HP!`, ...prev].slice(0, 15))
     setReviveModal(null)
   }
@@ -7241,6 +7274,7 @@ function MainApp() {
     setPcStorage([])
     setSpeedrunSeconds(0)
     battleStartHPRef.current = 0
+    battleMinHpRef.current = 0
     if (speedrunTimerRef.current) {
       clearInterval(speedrunTimerRef.current)
       speedrunTimerRef.current = null
@@ -10732,6 +10766,7 @@ function MainApp() {
             <div style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>¡Logro Desbloqueado!</div>
             <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '1rem' }}>{newAchievement.name}</div>
             <div style={{ color: '#9b98cf', fontSize: '0.8rem' }}>{newAchievement.desc}</div>
+            <div style={{ color: '#ffcb05', fontSize: '0.8rem', fontWeight: 'bold', marginTop: '0.25rem' }}>🪙 +{newAchievement.reward} — reclama en la pestaña de Logros</div>
           </div>
         </div>
         <button onClick={handleAchievementDismiss} style={{ position: 'absolute', top: '4px', right: '8px', background: 'none', border: 'none', color: '#7d7ab5', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
@@ -10888,18 +10923,37 @@ function MainApp() {
       {showAchievements && (
         <div className="modal-backdrop" onClick={() => setShowAchievements(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
-            <h2 style={{ color: '#4d9bff', textAlign: 'center', marginBottom: '1rem' }}>🏅 Logros ({Object.values(achievements).filter(a => a.unlocked).length}/{ACHIEVEMENTS.length})</h2>
+            <h2 style={{ color: '#4d9bff', textAlign: 'center', marginBottom: '0.25rem' }}>🏅 Logros ({Object.values(achievements).filter(a => a.unlocked).length}/{ACHIEVEMENTS.length})</h2>
+            <div style={{ color: '#ffcb05', textAlign: 'center', marginBottom: '1rem', fontSize: '0.9rem' }}>
+              🪙 {ACHIEVEMENTS.filter(a => achievements[a.id]?.unlocked && !achievements[a.id]?.claimed).reduce((sum, a) => sum + a.reward, 0)} PokéCoins por reclamar
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               {ACHIEVEMENTS.map(a => {
                 const unlocked = achievements[a.id]?.unlocked
+                const claimed = achievements[a.id]?.claimed
                 return (
-                  <div key={a.id} style={{ background: unlocked ? 'rgba(250,204,21,0.1)' : 'rgba(30,41,59,0.5)', border: `1px solid ${unlocked ? '#ffcb05' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
+                  <div key={a.id} style={{ background: unlocked ? 'rgba(250,204,21,0.1)' : 'rgba(30,41,59,0.5)', border: `1px solid ${unlocked ? (claimed ? '#37d16b' : '#ffcb05') : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontSize: '1.5rem' }}>{a.icon}</span>
-                      <div>
+                      <div style={{ flex: 1 }}>
                         <div style={{ color: unlocked ? '#ffcb05' : '#9b98cf', fontWeight: 'bold', fontSize: '0.85rem' }}>{a.name}</div>
                         <div style={{ color: '#7d7ab5', fontSize: '0.75rem' }}>{a.desc}</div>
                       </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                      <span style={{ color: unlocked ? '#ffcb05' : '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold' }}>🪙 +{a.reward}</span>
+                      {!unlocked ? (
+                        <span style={{ color: '#64748b', fontSize: '0.75rem' }}>🔒 Bloqueado</span>
+                      ) : claimed ? (
+                        <span style={{ color: '#37d16b', fontSize: '0.75rem', fontWeight: 'bold' }}>✓ Reclamado</span>
+                      ) : (
+                        <button
+                          onClick={() => { playClick(); claimAchievement(a.id) }}
+                          style={{ background: '#ffcb05', color: '#000', border: 'none', borderRadius: '4px', padding: '0.25rem 0.5rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.75rem' }}
+                        >
+                          Reclamar
+                        </button>
+                      )}
                     </div>
                   </div>
                 )

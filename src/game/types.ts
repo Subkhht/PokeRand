@@ -176,10 +176,11 @@ export interface Achievement {
   desc: string
   icon: string
   hidden: boolean
+  reward: number
 }
 
 export interface AchievementState {
-  [id: string]: { unlocked: boolean; date: string }
+  [id: string]: { unlocked: boolean; date: string; claimed?: boolean }
 }
 
 export interface MetaProgression {
