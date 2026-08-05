@@ -19,8 +19,9 @@ const STATUS_LABELS: Record<StatusType, string> = {
 }
 
 function getStageMultiplier(stage: number): number {
-  if (stage > 0) return (2 + stage) / 2
-  if (stage < 0) return 2 / (2 - stage)
+  const s = Math.max(-6, Math.min(6, stage))
+  if (s > 0) return (2 + s) / 2
+  if (s < 0) return 2 / (2 - s)
   return 1
 }
 

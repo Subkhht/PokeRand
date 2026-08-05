@@ -1743,8 +1743,9 @@ function isProtectMove(move: Move): boolean {
 }
 
 function getStageMultiplier(stage: number): number {
-  if (stage > 0) return (2 + stage) / 2
-  if (stage < 0) return 2 / (2 - stage)
+  const s = Math.max(-6, Math.min(6, stage))
+  if (s > 0) return (2 + s) / 2
+  if (s < 0) return 2 / (2 - s)
   return 1
 }
 
@@ -2647,6 +2648,15 @@ function MainApp() {
     return team.reduce((max, p) => Math.max(max, p.level), 0)
   }
 
+  // En Infinite los enemigos ya no apuntan SIEMPRE al nivel máximo del equipo:
+  // usan la media entre el máximo y el promedio. Así un equipo desparejo no
+  // dispara la dificultad al miembro más alto, y los combates escalan suave.
+  function getInfiniteTargetLevel(): number {
+    const maxLvl = getMaxTeamLevel()
+    const avgLvl = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
+    return Math.round((maxLvl + avgLvl) / 2)
+  }
+
   async function handleSelectPokedexPokemon(id: number) {
     setIsLoadingDetail(true)
     try {
@@ -3038,9 +3048,9 @@ function MainApp() {
           type = 'mega'
         } else if (rand < 0.60 && metaProgression.permanentlyUnlockedItems.includes('unlock_gmax_node')) {
           type = 'gmax'
-        } else if (rand < 0.66 && metaProgression.permanentlyUnlockedItems.includes('unlock_primal_node')) {
+        } else if (rand < 0.63 && metaProgression.permanentlyUnlockedItems.includes('unlock_primal_node')) {
           type = 'primal'
-        } else if (rand < 0.72 && metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node')) {
+        } else if (rand < 0.69 && metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node')) {
           type = 'casino'
         }
       } else if (difficulty === 'medium') {
@@ -3662,6 +3672,14 @@ function MainApp() {
   }
 
   async function completeCurrentNode(): Promise<void> {
+    // Las etapas de stats (subidas/bajadas de Ataque, Def. Esp., etc.) solo
+    // debían durar un combate. Como las pantallas de victoria/derrota solo se
+    // usan al terminar la run, aquí se resetean al completar CUALQUIER nodo:
+    // evita que una Def. Esp. subida se "pegue" a niveles altos durante toda la run.
+    setTeam(prev => prev.map(p => p.statStages && (p.statStages.attack !== 0 || p.statStages.defense !== 0 || p.statStages.spAttack !== 0 || p.statStages.spDefense !== 0 || p.statStages.speed !== 0)
+      ? { ...p, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
+      : p))
+
     if (difficulty === 'coliseum') {
       setTeam(prev => prev.map(p => ({ ...p, hp: p.maxHp, status: undefined })))
       setBattleLog(prev => [`💊 ¡Equipo curado automáticamente!`, ...prev].slice(0, 15))
@@ -5287,7 +5305,7 @@ function MainApp() {
       try {
         const targetGen = getEffectiveGen()
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
-        const targetLevel = difficulty === 'infinite' ? getMaxTeamLevel() : avgPlayerLevel
+        const targetLevel = difficulty === 'infinite' ? getInfiniteTargetLevel() : avgPlayerLevel
         const fetches = Array.from({ length: 4 }, () =>
           getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
             .then((base) => {
@@ -5314,7 +5332,7 @@ function MainApp() {
       try {
         const targetGen = getEffectiveGen()
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
-        const targetLevel = difficulty === 'infinite' ? getMaxTeamLevel() : avgPlayerLevel + 1
+        const targetLevel = difficulty === 'infinite' ? getInfiniteTargetLevel() : avgPlayerLevel + 1
         const fetches = Array.from({ length: 2 }, (_, idx) =>
           getBalancedPokemonByGeneration(targetGen, routeIndex + idx, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
             .then((base) => {
@@ -5414,7 +5432,7 @@ function MainApp() {
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const fetches = Array.from({ length: 6 }, () => {
           const targetLevel = difficulty === 'infinite'
-            ? getMaxTeamLevel() + 1 + Math.floor(Math.random() * 2)
+            ? getInfiniteTargetLevel() + 1 + Math.floor(Math.random() * 2)
             : avgPlayerLevel + Math.floor(Math.random() * 3) - 1
           return getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
             .then((base) => {
@@ -5458,7 +5476,7 @@ function MainApp() {
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const gmaxId = Array.from(GMAX_CAPABLE_IDS)[Math.floor(Math.random() * GMAX_CAPABLE_IDS.size)]
         const gmaxTargetLevel = difficulty === 'infinite'
-          ? getMaxTeamLevel() + 2
+            ? getInfiniteTargetLevel() + 2
           : avgPlayerLevel + 2
         const base = await buildPokemonFromApi(gmaxId, targetGen, gmaxTargetLevel, false, difficulty, true)
         const gmaxLevelDelta = modifier?.enemyLevelDelta ?? 0
@@ -5575,7 +5593,7 @@ function MainApp() {
       const targetGen = getEffectiveGen()
       const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
       const restTargetLevel = difficulty === 'infinite'
-        ? getMaxTeamLevel() + (Math.floor(Math.random() * 3) - 1)
+            ? getInfiniteTargetLevel() + (Math.floor(Math.random() * 3) - 1)
         : avgPlayerLevel - 2 + Math.floor(Math.random() * 3) - 1
       const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, restTargetLevel)
       const levelDiff = restTargetLevel - restPokemonBase.level
@@ -5627,7 +5645,7 @@ function MainApp() {
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const fetches = Array.from({ length: teamSize }, (_, idx) => {
           const targetLevel = difficulty === 'infinite'
-            ? getMaxTeamLevel() + trainerMemberLevelOffset(idx, teamSize, true, difficulty)
+            ? getInfiniteTargetLevel() + trainerMemberLevelOffset(idx, teamSize, true, difficulty)
             : avgPlayerLevel + trainerMemberLevelOffset(idx, teamSize, true, difficulty)
           const baseStepIndex = difficulty === 'infinite' ? Math.max(0, targetLevel - 10) : routeIndex
           return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
@@ -5669,7 +5687,7 @@ function MainApp() {
 
         const fetches = Array.from({ length: teamSize }, (_, idx) => {
           const targetLevel = difficulty === 'infinite'
-            ? getMaxTeamLevel() + trainerMemberLevelOffset(idx, teamSize, false, difficulty)
+            ? getInfiniteTargetLevel() + trainerMemberLevelOffset(idx, teamSize, false, difficulty)
             : avgPlayerLevel + trainerMemberLevelOffset(idx, teamSize, false, difficulty)
           // En Infinite, genera al rival directamente a su nivel objetivo para que
           // respete etapas evolutivas y movimientos según el nivel. En Co-op, igual.
@@ -5733,7 +5751,7 @@ function MainApp() {
               })()
             : (() => {
                 const targetLevel = difficulty === 'infinite'
-                  ? getMaxTeamLevel() + trainerMemberLevelOffset(idx, teamSize, isBoss, difficulty) + (isLeague ? 2 : 0)
+            ? getInfiniteTargetLevel() + trainerMemberLevelOffset(idx, teamSize, isBoss, difficulty) + (isLeague ? 2 : 0)
                   : avgPlayerLevel + trainerMemberLevelOffset(idx, teamSize, isBoss, difficulty) + (isLeague ? 2 : 0)
                 // En Infinite, genera al rival directamente a su nivel objetivo para que
                 // respete etapas evolutivas y movimientos según el nivel. En Co-op,
@@ -5811,7 +5829,7 @@ function MainApp() {
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const wildLevelOffset = Math.floor(Math.random() * 3) - 1
         const targetLevel = difficulty === 'infinite'
-          ? getMaxTeamLevel() + (Math.floor(Math.random() * 3) - 1)
+            ? getInfiniteTargetLevel() + (Math.floor(Math.random() * 3) - 1)
           : avgPlayerLevel + wildLevelOffset
         const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
         const levelDiff = targetLevel - enemyBase.level

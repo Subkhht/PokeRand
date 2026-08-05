@@ -793,20 +793,20 @@ export async function getBalancedPokemonByGeneration(
     }
   } else if (difficulty === 'infinite') {
     if (isBoss) {
-      minBst = 550
+      minBst = 540
       maxBst = 999
     } else if (progressRatio < 0.25) {
-      minBst = 280
-      maxBst = 500
+      minBst = 260
+      maxBst = 480
     } else if (progressRatio < 0.50) {
-      minBst = 390
-      maxBst = 590
+      minBst = 370
+      maxBst = 560
     } else if (progressRatio < 0.75) {
-      minBst = 470
-      maxBst = 680
+      minBst = 450
+      maxBst = 640
     } else {
-      minBst = 550
-      maxBst = 850
+      minBst = 520
+      maxBst = 800
     }
   } else if (difficulty === 'hard') {
     if (isBoss) {
