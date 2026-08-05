@@ -43,7 +43,7 @@ export default function SlidePuzzle({ onComplete }: CasinoMinigameProps): JSX.El
   const [ready, setReady] = useState(false)
   const [moves, setMoves] = useState(0)
   const [seconds, setSeconds] = useState(0)
-  const [status, setStatus] = useState<'playing' | 'won'>('playing')
+  const [status, setStatus] = useState<'playing' | 'won' | 'surrendered'>('playing')
   const [result, setResult] = useState<number | null>(null)
   const [msg, setMsg] = useState('')
 
@@ -77,6 +77,15 @@ export default function SlidePuzzle({ onComplete }: CasinoMinigameProps): JSX.El
     setStatus('playing')
     setResult(null)
     setMsg('')
+  }
+
+  const surrender = (): void => {
+    if (!started || !ready || status !== 'playing' || result !== null) return
+    playClick()
+    setStatus('surrendered')
+    setMsg('Te rendiste... ¡mejor suerte la próxima!')
+    setResult(0)
+    setTimeout(() => onCompleteRef.current(0), 600)
   }
 
   useEffect(() => {
@@ -222,6 +231,15 @@ export default function SlidePuzzle({ onComplete }: CasinoMinigameProps): JSX.El
               >
                 🔀 Reiniciar
               </button>
+              <button
+                className="tiny-btn"
+                type="button"
+                onClick={surrender}
+                disabled={status !== 'playing' || result !== null || !ready}
+                style={{ color: '#f87171' }}
+              >
+                🏳 Rendirse
+              </button>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '18px', color: '#cbd5e1', fontSize: '0.9rem' }}>
@@ -244,8 +262,8 @@ export default function SlidePuzzle({ onComplete }: CasinoMinigameProps): JSX.El
         </>
       )}
       {result !== null && (
-        <p style={{ color: result >= 800 ? '#ffcb05' : result >= 400 ? '#34d399' : '#94a3b8', fontWeight: 'bold', fontSize: '1.2rem', margin: 0, animation: 'casinoSlideUp 0.4s ease' }}>
-          {result >= 800 ? '🧩 ¡Maestro del puzle!' : result >= 400 ? '🙂 ¡Buen trabajo!' : '🔄 ¡A mejorar!'} · {result} pts
+        <p style={{ color: status === 'surrendered' ? '#94a3b8' : result >= 800 ? '#ffcb05' : result >= 400 ? '#34d399' : '#94a3b8', fontWeight: 'bold', fontSize: '1.2rem', margin: 0, animation: 'casinoSlideUp 0.4s ease' }}>
+          {status === 'surrendered' ? '🏳 ¡Te rendiste!' : result >= 800 ? '🧩 ¡Maestro del puzle!' : result >= 400 ? '🙂 ¡Buen trabajo!' : '🔄 ¡A mejorar!'} · {result} pts
         </p>
       )}
     </div>

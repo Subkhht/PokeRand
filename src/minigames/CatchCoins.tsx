@@ -134,13 +134,6 @@ export default function CatchCoins({ onComplete }: CasinoMinigameProps): JSX.Ele
               setScore(scoreRef.current)
               items.splice(i, 1)
             } else {
-              if (it.kind === 'bomb') {
-                scoreRef.current -= 20
-                burst(it.x, GROUND_Y, '#ff8a80', 10)
-                shakeRef.current = 0.2
-                playHit()
-                setScore(scoreRef.current)
-              }
               items.splice(i, 1)
             }
           } else if (it.y > H + 20) {
