@@ -9466,6 +9466,7 @@ function MainApp() {
             {generations.map((gen) => {
               const unlocked = isGenUnlocked(gen)
               const hardUnlocked = isHardUnlocked(gen)
+              const infUnlocked = isInfiniteUnlocked(gen)
               const completedMed = progression.completedMedium.includes(gen)
               const completedAny = progression.completedAny.includes(gen)
               const completedHard = progression.completedHard.includes(gen)
@@ -9506,7 +9507,10 @@ function MainApp() {
                       🔒 Pásate Gen {gen - 1} en Intermedio
                     </span>
                   )}
-                  {unlocked && hardUnlocked && (
+                  {unlocked && infUnlocked && (
+                    <span className="unlock-tag-infinite">♾️ Infinite Disponible</span>
+                  )}
+                  {unlocked && !infUnlocked && hardUnlocked && (
                     <span className="unlock-tag">🔥 Difícil disponible</span>
                   )}
                 </button>
