@@ -321,21 +321,39 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
     const res = await fetch(moveUrl)
     const data = await res.json()
 
-    // 🚫 Descartamos movimientos de estado (Protect, Growl, Dance, etc.) o sin potencia real
-    if (
-      !data.power || 
-      data.power <= 0 || 
-      data.damage_class?.name === 'status'
-    ) {
-      return null
-    }
+    // Solo se aceptan movimientos de DAÑO (physical/special). Los movimientos de
+    // estado (damage_class 'status', potencia 0) se descartan salvo Drenadoras
+    // (Leech Seed), que funciona bien. Así los Pokémon solo tienen ataques de
+    // daño + Drenadoras.
+    const dc = data.damage_class?.name
+    const isLeechSeed = data.ailment?.name === 'leech-seed'
+    if (dc !== 'physical' && dc !== 'special' && dc !== 'status') return null
+    if (dc === 'status' && !isLeechSeed) return null
+    if ((dc === 'physical' || dc === 'special') && (!data.power || data.power <= 0)) return null
 
     const esName = data.names?.find((n: any) => n.language?.name === 'es')?.name
     const moveName = esName || capitalize(data.name.replace(/-/g, ' '))
 
     const ailmentRaw = data.ailment?.name
-    const ailment: StatusType | undefined = ailmentRaw && AILMENT_MAP[ailmentRaw] ? AILMENT_MAP[ailmentRaw] : undefined
-    const ailmentChance = (data.meta?.ailment_chance ?? 0) > 0 ? data.meta.ailment_chance / 100 : undefined
+    const flinchRaw = data.meta?.flinch_chance ?? 0
+    // El flinch (aturdimiento) se parsea aparte: muchos movimientos de daño lo
+    // tienen en meta.flinch_chance y, si se aplica, gana sobre la afección.
+    let ailment: StatusType | undefined
+    let ailmentChance: number | undefined
+    if (flinchRaw > 0) {
+      ailment = 'flinch'
+      ailmentChance = flinchRaw / 100
+    } else if (ailmentRaw && AILMENT_MAP[ailmentRaw]) {
+      ailment = AILMENT_MAP[ailmentRaw]
+      // En movimientos de ESTADO, si tienen afección y PokeAPI no da chance
+      // (ailment_chance 0/null, p. ej. Yawn), se considera garantizada al 100%.
+      // En movimientos de daño, la chance es la que indica la API.
+      if (dc === 'status') {
+        ailmentChance = (data.meta?.ailment_chance ?? 0) > 0 ? data.meta.ailment_chance / 100 : 1
+      } else {
+        ailmentChance = (data.meta?.ailment_chance ?? 0) > 0 ? data.meta.ailment_chance / 100 : undefined
+      }
+    }
 
     const minHits = data.meta?.min_hits ?? undefined
     const maxHits = data.meta?.max_hits ?? undefined
@@ -353,7 +371,7 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
 
     const statChanges: StatChange[] | undefined = data.stat_changes?.length > 0
       ? data.stat_changes.map((sc: any) => ({
-          stat: sc.stat.name === 'attack' ? 'attack' : sc.stat.name === 'defense' ? 'defense' : sc.stat.name === 'speed' ? 'speed' : null,
+          stat: sc.stat.name === 'attack' ? 'attack' : sc.stat.name === 'defense' ? 'defense' : sc.stat.name === 'speed' ? 'speed' : sc.stat.name === 'special-attack' ? 'special-attack' : sc.stat.name === 'special-defense' ? 'special-defense' : null,
           change: sc.change,
           chance: statChance,
         })).filter((sc: StatChange | null) => sc !== null)
@@ -361,15 +379,30 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
 
     const metaCategory = data.meta?.category?.name ?? undefined
 
+    // Descripción con preferencia al español: se intenta el short_effect en 'es',
+    // luego el efecto completo en 'es', y como último recurso el inglés.
+    const esEntry = data.effect_entries?.find((e: any) => e.language.name === 'es')
+    const enEntry = data.effect_entries?.find((e: any) => e.language.name === 'en')
+    const cleanText = (s: string): string => s
+      .replace(/\$effect_chance/g, String(data.meta?.ailment_chance ?? data.meta?.stat_chance ?? 100))
+      .replace(/\r?\n/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    const description = cleanText(
+      esEntry?.short_effect || esEntry?.effect || enEntry?.short_effect || enEntry?.effect || 'Ataque de daño directo.'
+    )
+
     return {
       name: moveName,
       type: data.type.name,
       power: data.power,
       accuracy: data.accuracy ?? 100,
-      description: data.effect_entries.find((e: any) => e.language.name === 'es')?.short_effect
-        || data.effect_entries.find((e: any) => e.language.name === 'en')?.short_effect
-        || 'Ataque de daño directo.',
+      description,
       url: moveUrl,
+      damageClass: data.damage_class?.name === 'special' ? 'special' : 'physical',
+      leechSeed: data.ailment?.name === 'leech-seed' || /leech-seed|drenadoras/i.test(moveName),
+      disable: data.ailment?.name === 'disable' || /disable|anulación/i.test(moveName),
+      fakeOut: data.name === 'fake-out' || /fake-out|abatimiento|sorpresa/i.test(moveName),
       ailment,
       ailmentChance,
       minHits,
@@ -402,10 +435,10 @@ export function getMaxMovePowerForLevel(level: number, difficulty: string = 'med
 
 // Lista de ataques básicos de relleno por si el Pokémon tiene menos de 4 ataques de daño válidos
 const FALLBACK_MOVES: Move[] = [
-  { name: 'Placaje', type: 'normal', power: 40, accuracy: 100, description: 'Ataque físico básico.', priority: 0 },
-  { name: 'Ataque Rápido', type: 'normal', power: 40, accuracy: 100, description: 'Ataque rápido de daño directo.', priority: 1 },
-  { name: 'Cabezazo', type: 'normal', power: 70, accuracy: 100, description: 'Golpe de cabeza potente.', priority: 0 },
-  { name: 'Derribo', type: 'normal', power: 90, accuracy: 85, description: 'Carga contundente de gran impacto.', priority: 0 }
+  { name: 'Placaje', type: 'normal', power: 40, accuracy: 100, description: 'Ataque físico básico.', priority: 0, damageClass: 'physical' },
+  { name: 'Ataque Rápido', type: 'normal', power: 40, accuracy: 100, description: 'Ataque rápido de daño directo.', priority: 1, damageClass: 'physical' },
+  { name: 'Cabezazo', type: 'normal', power: 70, accuracy: 100, description: 'Golpe de cabeza potente.', priority: 0, damageClass: 'physical' },
+  { name: 'Derribo', type: 'normal', power: 90, accuracy: 85, description: 'Carga contundente de gran impacto.', priority: 0, damageClass: 'physical' }
 ]
 
 // Procesa movimientos asignando solo aquellos acordes al nivel actual del Pokémon
@@ -498,6 +531,7 @@ export async function fetchPokemonMoves(
       accuracy: 100,
       description: 'Ataque físico básico.',
       priority: 0,
+      damageClass: 'physical',
     }
     validMoves.push(basicTackle)
   }
@@ -552,6 +586,8 @@ export async function buildPokemonFromApi(
     hp: (statMap.get('hp') ?? 45) + 35 + (targetLevel - 10) * 4,
     attack: (statMap.get('attack') ?? 50) + 5 + (targetLevel - 10) * 2,
     defense: (statMap.get('defense') ?? 50) + 5 + (targetLevel - 10) * 2,
+    spAttack: (statMap.get('special-attack') ?? 50) + 5 + (targetLevel - 10) * 2,
+    spDefense: (statMap.get('special-defense') ?? 50) + 5 + (targetLevel - 10) * 2,
     speed: (statMap.get('speed') ?? 50) + (targetLevel - 10) * 2,
     types: sortedTypes,
     baseStatTotal,
@@ -586,6 +622,8 @@ export async function buildPokemonFromApi(
     pokemon.hp += diff * 4
     pokemon.attack += diff * 2
     pokemon.defense += diff * 2
+    pokemon.spAttack += diff * 2
+    pokemon.spDefense += diff * 2
     pokemon.speed += diff * 2
     if (pokemon.evolutionLevel && pokemon.level >= pokemon.evolutionLevel) {
       pokemon.evolutionLevel = undefined
@@ -987,6 +1025,8 @@ export async function evolvePokemon(currentPokemon: Pokemon): Promise<Pokemon | 
       hp: newBasePokemon.maxHp + 15,
       attack: newBasePokemon.attack + 5,
       defense: newBasePokemon.defense + 5,
+      spAttack: newBasePokemon.spAttack + 5,
+      spDefense: newBasePokemon.spDefense + 5,
       speed: newBasePokemon.speed + 3,
       holdItem: currentPokemon.holdItem,
     }

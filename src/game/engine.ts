@@ -29,8 +29,10 @@ export function applyDamage(
   move: Move,
   attackBoost = 0
 ): { damage: number } {
-  const effectiveAttack = attacker.attack + attackBoost
-  const baseDamage = Math.floor((move.power * effectiveAttack) / Math.max(1, defender.defense))
+  const isSpecial = move.damageClass === 'special'
+  const effectiveAttack = (isSpecial ? attacker.spAttack : attacker.attack) + attackBoost
+  const effectiveDefense = isSpecial ? defender.spDefense : defender.defense
+  const baseDamage = Math.floor((move.power * effectiveAttack) / Math.max(1, effectiveDefense))
   const finalDamage = Math.max(3, Math.floor(baseDamage * 0.45) + 2)
 
   return { damage: finalDamage }
@@ -68,6 +70,8 @@ export function scalePokemonForNode(base: Pokemon, _node: RouteNode, _stepIndex:
     hp: Math.max(20, base.maxHp + hpBonus),
     attack: Math.max(10, base.attack + statBonus),
     defense: Math.max(10, base.defense + statBonus),
+    spAttack: Math.max(10, base.spAttack + statBonus),
+    spDefense: Math.max(10, base.spDefense + statBonus),
     speed: Math.max(10, base.speed + statBonus)
   }
 }
@@ -76,16 +80,18 @@ export function applyNoEvolutionBuff(pokemon: Pokemon): Pokemon {
   return pokemon
 }
 
-export function getTeamStatAverages(team: Pokemon[]): { attack: number; defense: number; speed: number; maxHp: number } {
+export function getTeamStatAverages(team: Pokemon[]): { attack: number; defense: number; spAttack: number; spDefense: number; speed: number; maxHp: number } {
   const alive = team.filter(p => p.hp > 0)
   const pool = alive.length > 0 ? alive : team
   if (pool.length === 0) {
-    return { attack: 50, defense: 50, speed: 50, maxHp: 120 }
+    return { attack: 50, defense: 50, spAttack: 50, spDefense: 50, speed: 50, maxHp: 120 }
   }
   const avg = (f: (p: Pokemon) => number) => pool.reduce((acc, p) => acc + f(p), 0) / pool.length
   return {
     attack: avg(p => p.attack),
     defense: avg(p => p.defense),
+    spAttack: avg(p => p.spAttack),
+    spDefense: avg(p => p.spDefense),
     speed: avg(p => p.speed),
     maxHp: avg(p => p.maxHp),
   }
@@ -98,6 +104,8 @@ export function balanceWildPokemonToTeam(enemy: Pokemon, team: Pokemon[], diffic
 
   const attack = Math.max(10, Math.round(enemy.attack * blend + teamAvg.defense * strength * (1 - blend)))
   const defense = Math.max(10, Math.round(enemy.defense * blend + teamAvg.attack * strength * (1 - blend)))
+  const spAttack = Math.max(10, Math.round(enemy.spAttack * blend + teamAvg.spDefense * strength * (1 - blend)))
+  const spDefense = Math.max(10, Math.round(enemy.spDefense * blend + teamAvg.spAttack * strength * (1 - blend)))
   const speed = Math.max(10, Math.round(enemy.speed * blend + teamAvg.speed * strength * (1 - blend)))
   const maxHp = Math.max(20, Math.round(enemy.maxHp * blend + teamAvg.maxHp * strength * (1 - blend)))
 
@@ -105,6 +113,8 @@ export function balanceWildPokemonToTeam(enemy: Pokemon, team: Pokemon[], diffic
     ...enemy,
     attack,
     defense,
+    spAttack,
+    spDefense,
     speed,
     maxHp,
     hp: maxHp,

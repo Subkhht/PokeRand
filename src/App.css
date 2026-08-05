@@ -2279,3 +2279,17 @@ button {
   height: 100%;
   display: block;
 }
+
+/* ---- Barras de vida con transición suave ---- */
+.meter > div,
+.enemy-meter > div {
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes pvpSpriteBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.pvp-sprite-bob {
+  animation: pvpSpriteBob 1.6s ease-in-out infinite;
+}

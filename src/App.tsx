@@ -55,19 +55,60 @@ function StatusBadge({ status, compact = false }: { status?: Pokemon['status']; 
   if (!status) return null
   const label = STATUS_LABELS[status.type]
   const color = STATUS_COLORS[status.type]
+  const emoji = label.split(' ')[0]
+  const text = label.split(' ').slice(1).join(' ')
   return (
     <span
       title={label}
       style={{
-        fontSize: compact ? '0.65rem' : '0.75rem',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '3px',
+        padding: compact ? '1px 6px' : '2px 8px',
+        borderRadius: '999px',
+        background: `${color}2e`,
+        border: `1.5px solid ${color}`,
         color,
         fontWeight: 'bold',
-        marginLeft: '4px',
+        fontSize: compact ? '0.6rem' : '0.72rem',
+        marginLeft: '5px',
+        lineHeight: 1.5,
         whiteSpace: 'nowrap',
-        textShadow: '0 1px 2px rgba(0,0,0,0.8)',
+        verticalAlign: 'middle',
+        boxShadow: `0 0 8px ${color}66`,
+        animation: 'casinoPulse 1.8s ease infinite',
       }}
     >
-      {compact ? label.split(' ')[0] : label}
+      <span style={{ fontSize: compact ? '0.62rem' : '0.78rem' }}>{emoji}</span>
+      {!compact && <span>{text}</span>}
+    </span>
+  )
+}
+
+// Indicador visual flotante sobre el sprite del Pokémon para su estado/Drenadoras.
+function StatusFloat({ pokemon }: { pokemon?: Pokemon }) {
+  if (!pokemon) return null
+  const emoji = pokemon.status
+    ? STATUS_LABELS[pokemon.status.type].split(' ')[0]
+    : pokemon.leechSeed
+      ? '🌱'
+      : null
+  if (!emoji) return null
+  return (
+    <span
+      style={{
+        position: 'absolute',
+        top: '-14px',
+        right: '-6px',
+        fontSize: '1.35rem',
+        lineHeight: 1,
+        zIndex: 5,
+        pointerEvents: 'none',
+        filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.85))',
+        animation: 'casinoBounce 0.9s ease infinite',
+      }}
+    >
+      {emoji}
     </span>
   )
 }
@@ -729,6 +770,8 @@ interface HoldableItem {
   price: number
   attackMod?: number
   defenseMod?: number
+  spAttackMod?: number
+  spDefenseMod?: number
   speedMod?: number
   maxHpMod?: number
   healPerTurn?: number
@@ -745,13 +788,13 @@ interface HoldableItem {
 
 const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Muscle Band': { name: 'Muscle Band', desc: '+15% Ataque', price: 200, attackMod: 0.15 },
-  'Wise Glasses': { name: 'Wise Glasses', desc: '+15% Velocidad', price: 200, speedMod: 0.15 },
+  'Wise Glasses': { name: 'Wise Glasses', desc: '+15% At. Esp.', price: 200, spAttackMod: 0.15 },
   'Choice Band': { name: 'Choice Band', desc: '+25% Ataque', price: 350, attackMod: 0.25 },
   'Leftovers': { name: 'Leftovers', desc: 'Recupera 6 HP por turno', price: 300, healPerTurn: 6 },
   'Focus Sash': { name: 'Focus Sash', desc: '+20 HP máximos', price: 250, maxHpMod: 20 },
-  'Assault Vest': { name: 'Assault Vest', desc: '+20% Defensa', price: 300, defenseMod: 0.20 },
+  'Assault Vest': { name: 'Assault Vest', desc: '+20% Def. Esp.', price: 300, spDefenseMod: 0.20 },
   'Quick Claw': { name: 'Quick Claw', desc: '+20% Velocidad', price: 250, speedMod: 0.20 },
-  'Eviolite': { name: 'Eviolite', desc: '+10% Defensa y Ataque', price: 200, attackMod: 0.10, defenseMod: 0.10 },
+  'Eviolite': { name: 'Eviolite', desc: '+10% Defensa y Def. Esp.', price: 200, defenseMod: 0.10, spDefenseMod: 0.10 },
   'Life Orb': { name: 'Life Orb', desc: '+30% Daño, -5 HP por turno', price: 400, damageBoost: 0.30, healPerTurn: -5 },
   'Rocky Helmet': { name: 'Rocky Helmet', desc: '+15% Defensa', price: 200, defenseMod: 0.15 },
   'Scope Lens': { name: 'Scope Lens', desc: '20% Golpe Crítico', price: 250, critChance: 0.20 },
@@ -765,7 +808,7 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Vest Protector': { name: 'Vest Protector', desc: '+25% Defensa, 15% Reducción daño', price: 400, defenseMod: 0.25, damageReduction: 0.15 },
   'Focus Band': { name: 'Focus Band', desc: '25% Crítico, +10% Ataque', price: 300, critChance: 0.25, attackMod: 0.10 },
   'Dragon Fang': { name: 'Dragon Fang', desc: '+20% Ataque, +10% Velocidad', price: 350, attackMod: 0.20, speedMod: 0.10 },
-  'Guardian Charm': { name: 'Guardian Charm', desc: '+15% Defensa, +10 HP máximos', price: 300, defenseMod: 0.15, maxHpMod: 10 },
+  'Guardian Charm': { name: 'Guardian Charm', desc: '+15% Def. Esp., +10 HP máximos', price: 300, spDefenseMod: 0.15, maxHpMod: 10 },
   'Berserker Band': { name: 'Berserker Band', desc: '+30% Ataque bajo 25% HP', price: 400, attackMod: 0.10, lowHpBonus: 0.30 },
   'Phantom Cloak': { name: 'Phantom Cloak', desc: '10% Reducción daño, +10% Velocidad', price: 350, damageReduction: 0.10, speedMod: 0.10 },
   'Swift Feather': { name: 'Swift Feather', desc: '+15% Velocidad, 10% Crítico', price: 300, speedMod: 0.15, critChance: 0.10 },
@@ -1071,7 +1114,7 @@ const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (p
     items: ['Choice Band', 'Choice Scarf'],
     name: 'Elección Absoluta',
     desc: '+15% a todos los stats ofensivos',
-    effect: (p) => ({ attack: Math.round(p.attack * 1.1), speed: Math.round(p.speed * 1.1) })
+    effect: (p) => ({ attack: Math.round(p.attack * 1.1), spAttack: Math.round(p.spAttack * 1.1), speed: Math.round(p.speed * 1.1) })
   },
   {
     items: ['Leftovers', 'Sitrus Berry'],
@@ -1095,7 +1138,7 @@ const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (p
     items: ['Assault Vest', 'Vest Protector'],
     name: 'Fortaleza Total',
     desc: '+10% defensa y +10 maxHP',
-    effect: (p) => ({ defense: Math.round(p.defense * 1.1), maxHp: p.maxHp + 10, hp: Math.min(p.hp + 10, p.maxHp + 10) })
+    effect: (p) => ({ defense: Math.round(p.defense * 1.1), spDefense: Math.round(p.spDefense * 1.1), maxHp: p.maxHp + 10, hp: Math.min(p.hp + 10, p.maxHp + 10) })
   },
   {
     items: ['Muscle Band', 'Focus Band'],
@@ -1122,8 +1165,16 @@ const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (p
     effect: (p) => ({
       attack: Math.round(p.attack * 1.1),
       defense: Math.round(p.defense * 1.1),
+      spAttack: Math.round(p.spAttack * 1.1),
+      spDefense: Math.round(p.spDefense * 1.1),
       speed: Math.round(p.speed * 1.1),
     })
+  },
+  {
+    items: ['Wise Glasses', 'Choice Scarf'],
+    name: 'Mente Ágil',
+    desc: '+15% At. Esp. y +10% velocidad',
+    effect: (p) => ({ spAttack: Math.round(p.spAttack * 1.15), speed: Math.round(p.speed * 1.1) })
   },
 ]
 
@@ -1240,13 +1291,13 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_soda_pop', name: 'Soda Pop', desc: 'Restaura 40 HP. Aparece en tiendas.', price: 25, spriteKey: 'Soda Pop', category: 'consumable' },
   { id: 'unlock_lemonade', name: 'Lemonade', desc: 'Restaura 60 HP. Aparece en tiendas.', price: 30, spriteKey: 'Lemonade', category: 'consumable' },
   { id: 'unlock_muscle_band', name: 'Muscle Band', desc: '+15% Ataque.', price: 40, spriteKey: 'Muscle Band', category: 'holdable' },
-  { id: 'unlock_wise_glasses', name: 'Wise Glasses', desc: '+15% Velocidad.', price: 40, spriteKey: 'Wise Glasses', category: 'holdable' },
+  { id: 'unlock_wise_glasses', name: 'Wise Glasses', desc: '+15% At. Esp.', price: 40, spriteKey: 'Wise Glasses', category: 'holdable' },
   { id: 'unlock_choice_band', name: 'Choice Band', desc: '+25% Ataque.', price: 70, spriteKey: 'Choice Band', category: 'holdable' },
   { id: 'unlock_leftovers', name: 'Leftovers', desc: 'Recupera 6 HP por turno.', price: 60, spriteKey: 'Leftovers', category: 'holdable' },
   { id: 'unlock_focus_sash', name: 'Focus Sash', desc: '+20 HP máximos.', price: 50, spriteKey: 'Focus Sash', category: 'holdable' },
-  { id: 'unlock_assault_vest', name: 'Assault Vest', desc: '+20% Defensa.', price: 60, spriteKey: 'Assault Vest', category: 'holdable' },
+  { id: 'unlock_assault_vest', name: 'Assault Vest', desc: '+20% Def. Esp.', price: 60, spriteKey: 'Assault Vest', category: 'holdable' },
   { id: 'unlock_quick_claw', name: 'Quick Claw', desc: '+20% Velocidad.', price: 50, spriteKey: 'Quick Claw', category: 'holdable' },
-  { id: 'unlock_eviolite', name: 'Eviolite', desc: '+10% Ataque y Defensa.', price: 40, spriteKey: 'Eviolite', category: 'holdable' },
+  { id: 'unlock_eviolite', name: 'Eviolite', desc: '+10% Defensa y Def. Esp.', price: 40, spriteKey: 'Eviolite', category: 'holdable' },
   { id: 'unlock_life_orb', name: 'Life Orb', desc: '+30% Daño, -5 HP/turno.', price: 100, spriteKey: 'Life Orb', category: 'holdable' },
   { id: 'unlock_rocky_helmet', name: 'Rocky Helmet', desc: '+15% Defensa.', price: 40, spriteKey: 'Rocky Helmet', category: 'holdable' },
   { id: 'unlock_scope_lens', name: 'Scope Lens', desc: '20% Golpe Crítico.', price: 70, spriteKey: 'Scope Lens', category: 'holdable' },
@@ -1260,7 +1311,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_vest_protector', name: 'Vest Protector', desc: '+25% DEF, -15% daño.', price: 80, spriteKey: 'Vest Protector', category: 'holdable' },
   { id: 'unlock_focus_band', name: 'Focus Band', desc: '25% Crítico, +10% ATK.', price: 60, spriteKey: 'Focus Band', category: 'holdable' },
   { id: 'unlock_dragon_fang', name: 'Dragon Fang', desc: '+20% ATK, +10% Velocidad.', price: 70, spriteKey: 'Dragon Fang', category: 'holdable' },
-  { id: 'unlock_guardian_charm', name: 'Guardian Charm', desc: '+15% DEF, +10 HP máx.', price: 60, spriteKey: 'Guardian Charm', category: 'holdable' },
+  { id: 'unlock_guardian_charm', name: 'Guardian Charm', desc: '+15% Def. Esp., +10 HP máx.', price: 60, spriteKey: 'Guardian Charm', category: 'holdable' },
   { id: 'unlock_berserker_band', name: 'Berserker Band', desc: '+30% ATK bajo 25% HP.', price: 80, spriteKey: 'Berserker Band', category: 'holdable' },
   { id: 'unlock_phantom_cloak', name: 'Phantom Cloak', desc: '10% Reducción, +10% Vel.', price: 70, spriteKey: 'Phantom Cloak', category: 'holdable' },
   { id: 'unlock_swift_feather', name: 'Swift Feather', desc: '+15% Vel, 10% Crítico.', price: 60, spriteKey: 'Swift Feather', category: 'holdable' },
@@ -1552,10 +1603,20 @@ function getNodeMapLayout(nodeCount: number): { positions: Array<{ x: number; y:
 
 function moveTooltip(move: Move): string {
   const accuracy = move.accuracy === null ? 'Siempre acierta' : `${move.accuracy}% precisión`
-  let info = `${move.name}\nPotencia: ${move.power}\n${accuracy}`
+  const isStatus = !move.power || move.power <= 0
+  const cls = isStatus ? 'Estado' : move.damageClass === 'special' ? 'Especial' : 'Físico'
+  let info = `${move.name}\n${isStatus ? 'Movimiento de estado' : `${cls} · Potencia: ${move.power}`}\n${accuracy}`
   if (move.ailment) {
-    const chance = move.ailmentChance ? ` (${Math.round(move.ailmentChance * 100)}%)` : ''
-    info += `\nEfecto: ${STATUS_LABELS[move.ailment]}${chance}`
+    const pct = Math.round((move.ailmentChance ?? 1) * 100)
+    info += `\nEfecto: ${STATUS_LABELS[move.ailment]} (${pct}%)`
+  }
+  if (move.statChanges && move.statChanges.length > 0) {
+    for (const sc of move.statChanges) {
+      const statName = sc.stat === 'attack' ? 'Ataque' : sc.stat === 'defense' ? 'Defensa' : sc.stat === 'speed' ? 'Velocidad' : sc.stat === 'special-attack' ? 'At. Esp.' : 'Def. Esp.'
+      const dir = sc.change > 0 ? 'Sube' : 'Baja'
+      const pct = sc.chance != null ? ` (${sc.chance}%)` : ''
+      info += `\nEfecto: ${dir} ${statName}${pct}`
+    }
   }
   if (move.minHits && move.maxHits) {
     info += `\nGolpes: ${move.minHits}-${move.maxHits}`
@@ -1573,21 +1634,35 @@ function moveTooltip(move: Move): string {
   return info
 }
 
+// Detecta movimientos de protección (Protección/Protect, Detección, Defensa
+// Férrea, etc.): movimientos de estado sin efecto propio que bloquean el
+// próximo ataque del rival.
+function isProtectMove(move: Move): boolean {
+  if ((move.power ?? 0) > 0) return false
+  if (move.ailment) return false
+  if (move.statChanges && move.statChanges.length > 0) return false
+  return /proteg|protec|protect|evita todos los ataques|evade all attacks|escudo|shield|refugio/i.test(`${move.name} ${move.description}`)
+}
+
 function getStageMultiplier(stage: number): number {
   if (stage > 0) return (2 + stage) / 2
   if (stage < 0) return 2 / (2 - stage)
   return 1
 }
 
-function getEffectiveStats(pokemon: Pokemon): { attack: number; defense: number; speed: number; maxHp: number } {
+function getEffectiveStats(pokemon: Pokemon): { attack: number; defense: number; spAttack: number; spDefense: number; speed: number; maxHp: number } {
   const item = pokemon.holdItem ? HOLDABLE_ITEMS[pokemon.holdItem] : null
-  const stages = pokemon.statStages ?? { attack: 0, defense: 0, speed: 0 }
+  const stages = pokemon.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
   const atkStage = getStageMultiplier(stages.attack)
   const defStage = getStageMultiplier(stages.defense)
+  const spaStage = getStageMultiplier(stages.spAttack ?? 0)
+  const spDefStage = getStageMultiplier(stages.spDefense ?? 0)
   const spdStage = getStageMultiplier(stages.speed)
   return {
     attack: Math.round(pokemon.attack * (1 + (item?.attackMod ?? 0)) * atkStage),
     defense: Math.round(pokemon.defense * (1 + (item?.defenseMod ?? 0)) * defStage),
+    spAttack: Math.round(pokemon.spAttack * (1 + (item?.spAttackMod ?? 0)) * spaStage),
+    spDefense: Math.round(pokemon.spDefense * (1 + (item?.spDefenseMod ?? 0)) * spDefStage),
     speed: Math.round(pokemon.speed * (1 + (item?.speedMod ?? 0)) * spdStage),
     maxHp: pokemon.maxHp,
   }
@@ -2142,7 +2217,7 @@ function MainApp() {
   useEffect(() => {
     if (screen === 'defeat' || screen === 'victory') {
       setTeam(prev => prev.map((p) => {
-        const reset = { statStages: { attack: 0, defense: 0, speed: 0 }, furiaActive: false }
+        const reset = { statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
         const orig = p.megaOrig
         if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...orig, ...reset }
         return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...reset }
@@ -2254,7 +2329,7 @@ function MainApp() {
       const level = activePokemon?.level ?? team[0]?.level ?? 50
       const pokemon = await buildPokemonFromApi(query, getEffectiveGen(), level, false)
       registerInPokedex(pokemon)
-      const withStages: Pokemon = { ...pokemon, statStages: { attack: 0, defense: 0, speed: 0 }, hp: pokemon.maxHp }
+      const withStages: Pokemon = { ...pokemon, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, hp: pokemon.maxHp }
       if (team.length < maxTeamSize) {
         setTeam(prev => [...prev, withStages])
       } else {
@@ -3862,6 +3937,8 @@ function MainApp() {
       maxHp: p.maxHp,
       attack: p.attack,
       defense: p.defense,
+      spAttack: p.spAttack,
+      spDefense: p.spDefense,
       speed: p.speed,
       moves: p.moves.map(m => ({ name: m.name, power: m.power, type: m.type, accuracy: m.accuracy })),
       types: p.types,
@@ -3880,6 +3957,8 @@ function MainApp() {
       maxHp: offer.maxHp ?? 10,
       attack: offer.attack ?? 10,
       defense: offer.defense ?? 10,
+      spAttack: offer.spAttack ?? 10,
+      spDefense: offer.spDefense ?? 10,
       speed: offer.speed ?? 10,
       moves: (offer.moves ?? []).map(m => ({ ...m, description: '', accuracy: m.accuracy })),
       types: offer.types,
@@ -4788,7 +4867,7 @@ function MainApp() {
     if (money < price) return
     playClick()
     setMoney((prev) => prev - price)
-    const purchased = { ...pokemon, hp: pokemon.maxHp, statStages: { attack: 0, defense: 0, speed: 0 } }
+    const purchased = { ...pokemon, hp: pokemon.maxHp, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
     registerInPokedex(purchased)
     if (team.length < maxTeamSize) {
       setTeam((prev) => [...prev, purchased])
@@ -5114,7 +5193,7 @@ function MainApp() {
                   speed: scaled.speed + Math.floor(Math.random() * 20) - 10,
                 }
               }
-              return { ...scaled, statStages: { attack: 0, defense: 0, speed: 0 } }
+              return { ...scaled, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
             })
         )
         const enemies = await Promise.all(fetches)
@@ -5305,7 +5384,7 @@ function MainApp() {
           speed: Math.floor(scaled.speed * gmaxMultiplier),
           maxHp: Math.floor(scaled.maxHp * (1 + (gmaxMultiplier - 1) * 0.5)),
           hp: Math.floor(scaled.hp * (1 + (gmaxMultiplier - 1) * 0.5)),
-          statStages: { attack: 0, defense: 0, speed: 0 },
+          statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 },
         }
         seenInPokedex({ ...gmaxEnemy, id: gmaxFormId ?? gmaxEnemy.id, sprite: gmaxSprite })
         setIsTrainerBattle(false)
@@ -5470,7 +5549,7 @@ function MainApp() {
         setTrainerName('Rival')
         setTrainerSprite("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='12' fill='%23ffffff'/%3E%3Ccircle cx='48' cy='36' r='17' fill='%234d9bff'/%3E%3Cpath d='M20 88 q0 -30 28 -30 q28 0 28 30' fill='%234d9bff'/%3E%3C/svg%3E")
         setTrainerBadge('')
-        setEnemy({ ...rivalTeam[0], statStages: { attack: 0, defense: 0, speed: 0 } })
+        setEnemy({ ...rivalTeam[0], statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } })
         setIsTeamRocketBattle(false)
         setIsRivalBattle(true)
         setBattleLog((prev) => [
@@ -5515,10 +5594,10 @@ function MainApp() {
         setTrainerName('TeamR Grunt')
         setTrainerSprite("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='12' fill='%23111'/%3E%3Ctext x='48' y='62' font-family='Arial Black,Arial' font-size='52' font-weight='900' fill='%23ef4444' text-anchor='middle'%3ER%3C/text%3E%3Ccircle cx='48' cy='80' r='3' fill='%23ef4444'/%3E%3C/svg%3E")
         setTrainerBadge('')
-        setEnemy({ ...rocketTeam[0], statStages: { attack: 0, defense: 0, speed: 0 } })
+        setEnemy({ ...rocketTeam[0], statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } })
         setIsTeamRocketBattle(true)
         setTeamRocketFainted(false)
-        setTeamRocketTeam(rocketTeam.map(p => ({ ...p, statStages: p.statStages ?? { attack: 0, defense: 0, speed: 0 } })))
+        setTeamRocketTeam(rocketTeam.map(p => ({ ...p, statStages: p.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } })))
         setTeamRocketStealMessage('')
         setTeamRocketPickModal(false)
         setBattleLog((prev) => [
@@ -5542,9 +5621,9 @@ function MainApp() {
                   const ids = await getSpeciesIdsByGeneration(targetGen)
                   const id = ids[Math.floor(Math.random() * ids.length)] || 1
                   const pokemon = await buildPokemonFromApi(id, targetGen, 50, false, difficulty)
-                  return { ...pokemon, level: 50, statStages: { attack: 0, defense: 0, speed: 0 } }
+                  return { ...pokemon, level: 50, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
                 } catch {
-                  return { id: 1, name: 'Bulbasaur', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png', level: 50, hp: 100, maxHp: 100, attack: 50, defense: 50, speed: 50, moves: [], statStages: { attack: 0, defense: 0, speed: 0 } } as Pokemon
+                  return { id: 1, name: 'Bulbasaur', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png', level: 50, hp: 100, maxHp: 100, attack: 50, defense: 50, spAttack: 50, spDefense: 50, speed: 50, moves: [], statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } } as Pokemon
                 }
               })()
             : (() => {
@@ -5609,13 +5688,13 @@ function MainApp() {
           }
           return p
         })
-        setTrainerTeam(megaTeam.map(p => ({ ...p, statStages: p.statStages ?? { attack: 0, defense: 0, speed: 0 } })))
+        setTrainerTeam(megaTeam.map(p => ({ ...p, statStages: p.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } })))
         newTrainerTeam.forEach(p => seenInPokedex(p))
         setTrainerPokemonIndex(0)
         setTrainerName(chosenName)
         setTrainerSprite(chosenSprite)
         setTrainerBadge(chosenBadge)
-        setEnemy({ ...megaTeam[0], statStages: { attack: 0, defense: 0, speed: 0 } })
+        setEnemy({ ...megaTeam[0], statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } })
         setBattleLog((prev) => [
           isBoss
             ? `🏆 ¡El Líder ${chosenName} quiere combatir! (${chosenBadge})`
@@ -5642,7 +5721,7 @@ function MainApp() {
             speed: generatedEnemy.speed + Math.floor(Math.random() * 20) - 10,
           }
         }
-        generatedEnemy = { ...generatedEnemy, holdItem: null, statStages: { attack: 0, defense: 0, speed: 0 } }
+        generatedEnemy = { ...generatedEnemy, holdItem: null, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
         setIsTrainerBattle(false)
         setTrainerTeam([])
         setTrainerPokemonIndex(0)
@@ -5651,7 +5730,7 @@ function MainApp() {
     setTrainerBadge('')
     setReviveModal(null)
     setEquipModal(null)
-        setEnemy(generatedEnemy)
+        setEnemy({ ...generatedEnemy, justEntered: true })
         seenInPokedex(generatedEnemy)
         setBattleLog((prev) => [
           `🌿 ¡Un ${generatedEnemy.name} salvaje (Nv.${generatedEnemy.level}) apareció!`,
@@ -5660,10 +5739,11 @@ function MainApp() {
       }
       }
 
-      setTeam(prev => prev.map(p => {
+      setTeam(prev => prev.map((p, i) => {
         const orig = p.megaOrig
-        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...orig, statStages: { attack: 0, defense: 0, speed: 0 }, furiaActive: false }
-        return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, statStages: { attack: 0, defense: 0, speed: 0 }, furiaActive: false }
+        const entered = i === activeIndex
+        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: entered, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
+        return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: entered, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
       }))
       setBattleMegaUsed(false)
       setBattleGmaxUsed(false)
@@ -6102,9 +6182,12 @@ function MainApp() {
   }
 
   function applyAilmentToTarget(target: Pokemon, move: Move): Pokemon {
-    if (!move.ailment || !move.ailmentChance) return target
+    if (!move.ailment) return target
     if (target.status) return target
-    if (Math.random() >= move.ailmentChance) return target
+    // Si el movimiento trae afección pero no chance (p. ej. Polvo Veneno con
+    // ailment_chance 0 en PokeAPI), se aplica garantizada.
+    const chance = move.ailmentChance ?? 1
+    if (Math.random() >= chance) return target
 
     const ailmentTurns: Record<StatusType, number> = {
       burn: 999,
@@ -6128,6 +6211,28 @@ function MainApp() {
     move: Move,
     isEnemyHit: boolean
   ): { updatedDefender: Pokemon; updatedAttacker: Pokemon; lines: string[]; attackerHeal: number; crits: number; superEffective: boolean } {
+    // El defensor está protegido (Protección/Protect): se bloquea el ataque.
+    if (defender.protected) {
+      return {
+        updatedDefender: { ...defender, protected: false },
+        updatedAttacker: { ...attacker, protected: false },
+        lines: [`🛡️ ¡${defender.name} se protegió del ataque de ${attacker.name}!`],
+        attackerHeal: 0,
+        crits: 0,
+        superEffective: false,
+      }
+    }
+    // El atacante intenta usar un movimiento anulado (Anulación/Disable).
+    if (attacker.disabled && attacker.disabled.move === move.name) {
+      return {
+        updatedDefender: defender,
+        updatedAttacker: attacker,
+        lines: [`🚫 ¡${attacker.name} no puede usar ${move.name} por Anulación!`],
+        attackerHeal: 0,
+        crits: 0,
+        superEffective: false,
+      }
+    }
     const enemyBoost = isEnemyHit ? modifier?.enemyAttackDelta ?? 0 : 0
 
     const attackerItem = attacker.holdItem ? HOLDABLE_ITEMS[attacker.holdItem] : null
@@ -6143,20 +6248,24 @@ function MainApp() {
     const burnNerf = attacker.status?.type === 'burn' ? 0.5 : 1
     const paralysisSpdNerf = attacker.status?.type === 'paralysis' ? 0.75 : 1
 
-    const atkStages = attacker.statStages ?? { attack: 0, defense: 0, speed: 0 }
-    const defStages = defender.statStages ?? { attack: 0, defense: 0, speed: 0 }
+    const atkStages = attacker.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+    const defStages = defender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
     const atkStageMult = getStageMultiplier(atkStages.attack)
+    const spaStageMult = getStageMultiplier(atkStages.spAttack ?? 0)
     const spdStageMult = getStageMultiplier(atkStages.speed)
     const defStageMult = getStageMultiplier(defStages.defense)
+    const spDefStageMult = getStageMultiplier(defStages.spDefense ?? 0)
 
     const effectiveAttacker: Pokemon = {
       ...attacker,
       attack: Math.round(attacker.attack * (1 + (attackerItem?.attackMod ?? 0) + playerAtkMod) * burnNerf * atkStageMult),
+      spAttack: Math.round(attacker.spAttack * (1 + (attackerItem?.spAttackMod ?? 0) + playerAtkMod) * spaStageMult),
       speed: Math.round(attacker.speed * (1 + (attackerItem?.speedMod ?? 0) + playerSpdMod) * paralysisSpdNerf * spdStageMult + enemySpdDelta)
     }
     const effectiveDefender: Pokemon = {
       ...defender,
-      defense: Math.round(defender.defense * (1 + (defenderItem?.defenseMod ?? 0) + playerDefMod) * defStageMult + enemyDefDelta)
+      defense: Math.round(defender.defense * (1 + (defenderItem?.defenseMod ?? 0) + playerDefMod) * defStageMult + enemyDefDelta),
+      spDefense: Math.round(defender.spDefense * (1 + (defenderItem?.spDefenseMod ?? 0) + playerDefMod) * spDefStageMult + enemyDefDelta)
     }
 
     const effectiveMove = runChallenges.typeRandomizer
@@ -6179,7 +6288,7 @@ function MainApp() {
       if (accRoll >= move.accuracy) {
         return {
           updatedDefender: defender,
-          updatedAttacker: attacker,
+          updatedAttacker: { ...attacker, protected: false },
           lines: [`${attacker.name} usó ${effectiveMove.name} pero falló.`],
           attackerHeal: 0,
           crits: 0,
@@ -6199,6 +6308,8 @@ function MainApp() {
     let totalDamage = 0
     let totalCrits = 0
 
+    const isDamagingMove = (effectiveMove.power ?? 0) > 0
+    if (isDamagingMove) {
     for (let hit = 0; hit < totalHits; hit++) {
       const result = applyDamage(effectiveAttacker, currentDefender, effectiveMove, enemyBoost)
       let finalDamage = Math.floor(result.damage * effectiveness * stabBonus)
@@ -6239,53 +6350,86 @@ function MainApp() {
 
       if (currentDefender.hp <= 0) break
     }
+    } else {
+      // Movimiento de estado: no hace daño, solo puede aplicar su efecto.
+      lines.push(`${attacker.name} usa ${effectiveMove.name}.`)
+    }
 
     // --- Ailment application on first hit only ---
     if (totalHits > 0 && currentDefender.hp > 0) {
-      const ailmentedDefender = applyAilmentToTarget(currentDefender, move)
-      if (ailmentedDefender.status && ailmentedDefender.status.type !== currentDefender.status?.type) {
-        currentDefender = ailmentedDefender
-        const ailmentLabel = STATUS_LABELS[ailmentedDefender.status.type]
-        lines.push(`${currentDefender.name} fue ${ailmentLabel.split(' ')[1]} ${ailmentLabel.split(' ')[0]}.`)
+      // Sorpresa/Abatimiento (Fake Out): solo aturde en la PRIMERA acción del
+      // Pokémon tras entrar a la lucha; si ya actuó antes, no aturde.
+      const firstAction = attacker.justEntered ?? false
+      const canFlinch = !effectiveMove.fakeOut || firstAction
+      if (canFlinch) {
+        const ailmentedDefender = applyAilmentToTarget(currentDefender, move)
+        if (ailmentedDefender.status && ailmentedDefender.status.type !== currentDefender.status?.type) {
+          currentDefender = ailmentedDefender
+          const ailmentLabel = STATUS_LABELS[ailmentedDefender.status.type]
+          lines.push(`${currentDefender.name} fue ${ailmentLabel.split(' ')[1]} ${ailmentLabel.split(' ')[0]}.`)
+        }
+      } else {
+        lines.push(`${attacker.name} usa ${effectiveMove.name}: el rival ya conocía el ataque y no se aturdió.`)
+      }
+      // Drenadoras (Leech Seed): siembra al objetivo para drenarle HP por turno.
+      if (effectiveMove.leechSeed && !currentDefender.leechSeed) {
+        currentDefender = { ...currentDefender, leechSeed: true }
+        lines.push(`🌱 ¡${currentDefender.name} fue sembrado con Drenadoras!`)
+      }
+      // Anulación (Disable): bloquea el último movimiento usado del objetivo.
+      if (effectiveMove.disable && currentDefender.lastMove && !currentDefender.disabled) {
+        currentDefender = { ...currentDefender, disabled: { move: currentDefender.lastMove, turns: 4 } }
+        lines.push(`🚫 ¡${currentDefender.name} no podrá usar ${currentDefender.lastMove} por Anulación!`)
       }
     }
 
     // --- Stat changes ---
-    let attackerStages = effectiveAttacker.statStages ?? { attack: 0, defense: 0, speed: 0 }
+    let attackerStages = effectiveAttacker.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
     if (effectiveMove.statChanges && effectiveMove.statChanges.length > 0) {
       const isDamaging = (effectiveMove.power ?? 0) > 0
       const cat = effectiveMove.metaCategory ?? ''
-      for (const sc of effectiveMove.statChanges) {
+      const changes = effectiveMove.statChanges
+
+      // Decidir si los cambios afectan al atacante o al defensor. La categoría de
+      // PokeAPI es poco fiable (Malicioso/Leer sale como 'net-good-stats' aunque
+      // baja la Defensa del RIVAL), así que en movimientos de estado se usa el
+      // conjunto de cambios: solo negativos → rival; con positivos o mezcla →
+      // uno mismo (Danza Espada, Rompecoraza).
+      let changesHitSelf: boolean
+      if (isDamaging) {
+        changesHitSelf = cat === 'net-good-stats' || cat === 'damage+raise'
+      } else if (cat === 'net-bad-stats' || cat === 'swagger') {
+        changesHitSelf = false
+      } else {
+        changesHitSelf = changes.some(sc => sc.change > 0)
+      }
+
+      for (const sc of changes) {
         const rolled = sc.chance == null || Math.random() * 100 < sc.chance
         if (!rolled) continue
-        const applyToAttacker = cat === 'net-good-stats'
-          || (isDamaging && sc.change > 0)
-        const applyToDefender = cat === 'net-bad-stats'
-          || (isDamaging && sc.change < 0)
-          || (!isDamaging && cat === '')
-        if (!applyToAttacker && !applyToDefender) continue
-        if (applyToAttacker) {
-          const statKey = sc.stat as keyof typeof attackerStages
+
+        if (changesHitSelf) {
+          const stageKey: keyof typeof attackerStages = sc.stat === 'special-attack' ? 'spAttack' : sc.stat === 'special-defense' ? 'spDefense' : sc.stat
           const change = Number.isFinite(sc.change) ? sc.change : 0
-          const oldStage = attackerStages[statKey] ?? 0
+          const oldStage = attackerStages[stageKey] ?? 0
           const newStage = Math.max(-6, Math.min(6, oldStage + change))
           if (newStage !== oldStage) {
-            attackerStages = { ...attackerStages, [statKey]: newStage }
+            attackerStages = { ...attackerStages, [stageKey]: newStage }
             const direction = change > 0 ? 'subió' : 'bajó'
-            const statName = statKey === 'attack' ? 'Ataque' : statKey === 'defense' ? 'Defensa' : 'Velocidad'
+            const statName = sc.stat === 'attack' ? 'Ataque' : sc.stat === 'defense' ? 'Defensa' : sc.stat === 'special-attack' ? 'At. Esp.' : sc.stat === 'special-defense' ? 'Def. Esp.' : 'Velocidad'
             lines.push(`${effectiveAttacker.name} ${direction} su ${statName}! (${oldStage > 0 ? '+' : ''}${oldStage} → ${newStage > 0 ? '+' : ''}${newStage})`)
           }
-        } else if (applyToDefender && currentDefender.hp > 0) {
-          let newStages = currentDefender.statStages ?? { attack: 0, defense: 0, speed: 0 }
-          const statKey = sc.stat as keyof typeof newStages
+        } else if (currentDefender.hp > 0) {
+          let newStages = currentDefender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+          const stageKey: keyof typeof newStages = sc.stat === 'special-attack' ? 'spAttack' : sc.stat === 'special-defense' ? 'spDefense' : sc.stat
           const change = Number.isFinite(sc.change) ? sc.change : 0
-          const oldStage = newStages[statKey] ?? 0
+          const oldStage = newStages[stageKey] ?? 0
           const newStage = Math.max(-6, Math.min(6, oldStage + change))
           if (newStage !== oldStage) {
-            newStages = { ...newStages, [statKey]: newStage }
+            newStages = { ...newStages, [stageKey]: newStage }
             currentDefender = { ...currentDefender, statStages: newStages }
             const direction = change > 0 ? 'subió' : 'bajó'
-            const statName = statKey === 'attack' ? 'Ataque' : statKey === 'defense' ? 'Defensa' : 'Velocidad'
+            const statName = sc.stat === 'attack' ? 'Ataque' : sc.stat === 'defense' ? 'Defensa' : sc.stat === 'special-attack' ? 'At. Esp.' : sc.stat === 'special-defense' ? 'Def. Esp.' : 'Velocidad'
             lines.push(`${currentDefender.name} ${direction} su ${statName}! (${oldStage > 0 ? '+' : ''}${oldStage} → ${newStage > 0 ? '+' : ''}${newStage})`)
           }
         }
@@ -6294,7 +6438,7 @@ function MainApp() {
 
     // --- Furia (Rage): boost defender's Attack when hit while furiaActive ---
     if (totalDamage > 0 && currentDefender.hp > 0 && defender.furiaActive) {
-      let newStages = currentDefender.statStages ?? { attack: 0, defense: 0, speed: 0 }
+      let newStages = currentDefender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
       if (newStages.attack < 6) {
         newStages = { ...newStages, attack: Math.min(6, newStages.attack + 1) }
         currentDefender = { ...currentDefender, statStages: newStages }
@@ -6310,11 +6454,12 @@ function MainApp() {
 
     // --- Recoil damage ---
     let recoilDamage = 0
-    const hasAttackerStageChange = attackerStages.attack !== 0 || attackerStages.defense !== 0 || attackerStages.speed !== 0
+    const hasAttackerStageChange = attackerStages.attack !== 0 || attackerStages.defense !== 0 || attackerStages.spAttack !== 0 || attackerStages.spDefense !== 0 || attackerStages.speed !== 0
     const furiaActive = move.name === 'Furia' || attacker.furiaActive || false
+    const protectUsed = isProtectMove(effectiveMove)
     let updatedAttacker = hasAttackerStageChange
-      ? { ...attacker, statStages: attackerStages, furiaActive }
-      : { ...attacker, furiaActive }
+      ? { ...attacker, statStages: attackerStages, furiaActive, protected: protectUsed, lastMove: effectiveMove.name, justEntered: false }
+      : { ...attacker, furiaActive, protected: protectUsed, lastMove: effectiveMove.name, justEntered: false }
     if (move.recoilPercent && move.recoilPercent > 0 && totalDamage > 0) {
       recoilDamage = Math.floor(totalDamage * move.recoilPercent)
       updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - recoilDamage) }
@@ -6370,6 +6515,31 @@ function MainApp() {
     nextEnemy = enemyTick.updatedPokemon
     logs.push(...enemyTick.log)
 
+    // --- Drenadoras (Leech Seed): drena HP del sembrado y cura al otro lado ---
+    const leechDrain = (p: Pokemon): number => (p.leechSeed && p.hp > 0 ? Math.max(1, Math.floor(p.maxHp / 8)) : 0)
+    const enemySeedDrain = leechDrain(nextEnemy)
+    const playerSeedDrain = leechDrain(nextPlayer)
+    if (enemySeedDrain > 0) {
+      nextEnemy = { ...nextEnemy, hp: Math.max(0, nextEnemy.hp - enemySeedDrain) }
+      nextPlayer = { ...nextPlayer, hp: Math.min(nextPlayer.maxHp, nextPlayer.hp + enemySeedDrain) }
+      logs.push(`🌱 ${nextEnemy.name} pierde ${enemySeedDrain} HP por Drenadoras; ${nextPlayer.name} recupera ${enemySeedDrain} HP.`)
+    }
+    if (playerSeedDrain > 0) {
+      nextPlayer = { ...nextPlayer, hp: Math.max(0, nextPlayer.hp - playerSeedDrain) }
+      nextEnemy = { ...nextEnemy, hp: Math.min(nextEnemy.maxHp, nextEnemy.hp + playerSeedDrain) }
+      logs.push(`🌱 ${nextPlayer.name} pierde ${playerSeedDrain} HP por Drenadoras; ${nextEnemy.name} recupera ${playerSeedDrain} HP.`)
+    }
+
+    // --- Anulación (Disable): decrementa los turnos del movimiento anulado ---
+    const tickDisable = (p: Pokemon): Pokemon => {
+      if (!p.disabled) return p
+      const turns = p.disabled.turns - 1
+      if (turns <= 0) return { ...p, disabled: undefined }
+      return { ...p, disabled: { ...p.disabled, turns } }
+    }
+    nextPlayer = tickDisable(nextPlayer)
+    nextEnemy = tickDisable(nextEnemy)
+
     // Check if status killed either side
     if (nextPlayer.hp <= 0) {
       nextTeam[activeIndex] = nextPlayer
@@ -6402,6 +6572,7 @@ function MainApp() {
         setActiveIndex(Math.max(0, Math.min(activeIndex, nuzlockeTeam.length - 1)))
         setBattleLog((prev) => [`💀 Nuzlocke: ${nextPlayer.name} fue debilitado por su estado y liberado.`, ...logs, ...prev].slice(0, 15))
       } else {
+        if (nextTeam[nextAliveIndex]) nextTeam[nextAliveIndex] = { ...nextTeam[nextAliveIndex], justEntered: true }
         setTeam(nextTeam)
         setActiveIndex(nextAliveIndex)
         setBattleLog((prev) => [`${nextPlayer.name} fue debilitado por su estado.`, ...logs, ...prev].slice(0, 15))
@@ -6448,8 +6619,8 @@ function MainApp() {
     if (playerPriority !== enemyPriority) {
       playerStarts = playerPriority > enemyPriority
     } else {
-      const pStages = nextPlayer.statStages ?? { attack: 0, defense: 0, speed: 0 }
-      const eStages = nextEnemy.statStages ?? { attack: 0, defense: 0, speed: 0 }
+      const pStages = nextPlayer.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+      const eStages = nextEnemy.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
       const pSpdStage = getStageMultiplier(pStages.speed)
       const eSpdStage = getStageMultiplier(eStages.speed)
       const playerEffectiveSpeed = Math.round(nextPlayer.speed * (1 + (playerItem?.speedMod ?? 0)) * playerParalysisNerf * pSpdStage)
@@ -6494,7 +6665,18 @@ function MainApp() {
 
     const doEnemyAttack = async () => {
       if (nextEnemy.hp <= 0 || nextPlayer.hp <= 0 || enemySkipped || enemyConfusedSelfHit) return
-      const enemyMove = enemyMoveForPriority
+      let enemyMove = enemyMoveForPriority
+      // Anulación: el rival evita su movimiento anulado si puede.
+      if (nextEnemy.disabled && nextEnemy.disabled.move === enemyMove.name) {
+        const usable = nextEnemy.moves.filter(m => m.name !== nextEnemy.disabled?.move)
+        if (usable.length > 0) {
+          enemyMove = usable[Math.floor(Math.random() * usable.length)]
+          logs.push(`🚫 ${nextEnemy.name} no puede usar su movimiento anulado y usa ${enemyMove.name}.`)
+        } else {
+          logs.push(`🚫 ¡${nextEnemy.name} está anulado y no puede moverse!`)
+          return
+        }
+      }
       if (enemyMove.name !== 'Furia') nextEnemy = { ...nextEnemy, furiaActive: false }
       const enemyHit = performHit(nextEnemy, nextPlayer, enemyMove, true)
       nextPlayer = enemyHit.updatedDefender
@@ -6611,6 +6793,7 @@ function MainApp() {
         setActiveIndex(Math.max(0, newActiveIdx))
         setBattleLog((prev) => [`💀 Nuzlocke: ${nextPlayer.name} fue debilitado y liberado.`, ...logs, ...prev].slice(0, 15))
       } else {
+        if (nextTeam[nextAliveIndex]) nextTeam[nextAliveIndex] = { ...nextTeam[nextAliveIndex], justEntered: true }
         setTeam(nextTeam)
         setActiveIndex(nextAliveIndex)
         setBattleLog((prev) => [`${nextPlayer.name} cayó debilitado.`, ...logs, ...prev].slice(0, 15))
@@ -6650,6 +6833,8 @@ function MainApp() {
         const hpGain = levelsGained * 3
         const atkGain = levelsGained * 2
         const defGain = levelsGained * 2
+        const spaGain = levelsGained * 2
+        const spDefGain = levelsGained * 2
         const spdGain = levelsGained * 2
         const oldLevel = pokemon.level
         const newLevel = oldLevel + levelsGained
@@ -6662,6 +6847,8 @@ function MainApp() {
           hp: Math.min(newMaxHp, pokemon.hp + (difficulty === 'coliseum' ? 0 : Math.round(newMaxHp * 0.10)) + hpGain),
           attack: pokemon.attack + atkGain,
           defense: pokemon.defense + defGain,
+          spAttack: pokemon.spAttack + spaGain,
+          spDefense: pokemon.spDefense + spDefGain,
           speed: pokemon.speed + spdGain
         }
 
@@ -6859,7 +7046,7 @@ function MainApp() {
         const nextPkmn = updatedTrainerTeam[nextTrainerIndex]
         setTrainerTeam(updatedTrainerTeam)
         setTrainerPokemonIndex(nextTrainerIndex)
-        setEnemy({ ...nextPkmn, statStages: { attack: 0, defense: 0, speed: 0 } })
+        setEnemy({ ...nextPkmn, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, justEntered: true })
         setTeam(newTeam)
         setBattleLog((prev) => [
           `${trainerName} envía a ${nextPkmn.name} Nv.${nextPkmn.level}!`,
@@ -6998,10 +7185,12 @@ function MainApp() {
     setTeam(prev => prev.map((p, i) => i === activeIndex ? {
       ...p,
       megaEvolved: true,
-      megaOrig: { sprite: p.sprite, attack: p.attack, defense: p.defense, speed: p.speed },
+      megaOrig: { sprite: p.sprite, attack: p.attack, defense: p.defense, spAttack: p.spAttack, spDefense: p.spDefense, speed: p.speed },
       sprite: megaSprite ?? p.sprite,
       attack: Math.floor(p.attack * 1.15),
       defense: Math.floor(p.defense * 1.15),
+      spAttack: Math.floor(p.spAttack * 1.15),
+      spDefense: Math.floor(p.spDefense * 1.15),
       speed: Math.floor(p.speed * 1.15),
     } : p))
     if (megaFormId) {
@@ -7029,10 +7218,12 @@ function MainApp() {
       ...p,
       gmaxEvolved: true,
       gmaxTurnsLeft: 3,
-      megaOrig: p.megaOrig ?? { sprite: p.sprite, attack: p.attack, defense: p.defense, speed: p.speed },
+      megaOrig: p.megaOrig ?? { sprite: p.sprite, attack: p.attack, defense: p.defense, spAttack: p.spAttack, spDefense: p.spDefense, speed: p.speed },
       sprite: gmaxSprite ?? p.sprite,
       attack: Math.floor(p.attack * 1.15),
       defense: Math.floor(p.defense * 1.15),
+      spAttack: Math.floor(p.spAttack * 1.15),
+      spDefense: Math.floor(p.spDefense * 1.15),
       speed: Math.floor(p.speed * 1.15),
     } : p))
     if (gmaxFormId) {
@@ -7059,10 +7250,12 @@ function MainApp() {
     setTeam(prev => prev.map((p, i) => i === activeIndex ? {
       ...p,
       primalEvolved: true,
-      megaOrig: { sprite: p.sprite, attack: p.attack, defense: p.defense, speed: p.speed },
+      megaOrig: { sprite: p.sprite, attack: p.attack, defense: p.defense, spAttack: p.spAttack, spDefense: p.spDefense, speed: p.speed },
       sprite: primalSprite ?? p.sprite,
       attack: Math.floor(p.attack * 1.15),
       defense: Math.floor(p.defense * 1.15),
+      spAttack: Math.floor(p.spAttack * 1.15),
+      spDefense: Math.floor(p.spDefense * 1.15),
       speed: Math.floor(p.speed * 1.15),
     } : p))
     if (formId) {
@@ -7077,7 +7270,11 @@ function MainApp() {
     if (!target || target.hp <= 0 || index === activeIndex) return
     const orig = team[activeIndex]?.megaOrig
     setTeam(prev => prev.map((p, i) => {
-      if (i === activeIndex && orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...orig }
+      // Al cambiar de Pokémon se pierden Drenadoras y Anulación (como en los juegos reales),
+      // y el que entra cuenta como "recién llegado" para Sorpresa/Abatimiento.
+      if (i === activeIndex && orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false, ...orig }
+      if (i === activeIndex) return { ...p, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false }
+      if (i === index) return { ...p, justEntered: true }
       return p
     }))
     setActiveIndex(index)
@@ -7131,6 +7328,8 @@ function MainApp() {
         hp: newBase.maxHp + 15,
         attack: newBase.attack + 5,
         defense: newBase.defense + 5,
+        spAttack: newBase.spAttack + 5,
+        spDefense: newBase.spDefense + 5,
         speed: newBase.speed + 3,
         holdItem: targetPokemon.holdItem,
       }
@@ -7978,13 +8177,15 @@ function MainApp() {
                         )}
                       </strong>
                       <span style={{ fontSize: '0.75rem', color: canEquip ? '#9b98cf' : '#475569' }}>
-                        Nv. {pkmn.level} · ATK: {eff.attack} · DEF: {eff.defense} · SPD: {eff.speed}
+                        Nv. {pkmn.level} · ATK: {eff.attack} · DEF: {eff.defense} · At.Esp: {eff.spAttack} · Def.Esp: {eff.spDefense} · SPD: {eff.speed}
                       </span>
                     </div>
                     {canEquip && item && (
                       <div style={{ fontSize: '0.65rem', color: '#cba3ff', textAlign: 'right', whiteSpace: 'nowrap' }}>
                         {item.attackMod && <div>ATK {eff.attack} → {Math.round(pkmn.attack * (1 + item.attackMod))}</div>}
                         {item.defenseMod && <div>DEF {eff.defense} → {Math.round(pkmn.defense * (1 + item.defenseMod))}</div>}
+                        {item.spAttackMod && <div>At.Esp {eff.spAttack} → {Math.round(pkmn.spAttack * (1 + item.spAttackMod))}</div>}
+                        {item.spDefenseMod && <div>Def.Esp {eff.spDefense} → {Math.round(pkmn.spDefense * (1 + item.spDefenseMod))}</div>}
                         {item.speedMod && <div>SPD {eff.speed} → {Math.round(pkmn.speed * (1 + item.speedMod))}</div>}
                         {item.maxHpMod && <div>HP {pkmn.maxHp} → {pkmn.maxHp + item.maxHpMod}</div>}
                         {item.healPerTurn && item.healPerTurn > 0 && <div>+{item.healPerTurn} HP/turno</div>}
@@ -8794,7 +8995,7 @@ function MainApp() {
                           <img key={hit ? pvpHit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '128px', height: '128px', imageRendering: 'pixelated' }} />
                           <div style={{ fontSize: '0.95rem', color: '#f3f1ff', fontWeight: 'bold' }}>{pk?.name}</div>
                           <div style={{ fontSize: '0.8rem', color: '#7d7ab5' }}>Nv.{pk?.level}</div>
-                          {pk?.status && <div style={{ fontSize: '0.8rem', color: '#fb923c' }}>{STATUS_LABELS[pk.status.type]}</div>}
+                          {pk?.status && <div style={{ marginTop: '2px' }}><StatusBadge status={pk.status} compact /></div>}
                           {hpBar(pk)}
                         </>
                       )
@@ -8813,7 +9014,7 @@ function MainApp() {
                           <img key={hit ? pvpHit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '128px', height: '128px', imageRendering: 'pixelated' }} />
                           <div style={{ fontSize: '0.95rem', color: '#f3f1ff', fontWeight: 'bold' }}>{pk?.name}</div>
                           <div style={{ fontSize: '0.8rem', color: '#7d7ab5' }}>Nv.{pk?.level}</div>
-                          {pk?.status && <div style={{ fontSize: '0.8rem', color: '#fb923c' }}>{STATUS_LABELS[pk.status.type]}</div>}
+                          {pk?.status && <div style={{ marginTop: '2px' }}><StatusBadge status={pk.status} compact /></div>}
                           {hpBar(pk)}
                         </>
                       )
@@ -9001,7 +9202,7 @@ function MainApp() {
                     if (selectedIdx >= 0) {
                       setColiseumTempTeam(prev => prev.filter(p => p.id !== pkmn.id))
                     } else if (coliseumTempTeam.length < 6) {
-                      setColiseumTempTeam(prev => [...prev, { id: pkmn.id, name: pkmn.name, sprite: pkmn.sprite, level: 1, hp: 1, maxHp: 1, attack: 1, defense: 1, speed: 1, moves: [], types: pkmn.types }])
+                      setColiseumTempTeam(prev => [...prev, { id: pkmn.id, name: pkmn.name, sprite: pkmn.sprite, level: 1, hp: 1, maxHp: 1, attack: 1, defense: 1, spAttack: 1, spDefense: 1, speed: 1, moves: [], types: pkmn.types }])
                     }
                   }}
                   style={{
@@ -9029,7 +9230,7 @@ function MainApp() {
             <SetupBanner />
             <div className="setup-hero-overlay">
               <div>
-                <h1 className="setup-hero-title">¡Bienvenido!</h1>
+                <h1 className="setup-hero-title">¡Bienvenid@!</h1>
                 <p className="setup-hero-sub">Elige tu generación y dificultad para comenzar la aventura.</p>
               </div>
               <div className="setup-hero-actions">
@@ -9601,9 +9802,13 @@ function MainApp() {
         <section className="roulette-layout">
           <article className="panel trainer-panel">
             <p className="muted small-tag">Trainer</p>
-            <img className={`sprite trainer-sprite${activePokemon.megaEvolved ? ' mega-active' : ''}${activePokemon.gmaxEvolved ? ' gmax-active' : ''}`} src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
+            <div style={{ position: 'relative', display: 'block', width: 'fit-content', margin: '0 auto' }}>
+              <img className={`sprite trainer-sprite${activePokemon.megaEvolved ? ' mega-active' : ''}${activePokemon.gmaxEvolved ? ' gmax-active' : ''}`} src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
+              <StatusFloat pokemon={activePokemon} />
+            </div>
             <h2>
               {activePokemon.name}{activePokemon.shiny ? ' ✨' : ''}
+              {activePokemon.leechSeed && <span title="Drenadoras" style={{ marginLeft: '5px' }}>🌱</span>}
               <StatusBadge status={activePokemon.status} />
             </h2>
             <p className="muted" style={{ fontSize: '1.2rem' }}>
@@ -9637,7 +9842,7 @@ function MainApp() {
                         style={{ width: '18px', height: '18px', imageRendering: 'pixelated', position: 'absolute', bottom: '4px', right: '4px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
                       />
                     )}
-                    <strong>{pokemon.name}{pokemon.shiny ? ' ✨' : ''}</strong>
+                    <strong>{pokemon.name}{pokemon.shiny ? ' ✨' : ''}{pokemon.leechSeed ? ' 🌱' : ''}</strong>
                     <span>
                       {pokemon.hp}/{pokemon.maxHp}
                       <StatusBadge status={pokemon.status} compact />
@@ -9667,17 +9872,15 @@ function MainApp() {
                     )}
                     {(() => {
                       const eff = getEffectiveStats(pokemon)
-                      const stages = pokemon.statStages ?? { attack: 0, defense: 0, speed: 0 }
-                      const hasItem = !!pokemon.holdItem
+                      const stages = pokemon.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
                       const isMegaGmax = pokemon.megaEvolved || pokemon.gmaxEvolved
                       const fmt = (base: number, eff_: number, stage_: number) => {
                         const parts: ReactNode[] = []
-                        if (hasItem && base !== eff_ && !isMegaGmax) {
-                          parts.push(<strong key="v">{eff_}</strong>)
-                          parts.push(<span key="i" style={{ fontSize: '0.7rem', color: '#7ceb95' }}> (+{eff_ - base})</span>)
-                        } else if (isMegaGmax) {
-                          parts.push(<strong key="v" style={{ color: '#ff9ad6' }}>{eff_}</strong>)
-                          parts.push(<span key="i" style={{ fontSize: '0.7rem', color: '#ff9ad6' }}> (+{eff_ - base})</span>)
+                        const diff = eff_ - base
+                        if (diff !== 0) {
+                          const color = isMegaGmax ? '#ff9ad6' : diff > 0 ? '#7ceb95' : '#ff8a80'
+                          parts.push(<strong key="v" style={{ color }}>{eff_}</strong>)
+                          parts.push(<span key="i" style={{ fontSize: '0.7rem', color }}> ({diff > 0 ? '+' : ''}{diff})</span>)
                         } else {
                           parts.push(<strong key="v">{base}</strong>)
                         }
@@ -9693,6 +9896,8 @@ function MainApp() {
                           <div className="tooltip-stat"><span>HP</span><strong>{pokemon.hp}/{pokemon.maxHp}</strong></div>
                           <div className="tooltip-stat"><span>Ataque</span>{fmt(pokemon.attack, eff.attack, stages.attack)}</div>
                           <div className="tooltip-stat"><span>Defensa</span>{fmt(pokemon.defense, eff.defense, stages.defense)}</div>
+                          <div className="tooltip-stat"><span>At. Esp.</span>{fmt(pokemon.spAttack, eff.spAttack, stages.spAttack ?? 0)}</div>
+                          <div className="tooltip-stat"><span>Def. Esp.</span>{fmt(pokemon.spDefense, eff.spDefense, stages.spDefense ?? 0)}</div>
                           <div className="tooltip-stat"><span>Velocidad</span>{fmt(pokemon.speed, eff.speed, stages.speed)}</div>
                         </>
                       )
@@ -10610,7 +10815,7 @@ function MainApp() {
                     return (
                       <div key={idx} style={{ textAlign: 'center', flex: 1, maxWidth: 180, opacity: enemy.hp <= 0 ? 0.35 : 1 }}>
                         <img key={hit ? hit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={{ width: 72, height: 72, imageRendering: 'pixelated' }} />
-                        <div style={{ fontSize: '0.8rem', color: '#f3f1ff', fontWeight: 'bold' }}>{enemy.name}{enemy.hp <= 0 ? ' (debilitado)' : ''}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#f3f1ff', fontWeight: 'bold' }}>{enemy.name}{enemy.hp <= 0 ? ' (debilitado)' : ''}<StatusBadge status={enemy.status} compact /></div>
                         <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>HP {Math.max(0, enemy.hp)}/{enemy.maxHp}</div>
                       </div>
                     )
@@ -10625,7 +10830,7 @@ function MainApp() {
                     return (
                       <div key={slot} style={{ textAlign: 'center', flex: 1, maxWidth: 180 }}>
                         <img key={hit ? hit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={pokemon.sprite} alt={pokemon.name} onError={fallbackSprite} style={{ width: 72, height: 72, imageRendering: 'pixelated' }} />
-                        <div style={{ fontSize: '0.8rem', color: '#ffcb05', fontWeight: 'bold' }}>{pokemon.name}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#ffcb05', fontWeight: 'bold' }}>{pokemon.name}<StatusBadge status={pokemon.status} compact /></div>
                         <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>HP {Math.max(0, pokemon.hp)}/{pokemon.maxHp}</div>
                       </div>
                     )
@@ -10701,6 +10906,7 @@ function MainApp() {
                                 className="tiny-btn"
                                 type="button"
                                 onClick={() => doubleSelectMove(slot, mi)}
+                                title={moveTooltip(m)}
                                 style={{ background: sel?.moveIdx === mi ? '#a855f7' : '#2a2a55', color: '#fff', border: sel?.moveIdx === mi ? '2px solid #cba3ff' : '2px solid transparent' }}
                               >
                                 {m.name} ({m.type})
@@ -10831,10 +11037,14 @@ function MainApp() {
 
                 <p style={{ margin: '0 0 4px 0', fontSize: '1.2rem' }}>
                   <strong style={{ textTransform: 'capitalize' }}>{enemy.name}{enemy.shiny ? ' ✨' : ''}</strong>
+                  {enemy.leechSeed && <span title="Drenadoras" style={{ marginLeft: '5px' }}>🌱</span>}
                   <StatusBadge status={enemy.status} />
                   {' · '}Nv. {enemy.level}
                 </p>
-                <img className={`sprite enemy-sprite${enemy.gmaxEvolved ? ' gmax-active' : ''}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={enemyHitFlash ? { filter: 'brightness(1.5) sepia(1) hue-rotate(-40deg) saturate(5)', transition: 'filter 0.05s' } : { transition: 'filter 0.3s' }} />
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <img className={`sprite enemy-sprite${enemy.gmaxEvolved ? ' gmax-active' : ''}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={enemyHitFlash ? { filter: 'brightness(1.5) sepia(1) hue-rotate(-40deg) saturate(5)', transition: 'filter 0.05s' } : { transition: 'filter 0.3s' }} />
+                  <StatusFloat pokemon={enemy} />
+                </div>
                 <div className="hp-line">
                   <span>HP rival</span>
                   <strong>{enemy.hp}/{enemy.maxHp}</strong>
@@ -10844,19 +11054,22 @@ function MainApp() {
                 </div>
 
                 <div className="moves-grid">
-                  {(runChallenges.restrictedMoves ? activePokemon.moves.slice(0, 2) : activePokemon.moves).map((move) => (
+                  {(runChallenges.restrictedMoves ? activePokemon.moves.slice(0, 2) : activePokemon.moves).map((move) => {
+                    const isDisabled = activePokemon.disabled?.move === move.name
+                    return (
                     <button
                       key={move.name}
                       className="move-btn"
                       onClick={() => onPlayerMove(move)}
                       type="button"
-                      disabled={isLoading || (runChallenges.speedrun && speedrunSeconds <= 0)}
-                      title={moveTooltip(move)}
-                      style={move.ailment ? { borderColor: STATUS_COLORS[move.ailment] } : undefined}
+                      disabled={isLoading || isDisabled || (runChallenges.speedrun && speedrunSeconds <= 0)}
+                      title={isDisabled ? `🚫 Anulado por Anulación` : moveTooltip(move)}
+                      style={isDisabled ? { borderColor: '#ff8a80', opacity: 0.5, textDecoration: 'line-through' } : undefined}
                     >
-                      {move.name} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''}){move.minHits ? ` x${move.minHits}-${move.maxHits}` : ''}{move.ailment ? ` ${STATUS_LABELS[move.ailment].split(' ')[0]}` : ''}
+                      {isDisabled ? '🚫 ' : ''}{move.name} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''}){move.minHits ? ` x${move.minHits}-${move.maxHits}` : ''}
                     </button>
-                  ))}
+                    )
+                  })}
                 </div>
                 {!isTrainerBattle && currentNode?.type !== 'gmax' && (
                   <button
@@ -11611,7 +11824,7 @@ function MainApp() {
                   <div key={i} style={{ position: 'relative', width: '56px', height: '56px', borderRadius: '8px', border: p ? '1px solid #a855f7' : '1px dashed #3f3f6e', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.3)' }}>
                     {p ? (
                       <>
-                        <img src={p.sprite} alt={p.name} title={p.name} onError={fallbackSprite} style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} />
+                        <img src={p.sprite} alt={p.name} title={p.name} onError={fallbackSprite} className="pvp-sprite-bob" style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} />
                         <button
                           type="button"
                           onClick={() => {
@@ -11658,7 +11871,7 @@ function MainApp() {
                     }}
                     style={{ border: `1px solid ${isSelected ? '#a855f7' : inTeam ? '#37d16b' : '#3f3f6e'}`, borderRadius: '8px', padding: '6px', textAlign: 'center', cursor: 'pointer', background: isSelected ? 'rgba(168,85,247,0.15)' : 'rgba(15,23,42,0.5)' }}
                   >
-                    <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} />
+                    <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} className="pvp-sprite-bob" style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} />
                     <div style={{ fontSize: '0.7rem', color: '#f3f1ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pkmn.name}</div>
                     {inTeam && <div style={{ fontSize: '0.65rem', color: '#37d16b' }}>✓ En equipo</div>}
                   </div>

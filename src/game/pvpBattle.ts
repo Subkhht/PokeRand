@@ -48,7 +48,7 @@ function doSwitch(ps: PvpPlayerState, index: number): boolean {
     ...incoming,
     hp: Math.max(1, incoming.hp),
     status: undefined,
-    statStages: { attack: 0, defense: 0, speed: 0 },
+    statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 },
   }
   return true
 }
@@ -341,7 +341,7 @@ function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boo
 }
 
 function effectiveSpeed(p: Pokemon): number {
-  const stages = p.statStages ?? { attack: 0, defense: 0, speed: 0 }
+  const stages = p.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
   const paralysisNerf = p.status?.type === 'paralysis' ? 0.75 : 1
   return Math.round(p.speed * paralysisNerf * getStageMultiplier(stages.speed))
 }
@@ -352,19 +352,29 @@ function performPvpHit(
   defender: Pokemon,
   move: Move
 ): { updatedDefender: Pokemon; updatedAttacker: Pokemon; lines: string[] } {
+  // El defensor está protegido (Protección/Protect): se bloquea el ataque.
+  if (defender.protected) {
+    return {
+      updatedDefender: { ...defender, protected: false },
+      updatedAttacker: { ...attacker, protected: false },
+      lines: [`🛡️ ¡${defender.name} se protegió del ataque de ${attacker.name}!`],
+    }
+  }
   const burnNerf = attacker.status?.type === 'burn' ? 0.5 : 1
   const paralysisSpdNerf = attacker.status?.type === 'paralysis' ? 0.75 : 1
-  const atkStages = attacker.statStages ?? { attack: 0, defense: 0, speed: 0 }
-  const defStages = defender.statStages ?? { attack: 0, defense: 0, speed: 0 }
+  const atkStages = attacker.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+  const defStages = defender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
 
   const effectiveAttacker: Pokemon = {
     ...attacker,
     attack: Math.round(attacker.attack * burnNerf * getStageMultiplier(atkStages.attack)),
+    spAttack: Math.round(attacker.spAttack * getStageMultiplier(atkStages.spAttack ?? 0)),
     speed: Math.round(attacker.speed * paralysisSpdNerf * getStageMultiplier(atkStages.speed)),
   }
   const effectiveDefender: Pokemon = {
     ...defender,
     defense: Math.round(defender.defense * getStageMultiplier(defStages.defense)),
+    spDefense: Math.round(defender.spDefense * getStageMultiplier(defStages.spDefense ?? 0)),
   }
 
   const defTypes = (defender as any).types ?? []
@@ -432,48 +442,62 @@ function performPvpHit(
     }
   }
 
-  let attackerStages = effectiveAttacker.statStages ?? { attack: 0, defense: 0, speed: 0 }
+  let attackerStages = effectiveAttacker.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
   if (move.statChanges && move.statChanges.length > 0) {
     const isDamaging = (move.power ?? 0) > 0
     const cat = move.metaCategory ?? ''
-    for (const sc of move.statChanges) {
+    const changes = move.statChanges
+
+    // La categoría de PokeAPI es poco fiable (Malicioso/Leer sale como
+    // 'net-good-stats' aunque baja la Defensa del rival): en movimientos de
+    // estado se usa el conjunto de cambios (solo negativos → rival; con
+    // positivos o mezcla → uno mismo, p. ej. Rompecoraza).
+    let changesHitSelf: boolean
+    if (isDamaging) {
+      changesHitSelf = cat === 'net-good-stats' || cat === 'damage+raise'
+    } else if (cat === 'net-bad-stats' || cat === 'swagger') {
+      changesHitSelf = false
+    } else {
+      changesHitSelf = changes.some(sc => sc.change > 0)
+    }
+
+    for (const sc of changes) {
       const rolled = sc.chance == null || Math.random() * 100 < sc.chance
       if (!rolled) continue
-      const applyToAttacker = cat === 'net-good-stats' || (isDamaging && sc.change > 0)
-      const applyToDefender = cat === 'net-bad-stats' || (isDamaging && sc.change < 0) || (!isDamaging && cat === '')
-      if (!applyToAttacker && !applyToDefender) continue
-      if (applyToAttacker) {
-        const statKey = sc.stat as keyof typeof attackerStages
+
+      if (changesHitSelf) {
+        const stageKey: keyof typeof attackerStages = sc.stat === 'special-attack' ? 'spAttack' : sc.stat === 'special-defense' ? 'spDefense' : sc.stat
         const change = Number.isFinite(sc.change) ? sc.change : 0
-        const oldStage = attackerStages[statKey] ?? 0
+        const oldStage = attackerStages[stageKey] ?? 0
         const newStage = Math.max(-6, Math.min(6, oldStage + change))
         if (newStage !== oldStage) {
-          attackerStages = { ...attackerStages, [statKey]: newStage }
+          attackerStages = { ...attackerStages, [stageKey]: newStage }
           const direction = change > 0 ? 'subió' : 'bajó'
-          const statName = statKey === 'attack' ? 'Ataque' : statKey === 'defense' ? 'Defensa' : 'Velocidad'
+          const statName = sc.stat === 'attack' ? 'Ataque' : sc.stat === 'defense' ? 'Defensa' : sc.stat === 'special-attack' ? 'At. Esp.' : sc.stat === 'special-defense' ? 'Def. Esp.' : 'Velocidad'
           lines.push(`${effectiveAttacker.name} ${direction} su ${statName}! (${oldStage > 0 ? '+' : ''}${oldStage} → ${newStage > 0 ? '+' : ''}${newStage})`)
         }
-      } else if (applyToDefender && currentDefender.hp > 0) {
-        let newStages = currentDefender.statStages ?? { attack: 0, defense: 0, speed: 0 }
-        const statKey = sc.stat as keyof typeof newStages
+      } else if (currentDefender.hp > 0) {
+        let newStages = currentDefender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+        const stageKey: keyof typeof newStages = sc.stat === 'special-attack' ? 'spAttack' : sc.stat === 'special-defense' ? 'spDefense' : sc.stat
         const change = Number.isFinite(sc.change) ? sc.change : 0
-        const oldStage = newStages[statKey] ?? 0
+        const oldStage = newStages[stageKey] ?? 0
         const newStage = Math.max(-6, Math.min(6, oldStage + change))
         if (newStage !== oldStage) {
-          newStages = { ...newStages, [statKey]: newStage }
+          newStages = { ...newStages, [stageKey]: newStage }
           currentDefender = { ...currentDefender, statStages: newStages }
           const direction = change > 0 ? 'subió' : 'bajó'
-          const statName = statKey === 'attack' ? 'Ataque' : statKey === 'defense' ? 'Defensa' : 'Velocidad'
+          const statName = sc.stat === 'attack' ? 'Ataque' : sc.stat === 'defense' ? 'Defensa' : sc.stat === 'special-attack' ? 'At. Esp.' : sc.stat === 'special-defense' ? 'Def. Esp.' : 'Velocidad'
           lines.push(`${currentDefender.name} ${direction} su ${statName}! (${oldStage > 0 ? '+' : ''}${oldStage} → ${newStage > 0 ? '+' : ''}${newStage})`)
         }
       }
     }
   }
 
-  const hasAttackerStageChange = attackerStages.attack !== 0 || attackerStages.defense !== 0 || attackerStages.speed !== 0
+  const hasAttackerStageChange = attackerStages.attack !== 0 || attackerStages.defense !== 0 || attackerStages.spAttack !== 0 || attackerStages.spDefense !== 0 || attackerStages.speed !== 0
+  const protectUsed = /proteg|protec|protect|evita todos los ataques|evade all attacks|escudo|shield|refugio/i.test(`${move.name} ${move.description}`)
   let updatedAttacker = hasAttackerStageChange
-    ? { ...attacker, statStages: attackerStages }
-    : attacker
+    ? { ...attacker, statStages: attackerStages, protected: protectUsed }
+    : { ...attacker, protected: protectUsed }
   if (move.recoilPercent && move.recoilPercent > 0 && totalDamage > 0) {
     const recoilDamage = Math.floor(totalDamage * move.recoilPercent)
     updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - recoilDamage) }

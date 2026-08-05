@@ -85,6 +85,8 @@ export function serializePvpPokemon(p: Pokemon): Pokemon {
     maxHp: p.maxHp,
     attack: p.attack,
     defense: p.defense,
+    spAttack: p.spAttack,
+    spDefense: p.spDefense,
     speed: p.speed,
     types: p.types ?? [],
     baseStatTotal: p.baseStatTotal,

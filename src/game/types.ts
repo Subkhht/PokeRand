@@ -7,7 +7,7 @@ export interface StatusCondition {
 }
 
 export interface StatChange {
-  stat: 'attack' | 'defense' | 'speed'
+  stat: 'attack' | 'defense' | 'speed' | 'special-attack' | 'special-defense'
   change: number
   chance?: number
 }
@@ -19,6 +19,7 @@ export interface Move {
   accuracy: number | null
   description: string
   url?: string
+  damageClass?: 'physical' | 'special'
   ailment?: StatusType
   ailmentChance?: number
   minHits?: number
@@ -32,6 +33,9 @@ export interface Move {
   metaCategory?: string
   pp?: number
   maxPp?: number
+  leechSeed?: boolean
+  disable?: boolean
+  fakeOut?: boolean
 }
 
 export interface RawLevelUpMove {
@@ -49,6 +53,8 @@ export interface Pokemon {
   maxHp: number
   attack: number
   defense: number
+  spAttack: number
+  spDefense: number
   speed: number
   moves: Move[]
   types?: string[]
@@ -65,10 +71,15 @@ export interface Pokemon {
   gmaxEvolved?: boolean
   primalEvolved?: boolean
   gmaxTurnsLeft?: number
-  megaOrig?: { sprite: string; attack: number; defense: number; speed: number }
+  megaOrig?: { sprite: string; attack: number; defense: number; spAttack: number; spDefense: number; speed: number }
   status?: StatusCondition
-  statStages?: { attack: number; defense: number; speed: number }
+  statStages?: { attack: number; defense: number; spAttack: number; spDefense: number; speed: number }
   furiaActive?: boolean
+  protected?: boolean
+  leechSeed?: boolean
+  lastMove?: string
+  disabled?: { move: string; turns: number }
+  justEntered?: boolean
 }
 
 export interface RouteNode {

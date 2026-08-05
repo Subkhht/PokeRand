@@ -28,6 +28,8 @@ export interface CoopTrade {
     maxHp?: number
     attack?: number
     defense?: number
+    spAttack?: number
+    spDefense?: number
     speed?: number
     moves?: Array<{ name: string; power: number; type: string; accuracy: number | null }>
     types?: string[]
