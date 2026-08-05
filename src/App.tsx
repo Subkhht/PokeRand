@@ -573,6 +573,7 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'Dusk Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
   'Dawn Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
   'Ice Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
+  'Disco MT': { price: 250, desc: 'Enseña un nuevo movimiento a un Pokémon, como el nodo Move Tutor.' },
 }
 
 const EVOLUTION_STONES = ['Fire Stone', 'Water Stone', 'Thunder Stone', 'Leaf Stone', 'Moon Stone', 'Sun Stone', 'Shiny Stone', 'Dusk Stone', 'Dawn Stone', 'Ice Stone'] as const
@@ -668,6 +669,7 @@ const itemDescriptions: Record<string, string> = {
   'Lemonade': 'Restaura 60 HP de un Pokémon.',
   'Auspicious Armor': 'Armadura que evoluciona a Charcadet en Armarouge.',
   'Malicious Armor': 'Armadura que evoluciona a Charcadet en Ceruledge.',
+  'Disco MT': 'Úsalo para enseñar un nuevo movimiento a tu Pokémon activo, igual que el nodo Move Tutor.',
 }
 
 const ITEM_SPRITES: Record<string, string> = {
@@ -762,6 +764,7 @@ const ITEM_SPRITES: Record<string, string> = {
   'Fresh Water': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fresh-water.png',
   'Soda Pop': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/soda-pop.png',
   'Lemonade': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/lemonade.png',
+  'Disco MT': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tm-normal.png',
 }
 
 interface HoldableItem {
@@ -1269,7 +1272,7 @@ interface MetaShopItem {
   desc: string
   price: number
   spriteKey: string
-  category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' | 'pokeball' | 'evolution_stone' | 'evolution_item'
+  category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' | 'pokeball' | 'evolution_stone' | 'evolution_item' | 'disco_mt'
   requires?: string
 }
 
@@ -1369,6 +1372,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_malicious_armor', name: 'Malicious Armor', desc: 'Evoluciona a Charcadet en Ceruledge. Aparece con el Comerciante Misterioso.', price: 50, spriteKey: 'Malicious Armor', category: 'evolution_item' },
   { id: 'music_menu_chill', name: 'Menú Relax', desc: 'Música de menú relajante y ambiental.', price: 40, spriteKey: 'Potion', category: 'music' },
   { id: 'music_battle_epic', name: 'Batalla Épica', desc: 'Música de batalla más intensa y rápida.', price: 60, spriteKey: 'Potion', category: 'music' },
+  { id: 'unlock_disco_mt', name: 'Disco MT', desc: 'Desbloquea el Disco MT: un objeto consumible que enseña un movimiento a tu Pokémon, igual que el nodo Move Tutor. Aparece en tiendas.', price: 120, spriteKey: 'Disco MT', category: 'disco_mt' },
 ]
 
 function fallbackSprite(e: React.SyntheticEvent<HTMLImageElement>) {
@@ -1917,6 +1921,7 @@ function MainApp() {
   const [moveOptions, setMoveOptions] = useState<Move[]>([])
   const [selectedNewMove, setSelectedNewMove] = useState<Move | null>(null)
   const [moveOptionsByIndex, setMoveOptionsByIndex] = useState<Record<number, Move[]>>({})
+  const moveFromItemRef = useRef(false)
 
   // Egglocke
   const [eggInventory, setEggInventory] = useState<Array<{ name: string; sprite: string; types: string[]; hatchIn: number; id: number }>>([])
@@ -2398,6 +2403,7 @@ function MainApp() {
     unlock_fresh_water: 'Fresh Water',
     unlock_soda_pop: 'Soda Pop',
     unlock_lemonade: 'Lemonade',
+    unlock_disco_mt: 'Disco MT',
   }
   const LOCKED_HOLDABLE_MAP: Record<string, string> = {
     unlock_muscle_band: 'Muscle Band',
@@ -5310,38 +5316,7 @@ function MainApp() {
     }
 
     if (currentNode.type === 'move') {
-      setIsLoading(true)
-      setApiError('')
-      setSelectedNewMove(null)
-      setMoveOptionsByIndex({})
-      try {
-        const pokemon = team[activeIndex]
-        if (!pokemon || !pokemon.rawLevelUpMoves || pokemon.rawLevelUpMoves.length === 0) {
-          setBattleLog((prev) => ['Tu Pokémon no tiene movimientos disponibles para aprender.', ...prev].slice(0, 15))
-          completeCurrentNode()
-          setScreen('route')
-          return
-        }
-        const currentMoveUrls = new Set(pokemon.moves.map(m => m.url).filter(Boolean))
-        const learnable = pokemon.rawLevelUpMoves.filter(m => !currentMoveUrls.has(m.url))
-        const pool = learnable.length >= 2 ? learnable : [...learnable, ...pokemon.rawLevelUpMoves.filter(m => currentMoveUrls.has(m.url))]
-        const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, 10)
-        const allDetails = (await Promise.all(shuffled.map(m => getMoveDetails(m.url)))).filter((m): m is Move => m !== null)
-        const moveDetails = allDetails.slice(0, 2)
-        if (moveDetails.length === 0) {
-          setBattleLog((prev) => ['No se encontraron movimientos compatibles.', ...prev].slice(0, 15))
-          completeCurrentNode()
-          setScreen('route')
-          return
-        }
-        setMoveOptions(moveDetails)
-        setMoveOptionsByIndex({ [activeIndex]: moveDetails })
-        setScreen('move')
-      } catch {
-        setApiError('No se pudieron cargar los movimientos. Reintenta.')
-      } finally {
-        setIsLoading(false)
-      }
+      await openMoveTutor(false)
       return
     }
 
@@ -5940,8 +5915,57 @@ function MainApp() {
     setScreen('route')
   }
 
+  async function openMoveTutor(fromItem: boolean): Promise<void> {
+    setIsLoading(true)
+    setApiError('')
+    setSelectedNewMove(null)
+    setMoveOptionsByIndex({})
+    try {
+      const pokemon = team[activeIndex]
+      if (!pokemon || !pokemon.rawLevelUpMoves || pokemon.rawLevelUpMoves.length === 0) {
+        setBattleLog((prev) => ['Tu Pokémon no tiene movimientos disponibles para aprender.', ...prev].slice(0, 15))
+        if (fromItem) {
+          setScreen('route')
+        } else {
+          completeCurrentNode()
+          setScreen('route')
+        }
+        return
+      }
+      const currentMoveUrls = new Set(pokemon.moves.map(m => m.url).filter(Boolean))
+      const learnable = pokemon.rawLevelUpMoves.filter(m => !currentMoveUrls.has(m.url))
+      const pool = learnable.length >= 2 ? learnable : [...learnable, ...pokemon.rawLevelUpMoves.filter(m => currentMoveUrls.has(m.url))]
+      const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, 10)
+      const allDetails = (await Promise.all(shuffled.map(m => getMoveDetails(m.url)))).filter((m): m is Move => m !== null)
+      const moveDetails = allDetails.slice(0, 2)
+      if (moveDetails.length === 0) {
+        setBattleLog((prev) => ['No se encontraron movimientos compatibles.', ...prev].slice(0, 15))
+        if (fromItem) {
+          setScreen('route')
+        } else {
+          completeCurrentNode()
+          setScreen('route')
+        }
+        return
+      }
+      moveFromItemRef.current = fromItem
+      if (fromItem) {
+        setBattleLog((prev) => [`💿 Usaste un Disco MT en ${pokemon.name}.`, ...prev].slice(0, 15))
+      }
+      setMoveOptions(moveDetails)
+      setMoveOptionsByIndex({ [activeIndex]: moveDetails })
+      setScreen('move')
+    } catch {
+      setApiError('No se pudieron cargar los movimientos. Reintenta.')
+      if (fromItem) setScreen('route')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   function replaceTeamMove(moveIndex: number): void {
     if (!selectedNewMove || !activePokemon) return
+    const fromItem = moveFromItemRef.current
     const nextTeam = team.map((pokemon, index) => {
       if (index !== activeIndex) return pokemon
       const newMoves = [...pokemon.moves]
@@ -5950,26 +5974,43 @@ function MainApp() {
     })
     setTeam(nextTeam)
     setBattleLog((prev) => [
-      `📝 ¡${activePokemon.name} reemplazó ${activePokemon.moves[moveIndex].name} por ${selectedNewMove.name}!`,
+      `${fromItem ? '💿' : '📝'} ¡${activePokemon.name} reemplazó ${activePokemon.moves[moveIndex].name} por ${selectedNewMove.name} con ${fromItem ? 'el Disco MT' : 'el Move Tutor'}!`,
       ...prev
     ].slice(0, 15))
     setMoveOptions([])
     setSelectedNewMove(null)
     setMoveOptionsByIndex({})
-    completeCurrentNode()
-    setScreen('route')
+    moveFromItemRef.current = false
+    if (fromItem) {
+      setInventory((prev) => {
+        const idx = prev.indexOf('Disco MT')
+        if (idx === -1) return prev
+        return prev.filter((_, i) => i !== idx)
+      })
+      setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
+      setScreen('route')
+    } else {
+      completeCurrentNode()
+      setScreen('route')
+    }
   }
 
   function skipMoveNode(): void {
+    const fromItem = moveFromItemRef.current
     setBattleLog((prev) => [
-      `📝 Decidiste no cambiar movimientos.`,
+      fromItem ? `💿 Guardaste tu Disco MT sin enseñar ningún movimiento.` : `📝 Decidiste no cambiar movimientos.`,
       ...prev
     ].slice(0, 15))
     setMoveOptions([])
     setSelectedNewMove(null)
     setMoveOptionsByIndex({})
-    completeCurrentNode()
-    setScreen('route')
+    moveFromItemRef.current = false
+    if (fromItem) {
+      setScreen('route')
+    } else {
+      completeCurrentNode()
+      setScreen('route')
+    }
   }
 
   function buyShopItem(itemName: string, qty = 1) {
@@ -7396,6 +7437,16 @@ function MainApp() {
           })
           .catch(() => { /* sin resaltar si falla la consulta */ })
       }
+      return
+    }
+
+    if (itemName === 'Disco MT') {
+      if (screen !== 'route') {
+        setBattleLog((prev) => ['💿 El Disco MT solo se puede usar en la ruta, fuera de combate.', ...prev].slice(0, 15))
+        return
+      }
+      if (!activePokemon) return
+      void openMoveTutor(true)
       return
     }
 
@@ -10620,11 +10671,15 @@ function MainApp() {
 
             {screen === 'move' && (
               <div className="action-block">
-                <h3 style={{ margin: '0 0 0.5rem', color: '#f3f1ff', textAlign: 'center' }}>📝 ¡Move Tutor!</h3>
+                <h3 style={{ margin: '0 0 0.5rem', color: moveFromItemRef.current ? '#38bdf8' : '#f3f1ff', textAlign: 'center' }}>
+                  {moveFromItemRef.current ? '💿 ¡Disco MT!' : '📝 ¡Move Tutor!'}
+                </h3>
                 {!selectedNewMove ? (
                   <>
                     <p className="muted" style={{ textAlign: 'center', margin: '0 0 0.75rem' }}>
-                      Elige un movimiento para <strong>{activePokemon?.name}</strong> o salta el nodo.
+                      {moveFromItemRef.current
+                        ? <>Elige un movimiento para <strong>{activePokemon?.name}</strong> con tu Disco MT. Se consumirá al enseñarlo.</>
+                        : <>Elige un movimiento para <strong>{activePokemon?.name}</strong> o salta el nodo.</>}
                     </p>
                     <div className="moves-grid" style={{ marginBottom: '1rem' }}>
                       {moveOptions.map((move) => (
@@ -10644,7 +10699,7 @@ function MainApp() {
                     </div>
                     <div style={{ textAlign: 'center' }}>
                       <button className="secondary" onClick={skipMoveNode} type="button">
-                        Saltar
+                        {moveFromItemRef.current ? 'Salir (guardar Disco MT)' : 'Saltar'}
                       </button>
                     </div>
                   </>
@@ -12230,6 +12285,38 @@ function MainApp() {
                       <div>
                         <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
                         <div style={{ color: '#ff8a33', fontSize: '0.7rem' }}>Consumible</div>
+                      </div>
+                    </div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
+                    {owned ? (
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                    ) : (
+                      <button className="cta" onClick={() => buyMetaItem(item)}
+                        disabled={metaProgression.pokeCoins < item.price}
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#ffcb05' : '#475569', color: '#000' }}>
+                        🪙 {item.price}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <h3 style={{ color: '#38bdf8', marginBottom: '0.5rem' }}>💿 Discos MT</h3>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea el Disco MT: un objeto consumible que enseña un movimiento a tu Pokémon igual que el nodo Move Tutor. Aparecerá en tiendas durante las partidas.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {META_SHOP_ITEMS.filter(item => item.category === 'disco_mt').map(item => {
+                const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                return (
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      {ITEM_SPRITES[item.spriteKey]
+                        ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
+                        : <span style={{ fontSize: '1.5rem' }}>💿</span>
+                      }
+                      <div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#38bdf8', fontSize: '0.7rem' }}>Disco MT</div>
                       </div>
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
