@@ -494,7 +494,7 @@ function performPvpHit(
   }
 
   const hasAttackerStageChange = attackerStages.attack !== 0 || attackerStages.defense !== 0 || attackerStages.spAttack !== 0 || attackerStages.spDefense !== 0 || attackerStages.speed !== 0
-  const protectUsed = /proteg|protec|protect|evita todos los ataques|evade all attacks|escudo|shield|refugio/i.test(`${move.name} ${move.description}`)
+  const protectUsed = (move.power ?? 0) === 0 && /proteg|protec|protect|evita todos los ataques|evade all attacks|escudo|shield|refugio/i.test(`${move.name} ${move.description}`)
   let updatedAttacker = hasAttackerStageChange
     ? { ...attacker, statStages: attackerStages, protected: protectUsed }
     : { ...attacker, protected: protectUsed }
