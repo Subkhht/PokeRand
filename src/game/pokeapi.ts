@@ -733,7 +733,7 @@ function filterSpeciesIdsForProgress(
 
 const HARD_HELD_ITEMS = [
   { name: 'Muscle Band', attackMod: 0.15 },
-  { name: 'Wise Glasses', speedMod: 0.15 },
+  { name: 'Wise Glasses', spAttackMod: 0.15 },
   { name: 'Rocky Helmet', defenseMod: 0.15 },
   { name: 'Sitrus Berry', maxHpMod: 15, healPerTurn: 8 },
   { name: 'Quick Claw', speedMod: 0.20 },

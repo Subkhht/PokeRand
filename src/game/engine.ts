@@ -100,7 +100,11 @@ export function getTeamStatAverages(team: Pokemon[]): { attack: number; defense:
 export function balanceWildPokemonToTeam(enemy: Pokemon, team: Pokemon[], difficulty: string): Pokemon {
   const teamAvg = getTeamStatAverages(team)
   const strength = difficulty === 'infinite' ? 1.02 : difficulty === 'hard' ? 1.05 : difficulty === 'easy' ? 0.85 : 0.95
-  const blend = 0.5
+  // El salvaje conserva la mayor parte de sus stats de especie (70%) y solo se
+  // ajusta un 30% al equipo. Antes era 50/50 y un Pokémon débil "heredaba" un
+  // Ataque/At.Esp. desorbitado de la defensa del equipo (p. ej. una Def. Esp.
+  // alta del equipo inflaba el At. Esp. de cualquier salvaje).
+  const blend = 0.7
 
   const attack = Math.max(10, Math.round(enemy.attack * blend + teamAvg.defense * strength * (1 - blend)))
   const defense = Math.max(10, Math.round(enemy.defense * blend + teamAvg.attack * strength * (1 - blend)))

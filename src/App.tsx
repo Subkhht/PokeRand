@@ -5289,6 +5289,13 @@ function MainApp() {
   async function enterNode(): Promise<void> {
     if (!activePokemon || !currentNode) return
 
+    // Red de seguridad: las etapas de stats SIEMPRE se reinician al entrar a un
+    // nodo nuevo, cubriendo cualquier ruta de fin de combate que no pasara por
+    // completeCurrentNode. Evita que At. Esp. / Def. Esp. se acumulen.
+    setTeam(prev => prev.map(p => p.statStages && (p.statStages.attack !== 0 || p.statStages.defense !== 0 || p.statStages.spAttack !== 0 || p.statStages.spDefense !== 0 || p.statStages.speed !== 0)
+      ? { ...p, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
+      : p))
+
     // El flag de batalla TeamR debe reflejar SIEMPRE el nodo actual, para que un
     // TeamR escapado (Cuerda Huida) o un combate normal no hereden el robo/elección.
     setIsTeamRocketBattle(currentNode.type === 'teamRocket')
