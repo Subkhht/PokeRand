@@ -200,6 +200,11 @@ const EVOLUTION_ITEM_REVERSE: Record<string, string> = {
   'whipped-dream': 'Whipped Dream',
   'auspicious-armor': 'Auspicious Armor',
   'malicious-armor': 'Malicious Armor',
+  'razor-claw': 'Razor Claw',
+  'razor-fang': 'Razor Fang',
+  'oval-stone': 'Oval Stone',
+  'deep-sea-tooth': 'Deep Sea Tooth',
+  'deep-sea-scale': 'Deep Sea Scale',
 }
 
 export function getEvolutionItemDisplayName(pokeApiName: string): string {
@@ -610,6 +615,9 @@ export async function buildPokemonFromApi(
     pokemon.evolutionLevel = evoInfo.evolutionLevel ?? undefined
     pokemon.heldItemRequired = evoInfo.heldItem ?? undefined
   }
+  if (evoInfo.heldItemEvolutions.length > 0) {
+    pokemon.heldItemEvolutions = evoInfo.heldItemEvolutions
+  }
   pokemon.minAppearLevel = evoInfo.minAppearLevel ?? undefined
 
   // La forma G-MAX puede saltarse el umbral mínimo de aparición: es una forma
@@ -958,6 +966,41 @@ function findEvolutionForSpecies(chainNode: EvolutionChainNode, speciesName: str
   return null
 }
 
+interface HeldItemEvo {
+  item: string
+  target: string
+  level: number
+}
+
+function findHeldItemEvolutions(chainNode: EvolutionChainNode, speciesName: string): HeldItemEvo[] {
+  const baseName = getBaseName(speciesName)
+  const matchName = (name: string) => name.toLowerCase() === speciesName.toLowerCase() || name.toLowerCase() === baseName.toLowerCase()
+  const regionalSuffix = getRegionalSuffix(speciesName)
+
+  for (const evo of chainNode.evolves_to || []) {
+    const sub = findHeldItemEvolutions(evo, speciesName)
+    if (sub.length > 0) return sub
+  }
+  if (matchName(chainNode.species.name)) {
+    const result: HeldItemEvo[] = []
+    for (const evo of chainNode.evolves_to || []) {
+      const details = evo.evolution_details?.[0]
+      const heldItem = details?.held_item?.name ?? null
+      if (!heldItem) continue
+      const trigger = details?.trigger?.name ?? 'level-up'
+      const minLevel = details?.min_level ?? null
+      const level = minLevel ?? (trigger === 'trade' ? 35 : 45)
+      const rawEvolvedName = evo.species.name
+      const evolvedName = regionalSuffix && !rawEvolvedName.endsWith(regionalSuffix)
+        ? rawEvolvedName + regionalSuffix
+        : rawEvolvedName
+      result.push({ item: getEvolutionItemDisplayName(heldItem), target: evolvedName, level })
+    }
+    return result
+  }
+  return []
+}
+
 function findPreEvolutionLevel(chainNode: EvolutionChainNode, speciesName: string): number | null {
   const baseName = getBaseName(speciesName)
   const matchName = (name: string) => name.toLowerCase() === speciesName.toLowerCase() || name.toLowerCase() === baseName.toLowerCase()
@@ -984,23 +1027,24 @@ function findPreEvolutionLevel(chainNode: EvolutionChainNode, speciesName: strin
   return null
 }
 
-export async function getEvolutionInfo(pokemonId: number): Promise<{ nextName: string | null; evolutionLevel: number | null; heldItem: string | null; minAppearLevel: number | null }> {
+export async function getEvolutionInfo(pokemonId: number): Promise<{ nextName: string | null; evolutionLevel: number | null; heldItem: string | null; heldItemEvolutions: HeldItemEvo[]; minAppearLevel: number | null }> {
   try {
     const speciesRes = await fetch(`${API_BASE}/pokemon-species/${pokemonId}`)
-    if (!speciesRes.ok) return { nextName: null, evolutionLevel: null, heldItem: null, minAppearLevel: null }
+    if (!speciesRes.ok) return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
     const speciesData = await speciesRes.json()
-    if (!speciesData.evolution_chain?.url) return { nextName: null, evolutionLevel: null, heldItem: null, minAppearLevel: null }
+    if (!speciesData.evolution_chain?.url) return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
     const evoRes = await fetch(speciesData.evolution_chain.url)
-    if (!evoRes.ok) return { nextName: null, evolutionLevel: null, heldItem: null, minAppearLevel: null }
+    if (!evoRes.ok) return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
     const evoData = await evoRes.json()
     const found = findEvolutionForSpecies(evoData.chain, speciesData.name)
+    const heldItemEvolutions = findHeldItemEvolutions(evoData.chain, speciesData.name)
     const minLevel = findPreEvolutionLevel(evoData.chain, speciesData.name)
     if (found) {
-      return { nextName: found.speciesName, evolutionLevel: found.trigger === 'use-item' ? null : found.level, heldItem: found.heldItem ? getEvolutionItemDisplayName(found.heldItem) : null, minAppearLevel: minLevel }
+      return { nextName: found.speciesName, evolutionLevel: found.trigger === 'use-item' ? null : found.level, heldItem: found.heldItem ? getEvolutionItemDisplayName(found.heldItem) : null, heldItemEvolutions, minAppearLevel: minLevel }
     }
-    return { nextName: null, evolutionLevel: null, heldItem: null, minAppearLevel: minLevel }
+    return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions, minAppearLevel: minLevel }
   } catch {
-    return { nextName: null, evolutionLevel: null, heldItem: null, minAppearLevel: null }
+    return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
   }
 }
 
@@ -1012,11 +1056,12 @@ export function stripRegional(name: string): string {
   return name
 }
 
-export async function evolvePokemon(currentPokemon: Pokemon): Promise<Pokemon | null> {
+export async function evolvePokemon(currentPokemon: Pokemon, targetName?: string): Promise<Pokemon | null> {
   try {
     const info = await getEvolutionInfo(currentPokemon.id)
-    if (!info.nextName) return null
-    const nextName = info.nextName.includes('-') ? stripRegional(info.nextName) : info.nextName
+    const chosen = targetName ?? info.nextName
+    if (!chosen) return null
+    const nextName = chosen.includes('-') ? stripRegional(chosen) : chosen
     const newBasePokemon = await buildPokemonFromApi(nextName, 1, currentPokemon.level, currentPokemon.shiny ?? false)
     return {
       ...newBasePokemon,

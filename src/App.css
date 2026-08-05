@@ -56,6 +56,15 @@ body {
   padding: 1.5rem;
 }
 
+/* El fondo animado va detrás de todo el contenido: los paneles se elevan por
+   encima del canvas fijo (z-index 0) garantizando que se vea la animación.
+   Se excluyen los overlays fijos (modales y banners) para no romper su
+   posicionamiento. */
+.app-shell > *:not(.bg-layer):not(.modal-backdrop):not(.teamrocket-steal-banner) {
+  position: relative;
+  z-index: 1;
+}
+
 /* ------------------------------------------------------------
    BARRA SUPERIOR (TOPBAR)
    ------------------------------------------------------------ */

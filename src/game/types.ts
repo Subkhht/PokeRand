@@ -64,6 +64,7 @@ export interface Pokemon {
   evolutionChainId?: number
   minAppearLevel?: number
   heldItemRequired?: string | null
+  heldItemEvolutions?: Array<{ item: string; target: string; level: number }>
   rawLevelUpMoves?: RawLevelUpMove[]
   holdItem?: string | null
   shiny?: boolean
@@ -203,6 +204,8 @@ export interface MetaProgression {
   permanentlyUnlockedItems: string[]
   ownedThemes: string[]
   activeTheme: string
+  ownedBackgrounds: string[]
+  activeBackground: string
   ownedMusic: string[]
   activeMenuMusic: string
   activeBattleMusic: string

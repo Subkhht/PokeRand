@@ -25,6 +25,9 @@ import { isPvpEnabled, createPvpRoom, findPvpOpponent, joinPvpRoom, getPvpMatch,
 import { resolvePvpTurn, type PvpAction } from './game/pvpBattle'
 import CasinoMinigame from './minigames/CasinoMinigame'
 import MinigamePractice from './minigames/MinigamePractice'
+import BackgroundLayer from './BackgroundLayer'
+import BackgroundPreview from './BackgroundPreview'
+import { BACKGROUNDS } from './game/backgrounds'
 import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 
@@ -574,6 +577,12 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'Dawn Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
   'Ice Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
   'Disco MT': { price: 250, desc: 'Enseña un nuevo movimiento a un Pokémon, como el nodo Move Tutor.' },
+  'Proteína': { price: 200, desc: 'Aumenta permanentemente en +15 el ataque de un Pokémon.' },
+  'Calcio': { price: 200, desc: 'Aumenta permanentemente en +15 el Ataque Especial de un Pokémon.' },
+  'Hierro': { price: 200, desc: 'Aumenta permanentemente en +15 la defensa de un Pokémon.' },
+  'Zinc': { price: 200, desc: 'Aumenta permanentemente en +15 la Defensa Especial de un Pokémon.' },
+  'Carburante': { price: 200, desc: 'Aumenta permanentemente en +15 la velocidad de un Pokémon.' },
+  'Sacred Ash': { price: 400, desc: 'Revive a todos los Pokémon debilitados con el HP completo.' },
 }
 
 const EVOLUTION_STONES = ['Fire Stone', 'Water Stone', 'Thunder Stone', 'Leaf Stone', 'Moon Stone', 'Sun Stone', 'Shiny Stone', 'Dusk Stone', 'Dawn Stone', 'Ice Stone'] as const
@@ -623,6 +632,11 @@ const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
   'Gorra de Ash': 'unlock_gorra_de_ash',
   'Auspicious Armor': 'unlock_auspicious_armor',
   'Malicious Armor': 'unlock_malicious_armor',
+  'Razor Claw': 'unlock_razor_claw',
+  'Razor Fang': 'unlock_razor_fang',
+  'Oval Stone': 'unlock_oval_stone',
+  'Deep Sea Tooth': 'unlock_deep_sea_tooth',
+  'Deep Sea Scale': 'unlock_deep_sea_scale',
 }
 
 const itemDescriptions: Record<string, string> = {
@@ -670,6 +684,12 @@ const itemDescriptions: Record<string, string> = {
   'Auspicious Armor': 'Armadura que evoluciona a Charcadet en Armarouge.',
   'Malicious Armor': 'Armadura que evoluciona a Charcadet en Ceruledge.',
   'Disco MT': 'Úsalo para enseñar un nuevo movimiento a tu Pokémon activo, igual que el nodo Move Tutor.',
+  'Proteína': 'Aumenta permanentemente en +15 el ataque del Pokémon activo.',
+  'Calcio': 'Aumenta permanentemente en +15 el Ataque Especial del Pokémon activo.',
+  'Hierro': 'Aumenta permanentemente en +15 la defensa del Pokémon activo.',
+  'Zinc': 'Aumenta permanentemente en +15 la Defensa Especial del Pokémon activo.',
+  'Carburante': 'Aumenta permanentemente en +15 la velocidad del Pokémon activo.',
+  'Sacred Ash': 'Revive a todos los Pokémon debilitados con el HP completo.',
 }
 
 const ITEM_SPRITES: Record<string, string> = {
@@ -765,6 +785,26 @@ const ITEM_SPRITES: Record<string, string> = {
   'Soda Pop': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/soda-pop.png',
   'Lemonade': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/lemonade.png',
   'Disco MT': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tm-normal.png',
+  'Proteína': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/protein.png',
+  'Calcio': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/calcium.png',
+  'Hierro': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/iron.png',
+  'Zinc': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/zinc.png',
+  'Carburante': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/carbos.png',
+  'Sacred Ash': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sacred-ash.png',
+  'Luxury Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/luxury-ball.png',
+  'Premier Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/premier-ball.png',
+  'Fast Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fast-ball.png',
+  'Focus Sash II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/focus-sash.png',
+  'Scope Lens II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/scope-lens.png',
+  'Shell Bell II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shell-bell.png',
+  'Assault Vest II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/assault-vest.png',
+  'Leftovers II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/leftovers.png',
+  'Quick Claw II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/quick-claw.png',
+  'Razor Claw': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/razor-claw.png',
+  'Razor Fang': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/razor-fang.png',
+  'Oval Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/oval-stone.png',
+  'Deep Sea Tooth': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/deep-sea-tooth.png',
+  'Deep Sea Scale': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/deep-sea-scale.png',
 }
 
 interface HoldableItem {
@@ -834,6 +874,17 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Prism Scale': { name: 'Prism Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Sachet': { name: 'Sachet', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Whipped Dream': { name: 'Whipped Dream', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Focus Sash II': { name: 'Focus Sash II', desc: '+40 HP máximos', price: 350, maxHpMod: 40 },
+  'Scope Lens II': { name: 'Scope Lens II', desc: '30% Golpe Crítico', price: 350, critChance: 0.30 },
+  'Shell Bell II': { name: 'Shell Bell II', desc: '30% Robo de Vida', price: 400, lifesteal: 0.30 },
+  'Assault Vest II': { name: 'Assault Vest II', desc: '+30% Def. Esp.', price: 400, spDefenseMod: 0.30 },
+  'Leftovers II': { name: 'Leftovers II', desc: 'Recupera 12 HP por turno', price: 400, healPerTurn: 12 },
+  'Quick Claw II': { name: 'Quick Claw II', desc: '+30% Velocidad', price: 350, speedMod: 0.30 },
+  'Razor Claw': { name: 'Razor Claw', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Razor Fang': { name: 'Razor Fang', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Oval Stone': { name: 'Oval Stone', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Deep Sea Tooth': { name: 'Deep Sea Tooth', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Deep Sea Scale': { name: 'Deep Sea Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
 }
 
 const HOLDABLE_ITEM_NAMES = Object.keys(HOLDABLE_ITEMS)
@@ -863,6 +914,9 @@ const POKEBALLS: PokeBallDef[] = [
   { name: 'Love Ball', rate: 1, desc: 'Más efectiva si es de la misma familia evolutiva (x8).', price: 60, spriteKey: 'love-ball', rateFn: (_, __, alreadyCaught) => alreadyCaught ? 8 : 1 },
   { name: 'Friend Ball', rate: 1, desc: 'Hace más amistoso al Pokémon capturado.', price: 60, spriteKey: 'friend-ball' },
   { name: 'Heavy Ball', rate: 1, desc: 'Más efectiva contra Pokémon pesados.', price: 60, spriteKey: 'heavy-ball', rateFn: (target) => Math.max(1, Math.min(Math.floor(target.maxHp / 40), 4)) },
+  { name: 'Luxury Ball', rate: 1.2, desc: 'Un poco más efectiva que la Poké Ball (x1.2).', price: 40, spriteKey: 'luxury-ball' },
+  { name: 'Premier Ball', rate: 1, desc: 'Una ball estándar y elegante.', price: 30, spriteKey: 'premier-ball' },
+  { name: 'Fast Ball', rate: 1, desc: 'Más efectiva contra Pokémon muy rápidos (x4).', price: 60, spriteKey: 'fast-ball', rateFn: (target) => target.speed >= 100 ? 4 : 1 },
 ]
 
 const POKEBALL_NAMES = POKEBALLS.map(b => b.name)
@@ -887,6 +941,9 @@ const POKEBALL_UNLOCK_IDS: Record<string, string> = {
   'Friend Ball': 'unlock_friend_ball',
   'Heavy Ball': 'unlock_heavy_ball',
   'Master Ball': 'unlock_master_ball',
+  'Luxury Ball': 'unlock_luxury_ball',
+  'Premier Ball': 'unlock_premier_ball',
+  'Fast Ball': 'unlock_fast_ball',
 }
 
 function getPokeBallRate(ballName: string, target: Pokemon, turns: number, alreadyCaught: boolean, playerLevel?: number): number {
@@ -1264,6 +1321,18 @@ const THEMES: Array<{ id: string; name: string; desc: string; price: number; col
   { id: 'matrix', name: 'Matrix', desc: 'Verde neón sobre negro', price: 85, colors: { bg: '#000000', surface: '#0a1a0a', border: '#0f3d0f', text: '#a4f7a4', accent: '#22ff22', muted: '#2f6b2f' } },
   { id: 'midnight', name: 'Medianoche', desc: 'Azul profundo y plata', price: 70, colors: { bg: '#070b18', surface: '#101a30', border: '#2a3f6b', text: '#dbe6ff', accent: '#7aa2ff', muted: '#77839e' } },
   { id: 'candy', name: 'Caramelo', desc: 'Rosa chicle y vibrantes', price: 75, colors: { bg: '#1e0f1e', surface: '#3a1b33', border: '#7a3a63', text: '#ffe6f5', accent: '#ff77dd', muted: '#c98aa8' } },
+  { id: 'lava', name: 'Volcán', desc: 'Lava ardiente y roca fundida', price: 90, colors: { bg: '#1a0500', surface: '#3a1205', border: '#7a2508', text: '#ffe3c4', accent: '#ff5a1f', muted: '#c87a4a' } },
+  { id: 'galaxy', name: 'Galaxia', desc: 'Nebulosas violeta y estrellas', price: 90, colors: { bg: '#070216', surface: '#150a38', border: '#4b2a86', text: '#f3e8ff', accent: '#c084fc', muted: '#8a7bb8' } },
+  { id: 'gold', name: 'Dorado', desc: 'Oro y negro lujoso', price: 110, colors: { bg: '#0d0a00', surface: '#221b05', border: '#8a6d1a', text: '#fff3c4', accent: '#ffd700', muted: '#b8a05a' } },
+  { id: 'emerald', name: 'Esmeralda', desc: 'Verde joya y dorado', price: 90, colors: { bg: '#00160a', surface: '#00291a', border: '#0f7a4a', text: '#d9ffe9', accent: '#2ee6a0', muted: '#6fb896' } },
+  { id: 'vaporwave', name: 'Vaporwave', desc: 'Estética retro ochentera', price: 95, colors: { bg: '#180833', surface: '#2d0a4e', border: '#c84bd0', text: '#e8f4ff', accent: '#22d3ee', muted: '#a87bc9' } },
+  { id: 'ghost', name: 'Fantasma', desc: 'Misterio etéreo y cian', price: 85, colors: { bg: '#0a0a14', surface: '#161630', border: '#4a3a7a', text: '#e6f4ff', accent: '#67e8f9', muted: '#8f9bb5' } },
+  { id: 'carbon', name: 'Carbono', desc: 'Grafito industrial con lima', price: 85, colors: { bg: '#0d0d0d', surface: '#1c1c1c', border: '#3d3d3d', text: '#f5f5f5', accent: '#a3e635', muted: '#7a7a7a' } },
+  { id: 'bloodmoon', name: 'Luna Sangrienta', desc: 'Rojo sangre y luna pálida', price: 100, colors: { bg: '#12030a', surface: '#260711', border: '#8a1435', text: '#ffe4ee', accent: '#ff2e5f', muted: '#b07c92' } },
+  { id: 'toxic', name: 'Tóxico', desc: 'Veneno ácido y ultravioleta', price: 90, colors: { bg: '#0e1100', surface: '#1e2600', border: '#5c6b00', text: '#f0ffd0', accent: '#b6f000', muted: '#8ba05c' } },
+  { id: 'samurai', name: 'Samurái', desc: 'Rojo lacado, oro y negro', price: 95, colors: { bg: '#140404', surface: '#2b0d0d', border: '#b02020', text: '#ffe8c4', accent: '#ffb020', muted: '#c09a6a' } },
+  { id: 'pastel', name: 'Pastel', desc: 'Tonos suaves y delicados', price: 80, colors: { bg: '#191424', surface: '#2e2740', border: '#6b5f8f', text: '#fdf3ff', accent: '#ff9fd4', muted: '#b3a6c9' } },
+  { id: 'tropical', name: 'Tropical', desc: 'Paraíso aguamarina y mango', price: 85, colors: { bg: '#00141a', surface: '#063238', border: '#0f6b6b', text: '#e8ffff', accent: '#ffb340', muted: '#6fc7b8' } },
 ]
 
 interface MetaShopItem {
@@ -1274,6 +1343,11 @@ interface MetaShopItem {
   spriteKey: string
   category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' | 'pokeball' | 'evolution_stone' | 'evolution_item' | 'disco_mt'
   requires?: string
+}
+
+function metaShopItemMatches(item: { name: string; desc: string }, term: string): boolean {
+  if (!term) return true
+  return item.name.toLowerCase().includes(term) || item.desc.toLowerCase().includes(term)
 }
 
 const META_SHOP_ITEMS: MetaShopItem[] = [
@@ -1373,6 +1447,26 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'music_menu_chill', name: 'Menú Relax', desc: 'Música de menú relajante y ambiental.', price: 40, spriteKey: 'Potion', category: 'music' },
   { id: 'music_battle_epic', name: 'Batalla Épica', desc: 'Música de batalla más intensa y rápida.', price: 60, spriteKey: 'Potion', category: 'music' },
   { id: 'unlock_disco_mt', name: 'Disco MT', desc: 'Desbloquea el Disco MT: un objeto consumible que enseña un movimiento a tu Pokémon, igual que el nodo Move Tutor. Aparece en tiendas.', price: 120, spriteKey: 'Disco MT', category: 'disco_mt' },
+  { id: 'unlock_protein', name: 'Proteína', desc: '+15 Ataque permanente. Aparece en tiendas.', price: 40, spriteKey: 'Proteína', category: 'consumable' },
+  { id: 'unlock_calcium', name: 'Calcio', desc: '+15 At. Esp. permanente. Aparece en tiendas.', price: 40, spriteKey: 'Calcio', category: 'consumable' },
+  { id: 'unlock_iron', name: 'Hierro', desc: '+15 Defensa permanente. Aparece en tiendas.', price: 40, spriteKey: 'Hierro', category: 'consumable' },
+  { id: 'unlock_zinc', name: 'Zinc', desc: '+15 Def. Esp. permanente. Aparece en tiendas.', price: 40, spriteKey: 'Zinc', category: 'consumable' },
+  { id: 'unlock_carbos', name: 'Carburante', desc: '+15 Velocidad permanente. Aparece en tiendas.', price: 40, spriteKey: 'Carburante', category: 'consumable' },
+  { id: 'unlock_sacred_ash', name: 'Sacred Ash', desc: 'Revive a todo el equipo debilitado. Aparece en tiendas.', price: 90, spriteKey: 'Sacred Ash', category: 'consumable' },
+  { id: 'unlock_luxury_ball', name: 'Luxury Ball', desc: 'Ratio de captura x1.2. Aparece en tiendas y descansos.', price: 30, spriteKey: 'Luxury Ball', category: 'pokeball' },
+  { id: 'unlock_premier_ball', name: 'Premier Ball', desc: 'Ratio estándar, elegante. Aparece en tiendas y descansos.', price: 25, spriteKey: 'Premier Ball', category: 'pokeball' },
+  { id: 'unlock_fast_ball', name: 'Fast Ball', desc: 'x4 contra Pokémon muy rápidos. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Fast Ball', category: 'pokeball' },
+  { id: 'unlock_focus_sash_2', name: 'Focus Sash II', desc: '+40 HP máximos.', price: 70, spriteKey: 'Focus Sash II', category: 'holdable', requires: 'unlock_focus_sash' },
+  { id: 'unlock_scope_lens_2', name: 'Scope Lens II', desc: '30% Golpe Crítico.', price: 70, spriteKey: 'Scope Lens II', category: 'holdable', requires: 'unlock_scope_lens' },
+  { id: 'unlock_shell_bell_2', name: 'Shell Bell II', desc: '30% Robo de Vida.', price: 90, spriteKey: 'Shell Bell II', category: 'holdable', requires: 'unlock_shell_bell' },
+  { id: 'unlock_assault_vest_2', name: 'Assault Vest II', desc: '+30% Def. Esp.', price: 90, spriteKey: 'Assault Vest II', category: 'holdable', requires: 'unlock_assault_vest' },
+  { id: 'unlock_leftovers_2', name: 'Leftovers II', desc: 'Recupera 12 HP por turno.', price: 90, spriteKey: 'Leftovers II', category: 'holdable', requires: 'unlock_leftovers' },
+  { id: 'unlock_quick_claw_2', name: 'Quick Claw II', desc: '+30% Velocidad.', price: 70, spriteKey: 'Quick Claw II', category: 'holdable', requires: 'unlock_quick_claw' },
+  { id: 'unlock_razor_claw', name: 'Razor Claw', desc: 'Evoluciona a Sneasel en Weavile. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Razor Claw', category: 'evolution_item' },
+  { id: 'unlock_razor_fang', name: 'Razor Fang', desc: 'Evoluciona a Gligar en Gliscor. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Razor Fang', category: 'evolution_item' },
+  { id: 'unlock_oval_stone', name: 'Oval Stone', desc: 'Evoluciona a Happiny en Chansey. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Oval Stone', category: 'evolution_item' },
+  { id: 'unlock_deep_sea_tooth', name: 'Deep Sea Tooth', desc: 'Evoluciona a Clamperl en Huntail. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Deep Sea Tooth', category: 'evolution_item' },
+  { id: 'unlock_deep_sea_scale', name: 'Deep Sea Scale', desc: 'Evoluciona a Clamperl en Gorebyss. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Deep Sea Scale', category: 'evolution_item' },
 ]
 
 function fallbackSprite(e: React.SyntheticEvent<HTMLImageElement>) {
@@ -2032,10 +2126,12 @@ function MainApp() {
         if (!data.activeBattleMusic) data.activeBattleMusic = 'default'
         if (typeof data.totalMegas !== 'number') data.totalMegas = 0
         if (typeof data.totalGmax !== 'number') data.totalGmax = 0
+        if (!Array.isArray(data.ownedBackgrounds)) data.ownedBackgrounds = ['none']
+        if (!data.activeBackground) data.activeBackground = 'none'
         return data
       }
     } catch {}
-    return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark', ownedMusic: [], activeMenuMusic: 'default', activeBattleMusic: 'default', totalMegas: 0, totalGmax: 0, coopRuns: 0, coopWins: 0, coopTrades: 0 }
+    return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark', ownedBackgrounds: ['none'], activeBackground: 'none', ownedMusic: [], activeMenuMusic: 'default', activeBattleMusic: 'default', totalMegas: 0, totalGmax: 0, coopRuns: 0, coopWins: 0, coopTrades: 0 }
   })
 
   const [secretModalOpen, setSecretModalOpen] = useState(false)
@@ -2172,6 +2268,7 @@ function MainApp() {
   const [merchantItems, setMerchantItems] = useState<Array<{ name: string; price: number }> | null>(null)
   const [randomEventUsed, setRandomEventUsed] = useState<Set<string>>(new Set())
   const [showMetaShop, setShowMetaShop] = useState<boolean>(false)
+  const [metaShopSearch, setMetaShopSearch] = useState('')
   const [unlockPopup, setUnlockPopup] = useState<{ name: string; spriteKey: string } | null>(null)
   const [badges, setBadges] = useState<Array<{ id: string; name: string; sprite: string }>>([])
   const [currentStage, setCurrentStage] = useState<number>(1)
@@ -2265,12 +2362,14 @@ function MainApp() {
     const theme = THEMES.find(t => t.id === metaProgression.activeTheme) ?? THEMES[0]
     const root = document.documentElement
     if (theme.id === 'dark') {
+      root.style.removeProperty('--bg-dark')
       root.style.removeProperty('--surface')
       root.style.removeProperty('--border')
       root.style.removeProperty('--text')
       root.style.removeProperty('--accent')
       root.style.removeProperty('--muted')
     } else {
+      root.style.setProperty('--bg-dark', theme.colors.bg)
       root.style.setProperty('--surface', theme.colors.surface)
       root.style.setProperty('--border', theme.colors.border)
       root.style.setProperty('--text', theme.colors.text)
@@ -2386,6 +2485,24 @@ function MainApp() {
     localStorage.setItem('pokerand_meta', JSON.stringify(updated))
   }
 
+  function setBackground(bgId: string): void {
+    if (!metaProgression.ownedBackgrounds.includes(bgId)) return
+    const updated = { ...metaProgression, activeBackground: bgId }
+    setMetaProgression(updated)
+    localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+  }
+
+  function buyBackground(bg: (typeof BACKGROUNDS)[number]): void {
+    if (bg.id === 'none') return
+    if (metaProgression.ownedBackgrounds.includes(bg.id)) return
+    if (metaProgression.pokeCoins < bg.price) return
+    const updated = { ...metaProgression, pokeCoins: metaProgression.pokeCoins - bg.price, ownedBackgrounds: [...metaProgression.ownedBackgrounds, bg.id], activeBackground: bg.id }
+    setMetaProgression(updated)
+    localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+    setUnlockPopup({ name: bg.name, spriteKey: 'Potion' })
+    setTimeout(() => setUnlockPopup(null), 3000)
+  }
+
   const LOCKED_CONSUMABLE_MAP: Record<string, string> = {
     unlock_hyper_potion: 'Hyper Potion',
     unlock_full_restore: 'Full Restore',
@@ -2404,6 +2521,12 @@ function MainApp() {
     unlock_soda_pop: 'Soda Pop',
     unlock_lemonade: 'Lemonade',
     unlock_disco_mt: 'Disco MT',
+    unlock_protein: 'Proteína',
+    unlock_calcium: 'Calcio',
+    unlock_iron: 'Hierro',
+    unlock_zinc: 'Zinc',
+    unlock_carbos: 'Carburante',
+    unlock_sacred_ash: 'Sacred Ash',
   }
   const LOCKED_HOLDABLE_MAP: Record<string, string> = {
     unlock_muscle_band: 'Muscle Band',
@@ -2434,6 +2557,12 @@ function MainApp() {
     unlock_iron_ball: 'Iron Ball',
     unlock_vampire_fang: 'Vampire Fang',
     unlock_cursed_blade: 'Cursed Blade',
+    unlock_focus_sash_2: 'Focus Sash II',
+    unlock_scope_lens_2: 'Scope Lens II',
+    unlock_shell_bell_2: 'Shell Bell II',
+    unlock_assault_vest_2: 'Assault Vest II',
+    unlock_leftovers_2: 'Leftovers II',
+    unlock_quick_claw_2: 'Quick Claw II',
   }
   const LOCKED_POKEBALL_MAP: Record<string, string> = {}
   for (const [ballName, unlockId] of Object.entries(POKEBALL_UNLOCK_IDS)) {
@@ -2718,8 +2847,9 @@ function MainApp() {
       if (item.category === 'music') return metaProgression.ownedMusic.includes(item.id)
       return metaProgression.permanentlyUnlockedItems.includes(item.id)
     })
-    if (allThemesOwned && allItemsOwned) unlockAchievement('meta_complete')
-  }, [metaProgression.ownedThemes, metaProgression.ownedMusic, metaProgression.permanentlyUnlockedItems])
+    const allBackgroundsOwned = BACKGROUNDS.every(bg => bg.id === 'none' || metaProgression.ownedBackgrounds.includes(bg.id))
+    if (allThemesOwned && allItemsOwned && allBackgroundsOwned) unlockAchievement('meta_complete')
+  }, [metaProgression.ownedThemes, metaProgression.ownedMusic, metaProgression.permanentlyUnlockedItems, metaProgression.ownedBackgrounds])
 
   useEffect(() => {
     if (winStreak >= 3) unlockAchievement('streak_3')
@@ -6899,14 +7029,23 @@ function MainApp() {
 
         // Auto-evolución al alcanzar el nivel de evolución
         if (!runChallenges.noEvolution && updatedPokemon.evolutionLevel && updatedPokemon.level >= updatedPokemon.evolutionLevel) {
-          const itemOk = !updatedPokemon.heldItemRequired || updatedPokemon.holdItem === updatedPokemon.heldItemRequired
+          // Si el Pokémon evoluciona con objeto (p. ej. Clamperl → Huntail con
+          // Deep Sea Tooth o → Gorebyss con Deep Sea Scale), se elige la rama
+          // según el objeto equipado. Sin objeto, no evoluciona por esta vía.
+          const itemEvolutions = updatedPokemon.heldItemEvolutions ?? []
+          const hasItemEvolutions = itemEvolutions.length > 0
+          const matched = hasItemEvolutions
+            ? itemEvolutions.find(e => e.item === updatedPokemon.holdItem)
+            : null
+          const itemOk = !hasItemEvolutions || !!matched
           if (itemOk) {
             try {
               // El objeto que el Pokémon necesita para evolucionar a su forma
               // especial (p. ej. Gorra de Ash para Greninja-Ash). Solo se
               // consume si esta evolución es exactamente la del objeto.
-              const requiredItem = updatedPokemon.heldItemRequired
-              const evolved = await evolvePokemon(updatedPokemon)
+              const requiredItem = matched ? matched.item : undefined
+              const targetName = matched ? matched.target : undefined
+              const evolved = await evolvePokemon(updatedPokemon, targetName)
               if (evolved) {
                 const consumedItem = updatedPokemon.holdItem
                 const { updatedPokemon: finalEvolved } = await checkAndLearnNewMove(evolved, oldLevel, updatedPokemon.level, difficulty)
@@ -7477,6 +7616,19 @@ function MainApp() {
       return
     }
 
+    if (itemName === 'Sacred Ash') {
+      const hasFainted = team.some((p) => p.hp <= 0)
+      if (!hasFainted) {
+        setBattleLog((prev) => ['No tienes ningún Pokémon debilitado para usar la Sacred Ash.', ...prev].slice(0, 15))
+        return
+      }
+      setTeam(prev => prev.map(p => p.hp <= 0 ? { ...p, hp: p.maxHp } : p))
+      setInventory((previous) => previous.filter((_, index) => index !== itemIndex))
+      setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
+      setBattleLog((prev) => ['🪶 ¡La Sacred Ash revivió a todo tu equipo con el HP completo!', ...prev].slice(0, 15))
+      return
+    }
+
     if (itemName === 'Revive' || itemName === 'Max Revive') {
       const hasFainted = team.some((p) => p.hp <= 0)
       if (!hasFainted) {
@@ -7533,6 +7685,16 @@ function MainApp() {
       updatedPokemon = { ...activePokemon, defense: activePokemon.defense + 10 }
     } else if (itemName === 'X Speed 2') {
       updatedPokemon = { ...activePokemon, speed: activePokemon.speed + 10 }
+    } else if (itemName === 'Proteína') {
+      updatedPokemon = { ...activePokemon, attack: activePokemon.attack + 15 }
+    } else if (itemName === 'Calcio') {
+      updatedPokemon = { ...activePokemon, spAttack: activePokemon.spAttack + 15 }
+    } else if (itemName === 'Hierro') {
+      updatedPokemon = { ...activePokemon, defense: activePokemon.defense + 15 }
+    } else if (itemName === 'Zinc') {
+      updatedPokemon = { ...activePokemon, spDefense: activePokemon.spDefense + 15 }
+    } else if (itemName === 'Carburante') {
+      updatedPokemon = { ...activePokemon, speed: activePokemon.speed + 15 }
     }
 
     if (!updatedPokemon) return
@@ -7964,6 +8126,7 @@ function MainApp() {
 
   return (
     <main className="app-shell">
+      <BackgroundLayer backgroundId={metaProgression.activeBackground} />
       <header className="topbar">
         <TopbarCanvas />
         <div className="left-toolbar">
@@ -12240,10 +12403,39 @@ function MainApp() {
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
             <h2 style={{ color: '#ffcb05', textAlign: 'center', marginBottom: '0.5rem' }}>🪙 PokéShop</h2>
             <p style={{ textAlign: 'center', color: '#9b98cf', marginBottom: '1rem' }}>Tus PokéCoins: <strong style={{ color: '#ffcb05' }}>{metaProgression.pokeCoins}</strong></p>
+            <div style={{ marginBottom: '1rem' }}>
+              <input
+                type="text"
+                value={metaShopSearch}
+                onChange={(e) => setMetaShopSearch(e.target.value)}
+                placeholder="🔍 Buscar objetos por nombre o efecto..."
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  border: '2px solid #3f3f6e',
+                  background: 'rgba(15,23,42,0.7)',
+                  color: '#f3f1ff',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                }}
+              />
+              {(() => {
+                const term = metaShopSearch.trim().toLowerCase()
+                if (!term) return null
+                const visibleThemes = THEMES.filter(t => t.name.toLowerCase().includes(term) || t.desc.toLowerCase().includes(term))
+                const visibleItems = META_SHOP_ITEMS.filter(i => i.name.toLowerCase().includes(term) || i.desc.toLowerCase().includes(term))
+                const visibleBgs = BACKGROUNDS.filter(bg => bg.id === 'none' || bg.name.toLowerCase().includes(term) || bg.desc.toLowerCase().includes(term))
+                if (visibleThemes.length === 0 && visibleItems.length === 0 && visibleBgs.length === 0) {
+                  return <p style={{ color: '#7d7ab5', fontSize: '0.85rem', textAlign: 'center', margin: '0.75rem 0 0' }}>Sin resultados para "{metaShopSearch}".</p>
+                }
+                return null
+              })()}
+            </div>
 
             <h3 style={{ color: '#4d9bff', marginBottom: '0.5rem' }}>🎨 Temas Visuales</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              {THEMES.map(theme => {
+              {THEMES.filter(t => metaShopItemMatches(t, metaShopSearch.trim().toLowerCase())).map(theme => {
                 const owned = metaProgression.ownedThemes.includes(theme.id)
                 const active = metaProgression.activeTheme === theme.id
                 return (
@@ -12270,10 +12462,44 @@ function MainApp() {
               })}
             </div>
 
+            <h3 style={{ color: '#22d3ee', marginBottom: '0.5rem' }}>🖼️ Fondos Animados</h3>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Fondos animados e interactivos que se muestran detrás del juego. Toca un fondo que poseas para activarlo.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {BACKGROUNDS.filter(bg => bg.id === 'none' || metaShopItemMatches(bg, metaShopSearch.trim().toLowerCase())).map(bg => {
+                const owned = metaProgression.ownedBackgrounds.includes(bg.id)
+                const active = metaProgression.activeBackground === bg.id
+                return (
+                  <div key={bg.id} style={{ background: 'rgba(30,41,59,0.6)', border: `2px solid ${active ? '#ffcb05' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem', cursor: owned ? 'pointer' : 'default', opacity: owned ? 1 : 0.7 }}
+                    onClick={() => owned ? setBackground(bg.id) : undefined}>
+                    <div style={{ height: '52px', borderRadius: '6px', marginBottom: '0.5rem', border: '1px solid rgba(255,255,255,0.15)', overflow: 'hidden' }}>
+                      {bg.id === 'none' ? (
+                        <div style={{ width: '100%', height: '100%', background: bg.preview, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem' }}>
+                          <span style={{ filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.5))' }}>{bg.icon}</span>
+                        </div>
+                      ) : (
+                        <BackgroundPreview backgroundId={bg.id} height={52} />
+                      )}
+                    </div>
+                    <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{bg.name}</div>
+                    <div style={{ color: '#9b98cf', fontSize: '0.75rem', marginBottom: '0.4rem' }}>{bg.desc}</div>
+                    {owned ? (
+                      active ? <div style={{ color: '#ffcb05', fontSize: '0.75rem', fontWeight: 'bold' }}>✅ Activo</div> : <div style={{ color: '#9b98cf', fontSize: '0.75rem' }}>Toca para activar</div>
+                    ) : (
+                      <button className="cta" onClick={(e) => { e.stopPropagation(); buyBackground(bg) }}
+                        disabled={metaProgression.pokeCoins < bg.price}
+                        style={{ marginTop: '0.3rem', fontSize: '0.75rem', padding: '4px 12px', background: metaProgression.pokeCoins >= bg.price ? '#22d3ee' : '#475569', color: '#000' }}>
+                        🪙 {bg.price}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
             <h3 style={{ color: '#ff8a33', marginBottom: '0.5rem' }}>🧪 Items Curativos</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Al comprar un item, empezará a aparecer en tiendas y drops durante las partidas.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              {META_SHOP_ITEMS.filter(item => item.category === 'consumable').map(item => {
+              {META_SHOP_ITEMS.filter(item => item.category === 'consumable' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 return (
                   <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
@@ -12305,7 +12531,7 @@ function MainApp() {
             <h3 style={{ color: '#38bdf8', marginBottom: '0.5rem' }}>💿 Discos MT</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea el Disco MT: un objeto consumible que enseña un movimiento a tu Pokémon igual que el nodo Move Tutor. Aparecerá en tiendas durante las partidas.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              {META_SHOP_ITEMS.filter(item => item.category === 'disco_mt').map(item => {
+              {META_SHOP_ITEMS.filter(item => item.category === 'disco_mt' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 return (
                   <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
@@ -12337,7 +12563,7 @@ function MainApp() {
             <h3 style={{ color: '#ee3b2f', marginBottom: '0.5rem' }}>🏐 Poké Balls</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea distintos tipos de Poké Balls para usar en la captura de Pokémon salvajes.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              {META_SHOP_ITEMS.filter(item => item.category === 'pokeball').map(item => {
+              {META_SHOP_ITEMS.filter(item => item.category === 'pokeball' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 return (
                   <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
@@ -12369,7 +12595,7 @@ function MainApp() {
             <h3 style={{ color: '#a855f7', marginBottom: '0.5rem' }}>💎 Piedras Evolutivas</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea piedras evolutivas para evolucionar ciertos Pokémon. Aparecen en tiendas y Spin.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              {META_SHOP_ITEMS.filter(item => item.category === 'evolution_stone').map(item => {
+              {META_SHOP_ITEMS.filter(item => item.category === 'evolution_stone' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 return (
                   <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
@@ -12401,7 +12627,7 @@ function MainApp() {
             <h3 style={{ color: '#ff8a33', marginBottom: '0.5rem' }}>🔧 Objetos Evolutivos</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Objetos para evolucionar Pokémon. Aparecen con el Comerciante Misterioso.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              {META_SHOP_ITEMS.filter(item => item.category === 'evolution_item').map(item => {
+              {META_SHOP_ITEMS.filter(item => item.category === 'evolution_item' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 return (
                   <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
@@ -12433,7 +12659,7 @@ function MainApp() {
             <h3 style={{ color: '#22d3ee', marginBottom: '0.5rem' }}>⚙️ Mejoras</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Mejoras permanentes: empieza cada aventura con objetos y dinero extra, y desbloquea nodos especiales en rutas Hard/Infinite.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              {META_SHOP_ITEMS.filter(item => item.category === 'upgrade').map(item => {
+              {META_SHOP_ITEMS.filter(item => item.category === 'upgrade' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 const locked = item.requires ? !metaProgression.permanentlyUnlockedItems.includes(item.requires) : false
                 return (
@@ -12469,7 +12695,7 @@ function MainApp() {
             <h3 style={{ color: '#ff9ad6', marginBottom: '0.5rem' }}>🎵 Música</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Nuevas pistas musicales para el menú y los combates.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              {META_SHOP_ITEMS.filter(item => item.category === 'music').map(item => {
+              {META_SHOP_ITEMS.filter(item => item.category === 'music' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.ownedMusic.includes(item.id)
                 return (
                   <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
@@ -12498,10 +12724,11 @@ function MainApp() {
             <h3 style={{ color: '#a855f7', marginBottom: '0.5rem' }}>⚔️ Objetos Pasivos</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Se equipan a un Pokémon y otorgan efectos permanentes durante la batalla.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem' }}>
-              {META_SHOP_ITEMS.filter(item => item.category === 'holdable').map(item => {
+              {META_SHOP_ITEMS.filter(item => item.category === 'holdable' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                const locked = item.requires ? !metaProgression.permanentlyUnlockedItems.includes(item.requires) : false
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem', opacity: locked ? 0.5 : 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
@@ -12515,6 +12742,8 @@ function MainApp() {
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
                     {owned ? (
                       <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                    ) : locked ? (
+                      <div style={{ color: '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold' }}>🔒 Requiere {META_SHOP_ITEMS.find(i => i.id === item.requires)?.name ?? 'la versión anterior'}</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
