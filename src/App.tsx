@@ -9691,11 +9691,7 @@ function MainApp() {
                 <span style={{ fontSize: '1.2rem', color: coliseumUnlocked ? '#ffcb05' : '#7d7ab5' }}>👑 COLISEUM {coliseumUnlocked ? '' : '🔒'}</span>
                 <strong style={{ fontSize: '1rem', color: coliseumUnlocked ? '#ffcb05' : '#7d7ab5' }}>— 8 jefes a nivel 50</strong>
               </div>
-              {coliseumUnlocked ? (
-                <span className="lock-text" style={{ color: '#9b98cf', fontSize: '0.75rem' }}>
-                  Elige 6 Pokémon de tu Pokédex para enfrentarlos
-                </span>
-              ) : (
+              {!coliseumUnlocked && (
                 <span className="lock-text">
                   🔒 Completa todas las generaciones en Intermedio
                 </span>
