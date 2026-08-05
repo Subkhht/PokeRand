@@ -12,6 +12,13 @@ import GuessNumber from './GuessNumber'
 import GuessPokemon from './GuessPokemon'
 import PokeballToss from './PokeballToss'
 import PachinkoMinigame from './PachinkoMinigame'
+import GuessType from './GuessType'
+import TriviaPokemon from './TriviaPokemon'
+import Fishing from './Fishing'
+import CatchCoins from './CatchCoins'
+import VoltorbFlip from './VoltorbFlip'
+import SlidePuzzle from './SlidePuzzle'
+import GuessDex from './GuessDex'
 
 interface MinigamePlayerProps extends CasinoMinigameProps {
   gameKey: string
@@ -30,6 +37,13 @@ export default function MinigamePlayer({ gameKey, onComplete }: MinigamePlayerPr
     case 'guessNum': return <GuessNumber onComplete={onComplete} />
     case 'guessPoke': return <GuessPokemon onComplete={onComplete} />
     case 'toss': return <PokeballToss onComplete={onComplete} />
+    case 'guessType': return <GuessType onComplete={onComplete} />
+    case 'trivia': return <TriviaPokemon onComplete={onComplete} />
+    case 'fishing': return <Fishing onComplete={onComplete} />
+    case 'catchCoins': return <CatchCoins onComplete={onComplete} />
+    case 'voltorbFlip': return <VoltorbFlip onComplete={onComplete} />
+    case 'slidePuzzle': return <SlidePuzzle onComplete={onComplete} />
+    case 'guessDex': return <GuessDex onComplete={onComplete} />
     default: return <PachinkoMinigame onComplete={onComplete} />
   }
 }

@@ -21,4 +21,11 @@ export const CASINO_MINIGAMES: CasinoMinigameDef[] = [
   { key: 'guessPoke', name: '❓ ¿Quién es ese Pokémon?', desc: 'Identifica al Pokémon por su silueta.' },
   { key: 'toss', name: '⚾ Lanza la Poké Ball', desc: 'Lanza la Poké Ball con la potencia justa.' },
   { key: 'pachinko', name: '🃏 Pachinko', desc: 'Suelta la bola y llega a la casilla central.' },
+  { key: 'guessType', name: '🌈 Adivina el Tipo', desc: 'Descubre el tipo principal de cada Pokémon.' },
+  { key: 'trivia', name: '🧠 Trivia Pokémon', desc: 'Responde preguntas sobre tipos, números y regiones.' },
+  { key: 'fishing', name: '🎣 Pesca', desc: 'Pulsa justo cuando el corcho se hunda para pescar.' },
+  { key: 'catchCoins', name: '🪙 Atrapa Monedas', desc: 'Recoge monedas y evita los Voltorb que caen.' },
+  { key: 'voltorbFlip', name: '💣 Voltorb Flip', desc: 'Voltea casillas y esquiva los Voltorb.' },
+  { key: 'slidePuzzle', name: '🧩 Puzle Deslizante', desc: 'Ordena las fichas del Pokémon.' },
+  { key: 'guessDex', name: '📖 Adivina la Pokédex', desc: 'Reconoce al Pokémon por su nombre y número.' },
 ]
