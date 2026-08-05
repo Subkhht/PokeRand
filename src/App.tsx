@@ -9267,9 +9267,9 @@ function MainApp() {
                   type="button"
                   disabled={isLoading || !unlocked}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>Gen {gen} {unlocked ? '' : '🔒'}</span>
-                    <span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0 8px' }}>
+                    <span style={{ whiteSpace: 'nowrap' }}>Gen {gen} {unlocked ? '' : '🔒'}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       {completedHard ? (
                         <span className="badge-medium" title="Completado en Difícil">🏆🏆</span>
                       ) : completedMed ? (
@@ -9278,10 +9278,10 @@ function MainApp() {
                         <span className="badge-easy" title="Completado en Fácil">⭐</span>
                       ) : null}
                       {completedColiseum && (
-                        <span className="badge-medium" title="Completado en COLISEUM" style={{ marginLeft: '4px' }}>👑</span>
+                        <span className="badge-medium" title="Completado en COLISEUM">👑</span>
                       )}
                       {completedLeague && (
-                        <span className="badge-medium" title="Completado en Liga" style={{ marginLeft: '4px' }}>🏅</span>
+                        <span className="badge-medium" title="Completado en Liga">🏅</span>
                       )}
                     </span>
                   </div>
@@ -9332,11 +9332,11 @@ function MainApp() {
                     cursor: randomUnlocked ? 'pointer' : 'not-allowed'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.2rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '0 8px' }}>
+                    <span style={{ fontSize: '1.2rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5', whiteSpace: 'nowrap' }}>
                       🎲 RANDOM {randomUnlocked ? '' : '🔒'}
                     </span>
-                    <span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
                       {randomCompletedHard ? (
                         <span className="badge-medium" title="Completado en Difícil">🏆🏆</span>
                       ) : randomCompletedMed ? (
@@ -9345,13 +9345,13 @@ function MainApp() {
                         <span className="badge-easy" title="Completado en Fácil">⭐</span>
                       ) : null}
                       {randomCompletedColiseum && (
-                        <span className="badge-medium" title="Completado en COLISEUM" style={{ marginLeft: '4px' }}>👑</span>
+                        <span className="badge-medium" title="Completado en COLISEUM">👑</span>
                       )}
                       {randomCompletedLeague && (
-                        <span className="badge-medium" title="Completado en Liga" style={{ marginLeft: '4px' }}>🏅</span>
+                        <span className="badge-medium" title="Completado en Liga">🏅</span>
                       )}
                     </span>
-                    <strong style={{ fontSize: '1rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5' }}>
+                    <strong style={{ fontSize: '1rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5', whiteSpace: 'nowrap' }}>
                       — {randomUnlocked ? 'Mezclar todas las generaciones' : 'Todas las Generaciones'}
                     </strong>
                   </div>
