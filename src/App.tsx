@@ -2054,6 +2054,7 @@ function MainApp() {
   // Opciones / Volumen
   const [showOptions, setShowOptions] = useState<boolean>(false)
   const [showRestartConfirm, setShowRestartConfirm] = useState<boolean>(false)
+  const [showHelpModal, setShowHelpModal] = useState<boolean>(false)
   const [language, setLanguageState] = useState<Language>(getLanguage())
   const changeLanguage = (lang: Language): void => {
     setI18nLanguage(lang)
@@ -8150,6 +8151,21 @@ function MainApp() {
   return (
     <main className="app-shell">
       <BackgroundLayer backgroundId={metaProgression.activeBackground} />
+      <button
+        type="button"
+        onClick={() => { playClick(); setShowHelpModal(true) }}
+        title={t('help.title')}
+        style={{
+          position: 'fixed', bottom: '6px', right: '10px', zIndex: 5,
+          background: 'transparent', border: 'none', color: 'rgba(155,152,207,0.5)',
+          fontSize: '0.7rem', cursor: 'pointer', fontFamily: 'inherit', opacity: 0.6,
+          transition: 'opacity 0.2s',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6' }}
+      >
+        {t('help.version')}
+      </button>
       <header className="topbar">
         <TopbarCanvas />
         <div className="left-toolbar">
@@ -12464,6 +12480,95 @@ function MainApp() {
       )}
 
       {/* Meta Shop Modal */}
+      {/* Modal Tutorial / Cómo se juega */}
+      {showHelpModal && (
+        <div className="modal-backdrop" onClick={() => setShowHelpModal(false)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px', maxHeight: '86vh', overflow: 'auto', padding: '1.5rem', animation: 'casinoSlideUp 0.35s ease' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <h2 style={{ margin: 0, color: '#ffcb05' }}>❓ {t('help.title')} <span style={{ fontSize: '0.7rem', color: '#7d7ab5', fontWeight: 'normal' }}>{t('help.version')}</span></h2>
+              <button className="tiny-btn" type="button" onClick={() => setShowHelpModal(false)} style={{ color: '#ff8a80' }}>{t('common.close')}</button>
+            </div>
+
+            <div style={{ color: '#d9d6f2', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1.25rem', animation: 'casinoFadeIn 0.5s ease' }}>
+              {t('help.intro')}
+            </div>
+
+            <div className="help-section" style={{ marginBottom: '1.25rem', animation: 'casinoSlideUp 0.4s ease' }}>
+              <h3 style={{ color: '#4d9bff', margin: '0 0 0.5rem', fontSize: '1rem' }}>{t('help.howTitle')}</h3>
+              <ol style={{ margin: 0, paddingLeft: '1.2rem', color: '#d9d6f2', fontSize: '0.9rem', lineHeight: '1.7' }}>
+                <li>{t('help.how1')}</li>
+                <li>{t('help.how2')}</li>
+                <li>{t('help.how3')}</li>
+                <li>{t('help.how4')}</li>
+              </ol>
+            </div>
+
+            <div className="help-section" style={{ marginBottom: '1.25rem', animation: 'casinoSlideUp 0.45s ease' }}>
+              <h3 style={{ color: '#ff8a33', margin: '0 0 0.5rem', fontSize: '1rem' }}>{t('help.nodesTitle')}</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '0.5rem' }}>
+                {([
+                  ['battle', 'help.battle'], ['rest', 'help.rest'], ['shop', 'help.shop'], ['boss', 'help.boss'],
+                  ['teamRocket', 'help.teamRocket'], ['spin', 'help.spin'], ['pokeRand', 'help.pokeRand'], ['move', 'help.move'],
+                  ['mega', 'help.mega'], ['gmax', 'help.gmax'], ['primal', 'help.primal'], ['trade', 'help.trade'],
+                  ['rival', 'help.rival'], ['blackmarket', 'help.blackmarket'], ['double', 'help.double'], ['casino', 'help.casino'],
+                ] as Array<[string, string]>).map(([type, key], i) => (
+                  <div
+                    key={type}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '8px',
+                      background: 'rgba(15,23,42,0.6)', border: `1px solid ${NODE_TYPE_COLORS[type] ?? '#3f3f6e'}`, borderLeft: `4px solid ${NODE_TYPE_COLORS[type] ?? '#3f3f6e'}`,
+                      animation: `casinoWhackPop 0.35s ease both`, animationDelay: `${i * 0.03}s`,
+                    }}
+                  >
+                    <span style={{ fontSize: '1.2rem' }}>{NODE_EMOJIS[type] ?? '•'}</span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '0.8rem', color: '#f3f1ff' }}>{nodeTypeLabel({ type, id: 0, label: '', done: false } as RouteNode)}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#9b98cf', lineHeight: '1.35' }}>{t(key)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="help-section" style={{ marginBottom: '1.25rem', animation: 'casinoSlideUp 0.5s ease' }}>
+              <h3 style={{ color: '#37d16b', margin: '0 0 0.5rem', fontSize: '1rem' }}>{t('help.battleTitle')}</h3>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#d9d6f2', fontSize: '0.9rem', lineHeight: '1.7' }}>
+                <li>{t('help.battle1')}</li>
+                <li>{t('help.battle2')}</li>
+                <li>{t('help.battle3')}</li>
+              </ul>
+            </div>
+
+            <div className="help-section" style={{ marginBottom: '1.25rem', animation: 'casinoSlideUp 0.55s ease' }}>
+              <h3 style={{ color: '#ffcb05', margin: '0 0 0.5rem', fontSize: '1rem' }}>{t('help.progTitle')}</h3>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#d9d6f2', fontSize: '0.9rem', lineHeight: '1.7' }}>
+                <li>{t('help.prog1')}</li>
+                <li>{t('help.prog2')}</li>
+                <li>{t('help.prog3')}</li>
+              </ul>
+            </div>
+
+            <div className="help-section" style={{ marginBottom: '1.25rem', animation: 'casinoSlideUp 0.6s ease' }}>
+              <h3 style={{ color: '#cba3ff', margin: '0 0 0.5rem', fontSize: '1rem' }}>{t('help.modesTitle')}</h3>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#d9d6f2', fontSize: '0.9rem', lineHeight: '1.7' }}>
+                <li>{t('help.modes1')}</li>
+                <li>{t('help.modes2')}</li>
+                <li>{t('help.modes3')}</li>
+              </ul>
+            </div>
+
+            <div className="help-section" style={{ marginBottom: '1.25rem', animation: 'casinoSlideUp 0.65s ease' }}>
+              <h3 style={{ color: '#fb923c', margin: '0 0 0.5rem', fontSize: '1rem' }}>{t('help.chalTitle')}</h3>
+              <p style={{ margin: 0, color: '#d9d6f2', fontSize: '0.9rem', lineHeight: '1.6' }}>{t('help.chal1')}</p>
+            </div>
+
+            <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
+              <button className="cta" onClick={() => setShowHelpModal(false)} style={{ background: '#ffcb05', color: '#000' }}>{t('help.close')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Confirmar Volver a inicio */}
       {showRestartConfirm && (
         <div className="modal-backdrop" onClick={() => setShowRestartConfirm(false)}>
