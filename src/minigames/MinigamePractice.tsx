@@ -1,7 +1,7 @@
 import { useState, type JSX } from 'react'
 import { CASINO_MINIGAMES } from './registry'
 import MinigamePlayer from './MinigamePlayer'
-import { minigameName, minigameDesc } from '../game/i18n'
+import { minigameName, minigameDesc, t } from '../game/i18n'
 
 interface MinigamePracticeProps {
   onClose: () => void
@@ -50,10 +50,10 @@ export default function MinigamePractice({ onClose }: MinigamePracticeProps): JS
             <span style={{ fontSize: '2.2rem', filter: 'drop-shadow(0 2px 0 rgba(0,0,0,0.5))' }}>🎮</span>
             <div>
               <h2 style={{ margin: 0, color: '#f0abfc', fontSize: '1.05rem', fontFamily: 'var(--font-title)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                Minijuegos
+                {t('casino.practiceTitle')}
               </h2>
               <div style={{ color: '#9b98cf', fontSize: '0.75rem', marginTop: '0.15rem' }}>
-                Modo Práctica · {sorted.length} juegos
+                {t('casino.practiceMode', { n: sorted.length })}
               </div>
             </div>
           </div>
@@ -65,7 +65,7 @@ export default function MinigamePractice({ onClose }: MinigamePracticeProps): JS
         {selectedKey === null ? (
           <div style={{ padding: '1.25rem 1.5rem 1.5rem' }}>
             <p style={{ color: '#7d7ab5', fontSize: '0.85rem', margin: '0 0 1rem' }}>
-              Practica los minijuegos del Casino las veces que quieras. No ganas ni pierdes nada.
+              {t('casino.practiceDesc')}
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '0.75rem' }}>
               {sorted.map((g, i) => (
@@ -125,19 +125,19 @@ export default function MinigamePractice({ onClose }: MinigamePracticeProps): JS
         ) : (
           <div style={{ padding: '1.25rem 1.5rem 1.5rem' }}>
             <button className="tiny-btn" type="button" onClick={backToList} style={{ marginBottom: '0.75rem', color: '#7d7ab5' }}>
-              ← Volver a la lista
+              {t('casino.backToList')}
             </button>
             <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
               <div style={{ fontSize: '2rem' }}>{selected ? minigameName(selected.key).split(' ')[0] : ''}</div>
               <p style={{ color: '#f0abfc', fontWeight: 'bold', fontSize: '1rem', margin: '0.25rem 0 0' }}>{selected ? minigameName(selected.key) : ''}</p>
-              <p style={{ color: '#7d7ab5', fontSize: '0.75rem', margin: '0.25rem 0 0' }}>Modo práctica · sin premio</p>
+              <p style={{ color: '#7d7ab5', fontSize: '0.75rem', margin: '0.25rem 0 0' }}>{t('casino.practiceNoPrize')}</p>
             </div>
             <MinigamePlayer key={selectedKey} gameKey={selectedKey} onComplete={handleComplete} />
             {playedMsg && (
               <div style={{ textAlign: 'center', marginTop: '0.75rem' }}>
-                <p style={{ color: '#34d399', fontSize: '0.9rem', margin: 0 }}>✅ Práctica completada</p>
+                <p style={{ color: '#34d399', fontSize: '0.9rem', margin: 0 }}>{t('casino.practiceDone')}</p>
                 <button className="secondary" type="button" onClick={backToList} style={{ marginTop: '0.5rem' }}>
-                  🎮 Jugar otro
+                  {t('casino.playAnother')}
                 </button>
               </div>
             )}

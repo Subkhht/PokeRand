@@ -2,7 +2,7 @@ import { useEffect, useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { CASINO_MINIGAMES } from './registry'
 import MinigamePlayer from './MinigamePlayer'
-import { minigameName } from '../game/i18n'
+import { minigameName, t } from '../game/i18n'
 
 export default function CasinoMinigame({ onComplete }: CasinoMinigameProps): JSX.Element {
   const [gameKey, setGameKey] = useState<string | null>(null)
@@ -32,7 +32,7 @@ export default function CasinoMinigame({ onComplete }: CasinoMinigameProps): JSX
     return (
       <div style={{ textAlign: 'center', padding: '2rem 1rem', animation: 'casinoFadeIn 0.3s ease' }}>
         <div style={{ fontSize: '3rem', animation: 'casinoBounce 0.9s ease infinite' }}>🎰</div>
-        <p style={{ color: '#f0abfc', fontWeight: 'bold', fontSize: '1.1rem', margin: '1rem 0 0.25rem' }}>Eligiendo minijuego...</p>
+        <p style={{ color: '#f0abfc', fontWeight: 'bold', fontSize: '1.1rem', margin: '1rem 0 0.25rem' }}>{t('casino.choosing')}</p>
         <p style={{ color: '#cbd5e1', fontSize: '0.85rem', minHeight: '1.4em' }}>{rollingName}</p>
         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginTop: '0.75rem' }}>
           {CASINO_MINIGAMES.map((g, i) => (

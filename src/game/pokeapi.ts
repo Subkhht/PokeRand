@@ -15,6 +15,9 @@ let runSeed = 0
 
 export function setRunSeed(seed: number): void {
   runSeed = seed
+  // Al cambiar de run, se limpia la caché de Pokémon para que los movimientos
+  // se reconstruyan con la configuración actual (p. ej. chance de estado).
+  pokemonCache.clear()
 }
 
 interface PokeApiNamedResource {
@@ -356,13 +359,13 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
     const ailmentRaw = data.ailment?.name
     const flinchRaw = data.meta?.flinch_chance ?? 0
     // El flinch (aturdimiento) se parsea aparte: muchos movimientos de daño lo
-    // tienen en meta.flinch_chance y, si se aplica, gana sobre la afección.
+    // tienen en meta.flinch_chance. Si el movimiento también trae una afección
+    // real (quemadura, parálisis, veneno...), esa tiene prioridad; el flinch
+    // solo se usa cuando no hay afección principal (p. ej. Ataque Rápido no,
+    // pero Golpe Cabeza sí que solo aturde).
     let ailment: StatusType | undefined
     let ailmentChance: number | undefined
-    if (flinchRaw > 0) {
-      ailment = 'flinch'
-      ailmentChance = flinchRaw / 100
-    } else if (ailmentRaw && AILMENT_MAP[ailmentRaw]) {
+    if (ailmentRaw && AILMENT_MAP[ailmentRaw]) {
       ailment = AILMENT_MAP[ailmentRaw]
       // En movimientos de ESTADO, si tienen afección y PokeAPI no da chance
       // (ailment_chance 0/null, p. ej. Yawn), se considera garantizada al 100%.
@@ -372,6 +375,16 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
       } else {
         ailmentChance = (data.meta?.ailment_chance ?? 0) > 0 ? data.meta.ailment_chance / 100 : undefined
       }
+    } else if (flinchRaw > 0) {
+      ailment = 'flinch'
+      ailmentChance = flinchRaw / 100
+    }
+
+    // Balance: cualquier movimiento con chance de causar un estado (y que no
+    // sea garantizado) se sube al 50%. Los movimientos de estado garantizados
+    // (chance 1) se mantienen al 100%.
+    if (ailment && ailmentChance != null && ailmentChance > 0 && ailmentChance < 1) {
+      ailmentChance = 0.5
     }
 
     const minHits = data.meta?.min_hits ?? undefined
@@ -388,12 +401,17 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
 
     const statChance = data.meta?.stat_chance ?? undefined
 
+    // Algunos movimientos suben la Velocidad del usuario en generaciones modernas
+    // (p. ej. Rapid Spin desde Gen 8), pero en este juego se prefiere el
+    // comportamiento clásico sin ese boost. Se filtra el stat change aquí.
+    const NO_SPEED_BOOST = new Set(['rapid-spin'])
     const statChanges: StatChange[] | undefined = data.stat_changes?.length > 0
       ? data.stat_changes.map((sc: any) => ({
           stat: sc.stat.name === 'attack' ? 'attack' : sc.stat.name === 'defense' ? 'defense' : sc.stat.name === 'speed' ? 'speed' : sc.stat.name === 'special-attack' ? 'special-attack' : sc.stat.name === 'special-defense' ? 'special-defense' : null,
           change: sc.change,
           chance: statChance,
         })).filter((sc: StatChange | null) => sc !== null)
+        .filter((sc: StatChange) => !(NO_SPEED_BOOST.has(data.name) && sc.stat === 'speed'))
       : undefined
 
     const metaCategory = data.meta?.category?.name ?? undefined
@@ -472,7 +490,8 @@ const FALLBACK_MOVES: Move[] = [
 export async function fetchPokemonMoves(
   moveEntries: any[],
   level: number = 10,
-  difficulty: string = 'medium'
+  difficulty: string = 'medium',
+  pokemonId?: number
 ): Promise<{ moves: Move[]; rawLevelUpMoves: RawLevelUpMove[] }> {
   const maxAllowedPower = getMaxMovePowerForLevel(level, difficulty)
 
@@ -542,6 +561,28 @@ export async function fetchPokemonMoves(
     }
   }
 
+  // Charmander siempre aprende Ascuas (Ember): si aparece en sus movimientos de
+  // nivel, se garantiza que esté en el moveset de los 4 ataques.
+  if (pokemonId === 4 && !seenNames.has('Ascuas') && !seenNames.has('Ember')) {
+    const emberEntry = rawLevelUpMoves.find((m) => /ember|ascuas/i.test(m.name))
+    if (emberEntry) {
+      const ember = await getMoveDetails(emberEntry.url)
+      if (ember && ember.power <= maxAllowedPower) {
+        if (validMoves.length < 4) {
+          validMoves.push(ember)
+        } else {
+          // Reemplaza el movimiento de menor potencia para dejar sitio a Ascuas.
+          let minIdx = 0
+          for (let i = 1; i < validMoves.length; i++) {
+            if ((validMoves[i].power ?? 0) < (validMoves[minIdx].power ?? 0)) minIdx = i
+          }
+          validMoves[minIdx] = ember
+        }
+        seenNames.add(ember.name)
+      }
+    }
+  }
+
   for (const fallback of FALLBACK_MOVES) {
     if (validMoves.length === 4) break
     if (!seenNames.has(fallback.name) && fallback.power <= maxAllowedPower) {
@@ -603,7 +644,7 @@ export async function buildPokemonFromApi(
   const statMap = new Map(data.stats.map((entry) => [entry.stat.name, entry.base_stat]))
   const baseStatTotal = data.stats.reduce((acc, entry) => acc + entry.base_stat, 0)
   
-  const { moves: parsedMoves, rawLevelUpMoves } = await fetchPokemonMoves(data.moves, targetLevel, difficulty)
+  const { moves: parsedMoves, rawLevelUpMoves } = await fetchPokemonMoves(data.moves, targetLevel, difficulty, data.id)
   const sortedTypes = [...data.types].sort((a, b) => a.slot - b.slot).map(t => t.type.name)
 
   const pokemon: Pokemon = {

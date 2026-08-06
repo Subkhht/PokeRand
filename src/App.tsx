@@ -30,7 +30,7 @@ import BackgroundPreview from './BackgroundPreview'
 import { BACKGROUNDS } from './game/backgrounds'
 import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
-import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, metaItemDesc, moveName, statusLabel, statusAppliedLine, type Language } from './game/i18n'
+import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, metaItemDesc, moveName, statusLabel, statusAppliedLine, themeName, themeDesc, bgName, bgDesc, type Language } from './game/i18n'
 
 type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum'
@@ -105,6 +105,21 @@ function StatusFloat({ pokemon }: { pokemon?: Pokemon }) {
       {emoji}
     </span>
   )
+}
+
+// Clase CSS de animación sobre el sprite según el estado del Pokémon.
+function statusSpriteClass(status?: Pokemon['status']): string {
+  if (!status) return ''
+  switch (status.type) {
+    case 'burn': return 'status-burn'
+    case 'poison': return 'status-poison'
+    case 'paralysis': return 'status-paralysis'
+    case 'freeze': return 'status-freeze'
+    case 'sleep': return 'status-sleep'
+    case 'confusion': return 'status-confusion'
+    case 'flinch': return 'status-flinch'
+    default: return ''
+  }
 }
 
 function CopyCodeButton({ code }: { code: string }) {
@@ -1730,15 +1745,15 @@ function moveEffectSummary(move: Move): string {
   }
   if (move.statChanges && move.statChanges.length > 0) {
     for (const sc of move.statChanges) {
-      const statName = sc.stat === 'attack' ? 'Atq' : sc.stat === 'defense' ? 'Def' : sc.stat === 'speed' ? 'Vel' : sc.stat === 'special-attack' ? 'Atq.Esp' : 'Def.Esp'
+      const statName = sc.stat === 'attack' ? t('b.statAtk') : sc.stat === 'defense' ? t('b.statDef') : sc.stat === 'speed' ? t('b.statVel') : sc.stat === 'special-attack' ? t('b.statSpAtk') : t('b.statSpDef')
       const dir = sc.change > 0 ? '↑' : '↓'
       const pct = sc.chance != null ? ` ${sc.chance}%` : ''
       parts.push(`${dir} ${statName}${pct}`)
     }
   }
-  if (move.minHits && move.maxHits) parts.push(`${move.minHits}-${move.maxHits} golpes`)
-  if (move.drainPercent) parts.push(`drena ${Math.round(move.drainPercent * 100)}%`)
-  if (move.recoilPercent) parts.push(`recoil ${Math.round(move.recoilPercent * 100)}%`)
+  if (move.minHits && move.maxHits) parts.push(t('b.effectHits', { min: move.minHits, max: move.maxHits }))
+  if (move.drainPercent) parts.push(t('b.effectDrain', { pct: Math.round(move.drainPercent * 100) }))
+  if (move.recoilPercent) parts.push(t('b.effectRecoil', { pct: Math.round(move.recoilPercent * 100) }))
   return parts.join(' · ')
 }
 
@@ -2034,7 +2049,7 @@ function MainApp() {
 
   // Combate Doble (2 vs 2)
   const [doubleEnemies, setDoubleEnemies] = useState<Pokemon[]>([])
-  const [doubleActives, setDoubleActives] = useState<number[]>([])
+  const [doubleActives, setDoubleActives] = useState<(number | undefined)[]>([])
   const [doubleMoves, setDoubleMoves] = useState<Array<{ moveIdx: number; target: number } | null>>([null, null])
   const [doubleActiveSlot, setDoubleActiveSlot] = useState<number>(0)
   const [doubleChoosingSwitch, setDoubleChoosingSwitch] = useState(false)
@@ -2042,6 +2057,18 @@ function MainApp() {
   const [doubleFinished, setDoubleFinished] = useState<boolean>(false)
   const [doubleHits, setDoubleHits] = useState<Array<{ kind: 'enemy' | 'player'; index: number; key: number }>>([])
   const doubleHitKeyRef = useRef(0)
+
+  // Si el slot activo queda vacío o su Pokémon está debilitado, cambia
+  // automáticamente al primer slot con un Pokémon vivo.
+  useEffect(() => {
+    if (screen !== 'double') return
+    const slot = doubleActiveSlot
+    const teamIdx = doubleActives[slot]
+    if (teamIdx === undefined || !team[teamIdx] || team[teamIdx].hp <= 0) {
+      const aliveSlot = doubleActives.findIndex(ti => ti !== undefined && team[ti] && team[ti].hp > 0)
+      if (aliveSlot !== -1 && aliveSlot !== slot) setDoubleActiveSlot(aliveSlot)
+    }
+  }, [doubleActives, doubleActiveSlot, screen, team])
 
   // Move node (intercambio de movimientos)
   const [moveOptions, setMoveOptions] = useState<Move[]>([])
@@ -2259,6 +2286,41 @@ function MainApp() {
     } catch { /* ignore */ }
     return [[], [], []]
   })
+
+  // Migración: re-parsea los moves guardados sin `ailment` (equipos PvP de
+  // versiones anteriores) consultando PokeAPI, para que el texto azul del
+  // efecto se muestre siempre que el movimiento aplique un estado.
+  const pvpTeamsRef = useRef(pvpTeams)
+  useEffect(() => { pvpTeamsRef.current = pvpTeams }, [pvpTeams])
+  useEffect(() => {
+    const migrate = async () => {
+      const teams = pvpTeamsRef.current
+      let changed = false
+      const migrated = await Promise.all(teams.map(async (team) => {
+        if (team.length === 0) return team
+        const newTeam = await Promise.all(team.map(async (p) => {
+          const needsFix = p.moves.some((m) => (m.metaCategory === 'damage-ailment' || m.metaCategory === 'net-good-stats' || m.metaCategory === 'net-bad-stats') && !m.ailment && !m.statChanges)
+          if (!needsFix) return p
+          const fixedMoves = await Promise.all(p.moves.map(async (m) => {
+            if (!m.url) return m
+            try {
+              const fresh = await getMoveDetails(m.url)
+              if (fresh) return { ...m, ailment: fresh.ailment, ailmentChance: fresh.ailmentChance, statChanges: fresh.statChanges }
+            } catch { /* keep old */ }
+            return m
+          }))
+          if (fixedMoves.some((m, i) => m.ailment !== p.moves[i]?.ailment || m.statChanges !== p.moves[i]?.statChanges)) changed = true
+          return { ...p, moves: fixedMoves }
+        }))
+        return newTeam
+      }))
+      if (!changed) return
+      setPvpTeams(migrated)
+      localStorage.setItem('pokerand_pvp_teams', JSON.stringify(migrated))
+    }
+    void migrate()
+  }, [])
+
   const [pvpActiveSlot, setPvpActiveSlot] = useState<number>(() => {
     const n = Number(localStorage.getItem('pokerand_pvp_active_slot') ?? 0)
     return n >= 0 && n <= 2 ? n : 0
@@ -2539,7 +2601,7 @@ function MainApp() {
     const updated = { ...metaProgression, pokeCoins: metaProgression.pokeCoins - bg.price, ownedBackgrounds: [...metaProgression.ownedBackgrounds, bg.id], activeBackground: bg.id }
     setMetaProgression(updated)
     localStorage.setItem('pokerand_meta', JSON.stringify(updated))
-    setUnlockPopup({ name: bg.name, spriteKey: 'Potion' })
+    setUnlockPopup({ name: bgName(bg.id), spriteKey: 'Potion' })
     setTimeout(() => setUnlockPopup(null), 3000)
   }
 
@@ -3766,7 +3828,7 @@ function MainApp() {
         const batch = Array.from({ length: 5 }, (_, k) => generateRandomNodeType(nextId + k, routeRandRef.current))
         setRoute((previous) => [...previous, ...batch])
         setBattleLog((prev) => [
-          `♾️ ¡Modo Infinite! Aparecen 5 nuevas rutas...`,
+          t('b.infiniteNewRoutes'),
           ...prev
         ].slice(0, 15))
         setRouteIndex((previous) => previous + 1)
@@ -4965,13 +5027,13 @@ function MainApp() {
     if (team.length >= 6) {
       setPcStorage((prev) => [...prev, captured])
       setBattleLog((prev) => [
-        `✅ ¡${pokemon.name} capturado! Se envió al PC (equipo lleno).`,
+        t('b.capturedPC2', { name: pokemon.name }),
         ...prev
       ].slice(0, 15))
     } else {
       setTeam((prev) => [...prev, captured])
       setBattleLog((prev) => [
-        `✅ ¡${pokemon.name} se unió a tu equipo!`,
+        t('b.joinedTeam', { name: pokemon.name }),
         ...prev
       ].slice(0, 15))
     }
@@ -5031,7 +5093,7 @@ function MainApp() {
     playClick()
     setMoney((prev) => prev - price)
     setInventory((prev) => [...prev, itemName])
-    setBattleLog((prev) => [`🕶️ Compraste ${itemName} en el mercado negro por $${price}.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.boughtMarket', { item: itemName, price }), ...prev].slice(0, 15))
   }
 
   function blackMarketSellItem(itemName: string): void {
@@ -5046,7 +5108,7 @@ function MainApp() {
     const data = ALL_SHOP_ITEMS[itemName] ?? HOLDABLE_ITEMS[itemName]
     const value = data ? Math.max(1, Math.floor(data.price * 0.5)) : 10
     setMoney((prev) => prev + value)
-    setBattleLog((prev) => [`🕶️ Vendiste ${itemName} por $${value}.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.soldMarket', { item: itemName, value }), ...prev].slice(0, 15))
   }
 
   function blackMarketBuyPokemon(idx: number): void {
@@ -5067,7 +5129,7 @@ function MainApp() {
     } else {
       setPcStorage((prev) => [...prev, purchased])
     }
-    setBattleLog((prev) => [`🕶️ Compraste a ${pokemon.name} (Nv.${pokemon.level}) por $${price}.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.boughtMarketPokemon', { name: pokemon.name, lvl: pokemon.level, price }), ...prev].slice(0, 15))
   }
 
   // --- Combate Doble (2 vs 2) ---
@@ -5098,12 +5160,22 @@ function MainApp() {
     const damage = Math.max(1, Math.floor(result.damage * effectiveness * stab))
     const newHp = Math.max(0, defender.hp - damage)
     const log = [t('b.usesHit', { attacker: attacker.name, move: moveName(move), dmg: damage }) + (message ? ` (${message})` : '')]
-    return { attacker, defender: { ...defender, hp: newHp }, log }
+    let finalDefender: Pokemon = { ...defender, hp: newHp }
+    // Aplicar estado (parálisis, quemadura, veneno, confusión...) como en el
+    // combate normal: solo si el objetivo sobrevive al golpe.
+    if (finalDefender.hp > 0) {
+      const ailmented = applyAilmentToTarget(finalDefender, move)
+      if (ailmented.status && ailmented.status.type !== finalDefender.status?.type) {
+        finalDefender = ailmented
+        log.push(statusAppliedLine(finalDefender.name, ailmented.status.type))
+      }
+    }
+    return { attacker, defender: finalDefender, log }
   }
 
   function doubleEnemyCounterattack(
     teamCopy: Pokemon[],
-    actives: number[],
+    actives: (number | undefined)[],
     enemies: Pokemon[],
     log: string[],
     hits: Array<{ kind: 'enemy' | 'player'; index: number; key: number }>
@@ -5111,9 +5183,10 @@ function MainApp() {
     for (let e = 0; e < 2; e++) {
       const enemy = enemies[e]
       if (!enemy || enemy.hp <= 0) continue
-      const aliveTargets = actives.filter(ti => {
+      const aliveTargets = actives.filter((ti): ti is number => {
+        if (ti === undefined) return false
         const p = teamCopy[ti]
-        return p && p.hp > 0
+        return !!p && p.hp > 0
       })
       if (aliveTargets.length === 0) break
       const targetIdx = aliveTargets[Math.floor(Math.random() * aliveTargets.length)]
@@ -5132,17 +5205,20 @@ function MainApp() {
     }
   }
 
-  function doubleAutoSwitchAfterFaint(teamCopy: Pokemon[], actives: number[], log: string[]): number[] {
+  function doubleAutoSwitchAfterFaint(teamCopy: Pokemon[], actives: (number | undefined)[], log: string[]): (number | undefined)[] {
     const nextActives = [...actives]
     for (let i = 0; i < 2; i++) {
       const ti = nextActives[i]
-      if (teamCopy[ti] && teamCopy[ti].hp > 0) continue
+      if (ti !== undefined && teamCopy[ti] && teamCopy[ti].hp > 0) continue
       const alive = teamCopy
         .map((p, idx) => ({ p, idx }))
         .filter(x => x.p.hp > 0 && !nextActives.includes(x.idx))
       if (alive.length > 0) {
         nextActives[i] = alive[0].idx
-        log.push(`🔁 Sale ${teamCopy[nextActives[i]].name}!`)
+        log.push(`🔁 Sale ${teamCopy[nextActives[i] as number].name}!`)
+      } else {
+        // Sin reemplazo: este slot queda vacío (el combate sigue 1vs2 o 1vs1).
+        nextActives[i] = undefined
       }
     }
     return nextActives
@@ -5405,7 +5481,7 @@ function MainApp() {
         setDoubleMoves([null, null])
         setDoubleActiveSlot(0)
         setDoubleChoosingSwitch(false)
-        setDoubleLog([`🥊 ¡Combate Doble! ${enemies[0].name} y ${enemies[1].name} te desafían.`])
+        setDoubleLog([t('b.doubleChallenge', { a: enemies[0].name, b: enemies[1].name })])
         setDoubleHits([])
         doubleHitKeyRef.current = 0
         setDoubleFinished(false)
@@ -5423,7 +5499,7 @@ function MainApp() {
       setShopStock(generateShopStock())
       if (runChallenges.noPurchasing) {
         setBattleLog((prev) => [
-          `🚫 Desafío Sin Compras: No puedes comprar nada en la tienda.`,
+          t('b.challengeNoBuying'),
           ...prev
         ].slice(0, 15))
       }
@@ -5431,7 +5507,7 @@ function MainApp() {
       if (potionBonus > 0) {
         setInventory((prev) => [...prev, ...Array(potionBonus).fill('Potion')])
         setBattleLog((prev) => [
-          `Mercado en Oferta: ¡Recibes ${potionBonus} Poción${potionBonus > 1 ? 'es' : ''} gratis!`,
+          t('b.shopPotionBonus', { n: potionBonus }),
           ...prev
         ].slice(0, 15))
       }
@@ -5563,7 +5639,7 @@ function MainApp() {
         setBattleTurns(0)
         setScreen('battle')
       } catch {
-        setApiError('Error al generar el Pokémon G-MAX.')
+        setApiError(t('b.gmaxError'))
       } finally {
         setIsLoading(false)
       }
@@ -5627,8 +5703,8 @@ function MainApp() {
         setRestRewardItem(rewardItem)
         setInventory((previous) => [...previous, rewardItem])
         setBattleLog((prev) => [
-          `${currentNode.label}: ¡Obtuviste un Huevo de ${eggEntry.name}! (Eclosiona en ${eggEntry.hatchIn} battles)`,
-          `También obtienes ${rewardItem}.`,
+          t('rest.eggFound', { name: eggEntry.name, n: eggEntry.hatchIn, label: currentNode.label }),
+          t('rest.eggItem', { item: rewardItem }),
           ...prev
         ].slice(0, 15))
         completeCurrentNode()
@@ -5664,11 +5740,11 @@ function MainApp() {
       setRestRewardItem(rewardItem)
       setInventory((previous) => [...previous, rewardItem])
       setBattleLog((prev) => [
-        `${currentNode.label}: encuentras a ${generatedEncounter.name} y obtienes ${rewardItem}.`,
+        t('rest.found', { label: currentNode.label, name: generatedEncounter.name, item: rewardItem }),
         ...prev
       ])
     } catch {
-      setApiError('No se pudo generar el encuentro de descanso. Reintenta.')
+      setApiError(t('rest.error'))
     } finally {
       setIsLoading(false)
     }
@@ -5722,8 +5798,8 @@ function MainApp() {
         setIsTeamRocketBattle(false)
         setIsRivalBattle(true)
         setBattleLog((prev) => [
-          `👤 ¡Tu Rival aparece para desafiarte! Tiene ${teamSize} Pokémon.`,
-          `Envía a ${rivalTeam[0].name} Nv.${rivalTeam[0].level}.`,
+          t('b.rivalChallenge', { n: teamSize }),
+          t('b.sendsOut', { name: rivalTeam[0].name, lvl: rivalTeam[0].level }),
           ...prev
         ])
       } else if (isTeamRocket) {
@@ -5770,8 +5846,8 @@ function MainApp() {
         setTeamRocketStealMessage('')
         setTeamRocketPickModal(false)
         setBattleLog((prev) => [
-          `🔴 ¡Un TeamR Grunt te desafía! Tiene ${teamSize} Pokémon.`,
-          `Envía a ${rocketTeam[0].name} Nv.${rocketTeam[0].level}.`,
+          t('b.teamRocketChallenge', { n: teamSize }),
+          t('b.sendsOut', { name: rocketTeam[0].name, lvl: rocketTeam[0].level }),
           ...prev
         ])
       } else {
@@ -5874,9 +5950,9 @@ function MainApp() {
         setEnemy(firstEnemy)
         setBattleLog((prev) => [
           isBoss
-            ? `🏆 ¡El Líder ${chosenName} quiere combatir! (${chosenBadge})`
-            : `⚔️ ¡${chosenName} quiere combatir! Tiene ${teamSize} Pokémon.`,
-          `Envía a ${firstEnemy.name} Nv.${firstEnemy.level}.`,
+            ? t('b.leaderChallenge', { name: chosenName, badge: chosenBadge })
+            : t('b.trainerChallenge', { name: chosenName, n: teamSize }),
+          t('b.sendsOut', { name: firstEnemy.name, lvl: firstEnemy.level }),
           ...prev
         ])
       } else {
@@ -5990,7 +6066,7 @@ function MainApp() {
     const item = spinItems[spinWinnerIndex]
     setInventory((prev) => [...prev, item])
     setBattleLog((prev) => [
-      `🎰 ¡Giraste la Ruleta y obtuviste ${item}!`,
+      t('spin.logWon', { item }),
       ...prev
     ].slice(0, 15))
     unlockAchievement('gambler')
@@ -6044,13 +6120,13 @@ function MainApp() {
     if (team.length >= maxTeamSize) {
       setPcStorage((prev) => [...prev, pokemon])
       setBattleLog((prev) => [
-        `🎲 ¡PokeRand: ${pokemon.name} se envió al PC (equipo lleno)!`,
+        t('pokerand.logPC', { name: pokemon.name }),
         ...prev
       ].slice(0, 15))
     } else {
       setTeam((prev) => [...prev, pokemon])
       setBattleLog((prev) => [
-        `🎲 ¡PokeRand: ${pokemon.name} se unió a tu equipo!`,
+        t('pokerand.logJoin', { name: pokemon.name }),
         ...prev
       ].slice(0, 15))
     }
@@ -6060,7 +6136,7 @@ function MainApp() {
 
   function skipPokeRandPokemon(): void {
     setBattleLog((prev) => [
-      `🎲 ¡PokeRand: decidiste no capturar al Pokémon.`,
+      t('pokerand.logSkip'),
       ...prev
     ].slice(0, 15))
     completeCurrentNode()
@@ -6075,25 +6151,25 @@ function MainApp() {
       const rareItems = unlockedItems.filter(i => i === 'Master Ball' || i === 'Max Revive' || i === 'Full Restore' || i === 'Full Elixir')
       const pool = [...(rareItems.length > 0 ? rareItems : ['Ultra Ball']), ...(unlockedHoldables.length > 0 ? [unlockedHoldables[Math.floor(Math.random() * unlockedHoldables.length)]] : [])]
       const item = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : 'Ultra Ball'
-      return { label: '🏆 ¡JACKPOT!', money: 600, item }
+      return { label: t('casino.jackpot'), money: 600, item }
     }
     if (score >= 400) {
       const goodItems = ['Ultra Ball', 'Hyper Potion', 'Revive', 'Max Revive', 'Elixir'].filter(i => unlockedItems.includes(i))
       const holdable = unlockedHoldables.length > 0 ? [unlockedHoldables[Math.floor(Math.random() * unlockedHoldables.length)]] : []
       const pool = [...goodItems, ...holdable]
       const item = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null
-      return { label: '🎉 ¡Gran premio!', money: 300, item }
+      return { label: t('casino.greatPrize'), money: 300, item }
     }
     if (score >= 200) {
       const goodItems = ['Great Ball', 'Super Potion', 'Lum Berry', 'Full Heal'].filter(i => unlockedItems.includes(i))
       const stone = unlockedStones.length > 0 ? [unlockedStones[Math.floor(Math.random() * unlockedStones.length)]] : []
       const pool = [...goodItems, ...stone]
       const item = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null
-      return { label: '✨ ¡Buen premio!', money: 150, item }
+      return { label: t('casino.goodPrize'), money: 150, item }
     }
     const basicItems = ['Poké Ball', 'Potion', 'Oran Berry'].filter(i => unlockedItems.includes(i))
     const item = basicItems.length > 0 ? basicItems[Math.floor(Math.random() * basicItems.length)] : null
-    return { label: '💸 Consolación', money: 60, item }
+    return { label: t('casino.consolation'), money: 60, item }
   }
 
   function casinoComplete(score: number): void {
@@ -6111,7 +6187,7 @@ function MainApp() {
     if (!runChallenges.noMoney) setMoney(prev => prev + grantedMoney)
     if (item) setInventory(prev => [...prev, item])
     setBattleLog((prev) => [
-      `🃏 Casino: ${casinoReward.label} +$${grantedMoney}${item ? ` y ${item}.` : '.'}`,
+      t('casino.logReward', { label: casinoReward.label, money: grantedMoney, item: item ? ` y ${item}.` : '.' }),
       ...prev
     ].slice(0, 15))
     completeCurrentNode()
@@ -6159,7 +6235,7 @@ function MainApp() {
       }
       moveFromItemRef.current = fromItem
       if (fromItem) {
-        setBattleLog((prev) => [`💿 Usaste un Disco MT en ${pokemon.name}.`, ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.tmUsed', { name: pokemon.name }), ...prev].slice(0, 15))
       }
       setMoveOptions(moveDetails)
       setMoveOptionsByIndex({ [activeIndex]: moveDetails })
@@ -6207,7 +6283,7 @@ function MainApp() {
   function skipMoveNode(): void {
     const fromItem = moveFromItemRef.current
     setBattleLog((prev) => [
-      fromItem ? `💿 Guardaste tu Disco MT sin enseñar ningún movimiento.` : `📝 Decidiste no cambiar movimientos.`,
+      fromItem ? t('b.moveSkipTM') : t('b.moveSkipTutor'),
       ...prev
     ].slice(0, 15))
     setMoveOptions([])
@@ -6266,7 +6342,7 @@ function MainApp() {
     setMoney((prev) => prev - finalPrice)
     setInventory((prev) => [...prev, itemName])
     setRunStats(prev => ({ ...prev, moneySpent: prev.moneySpent + finalPrice }))
-    setBattleLog((prev) => [`Compraste ${itemName} por $${finalPrice}.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.bought', { qty: 1, item: itemName, total: finalPrice }), ...prev].slice(0, 15))
   }
 
   function sellItems(itemName: string, qty: number) {
@@ -6328,7 +6404,7 @@ function MainApp() {
       const otherItem = syn.items.find(i => i !== itemName)
       const hasOtherInTeam = team.some((p, i) => i !== pokemonIndex && p.holdItem === otherItem)
       if (hasOtherInTeam) {
-        setBattleLog((prev) => [`🔗 ¡SINERGIA: ${syn.name}! ${syn.desc}`, ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.synergy', { name: syn.name, desc: syn.desc }), ...prev].slice(0, 15))
         unlockAchievement('synergy_master')
       }
     }
@@ -6425,7 +6501,7 @@ function MainApp() {
 
     if (updated.hp <= 0) {
       updated = { ...updated, hp: 0 }
-      logs.push(`💀 ${updated.name} fue debilitado por su estado.`)
+      logs.push(t('b.debilitatedStatus', { name: updated.name }))
     }
 
     return { updatedPokemon: updated, skipTurn, log: logs }
@@ -6647,7 +6723,7 @@ function MainApp() {
       // uno mismo (Danza Espada, Rompecoraza).
       let changesHitSelf: boolean
       if (isDamaging) {
-        changesHitSelf = cat === 'net-good-stats' || cat === 'damage+raise'
+        changesHitSelf = cat === 'net-good-stats' || cat === 'damage+raise' || cat === 'damage-raise'
       } else if (cat === 'net-bad-stats' || cat === 'swagger') {
         changesHitSelf = false
       } else {
@@ -6787,12 +6863,12 @@ function MainApp() {
     if (enemySeedDrain > 0) {
       nextEnemy = { ...nextEnemy, hp: Math.max(0, nextEnemy.hp - enemySeedDrain) }
       nextPlayer = { ...nextPlayer, hp: Math.min(nextPlayer.maxHp, nextPlayer.hp + enemySeedDrain) }
-      logs.push(`🌱 ${nextEnemy.name} pierde ${enemySeedDrain} HP por Drenadoras; ${nextPlayer.name} recupera ${enemySeedDrain} HP.`)
+      logs.push(t('b.drenadorasDrain', { victim: nextEnemy.name, healer: nextPlayer.name, hp: enemySeedDrain }))
     }
     if (playerSeedDrain > 0) {
       nextPlayer = { ...nextPlayer, hp: Math.max(0, nextPlayer.hp - playerSeedDrain) }
       nextEnemy = { ...nextEnemy, hp: Math.min(nextEnemy.maxHp, nextEnemy.hp + playerSeedDrain) }
-      logs.push(`🌱 ${nextPlayer.name} pierde ${playerSeedDrain} HP por Drenadoras; ${nextEnemy.name} recupera ${playerSeedDrain} HP.`)
+      logs.push(t('b.drenadorasDrain', { victim: nextPlayer.name, healer: nextEnemy.name, hp: playerSeedDrain }))
     }
 
     // --- Anulación (Disable): decrementa los turnos del movimiento anulado ---
@@ -6810,7 +6886,7 @@ function MainApp() {
       nextTeam[activeIndex] = nextPlayer
       const nextAliveIndex = getFirstHealthyIndex(nextTeam, activeIndex)
       if (nextAliveIndex === -1) {
-        const fullLogs = ['¡Todo tu equipo ha sido debilitado!', ...logs, ...battleLog]
+        const fullLogs = [t('b.allFainted'), ...logs, ...battleLog]
         if (speedrunTimerRef.current) clearInterval(speedrunTimerRef.current)
         setTeam(nextTeam)
         setBattleLog(fullLogs)
@@ -6848,7 +6924,7 @@ function MainApp() {
     }
     if (nextEnemy.hp <= 0) {
       // Enemy died from status — treat as victory (reuses enemy defeat logic below)
-      logs.push(`💀 ${nextEnemy.name} fue debilitado por su estado.`)
+      logs.push(t('b.debilitatedStatus', { name: nextEnemy.name }))
       // Fall through to the enemy.hp <= 0 block at the end of this function
     }
 
@@ -6976,8 +7052,8 @@ function MainApp() {
         }
         const newHp = Math.min(updated.maxHp, updated.hp + healAmount)
         updated = { ...updated, hp: Math.max(1, newHp) }
-        if (healAmount > 0) logs.push(`${updated.name} recupera ${healAmount} HP por ${item.name}.`)
-        else logs.push(`${updated.name} pierde ${Math.abs(healAmount)} HP por ${item.name}.`)
+        if (healAmount > 0) logs.push(t('b.itemHealTurn', { name: updated.name, hp: healAmount, item: item.name }))
+        else logs.push(t('b.itemDamageTurn', { name: updated.name, hp: Math.abs(healAmount), item: item.name }))
       }
       return updated
     }
@@ -7021,7 +7097,7 @@ function MainApp() {
       const nextAliveIndex = getFirstHealthyIndex(nextTeam, activeIndex)
 
       if (nextAliveIndex === -1) {
-        const fullLogs = ['¡Todo tu equipo ha sido debilitado!', ...logs, ...battleLog]
+        const fullLogs = [t('b.allFainted'), ...logs, ...battleLog]
         if (speedrunTimerRef.current) clearInterval(speedrunTimerRef.current)
         setTeam(nextTeam)
         setBattleLog(fullLogs)
@@ -7218,8 +7294,8 @@ function MainApp() {
       }
 
       let logMsg = runChallenges.noMoney
-        ? `Derrotaste a ${nextEnemy.name}. ¡Todo el equipo ganó experiencia!`
-        : `Derrotaste a ${nextEnemy.name}. ¡Todo el equipo ganó experiencia! +$${moneyReward}`
+        ? t('b.defeatedWild2', { name: nextEnemy.name })
+        : t('b.defeatedWildMoney', { name: nextEnemy.name, money: moneyReward })
 
       // --- Batalla de entrenador: enviar siguiente Pokémon ---
       if (isTrainerBattle) {
@@ -7241,11 +7317,11 @@ function MainApp() {
               if (aliveTeam.length > 0) {
                 const stolen = aliveTeam[Math.floor(Math.random() * aliveTeam.length)]
                 const remainingTeam = newTeam.filter((p) => p !== stolen)
-                const msg = `🔴 ¡TeamR te robó a ${stolen.name}! Se lo llevan...`
+                const msg = t('b.teamRStole', { name: stolen.name })
                 setTeamRocketStealMessage(msg)
                 setBattleLog((prev) => [
                   msg,
-                  `🏆 ¡Derrotaste al TeamR Grunt! +$${totalReward + moneyReward}`,
+                  t('b.defeatedTeamR', { money: totalReward + moneyReward }),
                   logMsg,
                   ...logs,
                   ...prev
@@ -7264,7 +7340,7 @@ function MainApp() {
                     setTeam(remainingTeam)
                     setDefeatSummary({
                       finalTeam: remainingTeam,
-                      battleLog: [`¡TeamR te dejó sin Pokémon vivos!`, ...battleLog],
+                      battleLog: [t('b.teamRNoPokemon'), ...battleLog],
                       enemy: nextEnemy,
                       lastNodeLabel: currentNode?.label
                     })
@@ -7286,7 +7362,7 @@ function MainApp() {
               setTeamRocketTeam(defeated)
               setTeamRocketPickModal(true)
               setBattleLog((prev) => [
-                `🏆 ¡Derrotaste al TeamR Grunt sin bajas! ¡Elige un Pokémon! +$${totalReward + moneyReward}`,
+                t('b.defeatedTeamRNoLoss', { money: totalReward + moneyReward }),
                 logMsg,
                 ...logs,
                 ...prev
@@ -7308,7 +7384,7 @@ function MainApp() {
             }
           }
           setBattleLog((prev) => [
-            `🏆 ¡Derrotaste al entrenador ${trainerName}! +$${totalReward + moneyReward}`,
+            t('b.defeatedTrainer', { name: trainerName, money: totalReward + moneyReward }),
             logMsg,
             ...logs,
             ...prev
@@ -7323,7 +7399,7 @@ function MainApp() {
         setEnemy({ ...nextPkmn, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, justEntered: true })
         setTeam(newTeam)
         setBattleLog((prev) => [
-          `${trainerName} envía a ${nextPkmn.name} Nv.${nextPkmn.level}!`,
+          t('b.enemySendsOut', { trainer: trainerName, name: nextPkmn.name, lvl: nextPkmn.level }),
           logMsg,
           ...logs,
           ...prev
@@ -7585,7 +7661,7 @@ function MainApp() {
     try {
       const result = await canEvolveWithStone(targetPokemon.id, stoneItemName)
       if (!result.canEvolve || !result.evolvedName) {
-        setBattleLog((prev) => [`${stoneEvoModal.stoneName} no tiene efecto en ${targetPokemon.name}.`, ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.stoneNoEffect', { stone: stoneEvoModal.stoneName, name: targetPokemon.name }), ...prev].slice(0, 15))
         setStoneEvoModal(null)
         setStoneEvoTargets([])
         setStoneEvoCanEvolve(new Set())
@@ -7853,7 +7929,7 @@ function MainApp() {
   function skipRestCapture(): void {
     if (!restEncounter) return
 
-    setBattleLog((prev) => [`Dejaste ir a ${restEncounter.name}.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('rest.letGo', { name: restEncounter.name }), ...prev].slice(0, 15))
     completeCurrentNode()
   }
 
@@ -7891,7 +7967,7 @@ function MainApp() {
   function skipLegendaryCapture(): void {
     if (!legendaryEncounter) return
 
-    setBattleLog((prev) => [`Dejaste ir al legendario ${legendaryEncounter.name}.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('rest.letGoLegend', { name: legendaryEncounter.name }), ...prev].slice(0, 15))
     setLegendaryEncounter(null)
   }
 
@@ -8974,7 +9050,7 @@ function MainApp() {
                         padding: '6px 12px', borderRadius: '8px', border: `2px solid ${metaProgression.activeTheme === theme.id ? '#ffcb05' : '#475569'}`,
                         background: theme.colors.bg, color: theme.colors.text, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold',
                       }}>
-                      {theme.name}
+                      {themeName(theme.id)}
                     </button>
                   ))}
                 </div>
@@ -9367,7 +9443,7 @@ function MainApp() {
                       return (
                         <>
                           <div style={{ fontSize: '0.8rem', color: '#9b98cf', fontWeight: 'bold', marginBottom: '2px' }}>{nm}</div>
-                          <img key={hit ? pvpHit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '128px', height: '128px', imageRendering: 'pixelated' }} />
+                          <img key={hit ? pvpHit.key : undefined} className={`${hit ? 'pvp-hit-flash' : ''} ${statusSpriteClass(pk?.status)}`} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '128px', height: '128px', imageRendering: 'pixelated' }} />
                           <div style={{ fontSize: '0.95rem', color: '#f3f1ff', fontWeight: 'bold' }}>{pk?.name}</div>
                           <div style={{ fontSize: '0.8rem', color: '#7d7ab5' }}>Nv.{pk?.level}</div>
                           {pk?.status && <div style={{ marginTop: '2px' }}><StatusBadge status={pk.status} compact /></div>}
@@ -9386,7 +9462,7 @@ function MainApp() {
                       return (
                         <>
                           <div style={{ fontSize: '0.8rem', color: '#9b98cf', fontWeight: 'bold', marginBottom: '2px' }}>{nm}</div>
-                          <img key={hit ? pvpHit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '128px', height: '128px', imageRendering: 'pixelated' }} />
+                          <img key={hit ? pvpHit.key : undefined} className={`${hit ? 'pvp-hit-flash' : ''} ${statusSpriteClass(pk?.status)}`} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '128px', height: '128px', imageRendering: 'pixelated' }} />
                           <div style={{ fontSize: '0.95rem', color: '#f3f1ff', fontWeight: 'bold' }}>{pk?.name}</div>
                           <div style={{ fontSize: '0.8rem', color: '#7d7ab5' }}>Nv.{pk?.level}</div>
                           {pk?.status && <div style={{ marginTop: '2px' }}><StatusBadge status={pk.status} compact /></div>}
@@ -9745,6 +9821,23 @@ function MainApp() {
             })()}
           </div>
               </div>
+
+              <div className="setup-card" style={{ marginTop: '0.75rem' }}>
+                <h2 className="setup-card-title">{t('pvp.setupTitle')}</h2>
+                <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0' }}>
+                  <button
+                    className="gen-tile"
+                    type="button"
+                    onClick={openPvpModal}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '12px', border: '1px solid #a855f7', background: 'rgba(168,85,247,0.1)', borderRadius: '12px', cursor: 'pointer' }}
+                  >
+                    <span style={{ fontSize: '1.2rem', color: '#cba3ff' }}>{t('pvp.play')}</span>
+                    <strong style={{ fontSize: '0.85rem', color: '#9b98cf' }}>
+                      {pvpTeam.length > 0 ? t('pvp.buildTeam', { n: pvpTeam.length }) : t('pvp.buildTeamFirst', { n: pvpTeam.length })}
+                    </strong>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="setup-col">
@@ -10004,25 +10097,6 @@ function MainApp() {
           <div className="setup-grid">
             <div className="setup-col">
               <div className="setup-card">
-                <h2 className="setup-card-title">{t('pvp.setupTitle')}</h2>
-          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0' }}>
-            <button
-              className="gen-tile"
-              type="button"
-              onClick={openPvpModal}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '12px', border: '1px solid #a855f7', background: 'rgba(168,85,247,0.1)', borderRadius: '12px', cursor: 'pointer' }}
-            >
-              <span style={{ fontSize: '1.2rem', color: '#cba3ff' }}>{t('pvp.play')}</span>
-              <strong style={{ fontSize: '0.85rem', color: '#9b98cf' }}>
-                {pvpTeam.length > 0 ? t('pvp.buildTeam', { n: pvpTeam.length }) : t('pvp.buildTeamFirst', { n: pvpTeam.length })}
-              </strong>
-            </button>
-          </div>
-              </div>
-            </div>
-
-            <div className="setup-col">
-              <div className="setup-card">
                 <h2 className="setup-card-title"><span className="setup-step">3</span> {t('setup.challenges')} <span className="muted" style={{ fontSize: '0.6rem', fontWeight: 'normal' }}>{t('setup.challengesOptional')}</span></h2>
           {(() => {
             // En Cooperativo y COLISEUM los desafíos están siempre disponibles.
@@ -10179,7 +10253,7 @@ function MainApp() {
           <article className="panel trainer-panel">
             <p className="muted small-tag">{t('route.trainer')}</p>
             <div style={{ position: 'relative', display: 'block', width: 'fit-content', margin: '0 auto' }}>
-              <img className={`sprite trainer-sprite${activePokemon.megaEvolved ? ' mega-active' : ''}${activePokemon.gmaxEvolved ? ' gmax-active' : ''}`} src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
+              <img className={`sprite trainer-sprite${activePokemon.megaEvolved ? ' mega-active' : ''}${activePokemon.gmaxEvolved ? ' gmax-active' : ''} ${statusSpriteClass(activePokemon.status)}`} src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
               <StatusFloat pokemon={activePokemon} />
             </div>
             <h2>
@@ -10281,7 +10355,9 @@ function MainApp() {
                     {pokemon.moves.length > 0 && (
                       <div className="tooltip-moves">
                         {pokemon.moves.slice(0, 4).map((m) => (
-                          <span key={m.name}>{moveName(m)}</span>
+                          <span key={m.name} className="tooltip-move">
+                            {moveName(m)}
+                          </span>
                         ))}
                       </div>
                     )}
@@ -10855,8 +10931,8 @@ function MainApp() {
 
             {screen === 'spin' && (
               <div className="action-block spin-block">
-                <h3 style={{ margin: '0 0 0.5rem', color: '#cba3ff', textAlign: 'center' }}>🎰 ¡Ruleta del Botín!</h3>
-                <p className="muted" style={{ textAlign: 'center', margin: '0 0 1rem' }}>Gira para obtener un objeto al azar</p>
+                <h3 style={{ margin: '0 0 0.5rem', color: '#cba3ff', textAlign: 'center' }}>{t('spin.title')}</h3>
+                <p className="muted" style={{ textAlign: 'center', margin: '0 0 1rem' }}>{t('spin.desc')}</p>
                 <div className="roulette-wheel">
                   <div className={`roulette-items ${spinAnimating ? 'spinning' : ''}`}>
                     {spinItems.map((item, idx) => {
@@ -10879,19 +10955,19 @@ function MainApp() {
                 </div>
                 {!spinRevealed && !spinAnimating && (
                   <button className="cta spin-cta" onClick={spinRoulette} type="button">
-                    ¡Girar!
+                    {t('spin.spin')}
                   </button>
                 )}
                 {spinAnimating && (
-                  <p style={{ textAlign: 'center', color: '#cba3ff', fontWeight: 'bold', margin: '0.5rem 0' }}>Girando...</p>
+                  <p style={{ textAlign: 'center', color: '#cba3ff', fontWeight: 'bold', margin: '0.5rem 0' }}>{t('spin.spinning')}</p>
                 )}
                 {spinRevealed && spinWinnerIndex !== null && (
                   <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
                     <p style={{ color: '#7ceb95', fontWeight: 'bold', fontSize: '1.1rem', margin: '0 0 0.5rem' }}>
-                      ¡Obtuviste {spinItems[spinWinnerIndex]}!
+                      {t('spin.got', { item: spinItems[spinWinnerIndex] })}
                     </p>
                     <button className="cta spin-cta" onClick={claimSpinItem} type="button">
-                      Recoger objeto
+                      {t('spin.collect')}
                     </button>
                   </div>
                 )}
@@ -10900,8 +10976,8 @@ function MainApp() {
 
             {screen === 'pokeRand' && (
               <div className="action-block pokeRand-block">
-                <h3 style={{ margin: '0 0 0.5rem', color: '#4d9bff', textAlign: 'center' }}>🎲 ¡PokeRand Ruleta!</h3>
-                <p className="muted" style={{ textAlign: 'center', margin: '0 0 1rem' }}>Gira para obtener un Pokémon que se una a tu equipo</p>
+                <h3 style={{ margin: '0 0 0.5rem', color: '#4d9bff', textAlign: 'center' }}>{t('pokerand.title')}</h3>
+                <p className="muted" style={{ textAlign: 'center', margin: '0 0 1rem' }}>{t('pokerand.desc')}</p>
                 <div className="roulette-wheel" style={{ borderColor: 'rgba(56, 189, 248, 0.3)', background: 'rgba(56, 189, 248, 0.06)' }}>
                   <div className={`roulette-items ${pokeRandAnimating ? 'spinning' : ''}`}>
                     {pokeRandPokemon.map((pokemon, idx) => {
@@ -10925,16 +11001,16 @@ function MainApp() {
                 </div>
                 {!pokeRandRevealed && !pokeRandAnimating && (
                   <button className="cta pokeRand-cta" onClick={pokeRandSpin} type="button">
-                    ¡Girar!
+                    {t('pokerand.spin')}
                   </button>
                 )}
                 {pokeRandAnimating && (
-                  <p style={{ textAlign: 'center', color: '#4d9bff', fontWeight: 'bold', margin: '0.5rem 0' }}>Girando...</p>
+                  <p style={{ textAlign: 'center', color: '#4d9bff', fontWeight: 'bold', margin: '0.5rem 0' }}>{t('pokerand.spinning')}</p>
                 )}
                 {pokeRandRevealed && pokeRandWinnerIndex !== null && (
                   <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
                     <p style={{ color: '#7ceb95', fontWeight: 'bold', fontSize: '1.1rem', margin: '0 0 0.5rem' }}>
-                      ¡{pokeRandPokemon[pokeRandWinnerIndex].name} quiere unirse a tu equipo!
+                      {t('pokerand.join', { name: pokeRandPokemon[pokeRandWinnerIndex].name })}
                     </p>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                       <button
@@ -10951,7 +11027,7 @@ function MainApp() {
                         type="button"
                         style={{ padding: '10px 24px' }}
                       >
-                        Liberar
+                        {t('pokerand.release')}
                       </button>
                     </div>
                   </div>
@@ -10961,9 +11037,9 @@ function MainApp() {
 
             {screen === 'casino' && (
               <div className="action-block casino-block">
-                <h3 style={{ margin: '0 0 0.5rem', color: '#f0abfc', textAlign: 'center' }}>🃏 ¡Casino!</h3>
+                <h3 style={{ margin: '0 0 0.5rem', color: '#f0abfc', textAlign: 'center' }}>{t('casino.title')}</h3>
                 <p className="muted" style={{ textAlign: 'center', margin: '0 0 0.5rem' }}>
-                  Se elegirá un minijuego al azar. Cuanto mayor sea tu puntuación, mejor la recompensa.
+                  {t('casino.desc')}
                 </p>
                 <CasinoMinigame onComplete={casinoComplete} />
                 {casinoScore !== null && casinoReward && (
@@ -11017,6 +11093,7 @@ function MainApp() {
                           <span className="muted" style={{ fontSize: '0.5rem' }}>
                             {move.type.toUpperCase()} · Pwr {move.power} · Acc {move.accuracy ?? '—'}
                           </span>
+                          {moveEffectSummary(move) && <span className="move-btn-effect" style={{ fontSize: '0.55rem' }}>{moveEffectSummary(move)}</span>}
                         </button>
                       ))}
                     </div>
@@ -11045,6 +11122,7 @@ function MainApp() {
                           <span className="muted" style={{ fontSize: '0.5rem' }}>
                             {move.type.toUpperCase()} · Pwr {move.power}
                           </span>
+                          {moveEffectSummary(move) && <span className="move-btn-effect" style={{ fontSize: '0.55rem' }}>{moveEffectSummary(move)}</span>}
                         </button>
                       ))}
                     </div>
@@ -11061,19 +11139,19 @@ function MainApp() {
             {screen === 'mega' && (
               <div className="action-block" style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>💎</div>
-                <h3 style={{ margin: '0 0 0.5rem', color: '#ff9ad6' }}>¡Mega Piedra!</h3>
+                <h3 style={{ margin: '0 0 0.5rem', color: '#ff9ad6' }}>{t('mega.title')}</h3>
                 {inventory.includes('Mega Stone') || team.some(p => p.holdItem === 'Mega Stone') ? (
                   <>
-                    <p style={{ margin: '0 0 0.25rem' }}>Has recibido una <strong>Mega Piedra</strong>.</p>
+                    <p style={{ margin: '0 0 0.25rem' }}><span dangerouslySetInnerHTML={{ __html: t('mega.got') }} /></p>
                     <p className="muted" style={{ fontSize: '0.85rem', margin: '0 0 1rem' }}>
-                      Equípala a un Pokémon y durante el combate podrás mega-evolucionar una vez.
+                      {t('mega.gotDesc')}
                     </p>
                   </>
                 ) : (
                   <>
-                    <p style={{ margin: '0 0 0.25rem' }}>Ya tenías una Mega Piedra.</p>
+                    <p style={{ margin: '0 0 0.25rem' }}>{t('mega.already')}</p>
                     <p className="muted" style={{ fontSize: '0.85rem', margin: '0 0 1rem' }}>
-                      Recibiste PokéCoins como compensación.
+                      {t('mega.alreadyDesc')}
                     </p>
                   </>
                 )}
@@ -11086,26 +11164,26 @@ function MainApp() {
             {screen === 'primal' && (
               <div className="action-block" style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '4rem', marginBottom: '0.5rem' }}>🔮</div>
-                <h3 style={{ margin: '0 0 0.5rem', color: '#ff8a33' }}>¡Prisma Primal!</h3>
+                <h3 style={{ margin: '0 0 0.5rem', color: '#ff8a33' }}>{t('primal.title')}</h3>
                 {inventory.includes('Prisma Rojo') || team.some(p => p.holdItem === 'Prisma Rojo') ? (
                   <>
-                    <p style={{ margin: '0 0 0.25rem' }}>Has recibido un <strong>Prisma Rojo</strong>.</p>
+                    <p style={{ margin: '0 0 0.25rem' }}><span dangerouslySetInnerHTML={{ __html: t('primal.gotRed') }} /></p>
                     <p className="muted" style={{ fontSize: '0.85rem', margin: '0 0 1rem' }}>
-                      Equípalo a Groudon y durante el combate podrás activar su Primal Reversion.
+                      {t('primal.gotRedDesc')}
                     </p>
                   </>
                 ) : inventory.includes('Prisma Azul') || team.some(p => p.holdItem === 'Prisma Azul') ? (
                   <>
-                    <p style={{ margin: '0 0 0.25rem' }}>Has recibido un <strong>Prisma Azul</strong>.</p>
+                    <p style={{ margin: '0 0 0.25rem' }}><span dangerouslySetInnerHTML={{ __html: t('primal.gotBlue') }} /></p>
                     <p className="muted" style={{ fontSize: '0.85rem', margin: '0 0 1rem' }}>
-                      Equípalo a Kyogre y durante el combate podrás activar su Primal Reversion.
+                      {t('primal.gotBlueDesc')}
                     </p>
                   </>
                 ) : (
                   <>
-                    <p style={{ margin: '0 0 0.25rem' }}>Ya tenías ese Prisma.</p>
+                    <p style={{ margin: '0 0 0.25rem' }}>{t('primal.already')}</p>
                     <p className="muted" style={{ fontSize: '0.85rem', margin: '0 0 1rem' }}>
-                      Recibiste PokéCoins como compensación.
+                      {t('primal.alreadyDesc')}
                     </p>
                   </>
                 )}
@@ -11141,7 +11219,7 @@ function MainApp() {
                   {t('route.nextNode', { name: `${nodeTypeLabel(currentNode)} #${currentNode.id}` })}
                 </p>
                 <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={enterNode} type="button" disabled={isLoading}>
-                  {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : currentNode.type === 'mega' ? '💎 ¡Recoger Mega Piedra!' : currentNode.type === 'gmax' ? '⚡ ¡Enfrentar G-MAX!' : currentNode.type === 'primal' ? '🔮 ¡Recoger Prisma!' : currentNode.type === 'trade' ? '🤝 Intercambiar' : currentNode.type === 'rival' ? '👤 ¡Enfrentar al Rival!' : currentNode.type === 'blackmarket' ? '🕶️ Entrar al Mercado Negro' : currentNode.type === 'double' ? '🥊 ¡Combate Doble!' : currentNode.type === 'casino' ? '🃏 ¡Jugar al Casino!' : 'Enter node'}
+                  {isLoading ? t('node.searching') : currentNode.type === 'teamRocket' ? t('node.teamRocket') : currentNode.type === 'spin' ? t('node.spin') : currentNode.type === 'pokeRand' ? t('node.pokeRand') : currentNode.type === 'mega' ? t('node.mega') : currentNode.type === 'gmax' ? t('node.gmax') : currentNode.type === 'primal' ? t('node.primal') : currentNode.type === 'trade' ? t('node.trade') : currentNode.type === 'rival' ? t('node.rival') : currentNode.type === 'blackmarket' ? t('node.blackmarket') : currentNode.type === 'double' ? t('node.double') : currentNode.type === 'casino' ? t('node.casino') : t('node.enter')}
                 </button>
               </div>
             )}
@@ -11149,24 +11227,24 @@ function MainApp() {
             {screen === 'route' && currentNode && currentNode.type === 'rest' && restEncounter && !legendaryEncounter && (
               <div className="action-block">
                 <p>
-                  Rest stop: <strong>{restEncounter.name}{restEncounter.shiny ? ' ✨' : ''}</strong> is waiting.
+                  <span dangerouslySetInnerHTML={{ __html: t('rest.waiting', { name: restEncounter.name + (restEncounter.shiny ? ' ✨' : '') }) }} />
                 </p>
-                <p className="muted">Reward item added: {restRewardItem}</p>
+                <p className="muted">{t('rest.rewardAdded', { item: restRewardItem })}</p>
                 <div className="capture-card" style={restEncounter.shiny ? { border: '2px solid #ffcb05', boxShadow: '0 0 12px rgba(250,204,21,0.4)' } : undefined}>
                   <img className="sprite" src={restEncounter.sprite} alt={restEncounter.name} onError={fallbackSprite} />
                 </div>
                 <div className="moves-grid" style={{ marginBottom: '1rem' }}>
                   <button className="cta" onClick={captureRestPokemon} type="button">
-                    {team.length >= maxTeamSize ? t('route.captureToPC', { n: pcStorage.length }) : 'Capturar'}
+                    {team.length >= maxTeamSize ? t('route.captureToPC', { n: pcStorage.length }) : t('route.catchLabel')}
                   </button>
                   <button className="secondary" onClick={skipRestCapture} type="button">
-                    Skip
+                    {t('common.skip')}
                   </button>
                 </div>
                 <div className="evolve-section" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
-                  <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>Descansa para recuperar energía:</p>
+                  <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>{t('rest.healPrompt')}</p>
                   <button className="cta" onClick={() => { if (runChallenges.noHealing) { setBattleLog(prev => [t('b.challengeNoHealRest'), ...prev].slice(0, 15)); completeCurrentNode(); return } setTeam(prev => prev.map(p => p.hp <= 0 ? { ...p, hp: Math.max(1, Math.floor(p.maxHp * 0.5)) } : { ...p, hp: p.maxHp })); setBattleLog(prev => [t('b.restHealed'), ...prev].slice(0, 15)); completeCurrentNode() }} type="button"                     style={{ background: '#ee3b2f', width: '100%' }}>
-                    💊 Curar Equipo
+                    {t('rest.healTeam')}
                   </button>
                 </div>
               </div>
@@ -11178,7 +11256,7 @@ function MainApp() {
                   {t('b.restStop', { name: `${nodeTypeLabel(currentNode)} #${currentNode.id}` })}
                 </p>
                 <button className="cta" onClick={enterNode} type="button" disabled={isLoading}>
-                  {isLoading ? 'Searching encounter...' : 'Enter rest'}
+                  {isLoading ? t('rest.searching') : t('rest.enter')}
                 </button>
               </div>
             )}
@@ -11192,7 +11270,7 @@ function MainApp() {
                     const hit = doubleHits.find(h => h.kind === 'enemy' && h.index === idx)
                     return (
                       <div key={idx} style={{ textAlign: 'center', flex: 1, maxWidth: 180, opacity: enemy.hp <= 0 ? 0.35 : 1 }}>
-                        <img key={hit ? hit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={{ width: 72, height: 72, imageRendering: 'pixelated' }} />
+                        <img key={hit ? hit.key : undefined} className={`${hit ? 'pvp-hit-flash' : ''} ${statusSpriteClass(enemy.status)}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={{ width: 72, height: 72, imageRendering: 'pixelated' }} />
                         <div style={{ fontSize: '0.8rem', color: '#f3f1ff', fontWeight: 'bold' }}>{enemy.name}{enemy.hp <= 0 ? ' (debilitado)' : ''}<StatusBadge status={enemy.status} compact /></div>
                         <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>HP {Math.max(0, enemy.hp)}/{enemy.maxHp}</div>
                       </div>
@@ -11202,12 +11280,13 @@ function MainApp() {
 
                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '0.75rem' }}>
                   {doubleActives.map((teamIdx, slot) => {
+                    if (teamIdx === undefined) return null
                     const pokemon = team[teamIdx]
                     if (!pokemon) return null
                     const hit = doubleHits.find(h => h.kind === 'player' && h.index === slot)
                     return (
                       <div key={slot} style={{ textAlign: 'center', flex: 1, maxWidth: 180 }}>
-                        <img key={hit ? hit.key : undefined} className={hit ? 'pvp-hit-flash' : undefined} src={pokemon.sprite} alt={pokemon.name} onError={fallbackSprite} style={{ width: 72, height: 72, imageRendering: 'pixelated' }} />
+                        <img key={hit ? hit.key : undefined} className={`${hit ? 'pvp-hit-flash' : ''} ${statusSpriteClass(pokemon.status)}`} src={pokemon.sprite} alt={pokemon.name} onError={fallbackSprite} style={{ width: 72, height: 72, imageRendering: 'pixelated' }} />
                         <div style={{ fontSize: '0.8rem', color: '#ffcb05', fontWeight: 'bold' }}>{pokemon.name}<StatusBadge status={pokemon.status} compact /></div>
                         <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>HP {Math.max(0, pokemon.hp)}/{pokemon.maxHp}</div>
                       </div>
@@ -11227,6 +11306,7 @@ function MainApp() {
                   <>
                     <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {doubleActives.map((teamIdx, slot) => {
+                        if (teamIdx === undefined) return null
                         const pokemon = team[teamIdx]
                         if (!pokemon) return null
                         const sel = doubleMoves[slot]
@@ -11247,6 +11327,9 @@ function MainApp() {
                     {(() => {
                       const slot = doubleActiveSlot
                       const teamIdx = doubleActives[slot]
+                      if (teamIdx === undefined) {
+                        return <p style={{ margin: '0 0 0.5rem', color: '#7d7ab5', fontSize: '0.8rem', textAlign: 'center' }}>Este Pokémon está debilitado.</p>
+                      }
                       const pokemon = team[teamIdx]
                       const canSwitchNow = team.some((p, idx) => p.hp > 0 && !doubleActives.includes(idx))
                       if (!pokemon || pokemon.hp <= 0) {
@@ -11288,6 +11371,7 @@ function MainApp() {
                                 style={{ background: sel?.moveIdx === mi ? '#a855f7' : '#2a2a55', color: '#fff', border: sel?.moveIdx === mi ? '2px solid #cba3ff' : '2px solid transparent' }}
                               >
                                 {moveName(m)} ({m.type})
+                                {moveEffectSummary(m) && <div style={{ fontSize: '0.6rem', color: '#7dd3fc', marginTop: '2px' }}>{moveEffectSummary(m)}</div>}
                               </button>
                             ))}
                           </div>
@@ -11326,15 +11410,22 @@ function MainApp() {
                       )
                     })()}
 
-                    <button
-                      className="cta"
-                      type="button"
-                      onClick={resolveDoubleTurn}
-                      disabled={doubleChoosingSwitch || doubleActives[0] === undefined || !doubleMoves[0] || (doubleActives[1] !== undefined && !doubleMoves[1])}
-                      style={{ width: '100%', background: (doubleActives[0] !== undefined && doubleMoves[0] && (doubleActives[1] === undefined || doubleMoves[1])) ? '#facc15' : '#475569', color: (doubleActives[0] !== undefined && doubleMoves[0] && (doubleActives[1] === undefined || doubleMoves[1])) ? '#12122b' : '#d9d6f2' }}
-                    >
-                      🥊 ¡Atacar!
-                    </button>
+                    {(() => {
+                      const anyAlive = doubleActives.some(ti => ti !== undefined)
+                      const allReady = doubleActives.every((ti, i) => ti === undefined || doubleMoves[i] !== null)
+                      const ready = anyAlive && allReady
+                      return (
+                        <button
+                          className="cta"
+                          type="button"
+                          onClick={resolveDoubleTurn}
+                          disabled={doubleChoosingSwitch || !ready}
+                          style={{ width: '100%', background: ready && !doubleChoosingSwitch ? '#facc15' : '#475569', color: ready && !doubleChoosingSwitch ? '#12122b' : '#d9d6f2' }}
+                        >
+                          🥊 ¡Atacar!
+                        </button>
+                      )
+                    })()}
                   </>
                 )}
               </div>
@@ -11355,13 +11446,13 @@ function MainApp() {
                       )}
                       <div>
                         <p style={{ margin: '0', fontWeight: 'bold', color: '#ffcb05', fontSize: '0.95rem' }}>
-                          {trainerBadge ? `🏆 Líder ${trainerName}` : `⚔️ ${trainerName}`}
+                          {trainerBadge ? `🏆 ${t('battle.leader', { name: trainerName })}` : `⚔️ ${trainerName}`}
                         </p>
                         {trainerBadge && (
                           <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#fbbf24' }}>{trainerBadge}</p>
                         )}
                         <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#9b98cf' }}>
-                          Equipo: {trainerTeam.length} Pokémon
+                          {t('b.trainerTeam', { n: trainerTeam.length })}
                         </p>
                       </div>
                     </div>
@@ -11410,7 +11501,7 @@ function MainApp() {
                     </div>
                   </div>
                 ) : (
-                  <p style={{ margin: '0 0 4px 0', color: '#86efac', fontSize: '0.85rem' }}>🌿 Pokémon Salvaje</p>
+                  <p style={{ margin: '0 0 4px 0', color: '#86efac', fontSize: '0.85rem' }}>{t('b.wildPokemon')}</p>
                 )}
 
                 <p style={{ margin: '0 0 4px 0', fontSize: '1.2rem' }}>
@@ -11420,7 +11511,7 @@ function MainApp() {
                   {' · '}Nv. {enemy.level}
                 </p>
                 <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <img className={`sprite enemy-sprite${enemy.gmaxEvolved ? ' gmax-active' : ''}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={enemyHitFlash ? { filter: 'brightness(1.5) sepia(1) hue-rotate(-40deg) saturate(5)', transition: 'filter 0.05s' } : { transition: 'filter 0.3s' }} />
+                  <img className={`sprite enemy-sprite${enemy.gmaxEvolved ? ' gmax-active' : ''} ${statusSpriteClass(enemy.status)}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={enemyHitFlash ? { filter: 'brightness(1.5) sepia(1) hue-rotate(-40deg) saturate(5)', transition: 'filter 0.05s' } : { transition: 'filter 0.3s' }} />
                   <StatusFloat pokemon={enemy} />
                 </div>
                 <div className="hp-line">
@@ -12049,18 +12140,18 @@ function MainApp() {
       {/* Run Stats on Victory */}
       {screen === 'victory' && (
         <div className="panel" style={{ maxWidth: '400px', margin: '0 auto', padding: '1rem' }}>
-          <h3 style={{ color: '#4d9bff', textAlign: 'center', marginBottom: '0.75rem' }}>📊 Estadísticas de la Run</h3>
+          <h3 style={{ color: '#4d9bff', textAlign: 'center', marginBottom: '0.75rem' }}>{t('runstats.title')}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '1.1rem' }}>
-            <div style={{ color: '#9b98cf' }}>⚔️ Batallas ganadas:</div><div style={{ color: '#37d16b', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
-            <div style={{ color: '#9b98cf' }}>💥 Daño total infligido:</div><div style={{ color: '#ff8a80', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
-            <div style={{ color: '#9b98cf' }}>🛡️ Daño total recibido:</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>
-            <div style={{ color: '#9b98cf' }}>🎯 Golpes críticos:</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>{runStats.critsLanded}</div>
-            <div style={{ color: '#9b98cf' }}>🔄 Turnos jugados:</div><div style={{ color: '#d9d6f2', fontWeight: 'bold' }}>{runStats.totalTurns}</div>
-            <div style={{ color: '#9b98cf' }}>📦 Capturas:</div><div style={{ color: '#22d3ee', fontWeight: 'bold' }}>{runStats.captures}</div>
-            <div style={{ color: '#9b98cf' }}>💰 Dinero ganado:</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>${runStats.moneyEarned}</div>
-            <div style={{ color: '#9b98cf' }}>💸 Dinero gastado:</div><div style={{ color: '#ff8a80', fontWeight: 'bold' }}>${runStats.moneySpent}</div>
-            <div style={{ color: '#9b98cf' }}>🪙 PokéCoins ganadas:</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>+{(() => { const b = difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15; const c = Object.entries(runChallenges).some(([k, v]) => v && k !== 'allShiny') ? 15 : 0; return b + c + (team.length <= 1 ? 5 : 0) })()}</div>
-            {winStreak >= 2 && <><div style={{ color: '#9b98cf' }}>🔥 Racha:</div><div style={{ color: '#ff8a33', fontWeight: 'bold' }}>{winStreak} seguidas</div></>}
+            <div style={{ color: '#9b98cf' }}>{t('runstats.battlesWon')}</div><div style={{ color: '#37d16b', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.damageDealt')}</div><div style={{ color: '#ff8a80', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.damageTaken')}</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.crits')}</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>{runStats.critsLanded}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.turns')}</div><div style={{ color: '#d9d6f2', fontWeight: 'bold' }}>{runStats.totalTurns}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.captures')}</div><div style={{ color: '#22d3ee', fontWeight: 'bold' }}>{runStats.captures}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.moneyEarned')}</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>${runStats.moneyEarned}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.moneySpent')}</div><div style={{ color: '#ff8a80', fontWeight: 'bold' }}>${runStats.moneySpent}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.coinsEarned')}</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>+{(() => { const b = difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15; const c = Object.entries(runChallenges).some(([k, v]) => v && k !== 'allShiny') ? 15 : 0; return b + c + (team.length <= 1 ? 5 : 0) })()}</div>
+            {winStreak >= 2 && <><div style={{ color: '#9b98cf' }}>{t('runstats.streak')}</div><div style={{ color: '#ff8a33', fontWeight: 'bold' }}>{t('runstats.streakCount', { n: winStreak })}</div></>}
           </div>
         </div>
       )}
@@ -12068,14 +12159,14 @@ function MainApp() {
       {/* Run Stats on Defeat */}
       {screen === 'defeat' && (
         <div className="panel" style={{ maxWidth: '400px', margin: '0 auto', padding: '1rem' }}>
-          <h3 style={{ color: '#ee3b2f', textAlign: 'center', marginBottom: '0.75rem' }}>📊 Estadísticas de la Run</h3>
+          <h3 style={{ color: '#ee3b2f', textAlign: 'center', marginBottom: '0.75rem' }}>{t('runstats.title')}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '1.1rem' }}>
-            <div style={{ color: '#9b98cf' }}>⚔️ Batallas ganadas:</div><div style={{ color: '#37d16b', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
-            <div style={{ color: '#9b98cf' }}>💥 Daño total infligido:</div><div style={{ color: '#ff8a80', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
-            <div style={{ color: '#9b98cf' }}>🛡️ Daño total recibido:</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>
-            <div style={{ color: '#9b98cf' }}>🔄 Turnos jugados:</div><div style={{ color: '#d9d6f2', fontWeight: 'bold' }}>{runStats.totalTurns}</div>
-            <div style={{ color: '#9b98cf' }}>📦 Capturas:</div><div style={{ color: '#22d3ee', fontWeight: 'bold' }}>{runStats.captures}</div>
-            <div style={{ color: '#9b98cf' }}>🪙 PokéCoins ganadas:</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>+5</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.battlesWon')}</div><div style={{ color: '#37d16b', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.damageDealt')}</div><div style={{ color: '#ff8a80', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.damageTaken')}</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.turns')}</div><div style={{ color: '#d9d6f2', fontWeight: 'bold' }}>{runStats.totalTurns}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.captures')}</div><div style={{ color: '#22d3ee', fontWeight: 'bold' }}>{runStats.captures}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.coinsEarned')}</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>+5</div>
           </div>
         </div>
       )}
@@ -12315,6 +12406,7 @@ function MainApp() {
                           <div style={{ minWidth: 0 }}>
                             <span style={{ color: selected ? '#cba3ff' : '#d9d6f2', fontSize: '0.8rem', display: 'block' }}>{moveName(m)}</span>
                             <span style={{ color: '#7d7ab5', fontSize: '0.7rem', display: 'block' }}>PWR {m.power}</span>
+                            {moveEffectSummary(m) && <span style={{ color: '#7dd3fc', fontSize: '0.62rem', display: 'block' }}>{moveEffectSummary(m)}</span>}
                           </div>
                           <span style={{ background: TYPE_COLORS[m.type] ?? '#475569', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', padding: '2px 8px', borderRadius: '4px', textTransform: 'capitalize', flexShrink: 0 }}>{m.type}</span>
                         </div>
@@ -12714,11 +12806,11 @@ function MainApp() {
               {(() => {
                 const term = metaShopSearch.trim().toLowerCase()
                 if (!term) return null
-                const visibleThemes = THEMES.filter(t => t.name.toLowerCase().includes(term) || t.desc.toLowerCase().includes(term))
+                const visibleThemes = THEMES.filter(t => themeName(t.id).toLowerCase().includes(term) || themeDesc(t.id).toLowerCase().includes(term))
                 const visibleItems = META_SHOP_ITEMS.filter(i => i.name.toLowerCase().includes(term) || i.desc.toLowerCase().includes(term))
-                const visibleBgs = BACKGROUNDS.filter(bg => bg.id === 'none' || bg.name.toLowerCase().includes(term) || bg.desc.toLowerCase().includes(term))
+                const visibleBgs = BACKGROUNDS.filter(bg => bg.id === 'none' || bgName(bg.id).toLowerCase().includes(term) || bgDesc(bg.id).toLowerCase().includes(term))
                 if (visibleThemes.length === 0 && visibleItems.length === 0 && visibleBgs.length === 0) {
-                  return <p style={{ color: '#7d7ab5', fontSize: '0.85rem', textAlign: 'center', margin: '0.75rem 0 0' }}>Sin resultados para "{metaShopSearch}".</p>
+                  return <p style={{ color: '#7d7ab5', fontSize: '0.85rem', textAlign: 'center', margin: '0.75rem 0 0' }}>{t('shop.noResultsSearch', { q: metaShopSearch })}</p>
                 }
                 return null
               })()}
@@ -12737,10 +12829,10 @@ function MainApp() {
                         <div key={i} style={{ width: '16px', height: '16px', borderRadius: '4px', background: c, border: '1px solid rgba(255,255,255,0.2)' }} />
                       ))}
                     </div>
-                    <div style={{ color: theme.colors.text, fontWeight: 'bold', fontSize: '0.85rem' }}>{theme.name}</div>
-                    <div style={{ color: theme.colors.muted, fontSize: '0.75rem' }}>{theme.desc}</div>
+                    <div style={{ color: theme.colors.text, fontWeight: 'bold', fontSize: '0.85rem' }}>{themeName(theme.id)}</div>
+                    <div style={{ color: theme.colors.muted, fontSize: '0.75rem' }}>{themeDesc(theme.id)}</div>
                     {owned ? (
-                      active ? <div style={{ color: '#ffcb05', fontSize: '0.75rem', marginTop: '4px' }}>{t('shop.active')}</div> : <div style={{ color: theme.colors.muted, fontSize: '0.75rem', marginTop: '4px' }}>Tocado para activar</div>
+                      active ? <div style={{ color: '#ffcb05', fontSize: '0.75rem', marginTop: '4px' }}>{t('shop.active')}</div> : <div style={{ color: theme.colors.muted, fontSize: '0.75rem', marginTop: '4px' }}>{t('shop.tapToActivateTheme')}</div>
                     ) : (
                       <button className="cta" onClick={(e) => { e.stopPropagation(); buyMetaItem({ ...theme, id: theme.id, category: 'theme' as const, spriteKey: theme.id }) }}
                         disabled={metaProgression.pokeCoins < theme.price}
@@ -12754,7 +12846,7 @@ function MainApp() {
             </div>
 
             <h3 style={{ color: '#22d3ee', marginBottom: '0.5rem' }}>🖼️ {t('shop.backgrounds')}</h3>
-            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Fondos animados e interactivos que se muestran detrás del juego. Toca un fondo que poseas para activarlo.</p>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.backgroundsDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {BACKGROUNDS.filter(bg => bg.id === 'none' || metaShopItemMatches(bg, metaShopSearch.trim().toLowerCase())).map(bg => {
                 const owned = metaProgression.ownedBackgrounds.includes(bg.id)
@@ -12771,8 +12863,8 @@ function MainApp() {
                         <BackgroundPreview backgroundId={bg.id} height={52} />
                       )}
                     </div>
-                    <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{bg.name}</div>
-                    <div style={{ color: '#9b98cf', fontSize: '0.75rem', marginBottom: '0.4rem' }}>{bg.desc}</div>
+                    <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{bgName(bg.id)}</div>
+                    <div style={{ color: '#9b98cf', fontSize: '0.75rem', marginBottom: '0.4rem' }}>{bgDesc(bg.id)}</div>
                     {owned ? (
                       active ? <div style={{ color: '#ffcb05', fontSize: '0.75rem', fontWeight: 'bold' }}>{t('shop.active')}</div> : <div style={{ color: '#9b98cf', fontSize: '0.75rem' }}>{t('shop.tapToActivate')}</div>
                     ) : (
@@ -12788,7 +12880,7 @@ function MainApp() {
             </div>
 
             <h3 style={{ color: '#ff8a33', marginBottom: '0.5rem' }}>🧪 {t('shop.consumables')}</h3>
-            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Al comprar un item, empezará a aparecer en tiendas y drops durante las partidas.</p>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.consumablesDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'consumable' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
@@ -12801,7 +12893,7 @@ function MainApp() {
                       }
                       <div>
                         <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
-                        <div style={{ color: '#ff8a33', fontSize: '0.7rem' }}>Consumible</div>
+                        <div style={{ color: '#ff8a33', fontSize: '0.7rem' }}>{t('shop.catConsumable')}</div>
                       </div>
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
@@ -12820,7 +12912,7 @@ function MainApp() {
             </div>
 
             <h3 style={{ color: '#38bdf8', marginBottom: '0.5rem' }}>💿 {t('shop.disco')}</h3>
-            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea el Disco MT: un objeto consumible que enseña un movimiento a tu Pokémon igual que el nodo Move Tutor. Aparecerá en tiendas durante las partidas.</p>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.discoDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'disco_mt' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
@@ -12833,7 +12925,7 @@ function MainApp() {
                       }
                       <div>
                         <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
-                        <div style={{ color: '#38bdf8', fontSize: '0.7rem' }}>Disco MT</div>
+                        <div style={{ color: '#38bdf8', fontSize: '0.7rem' }}>{t('shop.catDisco')}</div>
                       </div>
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
@@ -12852,7 +12944,7 @@ function MainApp() {
             </div>
 
             <h3 style={{ color: '#ee3b2f', marginBottom: '0.5rem' }}>🏐 {t('shop.pokeballs')}</h3>
-            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea distintos tipos de Poké Balls para usar en la captura de Pokémon salvajes.</p>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.pokeballsDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'pokeball' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
@@ -12865,7 +12957,7 @@ function MainApp() {
                       }
                       <div>
                         <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
-                        <div style={{ color: '#ee3b2f', fontSize: '0.7rem' }}>Poké Ball</div>
+                        <div style={{ color: '#ee3b2f', fontSize: '0.7rem' }}>{t('shop.catPokeball')}</div>
                       </div>
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
@@ -12884,7 +12976,7 @@ function MainApp() {
             </div>
 
             <h3 style={{ color: '#a855f7', marginBottom: '0.5rem' }}>💎 {t('shop.stones')}</h3>
-            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea piedras evolutivas para evolucionar ciertos Pokémon. Aparecen en tiendas y Spin.</p>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.stonesDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'evolution_stone' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
@@ -12897,7 +12989,7 @@ function MainApp() {
                       }
                       <div>
                         <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
-                        <div style={{ color: '#a855f7', fontSize: '0.7rem' }}>Piedra Evolutiva</div>
+                        <div style={{ color: '#a855f7', fontSize: '0.7rem' }}>{t('shop.catStone')}</div>
                       </div>
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
@@ -12916,7 +13008,7 @@ function MainApp() {
             </div>
 
             <h3 style={{ color: '#ff8a33', marginBottom: '0.5rem' }}>🔧 {t('shop.evoItems')}</h3>
-            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Objetos para evolucionar Pokémon. Aparecen con el Comerciante Misterioso.</p>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.evoItemsDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'evolution_item' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
@@ -12929,7 +13021,7 @@ function MainApp() {
                       }
                       <div>
                         <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
-                        <div style={{ color: '#ff8a33', fontSize: '0.7rem' }}>Objeto Evolutivo</div>
+                        <div style={{ color: '#ff8a33', fontSize: '0.7rem' }}>{t('shop.catEvoItem')}</div>
                       </div>
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
@@ -12948,7 +13040,7 @@ function MainApp() {
             </div>
 
             <h3 style={{ color: '#22d3ee', marginBottom: '0.5rem' }}>⚙️ {t('shop.upgrades')}</h3>
-            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Mejoras permanentes: empieza cada aventura con objetos y dinero extra, y desbloquea nodos especiales en rutas Hard/Infinite.</p>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.upgradesDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'upgrade' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
@@ -12963,7 +13055,7 @@ function MainApp() {
                       </span>
                       <div>
                         <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
-                        <div style={{ color: '#22d3ee', fontSize: '0.7rem' }}>Mejora</div>
+                        <div style={{ color: '#22d3ee', fontSize: '0.7rem' }}>{t('shop.catUpgrade')}</div>
                       </div>
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
@@ -12984,7 +13076,7 @@ function MainApp() {
             </div>
 
             <h3 style={{ color: '#ff9ad6', marginBottom: '0.5rem' }}>{t('shop.music')}</h3>
-            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Nuevas pistas musicales para el menú y los combates.</p>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.musicDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'music' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.ownedMusic.includes(item.id)
@@ -12994,7 +13086,7 @@ function MainApp() {
                       <span style={{ fontSize: '1.5rem' }}>🎵</span>
                       <div>
                         <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
-                        <div style={{ color: '#ff9ad6', fontSize: '0.7rem' }}>Música</div>
+                        <div style={{ color: '#ff9ad6', fontSize: '0.7rem' }}>{t('shop.catMusic')}</div>
                       </div>
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
@@ -13013,7 +13105,7 @@ function MainApp() {
             </div>
 
             <h3 style={{ color: '#a855f7', marginBottom: '0.5rem' }}>{t('shop.holdables')}</h3>
-            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Se equipan a un Pokémon y otorgan efectos permanentes durante la batalla.</p>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.holdablesDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'holdable' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
@@ -13027,14 +13119,14 @@ function MainApp() {
                       }
                       <div>
                         <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
-                        <div style={{ color: '#a855f7', fontSize: '0.7rem' }}>Objeto Pasivo</div>
+                        <div style={{ color: '#a855f7', fontSize: '0.7rem' }}>{t('shop.catHoldable')}</div>
                       </div>
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
                       <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
                     ) : locked ? (
-                      <div style={{ color: '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold' }}>🔒 Requiere {META_SHOP_ITEMS.find(i => i.id === item.requires)?.name ?? 'la versión anterior'}</div>
+                      <div style={{ color: '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.requires', { name: META_SHOP_ITEMS.find(i => i.id === item.requires)?.name ?? (language === 'en' ? 'the previous version' : 'la versión anterior') })}</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}

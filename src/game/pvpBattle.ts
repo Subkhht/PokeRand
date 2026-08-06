@@ -326,7 +326,7 @@ function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boo
 
   if (updated.hp <= 0) {
     updated = { ...updated, hp: 0 }
-    logs.push(`💀 ${updated.name} fue debilitado por su estado.`)
+    logs.push(t('b.debilitatedStatus', { name: updated.name }))
   }
 
   return { updatedPokemon: updated, skipTurn, log: logs }
@@ -415,8 +415,11 @@ function performPvpHit(
     if (currentDefender.hp <= 0) break
   }
 
-  if (totalHits > 0 && currentDefender.hp > 0 && move.ailment && move.ailmentChance && !currentDefender.status) {
-    if (Math.random() < move.ailmentChance) {
+  if (totalHits > 0 && currentDefender.hp > 0 && move.ailment && !currentDefender.status) {
+    // La chance puede ser 1 (100%) o undefined si PokeAPI no la indica; en ese
+    // caso se aplica garantizada, igual que en el combate normal.
+    const chance = move.ailmentChance ?? 1
+    if (Math.random() < chance) {
       const ailmentTurns: Record<StatusType, number> = {
         burn: 999,
         poison: 999,
@@ -446,7 +449,7 @@ function performPvpHit(
     // positivos o mezcla → uno mismo, p. ej. Rompecoraza).
     let changesHitSelf: boolean
     if (isDamaging) {
-      changesHitSelf = cat === 'net-good-stats' || cat === 'damage+raise'
+      changesHitSelf = cat === 'net-good-stats' || cat === 'damage+raise' || cat === 'damage-raise'
     } else if (cat === 'net-bad-stats' || cat === 'swagger') {
       changesHitSelf = false
     } else {

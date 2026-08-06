@@ -371,8 +371,9 @@ button {
 
 .move-btn-effect {
   display: block;
-  font-size: 0.7em;
-  opacity: 0.85;
+  font-size: 0.72em;
+  font-weight: bold;
+  opacity: 1;
   color: var(--accent-blue);
 }
 
@@ -530,7 +531,7 @@ button {
   color: #c8c5ea;
 }
 
-.tooltip-moves span {
+.tooltip-moves .tooltip-move {
   display: inline-block;
   background: rgba(56, 189, 248, 0.15);
   color: var(--accent-blue);
@@ -2075,6 +2076,52 @@ button {
 .pvp-hit-flash {
   animation: pvp-hit-flash-kf 0.5s ease-out;
 }
+
+/* ---- Estados: efectos visuales sobre el sprite ---- */
+@keyframes status-burn-kf {
+  0%, 100% { filter: brightness(1) hue-rotate(0deg) saturate(1) drop-shadow(0 0 2px rgba(255, 120, 0, 0.2)); }
+  50% { filter: brightness(1.35) hue-rotate(-18deg) saturate(1.8) drop-shadow(0 0 10px rgba(255, 90, 0, 0.9)); }
+}
+.status-burn { animation: status-burn-kf 1.1s ease-in-out infinite; }
+
+@keyframes status-poison-kf {
+  0%, 100% { filter: brightness(1) hue-rotate(0deg) saturate(1) drop-shadow(0 0 2px rgba(140, 60, 220, 0.2)); }
+  50% { filter: brightness(1.25) hue-rotate(45deg) saturate(1.8) drop-shadow(0 0 10px rgba(150, 60, 230, 0.9)); }
+}
+.status-poison { animation: status-poison-kf 1.1s ease-in-out infinite; }
+
+@keyframes status-paralysis-kf {
+  0%, 100% { transform: translateX(0); filter: drop-shadow(0 0 3px rgba(250, 204, 21, 0.4)); }
+  25% { transform: translateX(-3px); filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.9)); }
+  75% { transform: translateX(3px); filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.9)); }
+}
+.status-paralysis { animation: status-paralysis-kf 0.4s ease-in-out infinite; }
+
+@keyframes status-freeze-kf {
+  0%, 100% { filter: brightness(1) hue-rotate(0deg) saturate(1) drop-shadow(0 0 3px rgba(77, 155, 255, 0.5)); }
+  50% { filter: brightness(1.3) hue-rotate(20deg) saturate(1.6) drop-shadow(0 0 10px rgba(77, 155, 255, 1)); }
+}
+.status-freeze { animation: status-freeze-kf 1.4s ease-in-out infinite; }
+
+@keyframes status-sleep-kf {
+  0%, 100% { filter: brightness(0.85) saturate(0.6); opacity: 1; }
+  50% { filter: brightness(1.05) saturate(0.8); opacity: 0.85; }
+}
+.status-sleep { animation: status-sleep-kf 2s ease-in-out infinite; }
+
+@keyframes status-confusion-kf {
+  0%, 100% { transform: rotate(0deg); filter: drop-shadow(0 0 3px rgba(236, 72, 153, 0.5)); }
+  25% { transform: rotate(-6deg); filter: drop-shadow(0 0 8px rgba(236, 72, 153, 0.9)); }
+  75% { transform: rotate(6deg); filter: drop-shadow(0 0 8px rgba(236, 72, 153, 0.9)); }
+}
+.status-confusion { animation: status-confusion-kf 0.5s ease-in-out infinite; }
+
+@keyframes status-flinch-kf {
+  0%, 100% { transform: translateX(0); }
+  30% { transform: translateX(-5px); }
+  60% { transform: translateX(5px); }
+}
+.status-flinch { animation: status-flinch-kf 0.25s ease-in-out infinite; }
 
 /* ---- Casino: minijuegos ---- */
 @keyframes casinoFadeIn {
