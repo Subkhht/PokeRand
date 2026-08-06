@@ -5,6 +5,6 @@ export default defineConfig({
   plugins: [react()],
   base: '/PokeRand/', // 👈 IMPORTANTE: El nombre de tu repositorio entre barras
   build: {
-    chunkSizeWarningLimit: 800,
+    chunkSizeWarningLimit: 1000,
   },
 })
