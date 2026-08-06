@@ -443,9 +443,16 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
 // Límite realista de potencia de movimiento según el nivel del Pokémon
 export function getMaxMovePowerForLevel(level: number, difficulty: string = 'medium'): number {
   if (difficulty.startsWith('coliseum')) return 150
+  if (difficulty === 'easy') {
+    if (level <= 12) return 45
+    if (level <= 22) return 65
+    return 120
+  }
   if (difficulty === 'hard' || difficulty === 'infinite') {
-    if (level <= 12) return 85
-    if (level <= 20) return 100
+    // Early-game: los rivales no deben arrasar con movimientos de 85+ de potencia
+    // cuando el starter del jugador ronda el nivel 10. Se sube gradualmente.
+    if (level <= 12) return 65
+    if (level <= 20) return 85
     return 150
   }
   if (level <= 12) return 60
@@ -789,7 +796,7 @@ export async function getBalancedPokemonByGeneration(
 
   const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss, bossStage, legendaryIds)
 
-  const levelMult = difficulty === 'infinite' ? 1.0 : difficulty === 'hard' ? 2.0 : 1.5
+  const levelMult = difficulty === 'easy' ? 1.0 : difficulty === 'infinite' ? 1.0 : difficulty === 'hard' ? 2.0 : 1.5
   // forcedLevel: genera la especie directamente a un nivel concreto (el nivel
   // objetivo del rival) para que la especie, sus evoluciones y sus movimientos
   // sean coherentes con ese nivel y no aparezcan formas evolucionadas a niveles
@@ -837,6 +844,20 @@ export async function getBalancedPokemonByGeneration(
     } else {
       minBst = 480
       maxBst = 700
+    }
+  } else if (difficulty === 'easy') {
+    if (isBoss) {
+      minBst = 380
+      maxBst = 900
+    } else if (progressRatio < 0.35) {
+      minBst = 120
+      maxBst = 320
+    } else if (progressRatio < 0.70) {
+      minBst = 240
+      maxBst = 420
+    } else {
+      minBst = 340
+      maxBst = 540
     }
   } else {
     if (isBoss) {
@@ -932,10 +953,10 @@ export async function getRandomPokemonByGeneration(generation: number): Promise<
   return buildPokemonFromApi(randomId, generation)
 }
 
-export async function getRandomStarterByGeneration(generation: number, shiny: boolean = false): Promise<Pokemon> {
+export async function getRandomStarterByGeneration(generation: number, shiny: boolean = false, difficulty: string = 'medium'): Promise<Pokemon> {
   const starters = startersByGen[generation] ?? startersByGen[1]
   const randomStarterId = randomFrom(starters)
-  return buildPokemonFromApi(randomStarterId, generation, 10, shiny)
+  return buildPokemonFromApi(randomStarterId, generation, 10, shiny, difficulty)
 }
 const REGIONAL_SUFFIXES = ['-alola', '-galar', '-hisui', '-paldea']
 

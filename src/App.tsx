@@ -30,7 +30,7 @@ import BackgroundPreview from './BackgroundPreview'
 import { BACKGROUNDS } from './game/backgrounds'
 import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
-import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, metaItemDesc, moveName, statusLabel, type Language } from './game/i18n'
+import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, metaItemDesc, moveName, statusLabel, statusAppliedLine, type Language } from './game/i18n'
 
 type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum'
@@ -1721,6 +1721,27 @@ function moveTooltip(move: Move): string {
   return info
 }
 
+// Resumen compacto de efectos del movimiento para los botones de combate.
+function moveEffectSummary(move: Move): string {
+  const parts: string[] = []
+  if (move.ailment) {
+    const pct = move.ailmentChance != null && move.ailmentChance < 1 ? `${Math.round(move.ailmentChance * 100)}% ` : ''
+    parts.push(`${pct}${statusLabel(move.ailment).split(' ').slice(1).join(' ') || statusLabel(move.ailment)}`)
+  }
+  if (move.statChanges && move.statChanges.length > 0) {
+    for (const sc of move.statChanges) {
+      const statName = sc.stat === 'attack' ? 'Atq' : sc.stat === 'defense' ? 'Def' : sc.stat === 'speed' ? 'Vel' : sc.stat === 'special-attack' ? 'Atq.Esp' : 'Def.Esp'
+      const dir = sc.change > 0 ? '↑' : '↓'
+      const pct = sc.chance != null ? ` ${sc.chance}%` : ''
+      parts.push(`${dir} ${statName}${pct}`)
+    }
+  }
+  if (move.minHits && move.maxHits) parts.push(`${move.minHits}-${move.maxHits} golpes`)
+  if (move.drainPercent) parts.push(`drena ${Math.round(move.drainPercent * 100)}%`)
+  if (move.recoilPercent) parts.push(`recoil ${Math.round(move.recoilPercent * 100)}%`)
+  return parts.join(' · ')
+}
+
 // Detecta movimientos de protección (Protección/Protect, Detección, Defensa
 // Férrea, etc.): movimientos de estado sin efecto propio que bloquean el
 // próximo ataque del rival.
@@ -1798,6 +1819,10 @@ function trainerMaxSize(routeIndex: number, routeLength: number, difficulty: str
 function trainerMemberLevelOffset(idx: number, teamSize: number, isBoss: boolean, difficulty: string): number {
   const progress = idx / Math.max(1, teamSize - 1)
   const jitter = Math.floor(Math.random() * 3) - 1 // -1, 0, +1
+  if (difficulty === 'easy') {
+    // En Fácil los entrenadores van por debajo del promedio del equipo.
+    return Math.round((1 - progress) * 2) - 2 + jitter
+  }
   if (difficulty === 'infinite') {
     // -1..+3 sobre el nivel máximo del equipo
     return Math.round((1 - progress) * 4) - 1 + jitter
@@ -1828,6 +1853,23 @@ interface VictoryUnlocks {
 
 function getFirstHealthyIndex(team: Pokemon[], currentIndex: number): number {
   return team.findIndex((pokemon, index) => index !== currentIndex && pokemon.hp > 0)
+}
+
+// Suaviza al rival del primer combate para que no pueda debilitar al starter
+// de un solo golpe: limita su ataque/at.especial según la defensa del equipo
+// del jugador y rebaja la potencia de sus movimientos.
+function softenFirstBattleEnemy(enemy: Pokemon, team: Pokemon[]): Pokemon {
+  const avgDef = team.reduce((s, p) => s + p.defense, 0) / Math.max(1, team.length)
+  const avgSpDef = team.reduce((s, p) => s + p.spDefense, 0) / Math.max(1, team.length)
+  const atkCap = Math.max(20, Math.round(avgDef * 1.2))
+  const spaCap = Math.max(20, Math.round(avgSpDef * 1.2))
+  const moves = enemy.moves.map((m) => (m.power ?? 0) > 50 ? { ...m, power: 50 } : m)
+  return {
+    ...enemy,
+    attack: Math.min(enemy.attack, atkCap),
+    spAttack: Math.min(enemy.spAttack, spaCap),
+    moves,
+  }
 }
 
 function MainApp() {
@@ -3234,7 +3276,7 @@ function MainApp() {
         setRunChallenges(activeChallenges)
       }
 
-      const starter = await getRandomStarterByGeneration(targetGen, activeChallenges.allShiny)
+      const starter = await getRandomStarterByGeneration(targetGen, activeChallenges.allShiny, effectiveDifficulty)
       const config: RunConfig = { generation: targetGen }
       const run = startRun(config, activeChallenges.doubleModifiers)
 
@@ -5737,7 +5779,9 @@ function MainApp() {
 
       if (willBeTrainer) {
         const isLeague = currentNode.id >= 1000
-        const maxSize = isBoss ? 6 : trainerMaxSize(routeIndex, route.length, difficulty)
+        // En Fácil, los jefes de las etapas 1 y 2 llevan la mitad de Pokémon (3);
+        // el jefe de la última etapa (3ª insignia) conserva los 6.
+        const maxSize = isBoss ? ((difficulty === 'easy' && !isLeague && badges.length < 2) ? 3 : 6) : trainerMaxSize(routeIndex, route.length, difficulty)
         const teamSize = isBoss ? maxSize : Math.max(1, Math.min(maxSize, 1 + Math.floor(Math.random() * maxSize)))
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
 
@@ -5821,17 +5865,25 @@ function MainApp() {
         setTrainerName(chosenName)
         setTrainerSprite(chosenSprite)
         setTrainerBadge(chosenBadge)
-        setEnemy({ ...megaTeam[0], statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } })
+        // Primer combate de la run: se suaviza al rival para que no pueda
+        // debilitar al starter de un golpe y el jugador pueda empezar a actuar.
+        let firstEnemy: Pokemon = { ...megaTeam[0], statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
+        if (routeIndex === 0 && !isBoss) {
+          firstEnemy = { ...softenFirstBattleEnemy(firstEnemy, team), statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
+        }
+        setEnemy(firstEnemy)
         setBattleLog((prev) => [
           isBoss
             ? `🏆 ¡El Líder ${chosenName} quiere combatir! (${chosenBadge})`
             : `⚔️ ¡${chosenName} quiere combatir! Tiene ${teamSize} Pokémon.`,
-          `Envía a ${megaTeam[0].name} Nv.${megaTeam[0].level}.`,
+          `Envía a ${firstEnemy.name} Nv.${firstEnemy.level}.`,
           ...prev
         ])
       } else {
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
-        const wildLevelOffset = Math.floor(Math.random() * 3) - 1
+        const wildLevelOffset = difficulty === 'easy'
+          ? Math.floor(Math.random() * 3) - 2 // -2..0
+          : Math.floor(Math.random() * 3) - 1 // -1..0..+1
         const targetLevel = difficulty === 'infinite'
             ? getInfiniteTargetLevel() + (Math.floor(Math.random() * 3) - 1)
           : avgPlayerLevel + wildLevelOffset
@@ -5849,6 +5901,11 @@ function MainApp() {
           }
         }
         generatedEnemy = { ...generatedEnemy, holdItem: null, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
+        // Primer combate de la run: se suaviza al rival para que no pueda
+        // debilitar al starter de un golpe y el jugador pueda empezar a actuar.
+        if (routeIndex === 0 && !isBoss) {
+          generatedEnemy = softenFirstBattleEnemy(generatedEnemy, team)
+        }
         setIsTrainerBattle(false)
         setTrainerTeam([])
         setTrainerPokemonIndex(0)
@@ -6559,8 +6616,7 @@ function MainApp() {
         const ailmentedDefender = applyAilmentToTarget(currentDefender, move)
         if (ailmentedDefender.status && ailmentedDefender.status.type !== currentDefender.status?.type) {
           currentDefender = ailmentedDefender
-          const ailmentLabel = statusLabel(ailmentedDefender.status.type)
-          lines.push(`${currentDefender.name} fue ${ailmentLabel.split(' ')[1]} ${ailmentLabel.split(' ')[0]}.`)
+          lines.push(statusAppliedLine(currentDefender.name, ailmentedDefender.status.type))
         }
       } else {
         lines.push(t('b.alreadyKnewFakeOut', { attacker: attacker.name, move: moveName(effectiveMove) }))
@@ -6687,6 +6743,21 @@ function MainApp() {
 
   async function onPlayerMove(move: Move): Promise<void> {
     if (!activePokemon || !enemy) return
+
+    // Si el Pokémon activo está debilitado no se puede atacar: se fuerza el
+    // cambio al siguiente sano o la derrota en lugar de quedarse bloqueado.
+    if (activePokemon.hp <= 0) {
+      const nextAliveIndex = getFirstHealthyIndex(team, activeIndex)
+      if (nextAliveIndex === -1) {
+        setBattleLog((prev) => [t('b.partyFainted', { name: activePokemon.name }), ...prev].slice(0, 15))
+        setScreen('defeat')
+        playDefeatMusic()
+        return
+      }
+      setTeam(prev => prev.map((p, i) => i === nextAliveIndex ? { ...p, justEntered: true } : p))
+      setActiveIndex(nextAliveIndex)
+      return
+    }
 
     setBattleTurns(t => t + 1)
 
@@ -9380,7 +9451,8 @@ function MainApp() {
                           >
                             <div style={{ fontSize: '0.88rem', fontWeight: 'bold', color: outOfPp ? '#7d7ab5' : '#f3f1ff' }}>{moveName(m)}</div>
                             <div style={{ fontSize: '0.72rem', color: '#9b98cf' }}>{m.type.toUpperCase()} · PWR {m.power} · {m.accuracy}%</div>
-                            <div style={{ fontSize: '0.68rem', color: outOfPp ? '#ee3b2f' : '#7dd3fc' }}>
+                            {moveEffectSummary(m) && <div style={{ fontSize: '0.7rem', color: '#7dd3fc' }}>{moveEffectSummary(m)}</div>}
+                            <div style={{ fontSize: '0.68rem', color: outOfPp ? '#ee3b2f' : '#7d7ab5' }}>
                               {outOfPp ? t('pvp.noPP') : t('pvp.pp', { n: pp, max: m.maxPp ?? 10 })}
                             </div>
                           </button>
@@ -9533,7 +9605,7 @@ function MainApp() {
               </div>
               <div className="setup-hero-actions">
                 <button className="cta setup-start" type="button" onClick={handleStartRunClick} onMouseEnter={playHover} disabled={isLoading}>
-                  {isLoading ? 'Cargando...' : t('setup.startAdventure')}
+                  {isLoading ? t('setup.loading') : t('setup.startAdventure')}
                 </button>
                 <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowMetaShop(true) }}>
                   🪙 {t('setup.metaShop')} ({metaProgression.pokeCoins} 🪙)
@@ -9588,7 +9660,7 @@ function MainApp() {
 
                   {!unlocked && (
                     <span className="lock-text">
-                      🔒 Pásate Gen {gen - 1} en Intermedio
+                      🔒 {t('setup.passGen', { gen: gen - 1 })}
                     </span>
                   )}
                   {unlocked && infUnlocked && (
@@ -10084,7 +10156,7 @@ function MainApp() {
 
           <div className="setup-footer">
             <button className="cta setup-start" onClick={handleStartRunClick} onMouseEnter={playHover} type="button" disabled={isLoading}>
-              {isLoading ? 'Cargando PokeAPI...' : '🚀 Iniciar Aventura'}
+              {isLoading ? t('setup.loading') : t('setup.startAdventure')}
             </button>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button className="secondary" onClick={() => { playClick(); setShowPokedex(true) }} onMouseEnter={playHover} type="button">
@@ -10590,7 +10662,7 @@ function MainApp() {
                 </details>
 
                 <button className="cta" onClick={completeCurrentNode} type="button" style={{ width: '100%' }}>
-                  Salir de la Tienda
+                  {t('shop.leave')}
                 </button>
               </div>
             )}
@@ -11354,6 +11426,27 @@ function MainApp() {
                 </div>
 
                 <div className="moves-grid">
+                  {activePokemon.hp <= 0 ? (
+                    <div className="panel" style={{ padding: '0.8rem', textAlign: 'center', border: '1px solid #ff8a80', background: 'rgba(239,68,68,0.12)' }}>
+                      <p style={{ margin: '0 0 0.4rem', color: '#ff8a80', fontWeight: 'bold' }}>
+                        💀 {activePokemon.name} {t('b.debilitado')}
+                      </p>
+                      <p style={{ margin: '0 0 0.6rem', color: '#9b98cf', fontSize: '0.85rem' }}>
+                        {t('b.mustSwitch')}
+                      </p>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        {team.map((p, idx) => (
+                          p.hp > 0 && idx !== activeIndex ? (
+                            <button key={idx} className="tiny-btn" type="button" onClick={() => switchActive(idx)}>
+                              <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '34px', height: '34px', imageRendering: 'pixelated', verticalAlign: 'middle', marginRight: '4px' }} />
+                              {p.name}
+                            </button>
+                          ) : null
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                  <>
                   {(runChallenges.restrictedMoves ? activePokemon.moves.slice(0, 2) : activePokemon.moves).map((move) => {
                     const isDisabled = activePokemon.disabled?.move === move.name
                     return (
@@ -11366,10 +11459,13 @@ function MainApp() {
                       title={isDisabled ? `🚫 Anulado por Anulación` : moveTooltip(move)}
                       style={isDisabled ? { borderColor: '#ff8a80', opacity: 0.5, textDecoration: 'line-through' } : undefined}
                     >
-                      {isDisabled ? '🚫 ' : ''}{moveName(move)} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''}){move.minHits ? ` x${move.minHits}-${move.maxHits}` : ''}
+                      <span className="move-btn-line">{isDisabled ? '🚫 ' : ''}{moveName(move)} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''}){move.minHits ? ` x${move.minHits}-${move.maxHits}` : ''}</span>
+                      {moveEffectSummary(move) && <span className="move-btn-effect">{moveEffectSummary(move)}</span>}
                     </button>
                     )
                   })}
+                  </>
+                  )}
                 </div>
                 {!isTrainerBattle && currentNode?.type !== 'gmax' && (
                   <button
@@ -11560,7 +11656,7 @@ function MainApp() {
             </button>
             {!isDailyRunRef.current && (
               <button className="cta" onClick={() => { playClick(); void restartRun() }} type="button" style={{ background: '#37d16b', color: '#12122b' }}>
-                🔄 Reiniciar
+                {t('end.restartRun')}
               </button>
             )}
           </div>
@@ -11639,11 +11735,11 @@ function MainApp() {
 
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '1.5rem', flexWrap: 'wrap' }}>
             <button className="cta" onClick={resetToSetup} type="button">
-              Volver al menú principal
+              {t('end.backToMainMenu')}
             </button>
             {!isDailyRunRef.current && (
               <button className="cta" onClick={() => { playClick(); void restartRun() }} type="button" style={{ background: '#37d16b', color: '#12122b' }}>
-                🔄 Reiniciar
+                {t('end.restartRun')}
               </button>
             )}
           </div>

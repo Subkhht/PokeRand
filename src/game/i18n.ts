@@ -73,6 +73,7 @@ const DICT: Record<string, Entry> = {
   'setup.welcome': { es: '¡Bienvenid@!', en: 'Welcome!' },
   'setup.subtitle': { es: 'Elige tu generación y dificultad para comenzar la aventura.', en: 'Choose your generation and difficulty to start the adventure.' },
   'setup.startAdventure': { es: '🚀 Iniciar Aventura', en: '🚀 Start Adventure' },
+  'setup.loading': { es: 'Cargando PokeAPI...', en: 'Loading PokeAPI...' },
   'setup.metaShop': { es: 'Tienda Meta', en: 'Meta Shop' },
   'setup.selectGeneration': { es: 'Selecciona la Generación', en: 'Select Generation' },
   'setup.selectDifficulty': { es: 'Selecciona la Dificultad', en: 'Select Difficulty' },
@@ -148,6 +149,8 @@ const DICT: Record<string, Entry> = {
   // ---------- Victory / Defeat ----------
   'victory.title': { es: '🎉 ¡Victoria!', en: '🎉 Victory!' },
   'defeat.title': { es: '💔 Derrota', en: '💔 Defeat' },
+  'end.backToMainMenu': { es: 'Volver al menú principal', en: 'Back to main menu' },
+  'end.restartRun': { es: '🔄 Reiniciar', en: '🔄 Restart' },
   'victory.rewards': { es: 'Recompensas', en: 'Rewards' },
   'victory.playAgain': { es: 'Jugar de nuevo', en: 'Play again' },
   'victory.nextGen': { es: 'Nueva generación desbloqueada', en: 'New generation unlocked' },
@@ -169,6 +172,7 @@ const DICT: Record<string, Entry> = {
   'shop.tapToActivate': { es: 'Toca para activar', en: 'Tap to activate' },
   'shop.active': { es: '✅ Activo', en: '✅ Active' },
   'shop.close': { es: 'Cerrar Tienda', en: 'Close Shop' },
+  'shop.leave': { es: 'Salir de la Tienda', en: 'Leave the Shop' },
   'shop.search': { es: 'Buscar objetos por nombre o efecto...', en: 'Search items by name or effect...' },
   'shop.noResults': { es: 'Sin resultados para "{q}".', en: 'No results for "{q}".' },
   'shop.requires': { es: '🔒 Requiere {name}', en: '🔒 Requires {name}' },
@@ -706,6 +710,13 @@ const DICT: Record<string, Entry> = {
   'b.burn': { es: '🔥 {name} sufre daño por quemadura ({dmg}).', en: '🔥 {name} is hurt by its burn ({dmg}).' },
   'b.poison': { es: '☠️ {name} sufre daño por veneno ({dmg}).', en: '☠️ {name} is hurt by poison ({dmg}).' },
   'b.paralysis': { es: '⚡ {name} está paralizado y no puede moverse.', en: '⚡ {name} is paralyzed and cannot move.' },
+  'b.gotBurn': { es: '🔥 ¡{name} quedó quemado!', en: '🔥 {name} was burned!' },
+  'b.gotPoison': { es: '☠️ ¡{name} fue envenenado!', en: '☠️ {name} was poisoned!' },
+  'b.gotParalysis': { es: '⚡ ¡{name} quedó paralizado!', en: '⚡ {name} was paralyzed!' },
+  'b.gotFreeze': { es: '🧊 ¡{name} quedó congelado!', en: '🧊 {name} was frozen!' },
+  'b.gotSleep': { es: '💤 ¡{name} se quedó dormido!', en: '💤 {name} fell asleep!' },
+  'b.gotConfusion': { es: '💫 ¡{name} se confundió!', en: '💫 {name} became confused!' },
+  'b.gotFlinch': { es: '❕ ¡{name} se aturdió!', en: '❕ {name} flinched!' },
   'b.sleep': { es: '💤 {name} está dormido y no puede moverse.', en: '💤 {name} is asleep and cannot move.' },
   'b.wokeUp': { es: '💤 {name} se despertó.', en: '💤 {name} woke up.' },
   'b.freeze': { es: '🧊 {name} está congelado y no puede moverse.', en: '🧊 {name} is frozen solid and cannot move.' },
@@ -743,6 +754,8 @@ const DICT: Record<string, Entry> = {
   'b.nuzlockeReleasedStatus': { es: '💀 Nuzlocke: {name} fue debilitado por su estado y liberado.', en: '💀 Nuzlocke: {name} fainted from its status and was released.' },
   'b.nuzlockeReleased': { es: '💀 Nuzlocke: {name} fue debilitado y liberado.', en: '💀 Nuzlocke: {name} fainted and was released.' },
   'b.partyFainted': { es: '{name} cayó debilitado.', en: '{name} fainted.' },
+  'b.mustSwitch': { es: 'Elige un Pokémon sano para continuar el combate.', en: 'Choose a healthy Pokémon to continue the battle.' },
+  'b.debilitado': { es: 'está debilitado.', en: 'is fainted.' },
   'b.partyFaintedStatus': { es: '{name} fue debilitado por su estado.', en: '{name} fainted from its status.' },
   'b.disabledCant': { es: '🚫 ¡{name} está anulado y no puede moverse!', en: '🚫 {name} is disabled and cannot move!' },
   'b.disabledUsed': { es: '🚫 {name} no puede usar su movimiento anulado y usa {move}.', en: '🚫 {name} cannot use its disabled move and uses {move}.' },
@@ -1228,4 +1241,19 @@ const STATUS_TEXT: Record<string, { es: string; en: string }> = {
 export function statusLabel(type: string): string {
   const e = STATUS_TEXT[type]
   return e ? e[currentLang] : type
+}
+
+const STATUS_APPLIED_KEY: Record<string, string> = {
+  burn: 'b.gotBurn',
+  poison: 'b.gotPoison',
+  paralysis: 'b.gotParalysis',
+  freeze: 'b.gotFreeze',
+  sleep: 'b.gotSleep',
+  confusion: 'b.gotConfusion',
+  flinch: 'b.gotFlinch',
+}
+
+export function statusAppliedLine(name: string, type: string): string {
+  const key = STATUS_APPLIED_KEY[type]
+  return key ? t(key, { name }) : `${name} → ${statusLabel(type)}`
 }

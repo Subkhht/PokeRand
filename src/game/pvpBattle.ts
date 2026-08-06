@@ -2,21 +2,11 @@ import type { Move, Pokemon, StatusType } from './types'
 import { applyDamage } from './engine'
 import { getTypeEffectiveness } from './typesChart'
 import type { PvpState, PvpPlayerState } from './pvp'
-import { t, moveName } from './i18n'
+import { t, moveName, statusAppliedLine } from './i18n'
 
 export interface PvpAction {
   kind: 'move' | 'switch'
   index: number
-}
-
-const STATUS_LABELS: Record<StatusType, string> = {
-  burn: t('status.burn'),
-  poison: t('status.poison'),
-  paralysis: t('status.paralysis'),
-  freeze: t('status.freeze'),
-  sleep: t('status.sleep'),
-  confusion: t('status.confusion'),
-  flinch: t('status.flinch'),
 }
 
 function getStageMultiplier(stage: number): number {
@@ -440,7 +430,7 @@ function performPvpHit(
         ...currentDefender,
         status: { type: move.ailment, turns: ailmentTurns[move.ailment] },
       }
-      lines.push(`${currentDefender.name} fue ${STATUS_LABELS[move.ailment].split(' ')[1]} ${STATUS_LABELS[move.ailment].split(' ')[0]}.`)
+      lines.push(statusAppliedLine(currentDefender.name, move.ailment))
     }
   }
 

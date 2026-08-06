@@ -356,6 +356,26 @@ button {
   transform: none !important;
 }
 
+.move-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  text-align: left;
+  line-height: 1.25;
+}
+
+.move-btn-line {
+  display: block;
+}
+
+.move-btn-effect {
+  display: block;
+  font-size: 0.7em;
+  opacity: 0.85;
+  color: var(--accent-blue);
+}
+
 .panel h2,
 .panel h3,
 .modal-content h2,

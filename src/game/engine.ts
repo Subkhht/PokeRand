@@ -46,8 +46,8 @@ export function healPokemon(pokemon: Pokemon, amount: number): Pokemon {
 }
 
 export function scalePokemonForNode(base: Pokemon, _node: RouteNode, _stepIndex: number, levelDelta = 0, difficulty: string = 'medium'): Pokemon {
-  const hpMultiplier = difficulty === 'infinite' ? 5.2 : difficulty === 'hard' ? 5 : difficulty === 'coliseum' ? 5 : 4
-  const statMultiplier = difficulty === 'infinite' ? 2.55 : difficulty === 'hard' ? 2.5 : difficulty === 'coliseum' ? 2.5 : 2
+  const hpMultiplier = difficulty === 'easy' ? 3 : difficulty === 'infinite' ? 5.2 : difficulty === 'hard' ? 5 : difficulty === 'coliseum' ? 5 : 4
+  const statMultiplier = difficulty === 'easy' ? 1.5 : difficulty === 'infinite' ? 2.55 : difficulty === 'hard' ? 2.5 : difficulty === 'coliseum' ? 2.5 : 2
 
   // El nivel mínimo de aparición ya se aplica en buildPokemonFromApi.
   // Aquí solo limitamos el piso: el nivel final nunca baja del umbral de
@@ -99,7 +99,7 @@ export function getTeamStatAverages(team: Pokemon[]): { attack: number; defense:
 
 export function balanceWildPokemonToTeam(enemy: Pokemon, team: Pokemon[], difficulty: string): Pokemon {
   const teamAvg = getTeamStatAverages(team)
-  const strength = difficulty === 'infinite' ? 1.02 : difficulty === 'hard' ? 1.05 : difficulty === 'easy' ? 0.85 : 0.95
+  const strength = difficulty === 'easy' ? 0.72 : difficulty === 'infinite' ? 1.02 : difficulty === 'hard' ? 1.05 : 0.95
   // El salvaje conserva la mayor parte de sus stats de especie (70%) y solo se
   // ajusta un 30% al equipo. Antes era 50/50 y un Pokémon débil "heredaba" un
   // Ataque/At.Esp. desorbitado de la defensa del equipo (p. ej. una Def. Esp.
