@@ -336,10 +336,9 @@ const AILMENT_MAP: Record<string, StatusType> = {
   'confusion': 'confusion',
   'flinch': 'flinch',
 }
-
 export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
   try {
-    const res = await fetch(moveUrl)
+    const res = await fetch(`${moveUrl}?ts=${Date.now()}`, { cache: 'no-store' })
     const data = await res.json()
 
     // Solo se aceptan movimientos de DAÑO (physical/special). Los movimientos de
@@ -347,7 +346,10 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
     // (Leech Seed), que funciona bien. Así los Pokémon solo tienen ataques de
     // daño + Drenadoras.
     const dc = data.damage_class?.name
-    const isLeechSeed = data.ailment?.name === 'leech-seed'
+    // El ailment puede venir en el nivel raíz o dentro de meta según la versión
+    // de la API/caché del navegador. Se comprueban ambos.
+    const ailmentName = data.meta?.ailment?.name ?? data.ailment?.name
+    const isLeechSeed = ailmentName === 'leech-seed'
     if (dc !== 'physical' && dc !== 'special' && dc !== 'status') return null
     if (dc === 'status' && !isLeechSeed) return null
     if ((dc === 'physical' || dc === 'special') && (!data.power || data.power <= 0)) return null
@@ -356,7 +358,7 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
     const moveName = esName || capitalize(data.name.replace(/-/g, ' '))
     const enName = data.names?.find((n: any) => n.language?.name === 'en')?.name || capitalize(data.name.replace(/-/g, ' '))
 
-    const ailmentRaw = data.ailment?.name
+    const ailmentRaw = ailmentName
     const flinchRaw = data.meta?.flinch_chance ?? 0
     // El flinch (aturdimiento) se parsea aparte: muchos movimientos de daño lo
     // tienen en meta.flinch_chance. Si el movimiento también trae una afección
@@ -378,13 +380,6 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
     } else if (flinchRaw > 0) {
       ailment = 'flinch'
       ailmentChance = flinchRaw / 100
-    }
-
-    // Balance: cualquier movimiento con chance de causar un estado (y que no
-    // sea garantizado) se sube al 50%. Los movimientos de estado garantizados
-    // (chance 1) se mantienen al 100%.
-    if (ailment && ailmentChance != null && ailmentChance > 0 && ailmentChance < 1) {
-      ailmentChance = 0.5
     }
 
     const minHits = data.meta?.min_hits ?? undefined
@@ -438,8 +433,8 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
       description,
       url: moveUrl,
       damageClass: data.damage_class?.name === 'special' ? 'special' : 'physical',
-      leechSeed: data.ailment?.name === 'leech-seed' || /leech-seed|drenadoras/i.test(moveName),
-      disable: data.ailment?.name === 'disable' || /disable|anulación/i.test(moveName),
+      leechSeed: ailmentName === 'leech-seed' || /leech-seed|drenadoras/i.test(moveName),
+      disable: ailmentName === 'disable' || /disable|anulación/i.test(moveName),
       fakeOut: data.name === 'fake-out' || /fake-out|abatimiento|sorpresa/i.test(moveName),
       ailment,
       ailmentChance,

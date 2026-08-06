@@ -7438,7 +7438,7 @@ function MainApp() {
     setBattleLog((prev) => [...logs, ...prev].slice(0, 15))
   }
 
-  function attemptCapture(ballName: string): void {
+  async function attemptCapture(ballName: string): Promise<void> {
     if (!enemy || !activePokemon) return
 
     const ballIdx = inventory.indexOf(ballName)
@@ -7450,10 +7450,27 @@ function MainApp() {
     const def = POKEBALL_DEFS[ballName]
     if (!def) return
 
+    // El rival del combate lleva sus stats infladas por el balance de dificultad
+    // (scalePokemonForNode + balanceWildPokemonToTeam). Al capturarlo, se
+    // reconstruye con las stats base de su especie al nivel actual para que no
+    // herede esa inflación en el equipo del jugador.
+    const buildCleanCaptured = async (): Promise<Pokemon> => {
+      try {
+        const fresh = await buildPokemonFromApi(enemy.id, getEffectiveGen(), enemy.level, enemy.shiny ?? false, difficulty)
+        return {
+          ...fresh,
+          hp: Math.min(fresh.maxHp, enemy.hp),
+          holdItem: (difficulty === 'hard' || difficulty === 'infinite') ? null : enemy.holdItem,
+        }
+      } catch {
+        return { ...enemy, holdItem: (difficulty === 'hard' || difficulty === 'infinite') ? null : enemy.holdItem }
+      }
+    }
+
     // Master Ball: captura automática
     if (def.isMaster) {
       setInventory(prev => prev.filter((_, i) => i !== ballIdx))
-      const capturedPkmn = { ...enemy, holdItem: (difficulty === 'hard' || difficulty === 'infinite') ? null : enemy.holdItem }
+      const capturedPkmn = await buildCleanCaptured()
       registerInPokedex(capturedPkmn)
       setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
       if (capturedPkmn.shiny) unlockAchievement('shiny_catch')
@@ -7486,7 +7503,7 @@ function MainApp() {
 
     if (Math.random() < catchProbability) {
       // Captura exitosa
-      const capturedPkmn = { ...enemy, holdItem: (difficulty === 'hard' || difficulty === 'infinite') ? null : enemy.holdItem }
+      const capturedPkmn = await buildCleanCaptured()
       registerInPokedex(capturedPkmn)
       setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
       if (capturedPkmn.shiny) unlockAchievement('shiny_catch')
