@@ -1,6 +1,7 @@
 import { useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
+import { t } from '../game/i18n'
 
 interface Question {
   q: string
@@ -9,52 +10,51 @@ interface Question {
 }
 
 const QUESTIONS: Array<{ q: string; options: string[]; correct: number }> = [
-  { q: '¿Cuál es el tipo de Pikachu?', options: ['Eléctrico', 'Agua', 'Normal', 'Planta'], correct: 0 },
-  { q: '¿De qué tipo es Mewtwo?', options: ['Psíquico', 'Siniestro', 'Dragón', 'Fantasma'], correct: 0 },
-  { q: '¿Qué Pokémon evoluciona a Charizard?', options: ['Charmander', 'Squirtle', 'Bulbasaur', 'Pidgey'], correct: 0 },
-  { q: '¿Cuál es el número de la Pokédex de Gengar?', options: ['94', '42', '109', '130'], correct: 0 },
-  { q: '¿Qué tipo es súper eficaz contra Agua?', options: ['Planta', 'Fuego', 'Hielo', 'Volador'], correct: 0 },
-  { q: '¿Cuál de estos Pokémon es Legendario?', options: ['Mewtwo', 'Snorlax', 'Gyarados', 'Lucario'], correct: 0 },
-  { q: '¿Qué Pokémon es de tipos Agua y Hielo?', options: ['Lapras', 'Milotic', 'Starmie', 'Walrein'], correct: 0 },
-  { q: '¿En qué generación aparece Lucario por primera vez?', options: ['4ª', '1ª', '3ª', '6ª'], correct: 0 },
-  { q: '¿Cuánto pesa aproximadamente Snorlax?', options: ['460 kg', '120 kg', '280 kg', '60 kg'], correct: 0 },
-  { q: '¿Qué tipo NO afecta a los Pokémon Fantasma?', options: ['Normal', 'Siniestro', 'Psíquico', 'Hada'], correct: 0 },
-  { q: '¿Cuál es el inicial de tipo Agua de Kanto?', options: ['Squirtle', 'Totodile', 'Mudkip', 'Oshawott'], correct: 0 },
-  { q: '¿Cuántos tipos de Pokémon existen?', options: ['18', '15', '16', '20'], correct: 0 },
-  { q: '¿Cuál de estos ataques es de tipo Eléctrico?', options: ['Rayo', 'Lanzallamas', 'Hidrobomba', 'Terremoto'], correct: 0 },
-  { q: '¿Qué Pokémon tiene los tipos Dragón y Volador?', options: ['Dragonite', 'Charizard', 'Gyarados', 'Aerodactyl'], correct: 0 },
-  { q: '¿Cuál de estos NO es un Pokémon inicial?', options: ['Pidgey', 'Bulbasaur', 'Chimchar', 'Oshawott'], correct: 0 },
-  { q: '¿Qué tipo tiene Eevee en su forma base?', options: ['Normal', 'Eléctrico', 'Agua', 'Hada'], correct: 0 },
-  { q: '¿Qué Pokémon evoluciona de Magikarp?', options: ['Gyarados', 'Milotic', 'Lanturn', 'Wailord'], correct: 0 },
-  { q: '¿Cuál es la altura de Pikachu?', options: ['0,4 m', '0,8 m', '1,2 m', '0,2 m'], correct: 0 },
-  { q: '¿Qué tipo es débil contra el tipo Lucha?', options: ['Normal', 'Volador', 'Eléctrico', 'Fantasma'], correct: 0 },
-  { q: '¿Cuál de estos Pokémon es de tipo Fantasma?', options: ['Gastly', 'Abra', 'Koffing', 'Grimer'], correct: 0 },
-  { q: '¿Cuál tiene más PS base?', options: ['Snorlax', 'Charizard', 'Blastoise', 'Pikachu'], correct: 0 },
-  { q: '¿Cuál es la región de la primera generación?', options: ['Kanto', 'Johto', 'Hoenn', 'Sinnoh'], correct: 0 },
-  { q: '¿Qué tipo es súper eficaz contra Dragón?', options: ['Hada', 'Eléctrico', 'Agua', 'Fuego'], correct: 0 },
-  { q: '¿Cuál de estos Pokémon es de tipo Lucha?', options: ['Hitmonlee', 'Drowzee', 'Machop', 'Hitmonlee'], correct: 0 },
-  { q: '¿Qué tipo es débil contra Eléctrico?', options: ['Volador', 'Roca', 'Planta', 'Hielo'], correct: 0 },
-  { q: '¿Cuál es el inicial de Planta de Johto?', options: ['Chikorita', 'Treecko', 'Turtwig', 'Snivy'], correct: 0 },
-  { q: '¿Qué Pokémon es de tipos Bicho y Volador?', options: ['Butterfree', 'Gengar', 'Onix', 'Pikachu'], correct: 0 },
-  { q: '¿Cuál de estos ataques es de tipo Psíquico?', options: ['Confusión', 'Látigo Cepa', 'Burbuja', 'Garra'], correct: 0 },
-  { q: '¿Qué Eeveelution se consigue con la Piedra Trueno?', options: ['Jolteon', 'Vaporeon', 'Flareon', 'Espeon'], correct: 0 },
-  { q: '¿Cuál es el número de la Pokédex de Charizard?', options: ['6', '150', '25', '94'], correct: 0 },
-  { q: '¿Qué tipo NO afecta a los Pokémon de Acero?', options: ['Veneno', 'Fuego', 'Lucha', 'Tierra'], correct: 0 },
-  { q: '¿Cuál de estos es de tipo Siniestro?', options: ['Umbreon', 'Espeon', 'Vaporeon', 'Jolteon'], correct: 0 },
-  { q: '¿Cuánto pesa Magikarp?', options: ['10 kg', '2 kg', '30 kg', '55 kg'], correct: 0 },
-  { q: '¿Cuál es el Pokémon más famoso de la franquicia?', options: ['Pikachu', 'Charizard', 'Mewtwo', 'Eevee'], correct: 0 },
-  { q: '¿Qué tipos tiene Gardevoir?', options: ['Psíquico y Hada', 'Psíquico y Eléctrico', 'Hada y Volador', 'Psíquico y Fantasma'], correct: 0 },
-  { q: '¿En qué generación se introdujo el tipo Hada?', options: ['6ª', '3ª', '5ª', '8ª'], correct: 0 },
-  { q: '¿Cuál de estos es un Legendario de tipo Agua?', options: ['Suicune', 'Gyarados', 'Lapras', 'Milotic'], correct: 0 },
-  { q: '¿Qué Pokémon tiene una forma Gigamax?', options: ['Charizard', 'Pikachu', 'Mewtwo', 'Snorlax'], correct: 0 },
-  { q: '¿Qué tipo es súper eficaz contra Roca?', options: ['Agua', 'Eléctrico', 'Dragón', 'Siniestro'], correct: 0 },
-  { q: '¿Cuál de estos ataques es de tipo Fuego?', options: ['Lanzallamas', 'Rayo', 'Hidrobomba', 'Rayo de Hielo'], correct: 0 },
-  { q: '¿Qué Pokémon es el número 25 de la Pokédex?', options: ['Pikachu', 'Eevee', 'Meowth', 'Psyduck'], correct: 0 },
-  { q: '¿Qué tipo es inmune a los ataques de Tierra?', options: ['Volador', 'Hielo', 'Agua', 'Eléctrico'], correct: 0 },
-  { q: '¿Qué Pokémon es conocido como el "Pokémon Rata"?', options: ['Rattata', 'Meowth', 'Zubat', 'Pidgey'], correct: 0 },
-  { q: '¿Cuál es la evolución de Eevee con la Piedra Hoja?', options: ['Leafeon', 'Glaceon', 'Jolteon', 'Espeon'], correct: 0 },
+  { q: 'What type is Pikachu?', options: ['Electric', 'Water', 'Normal', 'Grass'], correct: 0 },
+  { q: 'What type is Mewtwo?', options: ['Psychic', 'Dark', 'Dragon', 'Ghost'], correct: 0 },
+  { q: 'Which Pokémon evolves into Charizard?', options: ['Charmander', 'Squirtle', 'Bulbasaur', 'Pidgey'], correct: 0 },
+  { q: 'What is Gengar\'s Pokédex number?', options: ['94', '42', '109', '130'], correct: 0 },
+  { q: 'What type is super effective against Water?', options: ['Grass', 'Fire', 'Ice', 'Flying'], correct: 0 },
+  { q: 'Which of these Pokémon is Legendary?', options: ['Mewtwo', 'Snorlax', 'Gyarados', 'Lucario'], correct: 0 },
+  { q: 'Which Pokémon is Water/Ice type?', options: ['Lapras', 'Milotic', 'Starmie', 'Walrein'], correct: 0 },
+  { q: 'In which generation was Lucario introduced?', options: ['4th', '1st', '3rd', '6th'], correct: 0 },
+  { q: 'How much does Snorlax weigh approximately?', options: ['460 kg', '120 kg', '280 kg', '60 kg'], correct: 0 },
+  { q: 'What type does NOT affect Ghost Pokémon?', options: ['Normal', 'Dark', 'Psychic', 'Fairy'], correct: 0 },
+  { q: 'What is the Water starter of Kanto?', options: ['Squirtle', 'Totodile', 'Mudkip', 'Oshawott'], correct: 0 },
+  { q: 'How many Pokémon types are there?', options: ['18', '15', '16', '20'], correct: 0 },
+  { q: 'Which of these moves is Electric type?', options: ['Thunderbolt', 'Flamethrower', 'Hydro Pump', 'Earthquake'], correct: 0 },
+  { q: 'Which Pokémon is Dragon/Flying type?', options: ['Dragonite', 'Charizard', 'Gyarados', 'Aerodactyl'], correct: 0 },
+  { q: 'Which of these is NOT a starter Pokémon?', options: ['Pidgey', 'Bulbasaur', 'Chimchar', 'Oshawott'], correct: 0 },
+  { q: 'What type is Eevee in its base form?', options: ['Normal', 'Electric', 'Water', 'Fairy'], correct: 0 },
+  { q: 'Which Pokémon evolves from Magikarp?', options: ['Gyarados', 'Milotic', 'Lanturn', 'Wailord'], correct: 0 },
+  { q: 'How tall is Pikachu?', options: ['0.4 m', '0.8 m', '1.2 m', '0.2 m'], correct: 0 },
+  { q: 'What type is weak against Fighting?', options: ['Normal', 'Flying', 'Electric', 'Ghost'], correct: 0 },
+  { q: 'Which of these Pokémon is Ghost type?', options: ['Gastly', 'Abra', 'Koffing', 'Grimer'], correct: 0 },
+  { q: 'Which has more base HP?', options: ['Snorlax', 'Charizard', 'Blastoise', 'Pikachu'], correct: 0 },
+  { q: 'What is the region of the first generation?', options: ['Kanto', 'Johto', 'Hoenn', 'Sinnoh'], correct: 0 },
+  { q: 'What type is super effective against Dragon?', options: ['Fairy', 'Electric', 'Water', 'Fire'], correct: 0 },
+  { q: 'Which of these Pokémon is Fighting type?', options: ['Hitmonlee', 'Drowzee', 'Machop', 'Hitmonlee'], correct: 0 },
+  { q: 'What type is weak against Electric?', options: ['Flying', 'Rock', 'Grass', 'Ice'], correct: 0 },
+  { q: 'What is the Grass starter of Johto?', options: ['Chikorita', 'Treecko', 'Turtwig', 'Snivy'], correct: 0 },
+  { q: 'Which Pokémon is Bug/Flying type?', options: ['Butterfree', 'Gengar', 'Onix', 'Pikachu'], correct: 0 },
+  { q: 'Which of these moves is Psychic type?', options: ['Confusion', 'Vine Whip', 'Bubble', 'Scratch'], correct: 0 },
+  { q: 'Which Eeveelution is obtained with a Thunder Stone?', options: ['Jolteon', 'Vaporeon', 'Flareon', 'Espeon'], correct: 0 },
+  { q: 'What is Charizard\'s Pokédex number?', options: ['6', '150', '25', '94'], correct: 0 },
+  { q: 'What type does NOT affect Steel Pokémon?', options: ['Poison', 'Fire', 'Fighting', 'Ground'], correct: 0 },
+  { q: 'Which of these is Dark type?', options: ['Umbreon', 'Espeon', 'Vaporeon', 'Jolteon'], correct: 0 },
+  { q: 'How much does Magikarp weigh?', options: ['10 kg', '2 kg', '30 kg', '55 kg'], correct: 0 },
+  { q: 'What is the most famous Pokémon of the franchise?', options: ['Pikachu', 'Charizard', 'Mewtwo', 'Eevee'], correct: 0 },
+  { q: 'What types does Gardevoir have?', options: ['Psychic and Fairy', 'Psychic and Electric', 'Fairy and Flying', 'Psychic and Ghost'], correct: 0 },
+  { q: 'In which generation was the Fairy type introduced?', options: ['6th', '3rd', '5th', '8th'], correct: 0 },
+  { q: 'Which of these is a Water Legendary?', options: ['Suicune', 'Gyarados', 'Lapras', 'Milotic'], correct: 0 },
+  { q: 'Which Pokémon has a Gigantamax form?', options: ['Charizard', 'Pikachu', 'Mewtwo', 'Snorlax'], correct: 0 },
+  { q: 'What type is super effective against Rock?', options: ['Water', 'Electric', 'Dragon', 'Dark'], correct: 0 },
+  { q: 'Which of these moves is Fire type?', options: ['Flamethrower', 'Thunderbolt', 'Hydro Pump', 'Ice Beam'], correct: 0 },
+  { q: 'Which Pokémon is number 25 in the Pokédex?', options: ['Pikachu', 'Eevee', 'Meowth', 'Psyduck'], correct: 0 },
+  { q: 'What type is immune to Ground attacks?', options: ['Flying', 'Ice', 'Water', 'Electric'], correct: 0 },
+  { q: 'Which Pokémon is known as the "Rat Pokémon"?', options: ['Rattata', 'Meowth', 'Zubat', 'Pidgey'], correct: 0 },
+  { q: 'Which is Eevee\'s evolution with a Leaf Stone?', options: ['Leafeon', 'Glaceon', 'Jolteon', 'Espeon'], correct: 0 },
 ]
-
 const ROUNDS = 6
 
 export default function TriviaPokemon({ onComplete }: CasinoMinigameProps): JSX.Element {
@@ -169,7 +169,7 @@ export default function TriviaPokemon({ onComplete }: CasinoMinigameProps): JSX.
       ) : null}
       {result !== null && (
         <p style={{ color: result >= 800 ? '#ffcb05' : result >= 400 ? '#34d399' : '#94a3b8', fontWeight: 'bold', fontSize: '1.2rem', margin: 0, animation: 'casinoSlideUp 0.4s ease' }}>
-          {result >= 800 ? '🏆 ¡Poké-enciclopedia!' : result >= 400 ? '🙂 ¡No está mal!' : '📚 ¡A repasar!'} · {result} pts
+          {result >= 800 ? t('mg.trivia.encyclopedia') : result >= 400 ? t('mg.trivia.notBad') : '📚 ¡A repasar!'} · {result} pts
         </p>
       )}
     </div>

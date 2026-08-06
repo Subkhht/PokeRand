@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
+import { t } from '../game/i18n'
 
 interface ArrowState {
   x: number
@@ -198,14 +199,14 @@ export default function Slingshot({ onComplete }: CasinoMinigameProps): JSX.Elem
             onPointerLeave={release}
             style={{ width: '100%', background: charging ? (power > 0.85 ? '#ff8a80' : '#f0abfc') : '#f0abfc', color: '#1a1033', touchAction: 'none', userSelect: 'none' }}
           >
-            {charging ? `⚡ Cargando... ${Math.round(power * 100)}%` : '🪃 Mantén pulsado para cargar'}
+            {charging ? `⚡ ${t('mg.loading')}... ${Math.round(power * 100)}%` : t('mg.slingshot.hold')}
           </button>
         </div>
       )}
       {result !== null && (
         <div style={{ textAlign: 'center', animation: 'casinoSlideUp 0.4s ease' }}>
           <p style={{ color: result >= 800 ? '#ffcb05' : result >= 400 ? '#34d399' : '#94a3b8', fontWeight: 'bold', fontSize: '1.2rem', margin: 0 }}>
-            {result >= 800 ? '🎯 ¡Disparo perfecto!' : `¡${result} puntos!`}
+            {result >= 800 ? t('mg.slingshot.perfect') : `${t('mg.points')}: ${result}`}
           </p>
         </div>
       )}

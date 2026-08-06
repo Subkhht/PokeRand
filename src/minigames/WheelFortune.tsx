@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playEvolution } from '../game/sound'
+import { t } from '../game/i18n'
 
 const SECTORS = [
   { label: '500', color: '#60a5fa', score: 500 },
@@ -84,7 +85,7 @@ export default function WheelFortune({ onComplete }: CasinoMinigameProps): JSX.E
 
       {!result && (
         <button className="cta" type="button" onClick={spin} disabled={spinning} style={{ background: spinning ? '#475569' : '#f0abfc', color: '#1a1033' }}>
-          {spinning ? 'Girando...' : '🎡 ¡Girar!'}
+          {spinning ? t('mg.spinning') : t('mg.wheel.spin')}
         </button>
       )}
       {result && (
@@ -92,7 +93,7 @@ export default function WheelFortune({ onComplete }: CasinoMinigameProps): JSX.E
           <p style={{ color: result.color, fontWeight: 'bold', fontSize: '1.2rem', margin: '0 0 0.25rem' }}>
             {result.label === 'JACKPOT' ? '🏆 ¡JACKPOT!' : `¡${result.score} puntos!`}
           </p>
-          <p style={{ color: '#cbd5e1', fontSize: '0.85rem', margin: 0 }}>Calculando premio...</p>
+          <p style={{ color: '#cbd5e1', fontSize: '0.85rem', margin: 0 }}>{t('mg.wheel.calculating')}</p>
         </div>
       )}
     </div>

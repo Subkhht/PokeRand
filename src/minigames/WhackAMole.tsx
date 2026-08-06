@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
+import { t } from '../game/i18n'
 
 const HOLES = 9
 const GAME_TIME = 10
@@ -126,7 +127,7 @@ export default function WhackAMole({ onComplete }: CasinoMinigameProps): JSX.Ele
         )}
         {result !== null && (
           <p style={{ color: result >= 800 ? '#ffcb05' : result >= 400 ? '#34d399' : '#94a3b8', fontWeight: 'bold', fontSize: '1.2rem', margin: 0, animation: 'casinoSlideUp 0.4s ease' }}>
-            {result >= 800 ? '⚡ ¡Reflejos de gato!' : `¡${result} puntos!`}
+            {result >= 800 ? t('mg.whack.cat') : t('mg.pointsResult', { n: result })}
           </p>
         )}
       </div>

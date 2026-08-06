@@ -1,6 +1,7 @@
 import { useState, useRef, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
+import { t } from '../game/i18n'
 
 const EMOJIS = ['⚔️', '🔥', '💧', '🌿', '⚡', '💎', '🐉', '🌟']
 const PAIRS = 8
@@ -119,7 +120,7 @@ export default function MemoryCards({ onComplete }: CasinoMinigameProps): JSX.El
         )}
         {result !== null && (
           <p style={{ color: result >= 800 ? '#ffcb05' : result >= 400 ? '#34d399' : '#94a3b8', fontWeight: 'bold', fontSize: '1.2rem', margin: 0, animation: 'casinoSlideUp 0.4s ease' }}>
-            {result >= 800 ? '🧠 ¡Memoria perfecta!' : `¡${result} puntos!`}
+            {result >= 800 ? t('mg.memory.perfect') : t('mg.pointsResult', { n: result })}
           </p>
         )}
       </div>

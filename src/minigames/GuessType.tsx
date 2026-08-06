@@ -2,6 +2,7 @@ import { useCallback, useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
 import { ALL_TYPES, POKEDEX, TYPE_COLORS, TYPE_NAMES, randomFrom, shuffle } from './pokeData'
+import { t } from '../game/i18n'
 
 const ROUNDS = 6
 
@@ -107,7 +108,7 @@ export default function GuessType({ onComplete }: CasinoMinigameProps): JSX.Elem
           <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>
             {revealed ? (
               <span>
-                Tipo{data.entry.types.length > 1 ? 's' : ''}:{' '}
+                {t('mg.guessType.types', { s: data.entry.types.length > 1 ? 's' : '' })}:{' '}
                 {data.entry.types.map((t, i) => (
                   <span key={t} style={{ color: TYPE_COLORS[t], fontWeight: 'bold' }}>
                     {TYPE_NAMES[t]}
@@ -116,7 +117,7 @@ export default function GuessType({ onComplete }: CasinoMinigameProps): JSX.Elem
                 ))}
               </span>
             ) : (
-              '¿Cuál es su tipo principal?'
+              t('mg.guessType.ask')
             )}
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', maxWidth: '340px', width: '100%' }}>

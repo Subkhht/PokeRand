@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
+import { t } from '../game/i18n'
 import { POKEDEX, randomFrom, spriteUrl } from './pokeData'
 
 const GAP = 6
@@ -83,7 +84,7 @@ export default function SlidePuzzle({ onComplete }: CasinoMinigameProps): JSX.El
     if (!started || !ready || status !== 'playing' || result !== null) return
     playClick()
     setStatus('surrendered')
-    setMsg('Te rendiste... ¡mejor suerte la próxima!')
+    setMsg(t('mg.slidePuzzle.surrenderedMsg'))
     setResult(0)
     setTimeout(() => onCompleteRef.current(0), 600)
   }
@@ -120,7 +121,7 @@ export default function SlidePuzzle({ onComplete }: CasinoMinigameProps): JSX.El
       const score = Math.max(100, Math.min(1000, Math.round(1000 - seconds * 8 - nm * (size === 3 ? 4 : 2))))
       const used = seconds
       setTimeout(() => {
-        setMsg(`Completado en ${used}s y ${nm} movimientos`)
+        setMsg(t('mg.slidePuzzle.completed', { sec: used, moves: nm }))
         setResult(score)
         setTimeout(() => onCompleteRef.current(score), 900)
       }, 450)
@@ -137,14 +138,14 @@ export default function SlidePuzzle({ onComplete }: CasinoMinigameProps): JSX.El
         <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
           <div style={{ fontSize: '3rem', animation: 'casinoBounce 0.9s ease infinite' }}>🧩</div>
           <p style={{ color: '#cbd5e1', fontSize: '0.85rem', margin: 0, maxWidth: '360px' }}>
-            Ordena las fichas del Pokémon deslizándolas hasta la casilla vacía. ¡Elige tu dificultad!
+            {t('mg.slidePuzzle.intro')}
           </p>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button className="cta" type="button" onClick={() => start(3)} style={{ background: '#34d399', color: '#0b2012' }}>
-              3x3 · Fácil
+              {t('mg.slidePuzzle.easy')}
             </button>
             <button className="cta" type="button" onClick={() => start(4)} style={{ background: '#f0abfc', color: '#1a1033' }}>
-              4x4 · Difícil
+              {t('mg.slidePuzzle.hard')}
             </button>
           </div>
         </div>
@@ -168,7 +169,7 @@ export default function SlidePuzzle({ onComplete }: CasinoMinigameProps): JSX.El
                   }}
                 >
                   <div style={{ fontSize: '2rem', animation: 'casinoBounce 0.8s ease infinite' }}>🎴</div>
-                  <p style={{ color: '#7d7ab5', fontSize: '0.8rem', margin: 0 }}>¡Mezclando...</p>
+                  <p style={{ color: '#7d7ab5', fontSize: '0.8rem', margin: 0 }}>{t('mg.slidePuzzle.mixing')}</p>
                 </div>
               ) : (
                 tiles.map((v, pos) => {
@@ -218,7 +219,7 @@ export default function SlidePuzzle({ onComplete }: CasinoMinigameProps): JSX.El
               )}
             </div>
             <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-              <div style={{ fontSize: '0.75rem', color: '#7d7ab5' }}>Referencia</div>
+              <div style={{ fontSize: '0.75rem', color: '#7d7ab5' }}>{t('mg.slidePuzzle.reference')}</div>
               <div style={{ width: TILE, height: TILE, borderRadius: '10px', overflow: 'hidden', border: '2px solid #34d399' }}>
                 <img src={spriteUrl(sprite)} alt="ref" style={{ width: '100%', height: '100%', imageRendering: 'pixelated' }} />
               </div>
@@ -229,7 +230,7 @@ export default function SlidePuzzle({ onComplete }: CasinoMinigameProps): JSX.El
                 disabled={status !== 'playing' || result !== null || !ready}
                 style={{ color: '#7d7ab5' }}
               >
-                🔀 Reiniciar
+                {t('mg.slidePuzzle.restart')}
               </button>
               <button
                 className="tiny-btn"
@@ -238,13 +239,13 @@ export default function SlidePuzzle({ onComplete }: CasinoMinigameProps): JSX.El
                 disabled={status !== 'playing' || result !== null || !ready}
                 style={{ color: '#f87171' }}
               >
-                🏳 Rendirse
+                {t('mg.slidePuzzle.surrender')}
               </button>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '18px', color: '#cbd5e1', fontSize: '0.9rem' }}>
             <span>⏱ {seconds}s</span>
-            <span>🔄 Movimientos: <strong style={{ color: '#ffcb05' }}>{moves}</strong></span>
+            <span>🔄 {t('mg.slidePuzzle.moves')}: <strong style={{ color: '#ffcb05' }}>{moves}</strong></span>
             <span>📐 {size}x{size}</span>
           </div>
           {status === 'won' && result === null && (
@@ -263,7 +264,7 @@ export default function SlidePuzzle({ onComplete }: CasinoMinigameProps): JSX.El
       )}
       {result !== null && (
         <p style={{ color: status === 'surrendered' ? '#94a3b8' : result >= 800 ? '#ffcb05' : result >= 400 ? '#34d399' : '#94a3b8', fontWeight: 'bold', fontSize: '1.2rem', margin: 0, animation: 'casinoSlideUp 0.4s ease' }}>
-          {status === 'surrendered' ? '🏳 ¡Te rendiste!' : result >= 800 ? '🧩 ¡Maestro del puzle!' : result >= 400 ? '🙂 ¡Buen trabajo!' : '🔄 ¡A mejorar!'} · {result} pts
+          {status === 'surrendered' ? t('mg.slidePuzzle.surrendered') : result >= 800 ? t('mg.slidePuzzle.master') : result >= 400 ? t('mg.slidePuzzle.good') : t('mg.slidePuzzle.improve')} · {result} pts
         </p>
       )}
     </div>

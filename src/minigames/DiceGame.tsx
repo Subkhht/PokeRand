@@ -1,6 +1,7 @@
 import { useState, useRef, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playEvolution } from '../game/sound'
+import { t } from '../game/i18n'
 
 const DICE_FACES: Record<number, string[][]> = {
   1: [['', '', ''], ['', '●', ''], ['', '', '']],
@@ -111,7 +112,7 @@ export default function DiceGame({ onComplete }: CasinoMinigameProps): JSX.Eleme
                   )}
                 </div>
                 <p style={{ color: '#94a3b8', fontSize: '0.75rem', margin: '0.5rem 0 0' }}>
-                  {total === 12 ? '🎉 ¡Doble seis!' : 'Puedes relanzar para buscar un total mayor'}
+                  {total === 12 ? '🎉 ¡Doble seis!' : t('mg.dice.rerollHint')}
                 </p>
               </>
             )}
@@ -120,7 +121,7 @@ export default function DiceGame({ onComplete }: CasinoMinigameProps): JSX.Eleme
         {result !== null && (
           <div style={{ animation: 'casinoSlideUp 0.4s ease' }}>
             <p style={{ color: result >= 800 ? '#ffcb05' : result >= 400 ? '#34d399' : '#94a3b8', fontWeight: 'bold', fontSize: '1.2rem', margin: 0 }}>
-              {result >= 800 ? '🎲 ¡La suerte te sonríe!' : `¡${result} puntos!`}
+              {result >= 800 ? t('mg.dice.lucky') : `¡${result} puntos!`}
             </p>
           </div>
         )}

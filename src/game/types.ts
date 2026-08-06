@@ -14,6 +14,7 @@ export interface StatChange {
 
 export interface Move {
   name: string
+  enName?: string
   power: number
   type: string
   accuracy: number | null

@@ -1,6 +1,7 @@
 import { useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
+import { t } from '../game/i18n'
 
 const MAX = 10
 const MAX_TRIES = 3
@@ -45,7 +46,7 @@ export default function GuessNumber({ onComplete }: CasinoMinigameProps): JSX.El
         setHint(`😢 Se acabaron los intentos. Era ${secret}`)
         setTimeout(() => onComplete(score), 900)
       } else {
-        setHint(n < secret ? '📈 ¡Más alto!' : '📉 ¡Más bajo!')
+        setHint(n < secret ? t('mg.guessNumber.higher') : '📉 ¡Más bajo!')
       }
     }
   }

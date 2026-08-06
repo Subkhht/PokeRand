@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
 import { POKEDEX, formatDexId, randomFrom, shuffle, spriteUrl, type DexEntry } from './pokeData'
+import { t } from '../game/i18n'
 
 const ROUNDS = 5
 const ROUND_SECONDS = [10, 8, 7, 6, 6]
@@ -104,7 +105,7 @@ export default function GuessDex({ onComplete }: CasinoMinigameProps): JSX.Eleme
         <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
           <div style={{ fontSize: '3rem', animation: 'casinoBounce 0.9s ease infinite' }}>📖</div>
           <p style={{ color: '#cbd5e1', fontSize: '0.85rem', margin: 0, maxWidth: '340px' }}>
-            {ROUNDS} rondas. Te damos el <strong style={{ color: '#ffcb05' }}>nombre</strong> y el número de la Pokédex…
+            {ROUNDS} rondas. Te damos el <strong style={{ color: '#ffcb05' }}>{t('mg.guessDex.name')}</strong> y el número de la Pokédex…
             ¡elige el sprite correcto! El tiempo cada vez es menor.
           </p>
           <button className="cta" type="button" onClick={start} style={{ background: '#f0abfc', color: '#1a1033' }}>
@@ -163,13 +164,13 @@ export default function GuessDex({ onComplete }: CasinoMinigameProps): JSX.Eleme
             })}
           </div>
           <p style={{ color: timedOut ? '#ff8a80' : '#94a3b8', fontSize: '0.85rem', margin: 0 }}>
-            {revealed ? (timedOut ? '⏰ ¡Tiempo agotado!' : '¡Correcto!') : '¿Cuál de estos es el Pokémon?'}
+            {revealed ? (timedOut ? t('mg.guessDex.timeout') : t('mg.guessDex.correct')) : t('mg.guessDex.ask')}
           </p>
         </>
       ) : null}
       {result !== null && (
         <p style={{ color: result >= 800 ? '#ffcb05' : result >= 400 ? '#34d399' : '#94a3b8', fontWeight: 'bold', fontSize: '1.2rem', margin: 0, animation: 'casinoSlideUp 0.4s ease' }}>
-          {result >= 800 ? '📖 ¡Pokédex completa!' : result >= 400 ? '🙂 ¡Buen ojo!' : '👀 ¡A reconocer sprites!'} · {result} pts
+          {result >= 800 ? t('mg.guessDex.complete') : result >= 400 ? '🙂 ¡Buen ojo!' : '👀 ¡A reconocer sprites!'} · {result} pts
         </p>
       )}
     </div>

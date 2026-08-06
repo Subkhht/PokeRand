@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
+import { t } from '../game/i18n'
 
 const W = 420
 const H = 300
@@ -312,22 +313,22 @@ export default function CatchCoins({ onComplete }: CasinoMinigameProps): JSX.Ele
             <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
               <div style={{ fontSize: '2.5rem', animation: 'casinoBounce 0.9s ease infinite' }}>🪙</div>
               <p style={{ color: '#cbd5e1', fontSize: '0.85rem', margin: 0, maxWidth: '360px' }}>
-                Mueve la cesta con el ratón o las flechas ← →. Atrapa monedas 🪙 (+10), estrellas ⭐ (+30) y ¡evita los Voltorb 💣!
+                {t('mg.catchCoins.intro')}
               </p>
               <button className="cta" type="button" onClick={start} style={{ background: '#f0abfc', color: '#1a1033' }}>
-                🪙 ¡Empezar!
+                {t('mg.start')}
               </button>
             </div>
           ) : (
             <p style={{ color: '#cbd5e1', fontSize: '0.9rem', margin: 0 }}>
-              ⏱ {timeLeft}s · Puntos: <strong style={{ color: '#ffcb05' }}>{score}</strong>
+              ⏱ {timeLeft}s · {t('mg.points')}: <strong style={{ color: '#ffcb05' }}>{score}</strong>
             </p>
           )}
         </>
       )}
       {result !== null && (
         <p style={{ color: result >= 800 ? '#ffcb05' : result >= 400 ? '#34d399' : '#94a3b8', fontWeight: 'bold', fontSize: '1.2rem', margin: 0, animation: 'casinoSlideUp 0.4s ease' }}>
-          {result >= 800 ? '💰 ¡Cesta rebosante!' : result >= 400 ? '🪙 ¡Bueno recogiendo!' : '🧺 ¡Puedes mejorar!'} · {result} pts
+          {result >= 800 ? t('mg.catchCoins.high') : result >= 400 ? t('mg.catchCoins.mid') : t('mg.catchCoins.low')} · {result} pts
         </p>
       )}
     </div>

@@ -1,6 +1,7 @@
 import { useState, type JSX } from 'react'
 import { CASINO_MINIGAMES } from './registry'
 import MinigamePlayer from './MinigamePlayer'
+import { minigameName, minigameDesc } from '../game/i18n'
 
 interface MinigamePracticeProps {
   onClose: () => void
@@ -110,11 +111,11 @@ export default function MinigamePractice({ onClose }: MinigamePracticeProps): JS
                       borderRadius: '8px',
                     }}
                   >
-                    {g.name.split(' ')[0]}
+                    {minigameName(g.key).split(' ')[0]}
                   </span>
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'block', color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{g.name}</span>
-                    <span style={{ display: 'block', color: '#7d7ab5', fontSize: '0.72rem', lineHeight: '1.35' }}>{g.desc}</span>
+                    <span style={{ display: 'block', color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{minigameName(g.key)}</span>
+                    <span style={{ display: 'block', color: '#7d7ab5', fontSize: '0.72rem', lineHeight: '1.35' }}>{minigameDesc(g.key)}</span>
                   </span>
                   <span style={{ color: 'var(--accent-blue)', fontSize: '1rem', flexShrink: 0 }}>▶</span>
                 </button>
@@ -127,8 +128,8 @@ export default function MinigamePractice({ onClose }: MinigamePracticeProps): JS
               ← Volver a la lista
             </button>
             <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-              <div style={{ fontSize: '2rem' }}>{selected?.name.split(' ')[0]}</div>
-              <p style={{ color: '#f0abfc', fontWeight: 'bold', fontSize: '1rem', margin: '0.25rem 0 0' }}>{selected?.name}</p>
+              <div style={{ fontSize: '2rem' }}>{selected ? minigameName(selected.key).split(' ')[0] : ''}</div>
+              <p style={{ color: '#f0abfc', fontWeight: 'bold', fontSize: '1rem', margin: '0.25rem 0 0' }}>{selected ? minigameName(selected.key) : ''}</p>
               <p style={{ color: '#7d7ab5', fontSize: '0.75rem', margin: '0.25rem 0 0' }}>Modo práctica · sin premio</p>
             </div>
             <MinigamePlayer key={selectedKey} gameKey={selectedKey} onComplete={handleComplete} />

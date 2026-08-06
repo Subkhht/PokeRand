@@ -30,19 +30,10 @@ import BackgroundPreview from './BackgroundPreview'
 import { BACKGROUNDS } from './game/backgrounds'
 import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
+import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, metaItemDesc, moveName, statusLabel, type Language } from './game/i18n'
 
 type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum'
-
-const STATUS_LABELS: Record<StatusType, string> = {
-  burn: '🔥 Quemado',
-  poison: '☠️ Envenenado',
-  paralysis: '⚡ Paralizado',
-  freeze: '🧊 Congelado',
-  sleep: '💤 Dormido',
-  confusion: '💫 Confundido',
-  flinch: '❕ Aturdido',
-}
 
 const STATUS_COLORS: Record<StatusType, string> = {
   burn: '#ff8a33',
@@ -56,7 +47,7 @@ const STATUS_COLORS: Record<StatusType, string> = {
 
 function StatusBadge({ status, compact = false }: { status?: Pokemon['status']; compact?: boolean }) {
   if (!status) return null
-  const label = STATUS_LABELS[status.type]
+  const label = statusLabel(status.type)
   const color = STATUS_COLORS[status.type]
   const emoji = label.split(' ')[0]
   const text = label.split(' ').slice(1).join(' ')
@@ -92,7 +83,7 @@ function StatusBadge({ status, compact = false }: { status?: Pokemon['status']; 
 function StatusFloat({ pokemon }: { pokemon?: Pokemon }) {
   if (!pokemon) return null
   const emoji = pokemon.status
-    ? STATUS_LABELS[pokemon.status.type].split(' ')[0]
+    ? statusLabel(pokemon.status.type).split(' ')[0]
     : pokemon.leechSeed
       ? '🌱'
       : null
@@ -137,7 +128,7 @@ function CopyCodeButton({ code }: { code: string }) {
     <button
       type="button"
       onClick={() => { playClick(); void copy() }}
-      title={copied ? '¡Copiado!' : 'Copiar código'}
+      title={copied ? t('lb.copied') : t('lb.copyCode')}
       style={{
         background: copied ? 'rgba(55,209,107,0.2)' : 'rgba(255,255,255,0.08)',
         border: copied ? '1px solid rgba(55,209,107,0.5)' : '1px solid rgba(255,255,255,0.2)',
@@ -509,6 +500,20 @@ const difficultyLabels: Record<Difficulty, { title: string; desc: string }> = {
   hard: { title: 'Difícil', desc: '3 insignias · 25 rutas por etapa' },
   infinite: { title: 'Infinite', desc: 'Sin límite (Aventura infinita)' },
   coliseum: { title: 'COLISEUM', desc: '8 jefes a nivel 50' },
+}
+
+function difficultyLabel(lang: Language, d: Difficulty): { title: string; desc: string } {
+  if (lang === 'en') {
+    const map: Record<Difficulty, { title: string; desc: string }> = {
+      easy: { title: 'Easy', desc: '3 badges · 5 routes per stage' },
+      medium: { title: 'Medium', desc: '3 badges · 10 routes per stage' },
+      hard: { title: 'Hard', desc: '3 badges · 25 routes per stage' },
+      infinite: { title: 'Infinite', desc: 'No limit (endless adventure)' },
+      coliseum: { title: 'COLISEUM', desc: '8 bosses at level 50' },
+    }
+    return map[d]
+  }
+  return difficultyLabels[d]
 }
 
 const generations = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -1703,10 +1708,10 @@ function moveTooltip(move: Move): string {
   const accuracy = move.accuracy === null ? 'Siempre acierta' : `${move.accuracy}% precisión`
   const isStatus = !move.power || move.power <= 0
   const cls = isStatus ? 'Estado' : move.damageClass === 'special' ? 'Especial' : 'Físico'
-  let info = `${move.name}\n${isStatus ? 'Movimiento de estado' : `${cls} · Potencia: ${move.power}`}\n${accuracy}`
+  let info = `${moveName(move)}\n${isStatus ? 'Movimiento de estado' : `${cls} · Potencia: ${move.power}`}\n${accuracy}`
   if (move.ailment) {
     const pct = Math.round((move.ailmentChance ?? 1) * 100)
-    info += `\nEfecto: ${STATUS_LABELS[move.ailment]} (${pct}%)`
+    info += `\nEfecto: ${statusLabel(move.ailment ?? '')} (${pct}%)`
   }
   if (move.statChanges && move.statChanges.length > 0) {
     for (const sc of move.statChanges) {
@@ -1776,7 +1781,7 @@ function groupInventory(items: string[]): Array<{ name: string; count: number; d
   return [...counts.entries()].map(([name, count]) => ({
     name,
     count,
-    description: itemDescriptions[name] ?? 'No effect description available.'
+    description: itemDesc(name) !== name ? itemDesc(name) : (itemDescriptions[name] ?? 'No effect description available.')
   }))
 }
 
@@ -2064,6 +2069,12 @@ function MainApp() {
 
   // Opciones / Volumen
   const [showOptions, setShowOptions] = useState<boolean>(false)
+  const [language, setLanguageState] = useState<Language>(getLanguage())
+  const changeLanguage = (lang: Language): void => {
+    setI18nLanguage(lang)
+    setLanguageState(lang)
+    playClick()
+  }
   const optionsBeganInBattle = useRef(false)
   const [volume, setVolumeState] = useState<number>(() => Math.round(getVolume() * 100))
   const [sfxVol, setSfxVolState] = useState<number>(() => Math.round(getSfxVolume() * 100))
@@ -2440,7 +2451,7 @@ function MainApp() {
       } else {
         setPcStorage(prev => [...prev, withStages])
       }
-      setBattleLog(prev => [`🔓 Modo secreto: añadiste a ${pokemon.name} Nv.${pokemon.level}${team.length >= maxTeamSize ? ' (al PC)' : ''}.`, ...prev].slice(0, 15))
+      setBattleLog(prev => [t('b.secretAdded', { name: pokemon.name, lvl: pokemon.level, toPc: team.length >= maxTeamSize ? t('b.toPc') : '' }), ...prev].slice(0, 15))
       setSecretPokemonQuery('')
       setSecretAddOpen(false)
     } catch {
@@ -2760,8 +2771,8 @@ function MainApp() {
       if (!prev[id]?.unlocked || prev[id]?.claimed) return prev
       return { ...prev, [id]: { ...prev[id], claimed: true } }
     })
-    awardPokeCoins(achievement.reward, `Logro: ${achievement.name}`)
-    setBattleLog(prev => [`🏅 Reclamaste la recompensa de "${achievement.name}" (+${achievement.reward} PokéCoins)`, ...prev].slice(0, 15))
+    awardPokeCoins(achievement.reward, `${t('ach.reward')}: ${achName(achievement.id)}`)
+    setBattleLog(prev => [t('b.claimRewardAch', { name: achName(achievement.id), coins: achievement.reward }), ...prev].slice(0, 15))
   }
 
   useEffect(() => {
@@ -2891,7 +2902,7 @@ function MainApp() {
       localStorage.setItem('pokerand_meta', JSON.stringify(updated))
       return updated
     })
-    setBattleLog(prev => [`🪙 +${amount} PokéCoins (${reason})`, ...prev])
+    setBattleLog(prev => [t('b.coinsEarned', { amount, reason }), ...prev])
   }
 
   function triggerRandomEvent(routeProgress: number): void {
@@ -2932,7 +2943,7 @@ function MainApp() {
           speed: current.speed + 5,
         }
         setTeam(prev => prev.map(p => p.hp <= 0 ? p : { ...p, hp: p.maxHp }))
-        setBattleLog(prev => [`🐉 ¡Un Pokémon legendario apareció! Fue un encuentro de descanso. Todo el equipo vivo se ha curado.`, ...prev])
+        setBattleLog(prev => [t('b.legendAppeared'), ...prev])
         setLegendaryEncounter(legendary)
         setScreen('route')
         break
@@ -2948,19 +2959,19 @@ function MainApp() {
           const selected = shuffled.slice(0, 5).map(name => ({ name, price: 60 + Math.floor(Math.random() * 60) }))
           setMerchantItems(selected)
         } else {
-          setBattleLog(prev => ['🧳 El mercader misterioso se fue... no tenía objetos para ti.', ...prev].slice(0, 15))
+          setBattleLog(prev => [t('b.merchantLeft'), ...prev].slice(0, 15))
         }
         break
       }
       case 'trap': {
         const dmg = Math.floor(current.maxHp * 0.3)
         setTeam(prev => prev.map((p, i) => i === activeIndex ? { ...p, hp: Math.max(1, p.hp - dmg) } : p))
-        setBattleLog(prev => [`⚠️ ¡La trampa explotó! ${current.name} perdió ${dmg} HP.`, ...prev])
+        setBattleLog(prev => [t('b.trap', { name: current.name, dmg }), ...prev])
         break
       }
       case 'fairy_blessing': {
         setTeam(prev => prev.map((p, i) => i === activeIndex ? { ...p, hp: p.maxHp } : p))
-        setBattleLog(prev => [`🧚 ¡${current.name} fue curado completamente!`, ...prev])
+        setBattleLog(prev => [t('b.fairyBlessing', { name: current.name }), ...prev])
         break
       }
       case 'treasure_chest': {
@@ -2969,12 +2980,12 @@ function MainApp() {
         const items = ['Potion', 'X Attack', 'Oran Berry', 'Lum Berry']
         const item = items[Math.floor(Math.random() * items.length)]
         setInventory(prev => [...prev, item])
-        setBattleLog(prev => [`📦 ¡Cofre abierto! +$${gold} y ${item}`, ...prev])
+        setBattleLog(prev => [t('b.coinChest', { gold, item }), ...prev])
         break
       }
       case 'shiny_spot': {
         setShinyNextEncounter(true)
-        setBattleLog(prev => [`✨ ¡La zona brilla! Tu próximo encuentro de descanso será shiny.`, ...prev])
+        setBattleLog(prev => [t('b.shinySpot'), ...prev])
         break
       }
       case 'mysterious_help': {
@@ -2982,9 +2993,9 @@ function MainApp() {
         if (faintedIdx >= 0) {
           const revivedHp = Math.max(1, Math.floor(team[faintedIdx].maxHp * 0.5))
           setTeam(prev => prev.map((p, i) => i === faintedIdx ? { ...p, hp: revivedHp } : p))
-          setBattleLog(prev => [`🩺 ¡${team[faintedIdx].name} fue revivido con ${revivedHp} HP por una fuerza misteriosa!`, ...prev])
+          setBattleLog(prev => [t('b.mysteriousHelp', { name: team[faintedIdx].name, hp: revivedHp }), ...prev])
         } else {
-          setBattleLog(prev => [`🩺 Una fuerza misteriosa pasa de largo... todos tus Pokémon están en pie.`, ...prev])
+          setBattleLog(prev => [t('b.mysteriousHelpNone'), ...prev])
         }
         break
       }
@@ -3013,9 +3024,9 @@ function MainApp() {
       if (index === activeIndex) {
         setActiveIndex(0)
       }
-      setBattleLog(prev => [`🎭 El comerciante intercambió a ${traded.name} por ${scaled.name}!`, ...prev].slice(0, 15))
+      setBattleLog(prev => [t('b.traderSwapped', { a: traded.name, b: scaled.name }), ...prev].slice(0, 15))
     } catch {
-      setBattleLog(prev => [`🎭 El comerciante se fue sin hacer nada.`, ...prev].slice(0, 15))
+      setBattleLog(prev => [t('b.traderLeft'), ...prev].slice(0, 15))
     }
   }
 
@@ -3098,7 +3109,7 @@ function MainApp() {
   function handleStartRunClick(): void {
     playClick()
     if (coopMode) {
-      if (!coopSessionCode) { setCoopError('Primero crea o únete a una sesión cooperativa.'); return }
+      if (!coopSessionCode) { setCoopError(t('coop.needSession')); return }
       if (coopMyRole === 'a' && !coopPartnerJoined) { setCoopError('Espera a que tu compañero se una a la sesión.'); return }
     }
     startNewRun()
@@ -3489,7 +3500,7 @@ function MainApp() {
       setBattleLog([
         `Tu inicial es ${starter.name}${starter.shiny ? ' ✨' : ''}.`,
         `Modo: ${effectiveGen === 0 ? 'Random All-Stars' : `Gen ${effectiveGen}`}.`,
-        `Dificultad: ${difficultyLabels[effectiveDifficulty].title}${effectiveDifficulty === 'infinite' ? ' (Sin límite)' : ` (3 etapas de ${totalNodes} rutas)`}.`,
+        `${t('common.difficulty')}: ${difficultyLabel(language, effectiveDifficulty).title}${effectiveDifficulty === 'infinite' ? ' (Sin límite)' : ` (3 etapas de ${totalNodes} rutas)`}.`,
         `Recibes $${activeChallenges.noMoney ? '0' : '100'} de inicio e item: ${run.item}.`,
         ...challengeDescriptions,
       ])
@@ -3682,7 +3693,7 @@ function MainApp() {
 
     if (difficulty === 'coliseum') {
       setTeam(prev => prev.map(p => ({ ...p, hp: p.maxHp, status: undefined })))
-      setBattleLog(prev => [`💊 ¡Equipo curado automáticamente!`, ...prev].slice(0, 15))
+      setBattleLog(prev => [t('b.autoHeal'), ...prev].slice(0, 15))
     }
 
     setRestEncounter(null)
@@ -3865,7 +3876,7 @@ function MainApp() {
         // Red de seguridad: si el compañero nunca responde (~5 min), continúa
         // en solitario en vez de quedarse esperando para siempre.
         if (polls >= 120) {
-          setBattleLog((prev) => ['🤝 Tu compañero no responde. Continúas en solitario.', ...prev].slice(0, 15))
+          setBattleLog((prev) => [t('b.soloPartnerLeft'), ...prev].slice(0, 15))
           return 'ready'
         }
         await sleep(2500)
@@ -3939,7 +3950,7 @@ function MainApp() {
   async function handleJoinCoopSession(): Promise<void> {
     const codeInput = coopJoinCode.trim().toUpperCase()
     if (codeInput.length < 4) {
-      setCoopError('Introduce el código de sesión de 6 letras.')
+      setCoopError(t('coop.needCode'))
       return
     }
     if (!authUser) {
@@ -4127,7 +4138,7 @@ function MainApp() {
   function openPvpModal(): void {
     playClick()
     if (!authUser) {
-      setPvpError('Para jugar PvP necesitas iniciar sesión o crear una cuenta.')
+      setPvpError(t('pvp.needLogin'))
       setShowPvpModal(true)
       return
     }
@@ -4281,7 +4292,7 @@ function MainApp() {
     }
     const code = pvpJoinCode.trim().toUpperCase()
     if (code.length < 4) {
-      setPvpError('Introduce el código de la sala.')
+      setPvpError(t('pvp.needRoomCode'))
       return
     }
     setPvpError('')
@@ -4904,14 +4915,14 @@ function MainApp() {
 
   function pickRocketPokemon(pokemon: Pokemon): void {
     if (runChallenges.soloStarter) {
-      setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.challengeSoloStarter'), ...prev].slice(0, 15))
       setTeamRocketPickModal(false)
       setTeamRocketTeam([])
       completeCurrentNode()
       return
     }
     if (runChallenges.fixedTeam) {
-      setBattleLog((prev) => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.challengeFixedTeam'), ...prev].slice(0, 15))
       setTeamRocketPickModal(false)
       setTeamRocketTeam([])
       completeCurrentNode()
@@ -4956,26 +4967,26 @@ function MainApp() {
       setActiveIndex((prev) => Math.max(0, prev - 1))
     }
 
-    setBattleLog((prev) => [`Liberaste a ${target.name} del equipo.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.released', { name: target.name }), ...prev].slice(0, 15))
   }
 
   function withdrawFromPC(pcIndex: number): void {
     const pokemon = pcStorage[pcIndex]
     if (!pokemon) return
     if (runChallenges.soloStarter || runChallenges.fixedTeam) {
-      setBattleLog((prev) => ['🚫 No puedes modificar tu equipo con este desafío.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.noModifyTeam'), ...prev].slice(0, 15))
       return
     }
     if (team.length < maxTeamSize) {
       setTeam((prev) => [...prev, pokemon])
       setPcStorage((prev) => prev.filter((_, i) => i !== pcIndex))
-      setBattleLog((prev) => [`📦 ${pokemon.name} pasó del PC al equipo.`, ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.withdrawnPC', { name: pokemon.name }), ...prev].slice(0, 15))
     } else {
       const swapOut = team[activeIndex]
       const newTeam = team.map((p, i) => i === activeIndex ? pokemon : p)
       setTeam(newTeam)
       setPcStorage((prev) => prev.map((p, i) => i === pcIndex ? swapOut : p))
-      setBattleLog((prev) => [`📦 Intercambiaste a ${swapOut.name} por ${pokemon.name} del PC.`, ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.swappedPC', { a: swapOut.name, b: pokemon.name }), ...prev].slice(0, 15))
     }
   }
 
@@ -5012,7 +5023,7 @@ function MainApp() {
 
   function blackMarketBuyPokemon(idx: number): void {
     if (runChallenges.soloStarter || runChallenges.fixedTeam) {
-      setBattleLog((prev) => ['🚫 No puedes modificar tu equipo con este desafío.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.noModifyTeam'), ...prev].slice(0, 15))
       return
     }
     const pokemon = blackMarketPokemon[idx]
@@ -5050,7 +5061,7 @@ function MainApp() {
 
   function performDoubleHit(attacker: Pokemon, defender: Pokemon, move: Move): { attacker: Pokemon; defender: Pokemon; log: string[] } {
     if (move.accuracy != null && move.accuracy < 100 && Math.random() * 100 >= move.accuracy) {
-      return { attacker, defender, log: [`${attacker.name} usó ${move.name} pero falló.`] }
+      return { attacker, defender, log: [t('b.missed', { attacker: attacker.name, move: moveName(move) })] }
     }
     const defTypes = defender.types ?? []
     const { effectiveness, message } = getTypeEffectiveness(move.type, defTypes[0] || 'normal', defTypes[1])
@@ -5058,7 +5069,7 @@ function MainApp() {
     const result = applyDamage(attacker, defender, move)
     const damage = Math.max(1, Math.floor(result.damage * effectiveness * stab))
     const newHp = Math.max(0, defender.hp - damage)
-    const log = [`${attacker.name} usa ${move.name}: ${damage} de daño${message ? ` (${message})` : ''}.`]
+    const log = [t('b.usesHit', { attacker: attacker.name, move: moveName(move), dmg: damage }) + (message ? ` (${message})` : '')]
     return { attacker, defender: { ...defender, hp: newHp }, log }
   }
 
@@ -5117,7 +5128,7 @@ function MainApp() {
       const baseMoney = Math.floor(40 + enemies.reduce((s, p) => s + p.level, 0) * 4)
       const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoney * (modifier?.moneyMultiplier ?? 1))
       if (!runChallenges.noMoney) setMoney(prev => prev + moneyReward)
-      setBattleLog(prev => [`🥊 ¡Ganaste el combate doble! +$${moneyReward}.`, ...prev].slice(0, 15))
+      setBattleLog(prev => [t('b.doubleWon', { money: moneyReward }), ...prev].slice(0, 15))
       setDoubleFinished(true)
       return
     }
@@ -5218,7 +5229,7 @@ function MainApp() {
   }
 
   function doubleLeave(): void {
-    setBattleLog(prev => [`🥊 Combate doble completado.`, ...prev].slice(0, 15))
+    setBattleLog(prev => [t('b.doubleComplete'), ...prev].slice(0, 15))
     completeCurrentNode()
   }
 
@@ -5226,11 +5237,11 @@ function MainApp() {
     const pokemon = team[teamIndex]
     if (!pokemon) return
     if (runChallenges.soloStarter || runChallenges.fixedTeam) {
-      setBattleLog((prev) => ['🚫 No puedes modificar tu equipo con este desafío.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.noModifyTeam'), ...prev].slice(0, 15))
       return
     }
     if (team.length <= 1) {
-      setBattleLog((prev) => ['No puedes depositar a tu único Pokémon.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.noDepositOnly'), ...prev].slice(0, 15))
       return
     }
     setPcStorage((prev) => [...prev, pokemon])
@@ -5242,7 +5253,7 @@ function MainApp() {
     } else if (teamIndex < activeIndex) {
       setActiveIndex((prev) => Math.max(0, prev - 1))
     }
-    setBattleLog((prev) => [`📦 ${pokemon.name} fue depositado en el PC.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.depositedPC', { name: pokemon.name }), ...prev].slice(0, 15))
   }
 
   function generateShopStock(excludeStone?: string): string[] {
@@ -5283,7 +5294,7 @@ function MainApp() {
     setShopStock(generateShopStock(currentStone))
     setShopRerollsUsed(prev => prev + 1)
     playClick()
-    setBattleLog((prev) => [`🎲 ¡Has rerolleado la tienda! (${shopRerollsUsed + 1}/${maxShopRerolls()})`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.rerolled', { used: shopRerollsUsed + 1, max: maxShopRerolls() }), ...prev].slice(0, 15))
   }
 
   async function enterNode(): Promise<void> {
@@ -5519,7 +5530,7 @@ function MainApp() {
         seenInPokedex({ ...gmaxEnemy, id: gmaxFormId ?? gmaxEnemy.id, sprite: gmaxSprite })
         setIsTrainerBattle(false)
         setEnemy(gmaxEnemy)
-        setBattleLog(prev => [`⚡ ¡Un Pokémon Gigamax aparece! ${gmaxEnemy.name} está listo para el combate.`, ...prev].slice(0, 15))
+        setBattleLog(prev => [t('b.gmaxAppears', { name: gmaxEnemy.name }), ...prev].slice(0, 15))
         startBattleMusic()
         setBattleTurns(0)
         setScreen('battle')
@@ -5535,11 +5546,11 @@ function MainApp() {
       const alreadyHas = inventory.includes('Mega Stone') || team.some(p => p.holdItem === 'Mega Stone')
       if (!alreadyHas || difficulty === 'infinite') {
         setInventory(prev => [...prev, 'Mega Stone'])
-        setBattleLog(prev => [`💎 ¡Recibes una Mega Piedra! Un Pokémon puede equiparla para mega-evolucionar en combate.`, ...prev].slice(0, 15))
+        setBattleLog(prev => [t('b.megaStoneGot'), ...prev].slice(0, 15))
       } else {
         const price = 200
         setMetaProgression(prev => ({ ...prev, pokeCoins: prev.pokeCoins + price }))
-        setBattleLog(prev => [`💎 Ya tienes una Mega Piedra. Recibes ${price} PokéCoins en su lugar.`, ...prev].slice(0, 15))
+        setBattleLog(prev => [t('b.alreadyMegaCoin', { coins: price }), ...prev].slice(0, 15))
       }
       setScreen('mega')
       return
@@ -5552,11 +5563,11 @@ function MainApp() {
       const alreadyHas = orbName === 'Prisma Rojo' ? redHas : blueHas
       if (!alreadyHas || difficulty === 'infinite') {
         setInventory(prev => [...prev, orbName])
-        setBattleLog(prev => [`🔮 ¡Recibes un ${orbName}! ${orbName === 'Prisma Rojo' ? 'Groudon' : 'Kyogre'} puede equiparlo para su Primal Reversion en combate.`, ...prev].slice(0, 15))
+        setBattleLog(prev => [t('b.orbGot', { orb: orbName, poke: orbName === 'Prisma Rojo' ? 'Groudon' : 'Kyogre' }), ...prev].slice(0, 15))
       } else {
         const price = 150
         setMetaProgression(prev => ({ ...prev, pokeCoins: prev.pokeCoins + price }))
-        setBattleLog(prev => [`🔮 Ya tienes un ${orbName}. Recibes ${price} PokéCoins en su lugar.`, ...prev].slice(0, 15))
+        setBattleLog(prev => [t('b.alreadyOrbCoin', { orb: orbName, coins: price }), ...prev].slice(0, 15))
       }
       setScreen('primal')
       return
@@ -5972,11 +5983,11 @@ function MainApp() {
     if (pokeRandWinnerIndex === null) return
     let pokemon = pokeRandPokemon[pokeRandWinnerIndex]
     if (runChallenges.soloStarter) {
-      setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.challengeSoloStarter'), ...prev].slice(0, 15))
       return
     }
     if (runChallenges.fixedTeam) {
-      setBattleLog((prev) => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.challengeFixedTeam'), ...prev].slice(0, 15))
       return
     }
     if (runChallenges.noEvolution) pokemon = applyNoEvolutionBuff(pokemon)
@@ -6065,7 +6076,7 @@ function MainApp() {
   }
 
   function skipCasino(): void {
-    setBattleLog((prev) => [`🃏 Saliste del Casino sin reclamar el premio.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.casinoLeft'), ...prev].slice(0, 15))
     completeCurrentNode()
     setScreen('route')
   }
@@ -6078,7 +6089,7 @@ function MainApp() {
     try {
       const pokemon = team[activeIndex]
       if (!pokemon || !pokemon.rawLevelUpMoves || pokemon.rawLevelUpMoves.length === 0) {
-        setBattleLog((prev) => ['Tu Pokémon no tiene movimientos disponibles para aprender.', ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.noMovesToLearn'), ...prev].slice(0, 15))
         if (fromItem) {
           setScreen('route')
         } else {
@@ -6094,7 +6105,7 @@ function MainApp() {
       const allDetails = (await Promise.all(shuffled.map(m => getMoveDetails(m.url)))).filter((m): m is Move => m !== null)
       const moveDetails = allDetails.slice(0, 2)
       if (moveDetails.length === 0) {
-        setBattleLog((prev) => ['No se encontraron movimientos compatibles.', ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.noMovesCompat'), ...prev].slice(0, 15))
         if (fromItem) {
           setScreen('route')
         } else {
@@ -6129,7 +6140,7 @@ function MainApp() {
     })
     setTeam(nextTeam)
     setBattleLog((prev) => [
-      `${fromItem ? '💿' : '📝'} ¡${activePokemon.name} reemplazó ${activePokemon.moves[moveIndex].name} por ${selectedNewMove.name} con ${fromItem ? 'el Disco MT' : 'el Move Tutor'}!`,
+      `${fromItem ? '💿' : '📝'} ${activePokemon.name} ${t('move.replaced')} ${moveName(activePokemon.moves[moveIndex])} ${t('move.with')} ${moveName(selectedNewMove)} ${fromItem ? t('move.withDisco') : t('move.withTutor')}!`,
       ...prev
     ].slice(0, 15))
     setMoveOptions([])
@@ -6170,7 +6181,7 @@ function MainApp() {
 
   function buyShopItem(itemName: string, qty = 1) {
     if (runChallenges.noPurchasing) {
-      setBattleLog((prev) => ['🚫 Desafío Sin Compras: No puedes comprar nada.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.challengeNoBuying'), ...prev].slice(0, 15))
       return
     }
     const item = ALL_SHOP_ITEMS[itemName]
@@ -6185,13 +6196,13 @@ function MainApp() {
     setMoney((prev) => prev - total)
     setInventory((prev) => [...prev, ...Array(qty).fill(itemName)])
     setRunStats(prev => ({ ...prev, moneySpent: prev.moneySpent + total }))
-    setBattleLog((prev) => [`Compraste ${qty}× ${itemName} por $${total}.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.bought', { qty, item: itemName, total }), ...prev].slice(0, 15))
     setShopQty(prev => ({ ...prev, [itemName]: 1 }))
   }
 
   function buyHoldableItem(itemName: string) {
     if (runChallenges.noPurchasing) {
-      setBattleLog((prev) => ['🚫 Desafío Sin Compras: No puedes comprar nada.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.challengeNoBuying'), ...prev].slice(0, 15))
       return
     }
     if (HOLDABLE_ITEM_NAMES.includes(itemName)) {
@@ -6237,7 +6248,7 @@ function MainApp() {
       }
       return out
     })
-    setBattleLog((prev) => [`💰 Vendiste ${qty}× ${itemName} por $${total}.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.sold', { qty, item: itemName, total }), ...prev].slice(0, 15))
     setSellQty(prev => ({ ...prev, [itemName]: 1 }))
   }
 
@@ -6267,7 +6278,7 @@ function MainApp() {
       if (idx === -1) return prev
       return [...prev.slice(0, idx), ...prev.slice(idx + 1)]
     })
-    setBattleLog((prev) => [`Equipaste ${itemName} a ${pokemon.name}.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.equipped', { item: itemName, name: pokemon.name }), ...prev].slice(0, 15))
 
     const syn = SYNERGIES.find(s => s.items.includes(itemName))
     if (syn) {
@@ -6299,7 +6310,7 @@ function MainApp() {
       })
     )
     setInventory((prev) => [...prev, itemName])
-    setBattleLog((prev) => [`Desequipaste ${itemName} de ${pokemon.name}.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.unequipped', { item: itemName, name: pokemon.name }), ...prev].slice(0, 15))
   }
 
   function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boolean; log: string[] } {
@@ -6313,29 +6324,29 @@ function MainApp() {
       case 'burn': {
         const burnDmg = Math.max(1, Math.floor(p.maxHp / 16))
         updated = { ...updated, hp: Math.max(0, updated.hp - burnDmg) }
-        logs.push(`🔥 ${updated.name} sufre daño por quemadura (${burnDmg}).`)
+        logs.push(t('b.burn', { name: updated.name, dmg: burnDmg }))
         break
       }
       case 'poison': {
         const poisonDmg = Math.max(1, Math.floor(p.maxHp / 8))
         updated = { ...updated, hp: Math.max(0, updated.hp - poisonDmg) }
-        logs.push(`☠️ ${updated.name} sufre daño por veneno (${poisonDmg}).`)
+        logs.push(t('b.poison', { name: updated.name, dmg: poisonDmg }))
         break
       }
       case 'paralysis': {
         if (Math.random() < 0.25) {
           skipTurn = true
-          logs.push(`⚡ ${updated.name} está paralizado y no puede moverse.`)
+          logs.push(t('b.paralysis', { name: updated.name }))
         }
         break
       }
       case 'freeze': {
         if (Math.random() < 0.20) {
           updated = { ...updated, status: undefined }
-          logs.push(`🧊 ${updated.name} se descongeló.`)
+          logs.push(t('b.thawed', { name: updated.name }))
         } else {
           skipTurn = true
-          logs.push(`🧊 ${updated.name} está congelado y no puede moverse.`)
+          logs.push(t('b.freeze', { name: updated.name }))
         }
         break
       }
@@ -6343,11 +6354,11 @@ function MainApp() {
         const remaining = (p.status.turns ?? 2) - 1
         if (remaining <= 0) {
           updated = { ...updated, status: undefined }
-          logs.push(`💤 ${updated.name} se despertó.`)
+          logs.push(t('b.wokeUp', { name: updated.name }))
         } else {
           updated = { ...updated, status: { ...updated.status!, turns: remaining } }
           skipTurn = true
-          logs.push(`💤 ${updated.name} está dormido y no puede moverse.`)
+          logs.push(t('b.sleep', { name: updated.name }))
         }
         break
       }
@@ -6355,7 +6366,7 @@ function MainApp() {
         const remaining = (p.status.turns ?? 3) - 1
         if (remaining <= 0) {
           updated = { ...updated, status: undefined }
-          logs.push(`💫 ${updated.name} se desconfundió.`)
+          logs.push(t('b.unconfused', { name: updated.name }))
         } else {
           updated = { ...updated, status: { ...updated.status!, turns: remaining } }
         }
@@ -6364,7 +6375,7 @@ function MainApp() {
       case 'flinch': {
         skipTurn = true
         updated = { ...updated, status: undefined }
-        logs.push(`❕ ${updated.name} está aturdido y pierde su turno.`)
+        logs.push(t('b.flinch', { name: updated.name }))
         break
       }
     }
@@ -6412,7 +6423,7 @@ function MainApp() {
       return {
         updatedDefender: { ...defender, protected: false },
         updatedAttacker: { ...attacker, protected: false },
-        lines: [`🛡️ ¡${defender.name} se protegió del ataque de ${attacker.name}!`],
+        lines: [t('b.protected', { defender: defender.name, attacker: attacker.name })],
         attackerHeal: 0,
         crits: 0,
         superEffective: false,
@@ -6423,7 +6434,7 @@ function MainApp() {
       return {
         updatedDefender: defender,
         updatedAttacker: attacker,
-        lines: [`🚫 ¡${attacker.name} no puede usar ${move.name} por Anulación!`],
+        lines: [t('b.disabled', { name: attacker.name, move: moveName(move) })],
         attackerHeal: 0,
         crits: 0,
         superEffective: false,
@@ -6485,7 +6496,7 @@ function MainApp() {
         return {
           updatedDefender: defender,
           updatedAttacker: { ...attacker, protected: false },
-          lines: [`${attacker.name} usó ${effectiveMove.name} pero falló.`],
+          lines: [t('b.missed', { attacker: attacker.name, move: moveName(effectiveMove) })],
           attackerHeal: 0,
           crits: 0,
           superEffective: false,
@@ -6537,10 +6548,11 @@ function MainApp() {
       currentDefender = { ...currentDefender, hp: newHp }
       totalDamage += finalDamage
 
+      const typeNote = runChallenges.typeRandomizer && effectiveMove.type !== move.type ? ` [${effectiveMove.type}]` : ''
       let hitLine = totalHits > 1
-        ? `${attacker.name} usa ${effectiveMove.name}${runChallenges.typeRandomizer && effectiveMove.type !== move.type ? ` [${effectiveMove.type}]` : ''} (${hit + 1}/${totalHits}): ${finalDamage} de daño.`
-        : `${attacker.name} usa ${effectiveMove.name}${runChallenges.typeRandomizer && effectiveMove.type !== move.type ? ` [${effectiveMove.type}]` : ''}: ${finalDamage} de daño.`
-      if (isCrit) hitLine += ' ¡Golpe crítico!'
+        ? t('b.usesHitMulti', { attacker: attacker.name, move: moveName(effectiveMove) + typeNote, dmg: finalDamage, hit: hit + 1, total: totalHits })
+        : t('b.usesHit', { attacker: attacker.name, move: moveName(effectiveMove) + typeNote, dmg: finalDamage })
+      if (isCrit) hitLine += t('b.critSuffix')
       if (message) hitLine += ` (${message})`
       lines.push(hitLine)
 
@@ -6548,7 +6560,7 @@ function MainApp() {
     }
     } else {
       // Movimiento de estado: no hace daño, solo puede aplicar su efecto.
-      lines.push(`${attacker.name} usa ${effectiveMove.name}.`)
+      lines.push(t('b.statusMove', { attacker: attacker.name, move: moveName(effectiveMove) }))
     }
 
     // --- Ailment application on first hit only ---
@@ -6561,11 +6573,11 @@ function MainApp() {
         const ailmentedDefender = applyAilmentToTarget(currentDefender, move)
         if (ailmentedDefender.status && ailmentedDefender.status.type !== currentDefender.status?.type) {
           currentDefender = ailmentedDefender
-          const ailmentLabel = STATUS_LABELS[ailmentedDefender.status.type]
+          const ailmentLabel = statusLabel(ailmentedDefender.status.type)
           lines.push(`${currentDefender.name} fue ${ailmentLabel.split(' ')[1]} ${ailmentLabel.split(' ')[0]}.`)
         }
       } else {
-        lines.push(`${attacker.name} usa ${effectiveMove.name}: el rival ya conocía el ataque y no se aturdió.`)
+        lines.push(t('b.alreadyKnewFakeOut', { attacker: attacker.name, move: moveName(effectiveMove) }))
       }
       // Drenadoras (Leech Seed): siembra al objetivo para drenarle HP por turno.
       if (effectiveMove.leechSeed && !currentDefender.leechSeed) {
@@ -6575,7 +6587,7 @@ function MainApp() {
       // Anulación (Disable): bloquea el último movimiento usado del objetivo.
       if (effectiveMove.disable && currentDefender.lastMove && !currentDefender.disabled) {
         currentDefender = { ...currentDefender, disabled: { move: currentDefender.lastMove, turns: 4 } }
-        lines.push(`🚫 ¡${currentDefender.name} no podrá usar ${currentDefender.lastMove} por Anulación!`)
+        lines.push(t('b.disabled', { name: currentDefender.name, move: currentDefender.lastMove ?? '' }))
       }
     }
 
@@ -6613,7 +6625,7 @@ function MainApp() {
             attackerStages = { ...attackerStages, [stageKey]: newStage }
             const direction = change > 0 ? 'subió' : 'bajó'
             const statName = sc.stat === 'attack' ? 'Ataque' : sc.stat === 'defense' ? 'Defensa' : sc.stat === 'special-attack' ? 'At. Esp.' : sc.stat === 'special-defense' ? 'Def. Esp.' : 'Velocidad'
-            lines.push(`${effectiveAttacker.name} ${direction} su ${statName}! (${oldStage > 0 ? '+' : ''}${oldStage} → ${newStage > 0 ? '+' : ''}${newStage})`)
+            lines.push(direction === 'subió' ? t('b.statUp', { name: effectiveAttacker.name, stat: statName, old: `${oldStage > 0 ? '+' : ''}${oldStage}`, new: `${newStage > 0 ? '+' : ''}${newStage}` }) : t('b.statDown', { name: effectiveAttacker.name, stat: statName, old: `${oldStage > 0 ? '+' : ''}${oldStage}`, new: `${newStage > 0 ? '+' : ''}${newStage}` }))
           }
         } else if (currentDefender.hp > 0) {
           let newStages = currentDefender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
@@ -6626,7 +6638,7 @@ function MainApp() {
             currentDefender = { ...currentDefender, statStages: newStages }
             const direction = change > 0 ? 'subió' : 'bajó'
             const statName = sc.stat === 'attack' ? 'Ataque' : sc.stat === 'defense' ? 'Defensa' : sc.stat === 'special-attack' ? 'At. Esp.' : sc.stat === 'special-defense' ? 'Def. Esp.' : 'Velocidad'
-            lines.push(`${currentDefender.name} ${direction} su ${statName}! (${oldStage > 0 ? '+' : ''}${oldStage} → ${newStage > 0 ? '+' : ''}${newStage})`)
+            lines.push(direction === 'subió' ? t('b.statUp', { name: currentDefender.name, stat: statName, old: `${oldStage > 0 ? '+' : ''}${oldStage}`, new: `${newStage > 0 ? '+' : ''}${newStage}` }) : t('b.statDown', { name: currentDefender.name, stat: statName, old: `${oldStage > 0 ? '+' : ''}${oldStage}`, new: `${newStage > 0 ? '+' : ''}${newStage}` }))
           }
         }
       }
@@ -6638,14 +6650,14 @@ function MainApp() {
       if (newStages.attack < 6) {
         newStages = { ...newStages, attack: Math.min(6, newStages.attack + 1) }
         currentDefender = { ...currentDefender, statStages: newStages }
-        lines.push(`💢 ¡${currentDefender.name} se enfurece! Su Ataque sube! (${newStages.attack > 0 ? '+' : ''}${newStages.attack})`)
+        lines.push(t('b.rage', { name: currentDefender.name, stage: `${newStages.attack > 0 ? '+' : ''}${newStages.attack}` }))
       }
     }
 
     // --- Fire thaws frozen ---
     if (effectiveMove.type === 'fire' && currentDefender.status?.type === 'freeze' && currentDefender.hp > 0) {
       currentDefender = { ...currentDefender, status: undefined }
-      lines.push(`🔥 ¡El ataque de fuego descongeló a ${currentDefender.name}!`)
+      lines.push(t('b.thawFire', { name: currentDefender.name }))
     }
 
     // --- Recoil damage ---
@@ -6659,14 +6671,14 @@ function MainApp() {
     if (move.recoilPercent && move.recoilPercent > 0 && totalDamage > 0) {
       recoilDamage = Math.floor(totalDamage * move.recoilPercent)
       updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - recoilDamage) }
-      lines.push(`${attacker.name} sufre recoil (${recoilDamage}).`)
+      lines.push(t('b.recoil', { name: attacker.name, dmg: recoilDamage }))
     }
 
     // --- Drain (Absorb, Megaagotar, etc.) ---
     if (move.drainPercent && move.drainPercent > 0 && totalDamage > 0 && updatedAttacker.hp > 0) {
       const drainHeal = Math.floor(totalDamage * move.drainPercent)
       updatedAttacker = { ...updatedAttacker, hp: Math.min(updatedAttacker.maxHp, updatedAttacker.hp + drainHeal) }
-      lines.push(`${attacker.name} drena ${drainHeal} HP.`)
+      lines.push(t('b.drained', { name: attacker.name, hp: drainHeal }))
     }
 
     // --- Lifesteal ---
@@ -6693,7 +6705,7 @@ function MainApp() {
     setBattleTurns(t => t + 1)
 
     if (runChallenges.speedrun && speedrunSeconds <= 0) {
-      setBattleLog((prev) => ['⏱️ ¡Se acabó el tiempo! Pierdes tu turno.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.timeUp'), ...prev].slice(0, 15))
       return
     }
 
@@ -6766,12 +6778,12 @@ function MainApp() {
         const nuzlockeTeam = nextTeam.filter((_, idx) => idx !== activeIndex)
         setTeam(nuzlockeTeam)
         setActiveIndex(Math.max(0, Math.min(activeIndex, nuzlockeTeam.length - 1)))
-        setBattleLog((prev) => [`💀 Nuzlocke: ${nextPlayer.name} fue debilitado por su estado y liberado.`, ...logs, ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.nuzlockeReleasedStatus', { name: nextPlayer.name }), ...logs, ...prev].slice(0, 15))
       } else {
         if (nextTeam[nextAliveIndex]) nextTeam[nextAliveIndex] = { ...nextTeam[nextAliveIndex], justEntered: true }
         setTeam(nextTeam)
         setActiveIndex(nextAliveIndex)
-        setBattleLog((prev) => [`${nextPlayer.name} fue debilitado por su estado.`, ...logs, ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.partyFaintedStatus', { name: nextPlayer.name }), ...logs, ...prev].slice(0, 15))
       }
       if (isTeamRocketBattle) setTeamRocketFainted(true)
       setEnemy(nextEnemy)
@@ -6794,13 +6806,13 @@ function MainApp() {
       playerConfusedSelfHit = true
       const confusionDmg = Math.max(1, Math.floor((40 * nextPlayer.attack * 0.5) / Math.max(1, nextPlayer.defense) * 0.45 + 2))
       nextPlayer = { ...nextPlayer, hp: Math.max(0, nextPlayer.hp - confusionDmg) }
-      logs.push(`💫 ¡${nextPlayer.name} se golpeó a sí mismo! (${confusionDmg})`)
+      logs.push(t('b.confusedSelf', { name: nextPlayer.name, dmg: confusionDmg }))
     }
     if (nextEnemy.status?.type === 'confusion' && !enemySkipped && Math.random() < 1 / 3) {
       enemyConfusedSelfHit = true
       const confusionDmg = Math.max(1, Math.floor((40 * nextEnemy.attack * 0.5) / Math.max(1, nextEnemy.defense) * 0.45 + 2))
       nextEnemy = { ...nextEnemy, hp: Math.max(0, nextEnemy.hp - confusionDmg) }
-      logs.push(`💫 ¡${nextEnemy.name} se golpeó a sí mismo! (${confusionDmg})`)
+      logs.push(t('b.confusedSelf', { name: nextEnemy.name, dmg: confusionDmg }))
     }
 
     const playerItem = nextPlayer.holdItem ? HOLDABLE_ITEMS[nextPlayer.holdItem] : null
@@ -6848,14 +6860,14 @@ function MainApp() {
       if (playerHit.attackerHeal > 0) {
         const healed = Math.min(nextPlayer.maxHp, nextPlayer.hp + playerHit.attackerHeal)
         nextPlayer = { ...nextPlayer, hp: healed }
-        logs.push(`${nextPlayer.name} recupera ${playerHit.attackerHeal} HP por vampirismo.`)
+        logs.push(t('b.vampirism', { name: nextPlayer.name, hp: playerHit.attackerHeal }))
       }
       logs.push(...playerHit.lines)
 
       if (runChallenges.firstStrike && nextEnemy.hp > 0) {
         const recoil = Math.floor(nextPlayer.maxHp * 0.08)
         nextPlayer = { ...nextPlayer, hp: Math.max(1, nextPlayer.hp - recoil) }
-        logs.push(`⚡ ¡Recoil por Primer Golpe! ${nextPlayer.name} pierde ${recoil} HP.`)
+        logs.push(t('b.recoilFirstStrike', { name: nextPlayer.name, hp: recoil }))
       }
     }
 
@@ -6867,9 +6879,9 @@ function MainApp() {
         const usable = nextEnemy.moves.filter(m => m.name !== nextEnemy.disabled?.move)
         if (usable.length > 0) {
           enemyMove = usable[Math.floor(Math.random() * usable.length)]
-          logs.push(`🚫 ${nextEnemy.name} no puede usar su movimiento anulado y usa ${enemyMove.name}.`)
+          logs.push(t('b.disabledUsed', { name: nextEnemy.name, move: enemyMove.name }))
         } else {
-          logs.push(`🚫 ¡${nextEnemy.name} está anulado y no puede moverse!`)
+          logs.push(t('b.disabledCant', { name: nextEnemy.name }))
           return
         }
       }
@@ -6880,7 +6892,7 @@ function MainApp() {
       if (enemyHit.attackerHeal > 0) {
         const healed = Math.min(nextEnemy.maxHp, nextEnemy.hp + enemyHit.attackerHeal)
         nextEnemy = { ...nextEnemy, hp: healed }
-        logs.push(`${nextEnemy.name} recupera ${enemyHit.attackerHeal} HP por vampirismo.`)
+        logs.push(t('b.vampirism', { name: nextEnemy.name, hp: enemyHit.attackerHeal }))
       }
       logs.push(...enemyHit.lines)
     }
@@ -6927,7 +6939,7 @@ function MainApp() {
         } else {
           nextPlayer = { ...nextPlayer, gmaxEvolved: false }
         }
-        logs.push(`⏳ ${nextPlayer.name} volvió a su tamaño normal.`)
+        logs.push(t('b.gmaxBackNormal', { name: nextPlayer.name }))
       }
     }
 
@@ -6987,12 +6999,12 @@ function MainApp() {
         const newActiveIdx = Math.min(activeIndex, nuzlockeTeam.length - 1)
         setTeam(nuzlockeTeam)
         setActiveIndex(Math.max(0, newActiveIdx))
-        setBattleLog((prev) => [`💀 Nuzlocke: ${nextPlayer.name} fue debilitado y liberado.`, ...logs, ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.nuzlockeReleased', { name: nextPlayer.name }), ...logs, ...prev].slice(0, 15))
       } else {
         if (nextTeam[nextAliveIndex]) nextTeam[nextAliveIndex] = { ...nextTeam[nextAliveIndex], justEntered: true }
         setTeam(nextTeam)
         setActiveIndex(nextAliveIndex)
-        setBattleLog((prev) => [`${nextPlayer.name} cayó debilitado.`, ...logs, ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.partyFainted', { name: nextPlayer.name }), ...logs, ...prev].slice(0, 15))
       }
       if (isTeamRocketBattle) setTeamRocketFainted(true)
       setEnemy(nextEnemy)
@@ -7081,10 +7093,10 @@ function MainApp() {
                 updatedPokemon = finalEvolved
                 if (consumedItem && requiredItem && consumedItem === requiredItem) {
                   updatedPokemon = { ...updatedPokemon, holdItem: undefined }
-                  logs.push(`✅ ${consumedItem} fue consumido en la evolución.`)
+                  logs.push(t('b.itemConsumedEvo', { item: consumedItem }))
                 }
                 setRunStats(prev => ({ ...prev, evolutions: prev.evolutions + 1 }))
-                logs.push(`✨ ¡${updatedPokemon.name} evolucionó en ${finalEvolved.name}!`)
+                logs.push(t('b.evolved', { name: updatedPokemon.name, evolved: finalEvolved.name }))
               }
             } catch {}
           }
@@ -7134,10 +7146,10 @@ function MainApp() {
             registerInPokedex(hatchedPokemon)
             if (newTeam.filter(p => p.hp > 0).length < maxTeamSize) {
               newTeam.push(hatchedPokemon)
-              logs.push(`🥚 ¡El Huevo de ${egg.name} ha eclosionado!`)
+              logs.push(t('b.eggHatched', { name: egg.name }))
             } else {
               pendingPc.push(hatchedPokemon)
-              logs.push(`🥚 El Huevo de ${egg.name} eclosionó y fue enviado al PC.`)
+              logs.push(t('b.eggHatchedPC', { name: egg.name }))
             }
           }
         }
@@ -7231,11 +7243,11 @@ function MainApp() {
             const alreadyHas = inventory.includes('Dynamax Band') || team.some(p => p.holdItem === 'Dynamax Band')
             if (!alreadyHas) {
               setInventory(prev => [...prev, 'Dynamax Band'])
-              logs.push(`⚡ ¡Has obtenido la Banda Dynamax! Equípala para gigamaximar en combate.`)
+              logs.push(t('b.dynamaxBandGot'))
             } else {
               const price = 100
               setMetaProgression(prev => ({ ...prev, pokeCoins: prev.pokeCoins + price }))
-              logs.push(`⚡ Ya tienes una Banda Dynamax. Recibes ${price} PokéCoins en su lugar.`)
+              logs.push(t('b.alreadyHaveCoin', { coins: price }))
             }
           }
           setBattleLog((prev) => [
@@ -7267,11 +7279,11 @@ function MainApp() {
         const alreadyHas = inventory.includes('Dynamax Band') || team.some(p => p.holdItem === 'Dynamax Band')
         if (!alreadyHas) {
           setInventory(prev => [...prev, 'Dynamax Band'])
-          logs.push(`⚡ ¡Has obtenido la Banda Dynamax! Equípala para gigamaximar en combate.`)
+          logs.push(t('b.dynamaxBandGot'))
         } else {
           const price = 100
           setMetaProgression(prev => ({ ...prev, pokeCoins: prev.pokeCoins + price }))
-          logs.push(`⚡ Ya tienes una Banda Dynamax. Recibes ${price} PokéCoins en su lugar.`)
+          logs.push(t('b.alreadyHaveCoin', { coins: price }))
         }
       }
 
@@ -7357,7 +7369,7 @@ function MainApp() {
       completeCurrentNode()
     } else {
       // Falló
-      setBattleLog(prev => [`💨 ¡${enemy.name} escapó de la ${ballName}! (${Math.round(catchProbability * 100)}%)`, ...prev].slice(0, 15))
+      setBattleLog(prev => [t('b.escapedBall', { name: enemy.name, ball: ballName, pct: Math.round(catchProbability * 100) }), ...prev].slice(0, 15))
       setCaptureMessage(`¡${enemy.name} escapó!`)
       setTimeout(() => setCaptureMessage(null), 2000)
     }
@@ -7366,15 +7378,15 @@ function MainApp() {
   function openCaptureMenu(): void {
     const hasBalls = inventory.some(i => POKEBALL_NAMES.includes(i))
     if (!hasBalls) {
-      setBattleLog(prev => ['No tienes Poké Balls para capturar.', ...prev].slice(0, 15))
+      setBattleLog(prev => [t('b.noBalls'), ...prev].slice(0, 15))
       return
     }
     if (runChallenges.soloStarter) {
-      setBattleLog(prev => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
+      setBattleLog(prev => [t('b.challengeSoloStarter'), ...prev].slice(0, 15))
       return
     }
     if (runChallenges.fixedTeam) {
-      setBattleLog(prev => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
+      setBattleLog(prev => [t('b.challengeFixedTeam'), ...prev].slice(0, 15))
       return
     }
     setCaptureModal(true)
@@ -7409,7 +7421,7 @@ function MainApp() {
       return updated
     })
     unlockAchievement('first_mega')
-    setBattleLog(prev => [`💥 ¡${activePokemon.name} ha mega-evolucionado! Stats aumentados un 15%.`, ...prev].slice(0, 15))
+    setBattleLog(prev => [t('b.megaEvolved', { name: activePokemon.name }), ...prev].slice(0, 15))
   }
 
   function gmaxEvolveActive(): void {
@@ -7442,7 +7454,7 @@ function MainApp() {
       return updated
     })
     unlockAchievement('first_gmax')
-    setBattleLog(prev => [`⚡ ¡${activePokemon.name} ha gigamaximado! Stats aumentados un 15% por 3 turnos.`, ...prev].slice(0, 15))
+    setBattleLog(prev => [t('b.gmaxEvolved', { name: activePokemon.name }), ...prev].slice(0, 15))
   }
 
   function primalEvolveActive(): void {
@@ -7467,7 +7479,7 @@ function MainApp() {
       registerInPokedex({ ...activePokemon, id: formId, sprite: primalSprite ?? activePokemon.sprite })
     }
     setBattlePrimalUsed(true)
-    setBattleLog(prev => [`🔮 ¡${activePokemon.name} ha despertado su Primal Reversion! Stats aumentados un 15%.`, ...prev].slice(0, 15))
+    setBattleLog(prev => [t('b.primalEvolved', { name: activePokemon.name }), ...prev].slice(0, 15))
   }
 
   function switchActive(index: number): void {
@@ -7546,7 +7558,7 @@ function MainApp() {
       setRunStats(prev => ({ ...prev, evolutions: prev.evolutions + 1 }))
       setInventory(prev => prev.filter((_, i) => i !== stoneEvoModal.stoneIndex))
       setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
-      setBattleLog((prev) => [`✨ ¡${targetPokemon.name} evolucionó en ${evolved.name} con ${stoneEvoModal.stoneName}!`, ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.evolvedStone', { name: targetPokemon.name, evolved: evolved.name, stone: stoneEvoModal.stoneName }), ...prev].slice(0, 15))
     } catch {
       setApiError('Error al procesar la evolución.')
     } finally {
@@ -7565,11 +7577,11 @@ function MainApp() {
       if (screen === 'battle' && enemy && !isTrainerBattle && currentNode?.type !== 'gmax') {
         if (isLoading) return
         if (runChallenges.soloStarter) {
-          setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
+          setBattleLog((prev) => [t('b.challengeSoloStarter'), ...prev].slice(0, 15))
           return
         }
         if (runChallenges.fixedTeam) {
-          setBattleLog((prev) => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
+          setBattleLog((prev) => [t('b.challengeFixedTeam'), ...prev].slice(0, 15))
           return
         }
         attemptCapture(itemName)
@@ -7580,7 +7592,7 @@ function MainApp() {
     if (EVOLUTION_STONE_UNLOCK_IDS[itemName] || itemName === 'Gorra de Ash' || itemName === 'Auspicious Armor' || itemName === 'Malicious Armor') {
       const candidates = team.filter(p => p.hp > 0)
       if (candidates.length === 0) {
-        setBattleLog((prev) => ['No tienes Pokémon en pie para usar la piedra.', ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.noPokemonForStone'), ...prev].slice(0, 15))
         return
       }
       setStoneEvoTargets(candidates)
@@ -7606,7 +7618,7 @@ function MainApp() {
 
     if (itemName === 'Disco MT') {
       if (screen !== 'route') {
-        setBattleLog((prev) => ['💿 El Disco MT solo se puede usar en la ruta, fuera de combate.', ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.discoRouteOnly'), ...prev].slice(0, 15))
         return
       }
       if (!activePokemon) return
@@ -7616,48 +7628,48 @@ function MainApp() {
 
     if (itemName === 'Cuerda Huida') {
       if (screen !== 'battle') {
-        setBattleLog((prev) => ['La Cuerda Huida solo se puede usar durante un combate.', ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.escapeRopeBattleOnly'), ...prev].slice(0, 15))
         return
       }
       if (currentNode?.type === 'boss') {
-        setBattleLog((prev) => ['🚫 No puedes escapar de un combate contra un jefe.', ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.cannotEscapeBoss'), ...prev].slice(0, 15))
         return
       }
       setInventory(prev => prev.filter((_, i) => i !== itemIndex))
       setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
-      setBattleLog((prev) => [`💨 ¡Usaste la Cuerda Huida y escapaste del combate!`, ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.escapeRopeUsed'), ...prev].slice(0, 15))
       setIsTeamRocketBattle(false)
       completeCurrentNode()
       return
     }
 
     if (runChallenges.noItems) {
-      setBattleLog((prev) => ['🚫 Desafío Sin Objetos: No puedes usar items en batalla.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.challengeNoItemsBattle'), ...prev].slice(0, 15))
       return
     }
 
     if (runChallenges.noHealing && (itemName.includes('Potion') || itemName.includes('Berry') || itemName === 'Full Restore' || itemName === 'Full Heal' || itemName === 'Elixir' || itemName === 'Super Elixir' || itemName === 'Full Elixir')) {
-      setBattleLog((prev) => ['🚫 Desafío Sin Curación: No puedes usar items de curación.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.challengeNoHealItem'), ...prev].slice(0, 15))
       return
     }
 
     if (itemName === 'Sacred Ash') {
       const hasFainted = team.some((p) => p.hp <= 0)
       if (!hasFainted) {
-        setBattleLog((prev) => ['No tienes ningún Pokémon debilitado para usar la Sacred Ash.', ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.noFaintedSacredAsh'), ...prev].slice(0, 15))
         return
       }
       setTeam(prev => prev.map(p => p.hp <= 0 ? { ...p, hp: p.maxHp } : p))
       setInventory((previous) => previous.filter((_, index) => index !== itemIndex))
       setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
-      setBattleLog((prev) => ['🪶 ¡La Sacred Ash revivió a todo tu equipo con el HP completo!', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.sacredAshUsed'), ...prev].slice(0, 15))
       return
     }
 
     if (itemName === 'Revive' || itemName === 'Max Revive') {
       const hasFainted = team.some((p) => p.hp <= 0)
       if (!hasFainted) {
-        setBattleLog((prev) => ['No tienes ningún Pokémon debilitado para revivir.', ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.noFaintedToRevive'), ...prev].slice(0, 15))
         return
       }
       setReviveModal({ itemName, itemIndex })
@@ -7729,7 +7741,7 @@ function MainApp() {
     )
     setInventory((previous) => previous.filter((_, index) => index !== itemIndex))
     setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
-    setBattleLog((prev) => [`Usaste ${itemName} en ${activePokemon.name}.`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.usedItem', { item: itemName, name: activePokemon.name }), ...prev].slice(0, 15))
   }
 
   function applyRevive(targetIndex: number): void {
@@ -7744,7 +7756,7 @@ function MainApp() {
     setTeam((prev) => prev.map((p, idx) => (idx === targetIndex ? revivedPkmn : p)))
     setInventory((prev) => prev.filter((_, idx) => idx !== itemIndex))
     setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
-    setBattleLog((prev) => [`¡${revivedPkmn.name} ha sido revivido con ${revivedPkmn.hp} HP!`, ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.revived', { name: revivedPkmn.name, hp: revivedPkmn.hp }), ...prev].slice(0, 15))
     setReviveModal(null)
   }
 
@@ -7752,13 +7764,13 @@ function MainApp() {
     if (!restEncounter) return
 
     if (runChallenges.soloStarter) {
-      setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.challengeSoloStarter'), ...prev].slice(0, 15))
       completeCurrentNode()
       return
     }
 
     if (runChallenges.fixedTeam) {
-      setBattleLog((prev) => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.challengeFixedTeam'), ...prev].slice(0, 15))
       completeCurrentNode()
       return
     }
@@ -7773,10 +7785,10 @@ function MainApp() {
     if ((captured.attack + captured.defense + captured.speed + captured.maxHp) >= 600) unlockAchievement('legendary_catch')
     if (team.length >= maxTeamSize) {
       setPcStorage((prev) => [...prev, captured])
-      setBattleLog((prev) => [`Capturaste a ${captured.name} y se envió al PC (equipo lleno).`, ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.capturedPC', { name: captured.name }), ...prev].slice(0, 15))
     } else {
       setTeam((previous) => [...previous, captured])
-      setBattleLog((prev) => [`Capturaste a ${captured.name}.`, ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.captured', { name: captured.name }), ...prev].slice(0, 15))
     }
     completeCurrentNode()
   }
@@ -7792,12 +7804,12 @@ function MainApp() {
     if (!legendaryEncounter) return
 
     if (runChallenges.soloStarter) {
-      setBattleLog((prev) => ['🚫 Desafío Solo Starter: No puedes capturar Pokémon.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.challengeSoloStarter'), ...prev].slice(0, 15))
       return
     }
 
     if (runChallenges.fixedTeam) {
-      setBattleLog((prev) => ['🔒 Desafío Equipo Fijo: No puedes cambiar tu equipo.', ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.challengeFixedTeam'), ...prev].slice(0, 15))
       return
     }
 
@@ -7811,10 +7823,10 @@ function MainApp() {
     if ((captured.attack + captured.defense + captured.speed + captured.maxHp) >= 600) unlockAchievement('legendary_catch')
     if (team.length >= maxTeamSize) {
       setPcStorage((prev) => [...prev, captured])
-      setBattleLog((prev) => [`🐉 ¡Capturaste al legendario ${captured.name} y se envió al PC (equipo lleno)!`, ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.capturedLegendPC', { name: captured.name }), ...prev].slice(0, 15))
     } else {
       setTeam((previous) => [...previous, captured])
-      setBattleLog((prev) => [`🐉 ¡Capturaste al legendario ${captured.name}!`, ...prev].slice(0, 15))
+      setBattleLog((prev) => [t('b.capturedLegend', { name: captured.name }), ...prev].slice(0, 15))
     }
     setLegendaryEncounter(null)
   }
@@ -7913,7 +7925,7 @@ function MainApp() {
     setAuthMessage(null)
     if (authLoading) return
     if (!authEmail.trim() || !authPassword) {
-      setAuthMessage({ type: 'error', text: 'Introduce tu email y contraseña.' })
+      setAuthMessage({ type: 'error', text: t('auth.needEmailPass') })
       return
     }
     setAuthLoading(true)
@@ -7927,7 +7939,7 @@ function MainApp() {
       const taken = await isUsernameTaken(username)
       if (taken) {
         setAuthLoading(false)
-        setAuthMessage({ type: 'error', text: 'Ese nombre de usuario ya está en uso.' })
+        setAuthMessage({ type: 'error', text: t('auth.usernameTaken') })
         return
       }
       const res = await signUpWithUsername(authEmail, authPassword, username)
@@ -8158,7 +8170,7 @@ function MainApp() {
           <button
             className="tiny-btn"
             type="button"
-            title={musicMuted ? 'Activar música' : 'Silenciar música'}
+            title={musicMuted ? t('topbar.musicToggle') : t('topbar.musicMute')}
             onClick={toggleMusicMuted}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
           >
@@ -8188,24 +8200,24 @@ function MainApp() {
             </svg>
           </button>
           <button className="tiny-btn" type="button" onClick={() => setShowPokedex(true)}>
-            Pokédex ({pokedexCaught}/{pokedexSeen})
+            {t('topbar.pokedex')} ({pokedexCaught}/{pokedexSeen})
           </button>
           <button className="tiny-btn" type="button" onClick={() => { playClick(); optionsBeganInBattle.current = screen === 'battle'; setShowOptions(!showOptions) }}>
-            Opciones
+            {t('topbar.options')}
           </button>
           <button className="tiny-btn" type="button" onClick={openLeaderboard}>
-            Ranking ♾️
+            {t('topbar.ranking')}
           </button>
           <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowAchievements(!showAchievements) }}>
-            Logros
+            {t('topbar.achievements')}
           </button>
           {metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node') && (
             <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowMinigamePractice(true) }}>
-              🎮 Minijuegos
+              🎮 {t('topbar.minigames')}
             </button>
           )}
           <button className="tiny-btn" type="button" onClick={onRestartRun}>
-            Volver a inicio
+            {t('topbar.restart')}
           </button>
         </div>
         <h1>PokeRand</h1>
@@ -8349,7 +8361,7 @@ function MainApp() {
               <div>
                 <h3 style={{ margin: 0, color: '#cba3ff', fontSize: '1.1rem' }}>{equipModal.itemName}</h3>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: '#9b98cf' }}>
-                  {HOLDABLE_ITEMS[equipModal.itemName]?.desc}
+                  {itemDesc(equipModal.itemName)}
                 </p>
               </div>
             </div>
@@ -8506,7 +8518,7 @@ function MainApp() {
             </h3>
             <p className="muted" style={{ textAlign: 'center', margin: '0 0 1rem', fontSize: '0.8rem' }}>
               HP: {enemy.hp}/{enemy.maxHp} · Turno: {battleTurns}
-              {enemy.status && ` · ${STATUS_LABELS[enemy.status.type]}`}
+              {enemy.status && ` · ${statusLabel(enemy.status.type)}`}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {POKEBALLS.map(b => {
@@ -8622,7 +8634,7 @@ function MainApp() {
               {selectedPokemonDetail ? (
                 <div className="pokedex-detail-view">
                   <button className="tiny-btn back-btn" onClick={() => setSelectedPokemonDetail(null)}>
-                    ← Volver a la lista
+                    {t('minigames.backToList')}
                   </button>
 
                   <div className="detail-header" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -8648,18 +8660,18 @@ function MainApp() {
 
                   <div className="physical-stats">
                     <div>
-                      <span>Altura</span>
+                      <span>{t('pokedex.height')}</span>
                       <strong>{selectedPokemonDetail.height} m</strong>
                     </div>
                     <div>
-                      <span>Peso</span>
+                      <span>{t('pokedex.weight')}</span>
                       <strong>{selectedPokemonDetail.weight} kg</strong>
                     </div>
                   </div>
 
                   {selectedPokemonDetail.evolutions.length > 0 && (
                     <>
-                      <h3 style={{ fontSize: '0.9rem', color: '#9b98cf', marginTop: '12px' }}>Cadena Evolutiva</h3>
+                      <h3 style={{ fontSize: '0.9rem', color: '#9b98cf', marginTop: '12px' }}>{t('pokedex.evoChain')}</h3>
                       <div className="evolution-chain" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', padding: '8px 0' }}>
                         {selectedPokemonDetail.evolutions.map((evo, idx) => {
                           const entry = pokedex[evo.id]
@@ -8687,10 +8699,10 @@ function MainApp() {
                                   {known ? evo.name : '???'}
                                 </strong>
                                 {evo.level && (
-                                  <span style={{ fontSize: '0.85rem', color: '#a855f7', fontWeight: 'bold' }}>Nv. {evo.level}</span>
+                                  <span style={{ fontSize: '0.85rem', color: '#a855f7', fontWeight: 'bold' }}>{t('pokedex.lv')} {evo.level}</span>
                                 )}
                                 {!evo.level && evo.trigger && evo.trigger !== 'level-up' && (
-                                  <span style={{ fontSize: '0.85rem', color: '#ffcb05', fontWeight: 'bold' }}>{evo.trigger}</span>
+                                  <span style={{ fontSize: '0.85rem', color: '#ffcb05', fontWeight: 'bold' }}>{t(`evo.trigger.${evo.trigger}`)}</span>
                                 )}
                               </div>
                             </div>
@@ -8700,7 +8712,7 @@ function MainApp() {
                     </>
                   )}
 
-                  <h3 style={{ fontSize: '0.9rem', color: '#9b98cf', marginTop: '8px' }}>Estadísticas Base</h3>
+                  <h3 style={{ fontSize: '0.9rem', color: '#9b98cf', marginTop: '8px' }}>{t('pokedex.baseStats')}</h3>
                   <div className="stats-grid">
                     {selectedPokemonDetail.stats.map((st) => (
                       <div key={st.name} className="stat-row">
@@ -8719,14 +8731,14 @@ function MainApp() {
                   <div className="modal-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <h2 style={{ fontSize: '0.65rem', color: '#4d9bff', margin: 0 }}>
-                        Pokédex ({pokedexSeen} vistos · {pokedexCaught} capturados)
+                        Pokédex ({pokedexSeen} {t('pokedex.seen2b')} · {pokedexCaught} {t('pokedex.caught2b')})
                       </h2>
                     </div>
 
                     <div style={{ position: 'relative', width: '100%' }}>
                       <input
                         type="text"
-                        placeholder="🔍 Buscar por nombre o ID..."
+                        placeholder={t('pokedex.search2')}
                         value={pokedexSearch}
                         onChange={(e) => setPokedexSearch(e.target.value)}
                         style={{
@@ -8767,7 +8779,7 @@ function MainApp() {
                     <p className="muted" style={{ textAlign: 'center', padding: '2rem 0' }}>Cargando datos oficiales...</p>
                   ) : pokedexList.length === 0 ? (
                     <p className="muted" style={{ padding: '1rem 0', textAlign: 'center' }}>
-                      Aún no has registrado ningún Pokémon. ¡Inicia una partida!
+                      {t('pokedex.empty2')}
                     </p>
                   ) : filteredPokedex.length === 0 ? (
                     <p className="muted" style={{ padding: '2rem 0', textAlign: 'center' }}>
@@ -8825,7 +8837,7 @@ function MainApp() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div>
                   <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
-                    🎵 Volumen de Música
+                    🎵 {t('options.musicVolume')}
                   </strong>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <span style={{ fontSize: '0.8rem', color: '#9b98cf', minWidth: '20px' }}>🔈</span>
@@ -8851,7 +8863,7 @@ function MainApp() {
 
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
                   <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
-                    🔉 Volumen de Efectos
+                    🔉 {t('options.sfxVolume')}
                   </strong>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <span style={{ fontSize: '0.8rem', color: '#9b98cf', minWidth: '20px' }}>🔈</span>
@@ -8873,7 +8885,7 @@ function MainApp() {
 
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
                 <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
-                  🎨 Tema Visual
+                  🎨 {t('options.theme')}
                 </strong>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                   {THEMES.filter(t => metaProgression.ownedThemes.includes(t.id)).map(theme => (
@@ -8889,13 +8901,33 @@ function MainApp() {
                 </div>
               </div>
 
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+                <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
+                  🌐 {t('options.language')}
+                </strong>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {([['es', t('lang.spanish')], ['en', t('lang.english')]] as Array<[Language, string]>).map(([lang, label]) => (
+                    <button key={lang} type="button"
+                      onClick={() => changeLanguage(lang)}
+                      style={{
+                        padding: '6px 12px', borderRadius: '8px', cursor: 'pointer',
+                        border: `2px solid ${language === lang ? '#ffcb05' : '#475569'}`,
+                        background: language === lang ? 'rgba(250,204,21,0.15)' : 'transparent',
+                        color: language === lang ? '#ffcb05' : '#9b98cf', fontWeight: 'bold', fontSize: '0.8rem',
+                      }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Music selectors */}
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
                 <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.75rem' }}>
-                  🎵 Música
+                  🎵 {t('options.music')}
                 </strong>
                 <div style={{ marginBottom: '0.75rem' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#9b98cf', marginBottom: '0.25rem' }}>Menú:</div>
+                  <div style={{ fontSize: '0.8rem', color: '#9b98cf', marginBottom: '0.25rem' }}>{t('options.menu')}:</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                     {[
                       { id: 'default', name: 'Menú Clásico', always: true },
@@ -8925,7 +8957,7 @@ function MainApp() {
                             fontSize: '0.75rem', fontWeight: 'bold',
                             opacity: unlocked ? 1 : 0.5,
                           }}>
-                          {track.name}
+                          {track.id === 'default' ? (language === 'en' ? 'Classic Menu' : 'Menú Clásico') : (language === 'en' ? 'Relax Menu' : 'Menú Relax')}
                         </button>
                       )
                     })}
@@ -8961,7 +8993,7 @@ function MainApp() {
                             fontSize: '0.75rem', fontWeight: 'bold',
                             opacity: unlocked ? 1 : 0.5,
                           }}>
-                          {track.name}
+                          {track.id === 'default' ? (language === 'en' ? 'Classic Menu' : 'Menú Clásico') : (language === 'en' ? 'Relax Menu' : 'Menú Relax')}
                         </button>
                       )
                     })}
@@ -9078,21 +9110,21 @@ function MainApp() {
         if (!pvpSnapshot || !pvpRole) {
           return (
             <section className="panel setup-panel" style={{ maxWidth: '780px', minHeight: '440px', margin: '0 auto', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <h2 style={{ margin: '0 0 1.2rem', color: '#cba3ff', fontSize: '1.6rem' }}>⚔️ PvP 1vs1</h2>
+              <h2 style={{ margin: '0 0 1.2rem', color: '#cba3ff', fontSize: '1.6rem' }}>{t('pvp.setupTitle')}</h2>
               {pvpWaitingOpponent ? (
                 <>
-                  <p style={{ color: '#cba3ff', fontSize: '1.35rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>⏳ Esperando al rival para la revancha...</p>
+                  <p style={{ color: '#cba3ff', fontSize: '1.35rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>{t('pvp.waitingRematch')}</p>
                   {pvpRoomCode && (
                     <p style={{ color: '#ffcb05', fontSize: '1.5rem', fontWeight: 'bold', letterSpacing: '0.2em', marginBottom: '0.75rem' }}>
                       CÓDIGO: {pvpRoomCode}
                     </p>
                   )}
-                  <button className="cta" type="button" onClick={cancelPvpWaiting} style={{ color: '#ff8a80', marginTop: '1rem', maxWidth: '260px', alignSelf: 'center' }}>✕ Cancelar</button>
+                  <button className="cta" type="button" onClick={cancelPvpWaiting} style={{ color: '#ff8a80', marginTop: '1rem', maxWidth: '260px', alignSelf: 'center' }}>{t('pvp.cancel')}</button>
                 </>
               ) : (
                 <>
-                  <p style={{ color: '#9b98cf', fontSize: '1.15rem' }}>Cargando combate...</p>
-                  <button className="cta" type="button" onClick={pvpLeave} style={{ color: '#ff8a80', marginTop: '1rem', maxWidth: '260px', alignSelf: 'center' }}>✕ Abandonar</button>
+                  <p style={{ color: '#9b98cf', fontSize: '1.15rem' }}>{t('pvp.loadingBattle')}</p>
+                  <button className="cta" type="button" onClick={pvpLeave} style={{ color: '#ff8a80', marginTop: '1rem', maxWidth: '260px', alignSelf: 'center' }}>{t('pvp.abandon')}</button>
                 </>
               )}
             </section>
@@ -9125,7 +9157,7 @@ function MainApp() {
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div style={{ fontSize: '0.9rem', color: '#cba3ff', fontWeight: 'bold', textAlign: 'center' }}>
-                {side === 'a' ? '🔵 Jugador A' : '🔴 Jugador B'} — {ps.username ?? '?'}
+                {t('pvp.playerLabel', { side: side === 'a' ? 'A' : 'B' })} — {ps.username ?? '?'}
                 <span style={{ color: '#ffcb05', fontWeight: 'bold', marginLeft: '4px' }}>· Elo {side === 'a' ? (myRole === 'a' ? pvpMyElo : pvpOppElo) : (myRole === 'b' ? pvpMyElo : pvpOppElo)}</span>
               </div>
               {ps.team.map((p, i) => {
@@ -9151,12 +9183,12 @@ function MainApp() {
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: '0.85rem', color: '#f3f1ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
                           <div style={{ fontSize: '0.75rem', color: p.hp <= 0 ? '#ee3b2f' : '#7d7ab5' }}>
-                            {p.hp <= 0 ? 'Debilitado' : `Nv.${p.level} · HP ${Math.max(0, p.hp)}/${p.maxHp}`}
+                            {p.hp <= 0 ? t('pvp.defeated') : `Nv.${p.level} · HP ${Math.max(0, p.hp)}/${p.maxHp}`}
                           </div>
                         </div>
                       </>
                     ) : (
-                      <div style={{ color: '#7d7ab5', fontSize: '0.85rem', width: '100%', textAlign: 'center' }}>❓ ???</div>
+                      <div style={{ color: '#7d7ab5', fontSize: '0.85rem', width: '100%', textAlign: 'center' }}>{t('pvp.hidden')}</div>
                     )}
                   </div>
                 )
@@ -9170,18 +9202,18 @@ function MainApp() {
           return (
             <section className="panel setup-panel" style={{ maxWidth: '780px', minHeight: '440px', margin: '0 auto', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <h2 style={{ margin: '0 0 1rem', color: iWon ? '#ffcb05' : '#ee3b2f', fontSize: '1.7rem' }}>
-                {st.winner ? (iWon ? '🏆 ¡VICTORIA!' : '💀 DERROTA') : '🤝 EMPATE'}
+                {st.winner ? (iWon ? t('pvp.victory') : t('pvp.defeat')) : t('pvp.draw')}
               </h2>
               <p style={{ color: '#9b98cf', marginBottom: '1rem', fontSize: '1.05rem' }}>
-                {st.winner ? `${(st.winner === 'a' ? st.a.username : st.b.username) ?? 'El rival'} ha ganado el combate.` : 'Ambos equipos quedaron debilitados.'}
+                {st.winner ? t('pvp.wonCombat', { name: (st.winner === 'a' ? st.a.username : st.b.username) ?? t('pvp.rival') }) : t('pvp.bothFainted')}
               </p>
               {pvpEloRewarded && (
                 <div style={{ marginBottom: '1rem', padding: '0.6rem', borderRadius: '8px', background: 'rgba(255,203,5,0.1)', border: '1px solid #ffcb05' }}>
                   <p style={{ margin: 0, color: '#ffcb05', fontSize: '1.05rem', fontWeight: 'bold' }}>
-                    {iWon ? `🎉 +${pvpEloGain ?? 0} Elo` : `Tus puntos Elo: ${pvpMyElo}`}
+                    {iWon ? t('pvp.eloGain', { n: pvpEloGain ?? 0 }) : t('pvp.yourElo', { n: pvpMyElo })}
                   </p>
                   <p style={{ margin: '0.25rem 0 0', color: '#9b98cf', fontSize: '0.85rem' }}>
-                    Elo del rival: {pvpOppElo}
+                    {t('pvp.rivalElo', { n: pvpOppElo })}
                   </p>
                 </div>
               )}
@@ -9191,8 +9223,8 @@ function MainApp() {
                 ))}
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="cta" type="button" onClick={() => void pvpRematch()} style={{ flex: 1, fontSize: '1.05rem' }}>⚔️ Revancha</button>
-                <button className="cta" type="button" onClick={pvpLeave} style={{ flex: 1, background: '#7d7ab5', fontSize: '1.05rem' }}>Volver al menú</button>
+                <button className="cta" type="button" onClick={() => void pvpRematch()} style={{ flex: 1, fontSize: '1.05rem' }}>{t('pvp.rematch')}</button>
+                <button className="cta" type="button" onClick={pvpLeave} style={{ flex: 1, background: '#7d7ab5', fontSize: '1.05rem' }}>{t('pvp.backToMenu')}</button>
               </div>
             </section>
           )
@@ -9201,17 +9233,17 @@ function MainApp() {
           return (
             <section className="panel setup-panel" style={{ maxWidth: '1280px', margin: '0 auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <h2 style={{ margin: 0, color: '#cba3ff', fontSize: '1.5rem' }}>⚔️ PvP 1vs1</h2>
+                <h2 style={{ margin: 0, color: '#cba3ff', fontSize: '1.5rem' }}>{t('pvp.setupTitle')}</h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span style={{ color: '#9b98cf', fontSize: '0.9rem' }}>Turno #{pvpSnapshot.turn + 1}</span>
+                  <span style={{ color: '#9b98cf', fontSize: '0.9rem' }}>{t('pvp.turn', { n: pvpSnapshot.turn + 1 })}</span>
                   {pvpSnapshot.timer_by && pvpSnapshot.timer_until ? (
                     <span style={{ color: pvpTimerLeft <= 60 ? '#ff8a80' : '#ffcb05', fontSize: '0.95rem', fontWeight: 'bold' }}>
                       ⏱️ {Math.floor(pvpTimerLeft / 60)}:{String(pvpTimerLeft % 60).padStart(2, '0')}
                     </span>
                   ) : (
-                    <button className="tiny-btn" type="button" onClick={() => void pvpStartTimer()} style={{ color: '#ffcb05' }}>⏱️ Cuenta atrás (5 min)</button>
+                    <button className="tiny-btn" type="button" onClick={() => void pvpStartTimer()} style={{ color: '#ffcb05' }}>{t('pvp.countdown')}</button>
                   )}
-                  <button className="tiny-btn" type="button" onClick={() => void pvpForfeit()} style={{ color: '#ff8a80' }}>🏳️ Rendirse</button>
+                  <button className="tiny-btn" type="button" onClick={() => void pvpForfeit()} style={{ color: '#ff8a80' }}>{t('pvp.surrender')}</button>
                 </div>
               </div>
 
@@ -9263,7 +9295,7 @@ function MainApp() {
 
                 <div style={{ maxHeight: '220px', minHeight: '120px', overflowY: 'auto', padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid #3f3f6e' }}>
                   {st.log.length === 0 ? (
-                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#7d7ab5' }}>Elige un ataque para comenzar.</p>
+                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#7d7ab5' }}>{t('pvp.pickMoveStart')}</p>
                   ) : (
                     st.log.slice(-10).reverse().map((line, i) => (
                       <p key={i} style={{ margin: '0 0 0.25rem', fontSize: '0.85rem', color: '#d9d6f2' }}>{line}</p>
@@ -9276,7 +9308,7 @@ function MainApp() {
 
                 {st.phase === 'switch' && mySwitchNeeded && !iSubmitted && (
                   <div style={{ padding: '0.7rem', borderRadius: '8px', background: 'rgba(168,85,247,0.1)', border: '1px solid #a855f7' }}>
-                    <strong style={{ color: '#cba3ff', fontSize: '0.95rem' }}>Elige el siguiente Pokémon:</strong>
+                    <strong style={{ color: '#cba3ff', fontSize: '0.95rem' }}>{t('pvp.pickNext')}</strong>
                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
                       {my.team.map((p, i) => (
                         p.hp > 0 && p.id !== myActive?.id ? (
@@ -9319,10 +9351,10 @@ function MainApp() {
                               lineHeight: 1.3,
                             }}
                           >
-                            <div style={{ fontSize: '0.88rem', fontWeight: 'bold', color: outOfPp ? '#7d7ab5' : '#f3f1ff' }}>{m.name}</div>
+                            <div style={{ fontSize: '0.88rem', fontWeight: 'bold', color: outOfPp ? '#7d7ab5' : '#f3f1ff' }}>{moveName(m)}</div>
                             <div style={{ fontSize: '0.72rem', color: '#9b98cf' }}>{m.type.toUpperCase()} · PWR {m.power} · {m.accuracy}%</div>
                             <div style={{ fontSize: '0.68rem', color: outOfPp ? '#ee3b2f' : '#7dd3fc' }}>
-                              {outOfPp ? 'SIN PP' : `PP ${pp}/${m.maxPp ?? 10}`}
+                              {outOfPp ? t('pvp.noPP') : t('pvp.pp', { n: pp, max: m.maxPp ?? 10 })}
                             </div>
                           </button>
                         )
@@ -9337,8 +9369,8 @@ function MainApp() {
                 {st.phase === 'picking' && canActPicking && myActive && pvpChoosingSwitch && (
                   <div style={{ padding: '0.7rem', borderRadius: '8px', background: 'rgba(56,189,248,0.08)', border: '1px solid #38bdf8' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                      <strong style={{ color: '#7dd3fc', fontSize: '0.95rem' }}>Cambiar de Pokémon:</strong>
-                      <button className="tiny-btn" type="button" onClick={() => setPvpChoosingSwitch(false)}>← Volver a ataques</button>
+                      <strong style={{ color: '#7dd3fc', fontSize: '0.95rem' }}>{t('pvp.switchPokemon')}</strong>
+                      <button className="tiny-btn" type="button" onClick={() => setPvpChoosingSwitch(false)}>{t('pvp.backToMoves')}</button>
                     </div>
                     <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                       {my.team.map((p, i) => (
@@ -9349,7 +9381,7 @@ function MainApp() {
                           </button>
                         ) : null
                       ))}
-                      {!canSwitchNow && <span style={{ color: '#7d7ab5', fontSize: '0.85rem' }}>No hay otros Pokémon disponibles.</span>}
+                      {!canSwitchNow && <span style={{ color: '#7d7ab5', fontSize: '0.85rem' }}>{t('common.noPokemon')}</span>}
                     </div>
                   </div>
                 )}
@@ -9357,23 +9389,23 @@ function MainApp() {
                 {iSubmitted && (
                   <div style={{ textAlign: 'center', padding: '0.9rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
                     <p style={{ margin: '0 0 0.6rem', color: '#37d16b', fontSize: '1rem', fontWeight: 'bold' }}>
-                      ⏳ Esperando al rival...
+                      {t('pvp.waitingRival')}
                     </p>
                     <button className="tiny-btn" type="button" onClick={() => void pvpCancelAction()} style={{ color: '#ff8a80' }}>
-                      ✕ Cancelar acción
+                      {t('coop.cancelAction')}
                     </button>
                   </div>
                 )}
 
                 {!iSubmitted && st.phase === 'picking' && !canActPicking && (
                   <div style={{ textAlign: 'center', padding: '0.9rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
-                    <p style={{ margin: 0, color: '#37d16b', fontSize: '1rem', fontWeight: 'bold' }}>El rival está eligiendo su ataque...</p>
+                    <p style={{ margin: 0, color: '#37d16b', fontSize: '1rem', fontWeight: 'bold' }}>{t('pvp.rivalChoosing')}</p>
                   </div>
                 )}
 
                 {st.phase === 'switch' && !mySwitchNeeded && !iSubmitted && (
                   <div style={{ textAlign: 'center', padding: '0.9rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
-                    <p style={{ margin: 0, color: '#37d16b', fontSize: '1rem', fontWeight: 'bold' }}>⏳ El rival elige su siguiente Pokémon...</p>
+                    <p style={{ margin: 0, color: '#37d16b', fontSize: '1rem', fontWeight: 'bold' }}>{t('pvp.rivalPickingNext')}</p>
                   </div>
                 )}
 
@@ -9393,14 +9425,14 @@ function MainApp() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
             <h2 style={{ margin: 0, color: '#ffcb05' }}>👑 COLISEUM</h2>
             <button className="tiny-btn" onClick={() => { playClick(); preColiseumChallengesRef.current = null; setColiseumTempTeam([]); setRunChallenges({ noShops: false, noRests: false, allShiny: false, allTeamRocket: false, nuzlocke: false, soloStarter: false, fixedTeam: false, noEvolution: false, noItems: false, restrictedMoves: false, firstStrike: false, fixedLevel: false, noCrits: false, typeRandomizer: false, noPurchasing: false, blindRoute: false, bossRush: false, speedrun: false, noMoney: false, doubleModifiers: false, scalingEnemies: false, noHealing: false, ironman: false, totalRandomizer: false, nuzlockeHardcore: false, challengeGauntlet: false, egglocke: false }); setScreen('setup'); stopMusic() }} type="button" style={{ color: '#ff8a80' }}>
-              ✕ Salir
+              {t('coliseum.exit')}
             </button>
           </div>
           <p style={{ textAlign: 'center', color: '#9b98cf', marginBottom: '1rem' }}>
-            Selecciona 6 Pokémon de tu Pokédex para enfrentar 8 jefes a nivel 50.
+            {t('coliseum.select')}
           </p>
           <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#7d7ab5', marginBottom: '0.5rem' }}>
-            Elegidos: {coliseumTempTeam.length}/6
+            {t('coliseum.picked', { n: coliseumTempTeam.length })}
           </p>
           <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
             <input type="text" placeholder="🔍 Buscar Pokémon..." value={coliseumSearch} onChange={e => setColiseumSearch(e.target.value)}
@@ -9416,16 +9448,16 @@ function MainApp() {
                   const built = await Promise.all(coliseumTempTeam.map(p => buildPokemonFromApi(p.id, 1, 50, false, 'coliseum_' + coliseumSeed)))
                   setTeam(built)
                   built.forEach(p => registerInPokedex(p))
-                  setBattleLog(['👑 ¡COLISEUM! Enfrenta 8 jefes a nivel 50.', ...battleLog])
+                  setBattleLog([t('b.coliseumIntro'), ...battleLog])
                   setScreen('route')
                   startBattleMusic()
                 } catch {
-                  setApiError('Error al preparar el equipo.')
+                  setApiError(t('coliseum.error'))
                 } finally {
                   setIsLoading(false)
                 }
               }} style={{ background: '#ffcb05', color: '#000' }} disabled={isLoading}>
-                {isLoading ? 'Preparando equipo...' : '👑 ¡Comenzar COLISEUM!'}
+                {isLoading ? t('coliseum.preparing') : t('coliseum.start')}
               </button>
             </div>
           )}
@@ -9469,15 +9501,15 @@ function MainApp() {
             <SetupBanner />
             <div className="setup-hero-overlay">
               <div>
-                <h1 className="setup-hero-title">¡Bienvenid@!</h1>
-                <p className="setup-hero-sub">Elige tu generación y dificultad para comenzar la aventura.</p>
+                <h1 className="setup-hero-title">{t('setup.welcome')}</h1>
+                <p className="setup-hero-sub">{t('setup.subtitle')}</p>
               </div>
               <div className="setup-hero-actions">
                 <button className="cta setup-start" type="button" onClick={handleStartRunClick} onMouseEnter={playHover} disabled={isLoading}>
-                  {isLoading ? 'Cargando...' : '🚀 Iniciar Aventura'}
+                  {isLoading ? 'Cargando...' : t('setup.startAdventure')}
                 </button>
                 <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowMetaShop(true) }}>
-                  🪙 Tienda Meta ({metaProgression.pokeCoins} 🪙)
+                  🪙 {t('setup.metaShop')} ({metaProgression.pokeCoins} 🪙)
                 </button>
               </div>
             </div>
@@ -9486,7 +9518,7 @@ function MainApp() {
           <div className="setup-grid">
             <div className="setup-col">
               <div className="setup-card">
-                <h2 className="setup-card-title"><span className="setup-step">1</span> Selecciona la Generación</h2>
+                <h2 className="setup-card-title"><span className="setup-step">1</span> {t('setup.selectGeneration')}</h2>
                 <div className="generation-grid">
             {generations.map((gen) => {
               const unlocked = isGenUnlocked(gen)
@@ -9511,17 +9543,17 @@ function MainApp() {
                     <span style={{ whiteSpace: 'nowrap' }}>Gen {gen} {unlocked ? '' : '🔒'}</span>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       {completedHard ? (
-                        <span className="badge-medium" title="Completado en Difícil">🏆🏆</span>
+                        <span className="badge-medium" title={language === 'en' ? 'Completed on Hard' : 'Completado en Difícil'}>🏆🏆</span>
                       ) : completedMed ? (
-                        <span className="badge-medium" title="Completado en Intermedio">🏆</span>
+                        <span className="badge-medium" title={language === 'en' ? 'Completed on Medium' : 'Completado en Intermedio'}>🏆</span>
                       ) : completedAny ? (
-                        <span className="badge-easy" title="Completado en Fácil">⭐</span>
+                        <span className="badge-easy" title={language === 'en' ? 'Completed on Easy' : 'Completado en Fácil'}>⭐</span>
                       ) : null}
                       {completedColiseum && (
-                        <span className="badge-medium" title="Completado en COLISEUM">👑</span>
+                        <span className="badge-medium" title={language === 'en' ? 'Completed on COLISEUM' : 'Completado en COLISEUM'}>👑</span>
                       )}
                       {completedLeague && (
-                        <span className="badge-medium" title="Completado en Liga">🏅</span>
+                        <span className="badge-medium" title={language === 'en' ? 'Completed on the League' : 'Completado en Liga'}>🏅</span>
                       )}
                     </span>
                   </div>
@@ -9533,10 +9565,10 @@ function MainApp() {
                     </span>
                   )}
                   {unlocked && infUnlocked && (
-                    <span className="unlock-tag-infinite">♾️ Infinite Disponible</span>
+                    <span className="unlock-tag-infinite">{t('setup.infiniteUnlocked')}</span>
                   )}
                   {unlocked && !infUnlocked && hardUnlocked && (
-                    <span className="unlock-tag">🔥 Difícil disponible</span>
+                    <span className="unlock-tag">{t('setup.hardAvailable')}</span>
                   )}
                 </button>
               )
@@ -9577,30 +9609,30 @@ function MainApp() {
                 >
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '0 8px' }}>
                     <span style={{ fontSize: '1.2rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5', whiteSpace: 'nowrap' }}>
-                      🎲 RANDOM {randomUnlocked ? '' : '🔒'}
+                      {t('setup.randomAllStars')} {randomUnlocked ? '' : '🔒'}
                     </span>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
                       {randomCompletedHard ? (
-                        <span className="badge-medium" title="Completado en Difícil">🏆🏆</span>
+                        <span className="badge-medium" title={language === 'en' ? 'Completed on Hard' : 'Completado en Difícil'}>🏆🏆</span>
                       ) : randomCompletedMed ? (
-                        <span className="badge-medium" title="Completado en Intermedio">🏆</span>
+                        <span className="badge-medium" title={language === 'en' ? 'Completed on Medium' : 'Completado en Intermedio'}>🏆</span>
                       ) : randomCompletedAny ? (
-                        <span className="badge-easy" title="Completado en Fácil">⭐</span>
+                        <span className="badge-easy" title={language === 'en' ? 'Completed on Easy' : 'Completado en Fácil'}>⭐</span>
                       ) : null}
                       {randomCompletedColiseum && (
-                        <span className="badge-medium" title="Completado en COLISEUM">👑</span>
+                        <span className="badge-medium" title={language === 'en' ? 'Completed on COLISEUM' : 'Completado en COLISEUM'}>👑</span>
                       )}
                       {randomCompletedLeague && (
-                        <span className="badge-medium" title="Completado en Liga">🏅</span>
+                        <span className="badge-medium" title={language === 'en' ? 'Completed on the League' : 'Completado en Liga'}>🏅</span>
                       )}
                     </span>
                     <strong style={{ fontSize: '1rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5', whiteSpace: 'nowrap' }}>
-                      — {randomUnlocked ? 'Mezclar todas las generaciones' : 'Todas las Generaciones'}
+                      — {randomUnlocked ? t('setup.mixAllGens') : t('setup.allGens')}
                     </strong>
                   </div>
                   {!randomUnlocked && (
                     <span className="lock-text">
-                      🔒 Completa todas las generaciones en Intermedio para desbloquear
+                      {t('setup.unlockAllGens')}
                     </span>
                   )}
                 </button>
@@ -9612,7 +9644,7 @@ function MainApp() {
 
             <div className="setup-col">
               <div className="setup-card">
-                <h2 className="setup-card-title"><span className="setup-step">2</span> Selecciona la Dificultad</h2>
+                <h2 className="setup-card-title"><span className="setup-step">2</span> {t('setup.selectDifficulty')}</h2>
           <div className="generation-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
             {(['easy', 'medium', 'hard'] as Difficulty[]).map((diff) => {
               const isHard = diff === 'hard'
@@ -9630,12 +9662,12 @@ function MainApp() {
                   style={{ opacity: isLocked ? 0.65 : 1, cursor: isLocked ? 'not-allowed' : 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>{difficultyLabels[diff].title} {isLocked ? '🔒' : ''}</span>
+                    <span>{difficultyLabel(language, diff).title} {isLocked ? '🔒' : ''}</span>
                   </div>
-                  <strong>{difficultyNodeCounts[diff]} rutas/etapa ({difficultyNodeCounts[diff] * 3} total)</strong>
+                  <strong>{difficultyNodeCounts[diff]} {language === 'en' ? 'routes/stage' : 'rutas/etapa'} ({difficultyNodeCounts[diff] * 3} {language === 'en' ? 'total' : 'total'})</strong>
                   {isLocked && (
                     <span className="lock-text">
-                      🔒 Completa {generationRegions[generation]} 1 vez
+                      {t('setup.completeRegionOnce', { region: generationRegions[generation] })}
                     </span>
                   )}
                 </button>
@@ -9677,7 +9709,7 @@ function MainApp() {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '1.2rem', color: infUnlocked ? '#cba3ff' : '#7d7ab5' }}>♾️ INFINITE {infUnlocked ? '' : '🔒'}</span>
-                    <strong style={{ fontSize: '1rem', color: infUnlocked ? '#cba3ff' : '#7d7ab5' }}>— Rutas infinitas</strong>
+                    <strong style={{ fontSize: '1rem', color: infUnlocked ? '#cba3ff' : '#7d7ab5' }}>— {language === 'en' ? 'Endless routes' : 'Rutas infinitas'}</strong>
                   </div>
                   {infUnlocked && !authUser && (
                     <span className="lock-text" style={{ color: '#ffcb05' }}>
@@ -9713,25 +9745,25 @@ function MainApp() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem', color: coliseumUnlocked ? '#ffcb05' : '#7d7ab5' }}>👑 COLISEUM {coliseumUnlocked ? '' : '🔒'}</span>
-                <strong style={{ fontSize: '1rem', color: coliseumUnlocked ? '#ffcb05' : '#7d7ab5' }}>— 8 jefes a nivel 50</strong>
+                <span style={{ fontSize: '1.2rem', color: coliseumUnlocked ? '#ffcb05' : '#7d7ab5' }}>{t('setup.coliseum')} {coliseumUnlocked ? '' : '🔒'}</span>
+                <strong style={{ fontSize: '1rem', color: coliseumUnlocked ? '#ffcb05' : '#7d7ab5' }}>{t('setup.coliseum8')}</strong>
               </div>
               {!coliseumUnlocked && (
                 <span className="lock-text">
-                  🔒 Completa todas las generaciones en Intermedio
+                  {t('setup.unlockColiseum')}
                 </span>
               )}
             </button>
             )})()}
           </div>
 
-          <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>🎲 Desafío Diario</h2>
+          <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>🎲 {t('setup.daily')}</h2>
           <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
             {(() => {
               const dailyConfig = getDailyConfig(dailySeed, [1,2,3,4,5,6,7,8,9])
-              const diffLabel = dailyConfig?.difficulty === 'easy' ? 'Fácil' : dailyConfig?.difficulty === 'hard' ? 'Difícil' : 'Medio'
+              const diffLabel = dailyConfig ? difficultyLabel(language, dailyConfig.difficulty).title : ''
               const genLabel = dailyConfig ? `${generationRegions[dailyConfig.generation]}` : ''
-              const modName = dailyConfig ? RUN_MODIFIERS.find(m => m.id === dailyConfig.modifierId)?.name ?? '' : ''
+              const modName = dailyConfig ? runModName(dailyConfig.modifierId) : ''
               return (
             <button
               className="gen-tile"
@@ -9753,10 +9785,10 @@ function MainApp() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem', color: dailyPlayed ? '#7d7ab5' : '#37d16b' }}>📅 {dailyPlayed ? 'Completado hoy ✅' : 'Desafío del Día'}</span>
+                <span style={{ fontSize: '1.2rem', color: dailyPlayed ? '#7d7ab5' : '#37d16b' }}>📅 {dailyPlayed ? t('setup.dailyDone2') : t('setup.dailyTitle')}</span>
               </div>
               <strong style={{ fontSize: '0.85rem', color: '#9b98cf' }}>
-                {dailyPlayed ? 'Vuelve mañana para uno nuevo' : `Gen ${dailyConfig?.generation} (${genLabel}) — ${diffLabel} — ${modName}`}
+                {dailyPlayed ? t('setup.dailyTomorrow') : `Gen ${dailyConfig?.generation} (${genLabel}) — ${diffLabel} — ${modName}`}
               </strong>
             </button>
               )
@@ -9765,16 +9797,16 @@ function MainApp() {
               </div>
 
               <div className="setup-card">
-                <h2 className="setup-card-title">🤝 Cooperativo</h2>
+                <h2 className="setup-card-title">{t('coop.title2')}</h2>
           <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0' }}>
             {!coopMode ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', border: '1px solid #3f3f6e', borderRadius: '12px', background: 'rgba(15,23,42,0.6)' }}>
                 <p style={{ margin: '0', color: '#9b98cf', fontSize: '0.8rem' }}>
-                  Juega una run compartida con un amigo: misma ruta, mismos nodos, intercambios de Pokémon y objetos. Ambos necesitan cuenta.
+                  {t('coop.intro')}
                 </p>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <label style={{ flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '4px', color: '#9b98cf', fontSize: '0.75rem' }}>
-                    Generación
+                    {t('coop.generation')}
                     <select
                       value={coopGen}
                       onChange={(e) => setCoopGen(Number(e.target.value))}
@@ -9786,15 +9818,15 @@ function MainApp() {
                     </select>
                   </label>
                   <label style={{ flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '4px', color: '#9b98cf', fontSize: '0.75rem' }}>
-                    Dificultad
+                    {t('coop.difficulty')}
                     <select
                       value={coopDiff}
                       onChange={(e) => setCoopDiff(e.target.value as 'easy' | 'medium' | 'hard')}
                       style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
                     >
-                      <option value="easy">Fácil (5 rutas)</option>
-                      <option value="medium">Intermedio (10 rutas)</option>
-                      <option value="hard">Difícil (25 rutas)</option>
+                      <option value="easy">{t('coop.easy')}</option>
+                      <option value="medium">{t('coop.medium')}</option>
+                      <option value="hard">{t('coop.hard')}</option>
                     </select>
                   </label>
                 </div>
@@ -9805,14 +9837,14 @@ function MainApp() {
                   onClick={() => { playClick(); void handleCreateCoopSession() }}
                   style={{ background: '#37d16b', color: '#12122b' }}
                 >
-                  ➕ Crear sesión
+                  {t('coop.create')}
                 </button>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <input
                     type="text"
                     value={coopJoinCode}
                     onChange={(e) => setCoopJoinCode(e.target.value.toUpperCase())}
-                    placeholder="Código (6 letras)"
+                    placeholder={t('coop.joinCode')}
                     maxLength={6}
                     style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box', textTransform: 'uppercase' }}
                   />
@@ -9822,7 +9854,7 @@ function MainApp() {
                     disabled={isLoading}
                     onClick={() => { playClick(); void handleJoinCoopSession() }}
                   >
-                    🔑 Unirse
+                    {t('coop.join')}
                   </button>
                 </div>
               </div>
@@ -9831,7 +9863,7 @@ function MainApp() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                   <div style={{ textAlign: 'center', flex: 1 }}>
                     <div style={{ color: '#37d16b', fontWeight: 'bold', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>
-                      🎮 Código de sesión
+                      {t('coop.sessionCode')}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
                       <span style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '2rem', letterSpacing: '8px', textShadow: '0 2px 0 rgba(0,0,0,0.5)' }}>
@@ -9841,20 +9873,20 @@ function MainApp() {
                     </div>
                   </div>
                   <button className="tiny-btn" type="button" onClick={cancelCoopSession} style={{ color: '#ff8a80', alignSelf: 'flex-start' }}>
-                    ✕ Cancelar
+                    {t('pvp.cancel')}
                   </button>
                 </div>
                 {coopMyRole === 'a' ? (
                   coopPartnerJoined ? (
-                    <p style={{ margin: '0', color: '#37d16b', fontSize: '0.85rem' }}>✅ ¡Tu compañero se ha unido! Pulsa "Iniciar Aventura" para empezar.</p>
+                    <p style={{ margin: '0', color: '#37d16b', fontSize: '0.85rem' }}>{t('coop.partnerJoined')}</p>
                   ) : (
-                    <p style={{ margin: '0', color: '#ffcb05', fontSize: '0.85rem' }}>⏳ Comparte este código con tu amigo y espera a que se una...</p>
+                    <p style={{ margin: '0', color: '#ffcb05', fontSize: '0.85rem' }}>{t('coop.shareCode')}</p>
                   )
                 ) : (
-                  <p style={{ margin: '0', color: '#37d16b', fontSize: '0.85rem' }}>✅ Sesión unida. Pulsa "Iniciar Aventura" cuando tu compañero esté listo.</p>
+                  <p style={{ margin: '0', color: '#37d16b', fontSize: '0.85rem' }}>{t('coop.sessionJoined')}</p>
                 )}
                 <p style={{ margin: '0', color: '#7d7ab5', fontSize: '0.75rem' }}>
-                  Gen {coopGen} ({generationRegions[coopGen]}) — {coopDiff === 'easy' ? 'Fácil' : coopDiff === 'hard' ? 'Difícil' : 'Intermedio'}. Misma ruta para ambos (misma semilla); tiendas, enemigos y descansos distintos por jugador.
+                  {t('coop.sessionInfo', { gen: coopGen, region: generationRegions[coopGen], diff: difficultyLabel(language, coopDiff).title })}
                 </p>
               </div>
             )}
@@ -9867,7 +9899,7 @@ function MainApp() {
           <div className="setup-grid">
             <div className="setup-col">
               <div className="setup-card">
-                <h2 className="setup-card-title">⚔️ PvP 1vs1</h2>
+                <h2 className="setup-card-title">{t('pvp.setupTitle')}</h2>
           <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0' }}>
             <button
               className="gen-tile"
@@ -9875,9 +9907,9 @@ function MainApp() {
               onClick={openPvpModal}
               style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '12px', border: '1px solid #a855f7', background: 'rgba(168,85,247,0.1)', borderRadius: '12px', cursor: 'pointer' }}
             >
-              <span style={{ fontSize: '1.2rem', color: '#cba3ff' }}>⚔️ Jugar 1vs1</span>
+              <span style={{ fontSize: '1.2rem', color: '#cba3ff' }}>{t('pvp.play')}</span>
               <strong style={{ fontSize: '0.85rem', color: '#9b98cf' }}>
-                Enfréntate a otro jugador con tu equipo ({pvpTeam.length}/6) {pvpTeam.length > 0 ? '— 🛠️ Hacerse el equipo' : '— crea tu equipo primero'}
+                {pvpTeam.length > 0 ? t('pvp.buildTeam', { n: pvpTeam.length }) : t('pvp.buildTeamFirst', { n: pvpTeam.length })}
               </strong>
             </button>
           </div>
@@ -9886,7 +9918,7 @@ function MainApp() {
 
             <div className="setup-col">
               <div className="setup-card">
-                <h2 className="setup-card-title"><span className="setup-step">3</span> Desafíos de Run <span className="muted" style={{ fontSize: '0.6rem', fontWeight: 'normal' }}>(opcional)</span></h2>
+                <h2 className="setup-card-title"><span className="setup-step">3</span> {t('setup.challenges')} <span className="muted" style={{ fontSize: '0.6rem', fontWeight: 'normal' }}>{t('setup.challengesOptional')}</span></h2>
           {(() => {
             // En Cooperativo y COLISEUM los desafíos están siempre disponibles.
             // En Infinite NO se permiten (siempre bloqueados). En el resto
@@ -9901,65 +9933,65 @@ function MainApp() {
 
             const challengeCategories = [
               {
-                title: '🗺️ Ruta',
+                title: t('challenge.cat.route'),
                 items: [
-                  { key: 'noShops' as const, label: '🚫🏪 Sin Tiendas', desc: 'Se eliminan todos los nodos de tienda de la ruta.' },
-                  { key: 'noRests' as const, label: '🚫🏕️ Sin Descansos', desc: 'Se eliminan todos los nodos de descanso de la ruta.' },
-                  { key: 'allTeamRocket' as const, label: '🔴 Solo TeamR', desc: 'Todos los nodos no-boss se convierten en batallas Team Rocket.' },
-                  { key: 'bossRush' as const, label: '🏆 Boss Rush', desc: 'Solo combates y boss final, sin tiendas ni descansos.' },
-                  { key: 'blindRoute' as const, label: '👁️‍🗨️ Ruta Ciega', desc: 'No puedes ver qué nodo sigue hasta completar el actual.' },
+                  { key: 'noShops' as const, label: t('ch.noShops'), desc: t('ch.noShops.desc') },
+                  { key: 'noRests' as const, label: t('ch.noRests'), desc: t('ch.noRests.desc') },
+                  { key: 'allTeamRocket' as const, label: t('ch.allTeamRocket'), desc: t('ch.allTeamRocket.desc') },
+                  { key: 'bossRush' as const, label: t('ch.bossRush'), desc: t('ch.bossRush.desc') },
+                  { key: 'blindRoute' as const, label: t('ch.blindRoute'), desc: t('ch.blindRoute.desc') },
                 ]
               },
               {
-                title: '✨ Visual',
+                title: t('challenge.cat.visual'),
                 items: [
-                  { key: 'allShiny' as const, label: '✨ Solo Shiny', desc: 'Todos los Pokémon (aliados y rivales) son Shiny.' },
+                  { key: 'allShiny' as const, label: t('ch.allShiny'), desc: t('ch.allShiny.desc') },
                 ]
               },
               {
-                title: '⚔️ Combate',
+                title: t('challenge.cat.combat'),
                 items: [
-                  { key: 'noItems' as const, label: '🚫🎒 Sin Objetos', desc: 'No puedes usar consumables (pociones, X items, etc.) en batalla.' },
-                  { key: 'restrictedMoves' as const, label: '⚔️ 2 Movimientos', desc: 'Cada Pokémon solo puede usar sus 2 primeros movimientos.' },
-                  { key: 'firstStrike' as const, label: '⚡ Primer Golpe', desc: 'Si atacas primero y no debilitas al rival, recibes recoil del 8% HP.' },
-                  { key: 'noCrits' as const, label: '🚫💥 Sin Críticos', desc: 'Se desactivan completamente los golpes críticos.' },
-                  { key: 'typeRandomizer' as const, label: '🎲🎯 Tipo Random', desc: 'El tipo de cada movimiento se randomiza cada turno.' },
-                  { key: 'fixedLevel' as const, label: '📊 Nivel Fijo', desc: 'Todos los Pokémon están en nivel 50, siempre.' },
+                  { key: 'noItems' as const, label: t('ch.noItems'), desc: t('ch.noItems.desc') },
+                  { key: 'restrictedMoves' as const, label: t('ch.restrictedMoves'), desc: t('ch.restrictedMoves.desc') },
+                  { key: 'firstStrike' as const, label: t('ch.firstStrike'), desc: t('ch.firstStrike.desc') },
+                  { key: 'noCrits' as const, label: t('ch.noCrits'), desc: t('ch.noCrits.desc') },
+                  { key: 'typeRandomizer' as const, label: t('ch.typeRandomizer'), desc: t('ch.typeRandomizer.desc') },
+                  { key: 'fixedLevel' as const, label: t('ch.fixedLevel'), desc: t('ch.fixedLevel.desc') },
                 ]
               },
               {
-                title: '🎯 Equipo',
+                title: t('challenge.cat.team'),
                 items: [
-                  { key: 'soloStarter' as const, label: '🌟 Solo Starter', desc: 'No puedes capturar ni agregar Pokémon a tu equipo.' },
-                  { key: 'fixedTeam' as const, label: '🔒 Equipo Fijo', desc: 'Tu equipo inicial no puede cambiarse durante la run.' },
-                  { key: 'noEvolution' as const, label: '🚫🧬 Sin Evolución', desc: 'No puedes evolucionar Pokémon en los descansos.' },
-                  { key: 'egglocke' as const, label: '🥚 Egglocke', desc: 'En los descansos obtienes huevos que eclosionan tras 2-3 batallas.' },
+                  { key: 'soloStarter' as const, label: t('ch.soloStarter'), desc: t('ch.soloStarter.desc') },
+                  { key: 'fixedTeam' as const, label: t('ch.fixedTeam'), desc: t('ch.fixedTeam.desc') },
+                  { key: 'noEvolution' as const, label: t('ch.noEvolution'), desc: t('ch.noEvolution.desc') },
+                  { key: 'egglocke' as const, label: t('ch.egglocke'), desc: t('ch.egglocke.desc') },
                 ]
               },
               {
-                title: '💰 Economía',
+                title: t('challenge.cat.economy'),
                 items: [
-                  { key: 'noPurchasing' as const, label: '🚫💰 Sin Compras', desc: 'No puedes comprar nada en la Pokémart.' },
-                  { key: 'noMoney' as const, label: '💸 Sin Dinero', desc: 'No recibes dinero por derrotar rivales.' },
+                  { key: 'noPurchasing' as const, label: t('ch.noPurchasing'), desc: t('ch.noPurchasing.desc') },
+                  { key: 'noMoney' as const, label: t('ch.noMoney'), desc: t('ch.noMoney.desc') },
                 ]
               },
               {
-                title: '📈 Dificultad',
+                title: t('challenge.cat.difficulty'),
                 items: [
-                  { key: 'scalingEnemies' as const, label: '📈 Enemigos Reforzados', desc: 'Los enemigos ganan +1 nivel extra por cada nodo avanzado.' },
-                  { key: 'noHealing' as const, label: '🚫💊 Sin Curación', desc: 'Ni tiendas, ni descansos, ni items curan HP.' },
-                  { key: 'doubleModifiers' as const, label: '🎰 2 Modifiers', desc: 'Recibes 2 modificadores aleatorios en vez de 1.' },
-                  { key: 'speedrun' as const, label: '⏱️ Speedrun', desc: 'Tienes 30 segundos por turno. Si se agota, pierdes 15% HP.' },
-                  { key: 'totalRandomizer' as const, label: '🎲 Total Random', desc: 'Stats de ataque, defensa y velocidad de los enemigos son randomizados.' },
+                  { key: 'scalingEnemies' as const, label: t('ch.scalingEnemies'), desc: t('ch.scalingEnemies.desc') },
+                  { key: 'noHealing' as const, label: t('ch.noHealing'), desc: t('ch.noHealing.desc') },
+                  { key: 'doubleModifiers' as const, label: t('ch.doubleModifiers'), desc: t('ch.doubleModifiers.desc') },
+                  { key: 'speedrun' as const, label: t('ch.speedrun'), desc: t('ch.speedrun.desc') },
+                  { key: 'totalRandomizer' as const, label: t('ch.totalRandomizer'), desc: t('ch.totalRandomizer.desc') },
                 ]
               },
               {
-                title: '💀 Extremo',
+                title: t('challenge.cat.extreme'),
                 items: [
-                  { key: 'nuzlocke' as const, label: '💀 Nuzlocke', desc: 'Si un Pokémon muere, se libera automáticamente.' },
-                  { key: 'ironman' as const, label: '🔒 Ironman', desc: 'Activa Sin Evolución + Equipo Fijo + Sin Curación.' },
-                  { key: 'nuzlockeHardcore' as const, label: '💀💀 Nuzlocke Hardcore', desc: 'Activa Nuzlocke + Sin Objetos + Sin Descansos.' },
-                  { key: 'challengeGauntlet' as const, label: '🎰 Gauntlet (3 al azar)', desc: 'Se seleccionan 3 desafíos aleatorios al iniciar la run.' },
+                  { key: 'nuzlocke' as const, label: t('ch.nuzlocke'), desc: t('ch.nuzlocke.desc') },
+                  { key: 'ironman' as const, label: t('ch.ironman'), desc: t('ch.ironman.desc') },
+                  { key: 'nuzlockeHardcore' as const, label: t('ch.nuzlockeHardcore'), desc: t('ch.nuzlockeHardcore.desc') },
+                  { key: 'challengeGauntlet' as const, label: t('ch.challengeGauntlet'), desc: t('ch.challengeGauntlet.desc') },
                 ]
               },
             ]
@@ -9969,8 +10001,8 @@ function MainApp() {
                 {!challengesUnlocked && (
                   <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem', color: '#fbbf24' }}>
                     {difficulty === 'infinite'
-                      ? '🔒 Los desafíos no están disponibles en el modo Infinite.'
-                      : `🔒 Completa la ${generation === 0 ? 'todas las generaciones' : `Gen ${generation} (${generationRegions[generation]})`} en Intermedio o Difícil para desbloquear los desafíos.`}
+                      ? t('ch.locked')
+                      : t('ch.lockedGens', { region: generation === 0 ? 'todas las generaciones' : `Gen ${generation} (${generationRegions[generation]})` })}
                   </p>
                 )}
                 {challengeCategories.map((cat) => (
@@ -10040,7 +10072,7 @@ function MainApp() {
       {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double' || screen === 'casino') && activePokemon && (
         <section className="roulette-layout">
           <article className="panel trainer-panel">
-            <p className="muted small-tag">Trainer</p>
+            <p className="muted small-tag">{t('route.trainer')}</p>
             <div style={{ position: 'relative', display: 'block', width: 'fit-content', margin: '0 auto' }}>
               <img className={`sprite trainer-sprite${activePokemon.megaEvolved ? ' mega-active' : ''}${activePokemon.gmaxEvolved ? ' gmax-active' : ''}`} src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
               <StatusFloat pokemon={activePokemon} />
@@ -10062,7 +10094,7 @@ function MainApp() {
               <div style={{ width: `${(activePokemon.hp / activePokemon.maxHp) * 100}%` }}></div>
             </div>
 
-            <p className="label">Team {team.length}/{maxTeamSize}</p>
+            <p className="label">{t('route.team')} {team.length}/{maxTeamSize}</p>
             <div className="team-grid">
               {team.map((pokemon, index) => (
                 <div key={`${pokemon.id}-${index}`} className="sprite-tooltip-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -10077,7 +10109,7 @@ function MainApp() {
                       <img
                         src={ITEM_SPRITES[pokemon.holdItem]}
                         alt={pokemon.holdItem}
-                        title={`${pokemon.holdItem}: ${HOLDABLE_ITEMS[pokemon.holdItem]?.desc ?? ''}`}
+                        title={`${pokemon.holdItem}: ${itemDesc(pokemon.holdItem ?? '')}`}
                         style={{ width: '18px', height: '18px', imageRendering: 'pixelated', position: 'absolute', bottom: '4px', right: '4px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
                       />
                     )}
@@ -10097,7 +10129,7 @@ function MainApp() {
                         {ITEM_SPRITES[pokemon.holdItem] && (
                           <img src={ITEM_SPRITES[pokemon.holdItem]} alt="" style={{ width: '14px', height: '14px', imageRendering: 'pixelated', verticalAlign: 'middle', marginRight: '3px' }} />
                         )}
-                        {pokemon.holdItem} — {HOLDABLE_ITEMS[pokemon.holdItem]?.desc}
+                        {pokemon.holdItem} — {itemDesc(pokemon.holdItem ?? '')}
                       </div>
                     )}
                     {pokemon.types && pokemon.types.length > 0 && (
@@ -10144,7 +10176,7 @@ function MainApp() {
                     {pokemon.moves.length > 0 && (
                       <div className="tooltip-moves">
                         {pokemon.moves.slice(0, 4).map((m) => (
-                          <span key={m.name}>{m.name}</span>
+                          <span key={m.name}>{moveName(m)}</span>
                         ))}
                       </div>
                     )}
@@ -10205,7 +10237,7 @@ function MainApp() {
                           <img
                             src={ITEM_SPRITES[pokemon.holdItem]}
                             alt={pokemon.holdItem}
-                            title={`${pokemon.holdItem}: ${HOLDABLE_ITEMS[pokemon.holdItem]?.desc ?? ''}`}
+                            title={`${pokemon.holdItem}: ${itemDesc(pokemon.holdItem ?? '')}`}
                             style={{ width: '18px', height: '18px', imageRendering: 'pixelated', position: 'absolute', bottom: '4px', right: '4px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
                           />
                         )}
@@ -10238,7 +10270,7 @@ function MainApp() {
 
           <article className="panel center-panel">
             <h2>
-              {difficulty === 'infinite' ? `Ruta #${route.length}` : `Ruta (${routeIndex + 1}/${route.length})`}
+              {difficulty === 'infinite' ? `${t('route.route')} #${route.length}` : `${t('route.route')} (${routeIndex + 1}/${route.length})`}
               {runChallenges.speedrun && screen === 'battle' && (
                 <span style={{ marginLeft: '10px', fontSize: '0.9rem', color: speedrunSeconds <= 10 ? '#ee3b2f' : '#ffcb05', fontWeight: 'bold' }}>
                   ⏱️ {speedrunSeconds}s
@@ -10254,7 +10286,7 @@ function MainApp() {
             )}
             {difficulty !== 'infinite' && difficulty !== 'coliseum' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', padding: '6px 10px', background: 'rgba(250,204,21,0.08)', borderRadius: '8px', border: '1px solid rgba(250,204,21,0.2)' }}>
-                <span style={{ fontSize: '0.85rem', color: '#ffcb05', fontWeight: 'bold' }}>Etapa {currentStage}/3</span>
+                <span style={{ fontSize: '0.85rem', color: '#ffcb05', fontWeight: 'bold' }}>{t('route.stage')} {currentStage}/3</span>
                 <div style={{ display: 'flex', gap: '4px' }}>
                   {[0, 1, 2].map(i => {
                     const badge = badges[i]
@@ -10285,7 +10317,7 @@ function MainApp() {
             )}
             {modifier2 && (
               <div style={{ fontSize: '0.75rem', color: '#cba3ff', marginBottom: '0.5rem' }}>
-                🎰 Modifier 2: <strong>{modifier2.name}</strong> — {modifier2.description}
+                🎰 Modifier 2: <strong>{runModName(modifier2.id ?? '')}</strong> — {runModDesc(modifier2.id ?? '')}
               </div>
             )}
             <div
@@ -10333,9 +10365,9 @@ function MainApp() {
             {screen === 'shop' && (
               <div className="action-block shop-block" style={{ marginTop: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <h3 style={{ margin: 0, color: '#ffcb05' }}>🏪 Pokémart</h3>
+                  <h3 style={{ margin: 0, color: '#ffcb05' }}>{t('shop.mart')}</h3>
                   <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#7ceb95' }}>
-                    Dinero: ${money}
+                    {t('shop.money')}: ${money}
                   </span>
                 </div>
 
@@ -10390,7 +10422,7 @@ function MainApp() {
                           )}
                           <div>
                             <strong style={{ color: isHoldable ? '#cba3ff' : '#4d9bff' }}>{itemName}</strong>
-                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#9b98cf' }}>{data.desc}</p>
+                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#9b98cf' }}>{itemDesc(itemName)}</p>
                             {isHoldable && <span style={{ fontSize: '0.65rem', color: '#b8a1ff' }}>objeto pasivo</span>}
                           </div>
                         </div>
@@ -10539,12 +10571,12 @@ function MainApp() {
             {screen === 'blackmarket' && (
               <div className="action-block shop-block" style={{ marginTop: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <h3 style={{ margin: 0, color: '#fb923c' }}>🕶️ Mercado Negro</h3>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#7ceb95' }}>Dinero: ${money}</span>
+                  <h3 style={{ margin: 0, color: '#fb923c' }}>{t('shop.blackMarket')}</h3>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#7ceb95' }}>{t('shop.money')}: ${money}</span>
                 </div>
                 <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Objetos a precios reducidos, vende lo que no uses y compra Pokémon acordes a tu nivel.</p>
 
-                <h4 style={{ color: '#fb923c', margin: '0 0 0.4rem', fontSize: '0.9rem' }}>🛒 Comprar objetos (-15%)</h4>
+                <h4 style={{ color: '#fb923c', margin: '0 0 0.4rem', fontSize: '0.9rem' }}>{t('shop.buyItems')}</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '1rem' }}>
                   {blackMarketItems.map((itemName) => {
                     const price = blackMarketItemPrice(itemName)
@@ -10561,7 +10593,7 @@ function MainApp() {
                   })}
                 </div>
 
-                <h4 style={{ color: '#fb923c', margin: '0 0 0.4rem', fontSize: '0.9rem' }}>💸 Vender objetos</h4>
+                <h4 style={{ color: '#fb923c', margin: '0 0 0.4rem', fontSize: '0.9rem' }}>{t('shop.sellItems')}</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '1rem' }}>
                   {inventory.length === 0 ? (
                     <p style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No tienes objetos para vender.</p>
@@ -10580,7 +10612,7 @@ function MainApp() {
                   )}
                 </div>
 
-                <h4 style={{ color: '#fb923c', margin: '0 0 0.4rem', fontSize: '0.9rem' }}>🐾 Comprar Pokémon</h4>
+                <h4 style={{ color: '#fb923c', margin: '0 0 0.4rem', fontSize: '0.9rem' }}>{t('shop.buyPokemon')}</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {blackMarketPokemon.length === 0 ? (
                     <p style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>Cargando Pokémon...</p>
@@ -10604,7 +10636,7 @@ function MainApp() {
                   )}
                 </div>
 
-                <button className="cta" onClick={completeCurrentNode} type="button" style={{ width: '100%', marginTop: '1rem' }}>Salir del Mercado Negro</button>
+                <button className="cta" onClick={completeCurrentNode} type="button" style={{ width: '100%', marginTop: '1rem' }}>{t('shop.leaveMarket')}</button>
               </div>
             )}
 
@@ -10671,7 +10703,7 @@ function MainApp() {
                       onClick={() => void cancelCoopOffer()}
                       style={{ width: '100%', marginBottom: '0.5rem' }}
                     >
-                      ✕ Cancelar selección
+                      {t('coop.cancelSelection')}
                     </button>
                   </>
                 ) : (
@@ -10704,7 +10736,7 @@ function MainApp() {
                         onClick={() => void cancelCoopOffer()}
                         style={{ width: '100%', marginBottom: '0.5rem', color: '#ff8a80' }}
                       >
-                        ✕ Cancelar intercambio (recuperar oferta)
+                        {t('coop.cancelTrade')}
                       </button>
                     )}
                   </>
@@ -10723,10 +10755,8 @@ function MainApp() {
                 <div className="roulette-wheel">
                   <div className={`roulette-items ${spinAnimating ? 'spinning' : ''}`}>
                     {spinItems.map((item, idx) => {
-                      const isHoldable = !!HOLDABLE_ITEMS[item]
                       const itemIcon = ITEM_SPRITES[item]
                       const isWinner = spinRevealed && idx === spinWinnerIndex
-                      const desc = isHoldable ? HOLDABLE_ITEMS[item].desc : ALL_SHOP_ITEMS[item]?.desc ?? ''
                       return (
                         <div
                           key={`spin-${idx}`}
@@ -10736,7 +10766,7 @@ function MainApp() {
                             <img src={itemIcon} alt={item} className="roulette-item-icon" />
                           )}
                           <span className="roulette-item-name">{item}</span>
-                          <span className="roulette-item-desc">{desc}</span>
+                          <span className="roulette-item-desc">{itemDesc(item)}</span>
                         </div>
                       )
                     })}
@@ -10846,10 +10876,10 @@ function MainApp() {
                     )}
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                       <button className="cta" onClick={claimCasinoReward} type="button" style={{ background: '#f0abfc', color: '#1a1033' }}>
-                        🎁 Reclamar premio
+                        {t('route.claim')}
                       </button>
                       <button className="secondary" onClick={skipCasino} type="button">
-                        Salir sin premio
+                        {t('route.exit')}
                       </button>
                     </div>
                   </div>
@@ -10860,14 +10890,14 @@ function MainApp() {
             {screen === 'move' && (
               <div className="action-block">
                 <h3 style={{ margin: '0 0 0.5rem', color: moveFromItemRef.current ? '#38bdf8' : '#f3f1ff', textAlign: 'center' }}>
-                  {moveFromItemRef.current ? '💿 ¡Disco MT!' : '📝 ¡Move Tutor!'}
+                  {moveFromItemRef.current ? t('move.disco') : t('move.tutor')}
                 </h3>
                 {!selectedNewMove ? (
                   <>
                     <p className="muted" style={{ textAlign: 'center', margin: '0 0 0.75rem' }}>
                       {moveFromItemRef.current
-                        ? <>Elige un movimiento para <strong>{activePokemon?.name}</strong> con tu Disco MT. Se consumirá al enseñarlo.</>
-                        : <>Elige un movimiento para <strong>{activePokemon?.name}</strong> o salta el nodo.</>}
+                        ? <>{t('move.chooseFor', { name: activePokemon?.name ?? '' })} {t('move.discoUse')}</>
+                        : <>{t('move.chooseFor', { name: activePokemon?.name ?? '' })} {t('move.orSkip')}</>}
                     </p>
                     <div className="moves-grid" style={{ marginBottom: '1rem' }}>
                       {moveOptions.map((move) => (
@@ -10878,7 +10908,7 @@ function MainApp() {
                           onClick={() => setSelectedNewMove(move)}
                           style={{ borderColor: TYPE_COLORS[move.type] ?? '#475569' }}
                         >
-                          <strong>{move.name}</strong>
+                          <strong>{moveName(move)}</strong>
                           <span className="muted" style={{ fontSize: '0.5rem' }}>
                             {move.type.toUpperCase()} · Pwr {move.power} · Acc {move.accuracy ?? '—'}
                           </span>
@@ -10895,7 +10925,7 @@ function MainApp() {
                   <>
                     <p className="muted" style={{ textAlign: 'center', margin: '0 0 0.75rem' }}>
                       <strong style={{ color: TYPE_COLORS[selectedNewMove.type] ?? '#f3f1ff' }}>{selectedNewMove.name}</strong>
-                      {' '} — Elige qué movimiento reemplazar:
+                      {' '} {t('move.replaceWhich')}
                     </p>
                     <div className="moves-grid" style={{ marginBottom: '1rem' }}>
                       {activePokemon?.moves.map((move, idx) => (
@@ -10906,7 +10936,7 @@ function MainApp() {
                           onClick={() => replaceTeamMove(idx)}
                           style={{ borderColor: TYPE_COLORS[move.type] ?? '#475569' }}
                         >
-                          <strong>{move.name}</strong>
+                          <strong>{moveName(move)}</strong>
                           <span className="muted" style={{ fontSize: '0.5rem' }}>
                             {move.type.toUpperCase()} · Pwr {move.power}
                           </span>
@@ -11030,7 +11060,7 @@ function MainApp() {
                 </div>
                 <div className="evolve-section" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
                   <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>Descansa para recuperar energía:</p>
-                  <button className="cta" onClick={() => { if (runChallenges.noHealing) { setBattleLog(prev => ['🚫 Desafío Sin Curación: No puedes curar en descanso.', ...prev].slice(0, 15)); completeCurrentNode(); return } setTeam(prev => prev.map(p => p.hp <= 0 ? { ...p, hp: Math.max(1, Math.floor(p.maxHp * 0.5)) } : { ...p, hp: p.maxHp })); setBattleLog(prev => ['💊 ¡Equipo restaurado completamente en el descanso!', ...prev].slice(0, 15)); completeCurrentNode() }} type="button"                     style={{ background: '#ee3b2f', width: '100%' }}>
+                  <button className="cta" onClick={() => { if (runChallenges.noHealing) { setBattleLog(prev => [t('b.challengeNoHealRest'), ...prev].slice(0, 15)); completeCurrentNode(); return } setTeam(prev => prev.map(p => p.hp <= 0 ? { ...p, hp: Math.max(1, Math.floor(p.maxHp * 0.5)) } : { ...p, hp: p.maxHp })); setBattleLog(prev => [t('b.restHealed'), ...prev].slice(0, 15)); completeCurrentNode() }} type="button"                     style={{ background: '#ee3b2f', width: '100%' }}>
                     💊 Curar Equipo
                   </button>
                 </div>
@@ -11122,8 +11152,8 @@ function MainApp() {
                         return (
                           <div style={{ padding: '0.6rem', borderRadius: '8px', background: 'rgba(56,189,248,0.08)', border: '1px solid #38bdf8', marginBottom: '0.5rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                              <strong style={{ color: '#7dd3fc', fontSize: '0.85rem' }}>Cambiar de Pokémon:</strong>
-                              <button className="tiny-btn" type="button" onClick={() => setDoubleChoosingSwitch(false)}>← Volver a ataques</button>
+                              <strong style={{ color: '#7dd3fc', fontSize: '0.85rem' }}>{t('pvp.switchPokemon')}</strong>
+                              <button className="tiny-btn" type="button" onClick={() => setDoubleChoosingSwitch(false)}>{t('pvp.backToMoves')}</button>
                             </div>
                             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                               {backups.map(({ p, idx }) => (
@@ -11132,7 +11162,7 @@ function MainApp() {
                                   {p.name}
                                 </button>
                               ))}
-                              {backups.length === 0 && <span style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No hay Pokémon disponibles.</span>}
+                              {backups.length === 0 && <span style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>{t('common.noPokemon')}</span>}
                             </div>
                             <p style={{ margin: '0.5rem 0 0', color: '#7d7ab5', fontSize: '0.75rem' }}>El cambio gasta el turno: el Pokémon que entra no ataca y los enemigos sí.</p>
                           </div>
@@ -11152,7 +11182,7 @@ function MainApp() {
                                 title={moveTooltip(m)}
                                 style={{ background: sel?.moveIdx === mi ? '#a855f7' : '#2a2a55', color: '#fff', border: sel?.moveIdx === mi ? '2px solid #cba3ff' : '2px solid transparent' }}
                               >
-                                {m.name} ({m.type})
+                                {moveName(m)} ({m.type})
                               </button>
                             ))}
                           </div>
@@ -11260,7 +11290,7 @@ function MainApp() {
                             />
                             {tp.status && (
                               <span style={{ position: 'absolute', top: 1, right: 1, fontSize: '0.6rem', lineHeight: 1, textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>
-                                {STATUS_LABELS[tp.status.type].split(' ')[0]}
+                                {statusLabel(tp.status.type).split(' ')[0]}
                               </span>
                             )}
                             {isActive && (
@@ -11309,7 +11339,7 @@ function MainApp() {
                       title={isDisabled ? `🚫 Anulado por Anulación` : moveTooltip(move)}
                       style={isDisabled ? { borderColor: '#ff8a80', opacity: 0.5, textDecoration: 'line-through' } : undefined}
                     >
-                      {isDisabled ? '🚫 ' : ''}{move.name} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''}){move.minHits ? ` x${move.minHits}-${move.maxHits}` : ''}
+                      {isDisabled ? '🚫 ' : ''}{moveName(move)} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''}){move.minHits ? ` x${move.minHits}-${move.maxHits}` : ''}
                     </button>
                     )
                   })}
@@ -11322,7 +11352,7 @@ function MainApp() {
                     disabled={isLoading || !inventory.some(i => POKEBALL_NAMES.includes(i))}
                     style={{ marginTop: '8px', width: '100%', background: '#37d16b' }}
                   >
-                    🏐 Capturar ({inventory.filter(i => POKEBALL_NAMES.includes(i)).length} balls)
+                    {t('route.capture')} ({inventory.filter(i => POKEBALL_NAMES.includes(i)).length} {language === 'en' ? 'balls' : 'balls'})
                   </button>
                 )}
                 {activePokemon.holdItem === 'Mega Stone' && !battleMegaUsed && !activePokemon.gmaxEvolved && MEGA_CAPABLE_IDS.has(activePokemon.id) && (
@@ -11362,7 +11392,7 @@ function MainApp() {
           </article>
 
           <article className="panel items-panel">
-            <h2>Items</h2>
+            <h2>{t('route.items')}</h2>
             <div className="items-grid">
               {inventoryEntries.length > 0 ? (
                 inventoryEntries.map((entry) => {
@@ -11423,8 +11453,8 @@ function MainApp() {
             {modifier && (
               <div className="modifier-box">
                 <p className="small-tag">Modifier</p>
-                <strong>{modifier.name}</strong>
-                <p className="muted">{modifier.description}</p>
+                <strong>{runModName(modifier.id ?? '')}</strong>
+                <p className="muted">{runModDesc(modifier.id ?? '')}</p>
               </div>
             )}
 
@@ -11452,11 +11482,11 @@ function MainApp() {
 
       {screen === 'victory' && (
         <section className="panel end-panel">
-          <h2>¡Victoria!</h2>
+          <h2>{t('victory.header')}</h2>
           <p>
             {coopMode
-              ? `Has completado las 3 etapas cooperativas (${difficultyNodeCounts[coopDiff] || 10} rutas/etapa) y derrotado al jefe final.`
-              : `Has completado la ruta (${difficultyNodeCounts[difficulty]} nodos) y derrotado al jefe final.`}
+              ? t('victory.completedCoop', { n: difficultyNodeCounts[coopDiff] || 10 })
+              : t('victory.completedMedium', { n: difficultyNodeCounts[difficulty] })}
           </p>
 
           {victoryUnlocks && (
@@ -11472,7 +11502,7 @@ function MainApp() {
               }}
             >
               <h3 style={{ color: '#34d399', margin: '0 0 0.75rem 0', fontSize: '1.1rem' }}>
-                🎉 ¡Progreso de la Aventura!
+                {t('victory.progress')}
               </h3>
               {victoryUnlocks.nextGenNumber ? (
                 <p style={{ margin: '6px 0', color: '#f8fafc', fontSize: '0.95rem' }}>
@@ -11491,7 +11521,7 @@ function MainApp() {
               )}
               {victoryUnlocks.unlockedInfinite && (
                 <p style={{ margin: '6px 0', color: '#cba3ff', fontSize: '0.95rem' }}>
-                  ♾️ <strong>¡MODO INFINITE DESBLOQUEADO!</strong> Ahora puedes jugar la Gen {currentRunGen} ({victoryUnlocks.genName}) en modo Infinite (rutas infinitas).
+                  {t('victory.infiniteUnlocked2', { gen: currentRunGen, region: victoryUnlocks.genName })}
                 </p>
               )}
             </div>
@@ -11513,8 +11543,8 @@ function MainApp() {
       {screen === 'defeat' && (
         <section className="panel end-panel defeat-panel">
           <div className="defeat-header">
-            <h2 className="defeat-title">{voluntaryRunEnd ? '🏁 AVENTURA TERMINADA' : '💀 HAS SIDO DERROTADO'}</h2>
-            <p className="muted">{voluntaryRunEnd ? 'Has decidido finalizar la aventura.' : 'Tu equipo ha quedado fuera de combate.'}</p>
+            <h2 className="defeat-title">{voluntaryRunEnd ? t('defeat.ended') : t('defeat.lost')}</h2>
+            <p className="muted">{voluntaryRunEnd ? t('defeat.endedMsg') : t('defeat.lostMsg')}</p>
           </div>
 
           {coopSessionEndedMsg && (
@@ -11526,7 +11556,7 @@ function MainApp() {
           {defeatSummary && (
             <div className="defeat-details-grid" style={{ marginTop: '1rem', textAlign: 'left' }}>
               <div className="defeat-box" style={{ marginBottom: '1.5rem' }}>
-                <h3 className="section-subtitle" style={{ fontSize: '1rem', color: '#ff8a80' }}>🛡️ Equipo Caído</h3>
+                <h3 className="section-subtitle" style={{ fontSize: '1rem', color: '#ff8a80' }}>{t('defeat.fallenTeam')}</h3>
                 <div className="fainted-team-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.5rem', marginTop: '0.5rem' }}>
                   {defeatSummary.finalTeam.map((pkmn, idx) => (
                     <div key={`${pkmn.id}-${idx}`} className="fainted-card" style={{ background: 'rgba(0,0,0,0.3)', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
@@ -11540,12 +11570,12 @@ function MainApp() {
 
               {defeatSummary.enemy && (
                 <p className="muted" style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
-                  Caíste luchando contra <strong>{defeatSummary.enemy.name} (Nv. {defeatSummary.enemy.level})</strong> en el nodo <em>{defeatSummary.lastNodeLabel ?? 'de combate'}</em>.
+                  {t('defeat.fellTo', { name: `${defeatSummary.enemy.name} (Nv. ${defeatSummary.enemy.level})`, node: defeatSummary.lastNodeLabel ?? t('defeat.nodeCombat') })}
                 </p>
               )}
 
               <div className="log-mini defeat-log" style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '8px' }}>
-                <p className="small-tag">Últimas acciones</p>
+                <p className="small-tag">{t('defeat.lastActions')}</p>
                 <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.85rem' }}>
                   {defeatSummary.battleLog.slice(0, 5).map((line, index) => (
                     <li key={`defeat-log-${index}`}>{line}</li>
@@ -11612,7 +11642,7 @@ function MainApp() {
         <div className="modal-backdrop" style={{ zIndex: 10000 }}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '380px', textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🤝</div>
-            <h3 style={{ color: '#37d16b', margin: '0 0 0.5rem' }}>Esperando a tu compañero...</h3>
+            <h3 style={{ color: '#37d16b', margin: '0 0 0.5rem' }}>{t('coop.waiting')}</h3>
             <p style={{ color: '#9b98cf', margin: '0 0 1rem', fontSize: '0.9rem' }}>
               Completaste el nodo {coopWaitingNode}. Tu compañero aún no termina su parte.
             </p>
@@ -11646,8 +11676,8 @@ function MainApp() {
         <div className="modal-backdrop" onClick={() => { playClick(); handleRandomEventChoice() }}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>{activeRandomEvent.icon}</div>
-            <h3 style={{ color: '#ffcb05', margin: '0.5rem 0' }}>{activeRandomEvent.title}</h3>
-            <p style={{ color: '#d9d6f2', marginBottom: '1.5rem' }}>{activeRandomEvent.desc}</p>
+            <h3 style={{ color: '#ffcb05', margin: '0.5rem 0' }}>{runEventTitle(activeRandomEvent.id)}</h3>
+            <p style={{ color: '#d9d6f2', marginBottom: '1.5rem' }}>{runEventDesc(activeRandomEvent.id)}</p>
             <button className="cta" onClick={() => { playClick(); handleRandomEventChoice() }} style={{ background: '#ffcb05', color: '#000' }}>¡Continuar!</button>
           </div>
         </div>
@@ -11671,7 +11701,7 @@ function MainApp() {
                 </button>
               ))}
             </div>
-            <button className="cta" onClick={() => { playClick(); setTraderModal(false); setBattleLog(prev => [`🎭 Rechazaste el intercambio.`, ...prev].slice(0, 15)) }} style={{ marginTop: '1rem', background: '#7d7ab5', width: '100%' }}>Rechazar</button>
+            <button className="cta" onClick={() => { playClick(); setTraderModal(false); setBattleLog(prev => [t('b.tradeRejected'), ...prev].slice(0, 15)) }} style={{ marginTop: '1rem', background: '#7d7ab5', width: '100%' }}>Rechazar</button>
           </div>
         </div>
       )}
@@ -11752,7 +11782,7 @@ function MainApp() {
                 setRoute(leagueRoute)
                 setRouteIndex(0)
                 setScreen('route')
-                setBattleLog(prev => [`🏆 ¡Bienvenido a la Liga Pokémon! 4 jefes te esperan (Nv.${maxLvl}).`, ...prev].slice(0, 15))
+                setBattleLog(prev => [t('b.leagueWelcome', { lvl: maxLvl }), ...prev].slice(0, 15))
               }} style={{ background: '#4d9bff', color: '#000', width: '100%', marginBottom: '1rem' }}>
                 🏆 ¡Comenzar Liga!
               </button>
@@ -11791,7 +11821,7 @@ function MainApp() {
       {showAchievements && (
         <div className="modal-backdrop" onClick={() => setShowAchievements(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
-            <h2 style={{ color: '#4d9bff', textAlign: 'center', marginBottom: '0.25rem' }}>🏅 Logros ({Object.values(achievements).filter(a => a.unlocked).length}/{ACHIEVEMENTS.length})</h2>
+            <h2 style={{ color: '#4d9bff', textAlign: 'center', marginBottom: '0.25rem' }}>{t('ach.title')} ({Object.values(achievements).filter(a => a.unlocked).length}/{ACHIEVEMENTS.length})</h2>
             <div style={{ color: '#ffcb05', textAlign: 'center', marginBottom: '1rem', fontSize: '0.9rem' }}>
               🪙 {ACHIEVEMENTS.filter(a => achievements[a.id]?.unlocked && !achievements[a.id]?.claimed).reduce((sum, a) => sum + a.reward, 0)} PokéCoins por reclamar
             </div>
@@ -11804,16 +11834,16 @@ function MainApp() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontSize: '1.5rem' }}>{a.icon}</span>
                       <div style={{ flex: 1 }}>
-                        <div style={{ color: unlocked ? '#ffcb05' : '#9b98cf', fontWeight: 'bold', fontSize: '0.85rem' }}>{a.name}</div>
-                        <div style={{ color: '#7d7ab5', fontSize: '0.75rem' }}>{a.desc}</div>
+                        <div style={{ color: unlocked ? '#ffcb05' : '#9b98cf', fontWeight: 'bold', fontSize: '0.85rem' }}>{achName(a.id)}</div>
+                        <div style={{ color: '#7d7ab5', fontSize: '0.75rem' }}>{achDesc(a.id)}</div>
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                       <span style={{ color: unlocked ? '#ffcb05' : '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold' }}>🪙 +{a.reward}</span>
                       {!unlocked ? (
-                        <span style={{ color: '#64748b', fontSize: '0.75rem' }}>🔒 Bloqueado</span>
+                        <span style={{ color: '#64748b', fontSize: '0.75rem' }}>🔒 {language === 'en' ? 'Locked' : 'Bloqueado'}</span>
                       ) : claimed ? (
-                        <span style={{ color: '#37d16b', fontSize: '0.75rem', fontWeight: 'bold' }}>✓ Reclamado</span>
+                        <span style={{ color: '#37d16b', fontSize: '0.75rem', fontWeight: 'bold' }}>✓ {language === 'en' ? 'Claimed' : 'Reclamado'}</span>
                       ) : (
                         <button
                           onClick={() => { playClick(); claimAchievement(a.id) }}
@@ -11828,7 +11858,7 @@ function MainApp() {
               })}
             </div>
             <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-              <button className="cta" onClick={() => setShowAchievements(false)}>Cerrar</button>
+              <button className="cta" onClick={() => setShowAchievements(false)}>{t('common.close')}</button>
             </div>
           </div>
         </div>
@@ -11946,18 +11976,18 @@ function MainApp() {
       {showPvpModal && (
         <div className="modal-backdrop" onClick={() => setShowPvpModal(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px', maxHeight: '85vh', overflow: 'auto', padding: '1.5rem' }}>
-            <h2 style={{ color: '#cba3ff', textAlign: 'center', margin: '0 0 1rem' }}>⚔️ PvP 1vs1</h2>
+            <h2 style={{ color: '#cba3ff', textAlign: 'center', margin: '0 0 1rem' }}>{t('pvp.setupTitle')}</h2>
 
             {!authUser ? (
               <div style={{ textAlign: 'center', padding: '1rem', background: 'rgba(15,23,42,0.5)', borderRadius: '8px', border: '1px solid #3f3f6e' }}>
-                <p style={{ color: '#9b98cf', marginBottom: '0.75rem' }}>Para jugar PvP necesitas iniciar sesión o crear una cuenta.</p>
+                <p style={{ color: '#9b98cf', marginBottom: '0.75rem' }}>{t('pvp.needLogin')}</p>
                 <button className="cta" type="button" onClick={() => { setShowPvpModal(false); openLeaderboard() }} style={{ width: '100%' }}>
-                  Iniciar sesión / Crear cuenta
+                  {t('pvp.loginOrCreate')}
                 </button>
               </div>
             ) : !isPvpEnabled() ? (
               <div style={{ textAlign: 'center', padding: '1.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px dashed #3f3f6e' }}>
-                <p style={{ color: '#9b98cf', fontSize: '0.9rem', marginBottom: '0.5rem' }}>⚙️ El PvP aún no está configurado.</p>
+                <p style={{ color: '#9b98cf', fontSize: '0.9rem', marginBottom: '0.5rem' }}>{t('pvp.notConfigured')}</p>
                 <p style={{ color: '#7d7ab5', fontSize: '0.8rem', margin: 0 }}>
                   Copia <strong style={{ color: '#cba3ff' }}>.env.example</strong> a <strong style={{ color: '#cba3ff' }}>.env</strong>, rellena tus credenciales de Supabase y ejecuta el esquema de <strong style={{ color: '#cba3ff' }}>supabase/schema.sql</strong>.
                 </p>
@@ -11966,8 +11996,8 @@ function MainApp() {
               <>
                 <div style={{ marginBottom: '1rem', padding: '0.75rem', borderRadius: '8px', background: 'rgba(15,23,42,0.5)', border: '1px solid #3f3f6e' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <strong style={{ color: '#f3f1ff', fontSize: '0.9rem' }}>Tu equipo ({pvpTeam.length}/6)</strong>
-                    <button className="tiny-btn" type="button" onClick={openPvpTeamBuilder}>🛠️ Hacerse el equipo</button>
+                    <strong style={{ color: '#f3f1ff', fontSize: '0.9rem' }}>{t('pvp.yourTeam', { n: pvpTeam.length })}</strong>
+                    <button className="tiny-btn" type="button" onClick={openPvpTeamBuilder}>{t('pvp.buildTeamBtn')}</button>
                   </div>
                   <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem' }}>
                     {[0, 1, 2].map((slot) => {
@@ -11987,13 +12017,13 @@ function MainApp() {
                             fontWeight: active ? 'bold' : 'normal'
                           }}
                         >
-                          Equipo {slot + 1}{team.length > 0 ? ` (${team.length})` : ' (vacío)'}
+                          {t('pvp.teamX', { n: slot + 1 })}{team.length > 0 ? ` (${team.length})` : ` (${t('pvp.empty')})`}
                         </button>
                       )
                     })}
                   </div>
                   {pvpTeam.length === 0 ? (
-                    <p style={{ margin: 0, color: '#7d7ab5', fontSize: '0.8rem' }}>Aún no tienes equipo. Crea uno con los Pokémon que has capturado y elige 4 ataques por cada uno.</p>
+                    <p style={{ margin: 0, color: '#7d7ab5', fontSize: '0.8rem' }}>{t('lb.noTeam')}</p>
                   ) : (
                     <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
                       {pvpTeam.map((p, i) => (
@@ -12006,38 +12036,38 @@ function MainApp() {
                 {pvpWaitingOpponent ? (
                   <div style={{ textAlign: 'center', padding: '1.5rem', background: 'rgba(168,85,247,0.08)', borderRadius: '8px', border: '1px solid #a855f7' }}>
                     <p style={{ color: '#cba3ff', fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                      {pvpSearching ? '🔍 Buscando Oponente...' : '⏳ Esperando al rival...'}
+                      {pvpSearching ? t('pvp.searching') : t('pvp.waitingRival')}
                     </p>
                     {pvpRoomCode && (
                       <p style={{ color: '#ffcb05', fontSize: '1.2rem', fontWeight: 'bold', letterSpacing: '0.2em', marginBottom: '0.5rem' }}>
                         CÓDIGO: {pvpRoomCode}
                       </p>
                     )}
-                    <button className="tiny-btn" type="button" onClick={cancelPvpWaiting} style={{ color: '#ff8a80' }}>✕ Cancelar</button>
+                    <button className="tiny-btn" type="button" onClick={cancelPvpWaiting} style={{ color: '#ff8a80' }}>{t('pvp.cancel')}</button>
                   </div>
                 ) : (
                   <>
                     <button className="cta" type="button" style={{ width: '100%', marginBottom: '0.75rem' }} onClick={() => void startPvpOnline()}>
-                      🎮 Jugar Online
+                      {t('pvp.playOnline')}
                     </button>
 
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button className="cta" type="button" style={{ flex: 1, background: '#7d7ab5' }} onClick={() => void createPvpCustom()}>
-                        🏟️ Crear sala
+                        {t('pvp.createRoom')}
                       </button>
                       <input
                         value={pvpJoinCode}
                         onChange={(e) => setPvpJoinCode(e.target.value.toUpperCase())}
                         maxLength={6}
-                        placeholder="CÓDIGO"
+                        placeholder={t('pvp.codePlaceholder')}
                         style={{ width: '110px', textAlign: 'center', letterSpacing: '0.15em', padding: '8px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.9rem', outline: 'none' }}
                       />
                       <button className="cta" type="button" style={{ flex: 1, background: '#7d7ab5' }} onClick={() => void joinPvpCustom()}>
-                        🔑 Entrar
+                        {t('pvp.enter')}
                       </button>
                     </div>
                     <p style={{ textAlign: 'center', color: '#7d7ab5', fontSize: '0.75rem', marginTop: '0.5rem' }}>
-                      El jugador A crea la sala y comparte el código; el jugador B entra con él.
+                      {t('pvp.roomDesc')}
                     </p>
                   </>
                 )}
@@ -12046,7 +12076,7 @@ function MainApp() {
               </>
             )}
 
-            <button className="cta" type="button" onClick={() => setShowPvpModal(false)} style={{ marginTop: '1rem', background: '#7d7ab5', width: '100%' }}>Cerrar</button>
+            <button className="cta" type="button" onClick={() => setShowPvpModal(false)} style={{ marginTop: '1rem', background: '#7d7ab5', width: '100%' }}>{t('common.close')}</button>
           </div>
         </div>
       )}
@@ -12056,8 +12086,8 @@ function MainApp() {
         <div className="modal-backdrop" onClick={() => setShowPvpTeamBuilder(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '780px', maxHeight: '88vh', overflow: 'auto', padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <h2 style={{ margin: 0, color: '#ffcb05' }}>🛠️ Tu equipo PvP</h2>
-              <button className="tiny-btn" type="button" onClick={() => setShowPvpTeamBuilder(false)} style={{ color: '#ff8a80' }}>✕ Cerrar</button>
+              <h2 style={{ margin: 0, color: '#ffcb05' }}>{t('pvp.yourTeam2')}</h2>
+              <button className="tiny-btn" type="button" onClick={() => setShowPvpTeamBuilder(false)} style={{ color: '#ff8a80' }}>{t('pvp.close')}</button>
             </div>
 
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem', padding: '0.6rem', background: 'rgba(15,23,42,0.5)', borderRadius: '8px', border: '1px solid #3f3f6e' }}>
@@ -12088,7 +12118,7 @@ function MainApp() {
             </div>
 
             <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
-              <input type="text" placeholder="🔍 Buscar Pokémon..." value={pvpBuildSearch} onChange={e => setPvpBuildSearch(e.target.value)}
+              <input type="text" placeholder={t('pvp.searchPokemon')} value={pvpBuildSearch} onChange={e => setPvpBuildSearch(e.target.value)}
                 style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }} />
             </div>
 
@@ -12126,12 +12156,12 @@ function MainApp() {
               <div style={{ padding: '0.75rem', borderRadius: '8px', background: 'rgba(15,23,42,0.6)', border: '1px solid #a855f7', marginBottom: '1rem' }}>
                 <strong style={{ color: '#cba3ff', fontSize: '0.9rem' }}>Elige 4 ataques</strong>
                 <p style={{ color: '#7d7ab5', fontSize: '0.75rem', margin: '0.25rem 0 0.5rem' }}>
-                  Ataques: {pvpBuildSelectedMoveNames.size}/4 — elige entre los ataques {pvpBuildLoading ? 'cargando...' : pvpBuildMoves.length > 0 ? `que puede aprender (${pvpBuildMoves.length} disponibles)` : 'disponibles'}
+                  {t('pvp.moves4', { n: pvpBuildSelectedMoveNames.size, rest: pvpBuildLoading ? t('pvp.loadingMoves') : pvpBuildMoves.length > 0 ? t('pvp.canLearn', { n: pvpBuildMoves.length }) : t('pvp.available') })}
                 </p>
                 {pvpBuildLoading ? (
                   <p style={{ color: '#9b98cf', fontSize: '0.85rem' }}>Cargando ataques...</p>
                 ) : pvpBuildMoves.length === 0 ? (
-                  <p style={{ color: '#9b98cf', fontSize: '0.85rem' }}>Este Pokémon no tiene ataques de daño que aprender.</p>
+                  <p style={{ color: '#9b98cf', fontSize: '0.85rem' }}>{t('pvp.noMoves')}</p>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.35rem', maxHeight: '200px', overflowY: 'auto' }}>
                     {pvpBuildMoves.map((m) => {
@@ -12154,7 +12184,7 @@ function MainApp() {
                           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', border: `1px solid ${selected ? '#a855f7' : '#3f3f6e'}`, borderRadius: '6px', padding: '5px 8px', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, background: selected ? 'rgba(168,85,247,0.15)' : 'rgba(0,0,0,0.25)' }}
                         >
                           <div style={{ minWidth: 0 }}>
-                            <span style={{ color: selected ? '#cba3ff' : '#d9d6f2', fontSize: '0.8rem', display: 'block' }}>{m.name}</span>
+                            <span style={{ color: selected ? '#cba3ff' : '#d9d6f2', fontSize: '0.8rem', display: 'block' }}>{moveName(m)}</span>
                             <span style={{ color: '#7d7ab5', fontSize: '0.7rem', display: 'block' }}>PWR {m.power}</span>
                           </div>
                           <span style={{ background: TYPE_COLORS[m.type] ?? '#475569', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', padding: '2px 8px', borderRadius: '4px', textTransform: 'capitalize', flexShrink: 0 }}>{m.type}</span>
@@ -12167,7 +12197,7 @@ function MainApp() {
                   <button className="cta" type="button" disabled={pvpBuildSelectedMoveNames.size === 0 || pvpBuildLoading} onClick={addPvpBuildPokemon} style={{ fontSize: '0.85rem', padding: '6px 14px', marginTop: 0 }}>
                     ➕ Añadir al equipo
                   </button>
-                  <button className="tiny-btn" type="button" onClick={() => { setPvpBuildSelected(null); setPvpBuildMoves([]); setPvpBuildSelectedMoveNames(new Set()) }}>Cancelar</button>
+                  <button className="tiny-btn" type="button" onClick={() => { setPvpBuildSelected(null); setPvpBuildMoves([]); setPvpBuildSelectedMoveNames(new Set()) }}>{t('common.cancel')}</button>
                 </div>
               </div>
             )}
@@ -12185,7 +12215,7 @@ function MainApp() {
           <div className="modal-backdrop" onClick={() => setShowLeaderboard(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
             <h2 style={{ color: '#cba3ff', textAlign: 'center', margin: '0 0 0.75rem' }}>
-              {leaderboardTab === 'infinite' ? '🌍 Ranking Mundial — ♾️ Infinite' : '⚔️ Ranking Elo PvP'}
+              {leaderboardTab === 'infinite' ? `🌍 ${t('lb.title2')} — ♾️ Infinite` : '⚔️ Elo PvP Ranking'}
             </h2>
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '1rem' }}>
               {([['infinite', '♾️ Infinite'], ['elo', '⚔️ Elo PvP']] as const).map(([tab, label]) => (
@@ -12224,7 +12254,7 @@ function MainApp() {
                         📤 Registrar puntuación (Nodo #{pendingScoreRef.current.node})
                       </button>
                     )}
-                    <button className="tiny-btn" type="button" onClick={handleLogout}>Cerrar sesión</button>
+                    <button className="tiny-btn" type="button" onClick={handleLogout}>{t('lb.logout')}</button>
                   </div>
                 </div>
               ) : (
@@ -12244,7 +12274,7 @@ function MainApp() {
                           color: authMode === mode ? '#cba3ff' : '#9b98cf'
                         }}
                       >
-                        {mode === 'signup' ? 'Crear cuenta' : 'Iniciar sesión'}
+                        {mode === 'signup' ? t('lb.register') : t('lb.login')}
                       </button>
                     ))}
                   </div>
@@ -12289,7 +12319,7 @@ function MainApp() {
 
             {leaderboardTab === 'elo' ? (
               pvpEloLeaderboard.length === 0 ? (
-                <p style={{ textAlign: 'center', color: '#9b98cf' }}>Aún no hay jugadores con Elo. ¡Juega partidas de PvP para aparecer aquí!</p>
+                <p style={{ textAlign: 'center', color: '#9b98cf' }}>{t('pvp.noElo')}</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {pvpEloLeaderboard.map((entry, idx) => {
@@ -12325,9 +12355,9 @@ function MainApp() {
             <>
             {!isLeaderboardEnabled() ? (
               <div style={{ textAlign: 'center', padding: '1.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px dashed #3f3f6e' }}>
-                <p style={{ color: '#9b98cf', fontSize: '0.9rem', marginBottom: '0.5rem' }}>⚙️ El ranking aún no está configurado.</p>
+                <p style={{ color: '#9b98cf', fontSize: '0.9rem', marginBottom: '0.5rem' }}>{t('lb.notConfigured')}</p>
                 <p style={{ color: '#7d7ab5', fontSize: '0.8rem', margin: 0 }}>
-                  Copia <strong style={{ color: '#cba3ff' }}>.env.example</strong> a <strong style={{ color: '#cba3ff' }}>.env</strong>, rellena tus credenciales de Supabase (URL + anon key) y ejecuta el esquema de <strong style={{ color: '#cba3ff' }}>supabase/schema.sql</strong>.
+                  {t('lb.copyEnv')}
                 </p>
               </div>
             ) : leaderboardLoading && Object.keys(leaderboardByGen).length === 0 ? (
@@ -12357,7 +12387,7 @@ function MainApp() {
 
                 {leaderboardActiveEntries.length === 0 ? (
                   <p style={{ textAlign: 'center', color: '#9b98cf' }}>
-                    {leaderboardGen === 0 ? 'Aún no hay puntuaciones. ¡Sé el primero en llegar lejos en modo Infinite!' : `Aún no hay puntuaciones en la Generación ${leaderboardGen}. ¡Sé el primero!`}
+                    {leaderboardGen === 0 ? t('lb.emptyInfinite') : t('lb.emptyGen', { gen: leaderboardGen })}
                   </p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -12417,7 +12447,7 @@ function MainApp() {
             </>
             )}
 
-            <button className="cta" onClick={() => setShowLeaderboard(false)} style={{ marginTop: '1.25rem', background: '#7d7ab5', width: '100%' }}>Cerrar</button>
+            <button className="cta" onClick={() => setShowLeaderboard(false)} style={{ marginTop: '1.25rem', background: '#7d7ab5', width: '100%' }}>{t('common.close')}</button>
           </div>
         </div>
       )}
@@ -12426,14 +12456,14 @@ function MainApp() {
       {showMetaShop && (
         <div className="modal-backdrop" onClick={() => setShowMetaShop(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
-            <h2 style={{ color: '#ffcb05', textAlign: 'center', marginBottom: '0.5rem' }}>🪙 PokéShop</h2>
-            <p style={{ textAlign: 'center', color: '#9b98cf', marginBottom: '1rem' }}>Tus PokéCoins: <strong style={{ color: '#ffcb05' }}>{metaProgression.pokeCoins}</strong></p>
+            <h2 style={{ color: '#ffcb05', textAlign: 'center', marginBottom: '0.5rem' }}>🪙 {t('shop.title')}</h2>
+            <p style={{ textAlign: 'center', color: '#9b98cf', marginBottom: '1rem' }}>{t('shop.yourCoins')}: <strong style={{ color: '#ffcb05' }}>{metaProgression.pokeCoins}</strong></p>
             <div style={{ marginBottom: '1rem' }}>
               <input
                 type="text"
                 value={metaShopSearch}
                 onChange={(e) => setMetaShopSearch(e.target.value)}
-                placeholder="🔍 Buscar objetos por nombre o efecto..."
+                placeholder={t('shop.search')}
                 style={{
                   width: '100%',
                   padding: '10px 14px',
@@ -12458,7 +12488,7 @@ function MainApp() {
               })()}
             </div>
 
-            <h3 style={{ color: '#4d9bff', marginBottom: '0.5rem' }}>🎨 Temas Visuales</h3>
+            <h3 style={{ color: '#4d9bff', marginBottom: '0.5rem' }}>🎨 {t('shop.themes')}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {THEMES.filter(t => metaShopItemMatches(t, metaShopSearch.trim().toLowerCase())).map(theme => {
                 const owned = metaProgression.ownedThemes.includes(theme.id)
@@ -12474,7 +12504,7 @@ function MainApp() {
                     <div style={{ color: theme.colors.text, fontWeight: 'bold', fontSize: '0.85rem' }}>{theme.name}</div>
                     <div style={{ color: theme.colors.muted, fontSize: '0.75rem' }}>{theme.desc}</div>
                     {owned ? (
-                      active ? <div style={{ color: '#ffcb05', fontSize: '0.75rem', marginTop: '4px' }}>✅ Activo</div> : <div style={{ color: theme.colors.muted, fontSize: '0.75rem', marginTop: '4px' }}>Tocado para activar</div>
+                      active ? <div style={{ color: '#ffcb05', fontSize: '0.75rem', marginTop: '4px' }}>{t('shop.active')}</div> : <div style={{ color: theme.colors.muted, fontSize: '0.75rem', marginTop: '4px' }}>Tocado para activar</div>
                     ) : (
                       <button className="cta" onClick={(e) => { e.stopPropagation(); buyMetaItem({ ...theme, id: theme.id, category: 'theme' as const, spriteKey: theme.id }) }}
                         disabled={metaProgression.pokeCoins < theme.price}
@@ -12487,7 +12517,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#22d3ee', marginBottom: '0.5rem' }}>🖼️ Fondos Animados</h3>
+            <h3 style={{ color: '#22d3ee', marginBottom: '0.5rem' }}>🖼️ {t('shop.backgrounds')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Fondos animados e interactivos que se muestran detrás del juego. Toca un fondo que poseas para activarlo.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {BACKGROUNDS.filter(bg => bg.id === 'none' || metaShopItemMatches(bg, metaShopSearch.trim().toLowerCase())).map(bg => {
@@ -12508,7 +12538,7 @@ function MainApp() {
                     <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{bg.name}</div>
                     <div style={{ color: '#9b98cf', fontSize: '0.75rem', marginBottom: '0.4rem' }}>{bg.desc}</div>
                     {owned ? (
-                      active ? <div style={{ color: '#ffcb05', fontSize: '0.75rem', fontWeight: 'bold' }}>✅ Activo</div> : <div style={{ color: '#9b98cf', fontSize: '0.75rem' }}>Toca para activar</div>
+                      active ? <div style={{ color: '#ffcb05', fontSize: '0.75rem', fontWeight: 'bold' }}>{t('shop.active')}</div> : <div style={{ color: '#9b98cf', fontSize: '0.75rem' }}>{t('shop.tapToActivate')}</div>
                     ) : (
                       <button className="cta" onClick={(e) => { e.stopPropagation(); buyBackground(bg) }}
                         disabled={metaProgression.pokeCoins < bg.price}
@@ -12521,7 +12551,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#ff8a33', marginBottom: '0.5rem' }}>🧪 Items Curativos</h3>
+            <h3 style={{ color: '#ff8a33', marginBottom: '0.5rem' }}>🧪 {t('shop.consumables')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Al comprar un item, empezará a aparecer en tiendas y drops durante las partidas.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'consumable' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -12538,9 +12568,9 @@ function MainApp() {
                         <div style={{ color: '#ff8a33', fontSize: '0.7rem' }}>Consumible</div>
                       </div>
                     </div>
-                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
@@ -12553,7 +12583,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#38bdf8', marginBottom: '0.5rem' }}>💿 Discos MT</h3>
+            <h3 style={{ color: '#38bdf8', marginBottom: '0.5rem' }}>💿 {t('shop.disco')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea el Disco MT: un objeto consumible que enseña un movimiento a tu Pokémon igual que el nodo Move Tutor. Aparecerá en tiendas durante las partidas.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'disco_mt' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -12570,9 +12600,9 @@ function MainApp() {
                         <div style={{ color: '#38bdf8', fontSize: '0.7rem' }}>Disco MT</div>
                       </div>
                     </div>
-                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
@@ -12585,7 +12615,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#ee3b2f', marginBottom: '0.5rem' }}>🏐 Poké Balls</h3>
+            <h3 style={{ color: '#ee3b2f', marginBottom: '0.5rem' }}>🏐 {t('shop.pokeballs')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea distintos tipos de Poké Balls para usar en la captura de Pokémon salvajes.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'pokeball' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -12602,9 +12632,9 @@ function MainApp() {
                         <div style={{ color: '#ee3b2f', fontSize: '0.7rem' }}>Poké Ball</div>
                       </div>
                     </div>
-                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
@@ -12617,7 +12647,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#a855f7', marginBottom: '0.5rem' }}>💎 Piedras Evolutivas</h3>
+            <h3 style={{ color: '#a855f7', marginBottom: '0.5rem' }}>💎 {t('shop.stones')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Desbloquea piedras evolutivas para evolucionar ciertos Pokémon. Aparecen en tiendas y Spin.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'evolution_stone' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -12634,9 +12664,9 @@ function MainApp() {
                         <div style={{ color: '#a855f7', fontSize: '0.7rem' }}>Piedra Evolutiva</div>
                       </div>
                     </div>
-                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
@@ -12649,7 +12679,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#ff8a33', marginBottom: '0.5rem' }}>🔧 Objetos Evolutivos</h3>
+            <h3 style={{ color: '#ff8a33', marginBottom: '0.5rem' }}>🔧 {t('shop.evoItems')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Objetos para evolucionar Pokémon. Aparecen con el Comerciante Misterioso.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'evolution_item' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -12666,9 +12696,9 @@ function MainApp() {
                         <div style={{ color: '#ff8a33', fontSize: '0.7rem' }}>Objeto Evolutivo</div>
                       </div>
                     </div>
-                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
@@ -12681,7 +12711,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#22d3ee', marginBottom: '0.5rem' }}>⚙️ Mejoras</h3>
+            <h3 style={{ color: '#22d3ee', marginBottom: '0.5rem' }}>⚙️ {t('shop.upgrades')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Mejoras permanentes: empieza cada aventura con objetos y dinero extra, y desbloquea nodos especiales en rutas Hard/Infinite.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'upgrade' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -12700,11 +12730,11 @@ function MainApp() {
                         <div style={{ color: '#22d3ee', fontSize: '0.7rem' }}>Mejora</div>
                       </div>
                     </div>
-                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
                     ) : locked ? (
-                      <div style={{ color: '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold' }}>🔒 Requiere {META_SHOP_ITEMS.find(i => i.id === item.requires)?.name ?? 'mejora anterior'}</div>
+                      <div style={{ color: '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.requires', { name: META_SHOP_ITEMS.find(i => i.id === item.requires)?.name ?? (language === 'en' ? 'the previous upgrade' : 'la mejora anterior') })}</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
@@ -12717,7 +12747,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#ff9ad6', marginBottom: '0.5rem' }}>🎵 Música</h3>
+            <h3 style={{ color: '#ff9ad6', marginBottom: '0.5rem' }}>{t('shop.music')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Nuevas pistas musicales para el menú y los combates.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'music' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -12731,9 +12761,9 @@ function MainApp() {
                         <div style={{ color: '#ff9ad6', fontSize: '0.7rem' }}>Música</div>
                       </div>
                     </div>
-                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
@@ -12746,7 +12776,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#a855f7', marginBottom: '0.5rem' }}>⚔️ Objetos Pasivos</h3>
+            <h3 style={{ color: '#a855f7', marginBottom: '0.5rem' }}>{t('shop.holdables')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>Se equipan a un Pokémon y otorgan efectos permanentes durante la batalla.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'holdable' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -12764,9 +12794,9 @@ function MainApp() {
                         <div style={{ color: '#a855f7', fontSize: '0.7rem' }}>Objeto Pasivo</div>
                       </div>
                     </div>
-                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{item.desc}</div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Desbloqueado</div>
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
                     ) : locked ? (
                       <div style={{ color: '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold' }}>🔒 Requiere {META_SHOP_ITEMS.find(i => i.id === item.requires)?.name ?? 'la versión anterior'}</div>
                     ) : (
@@ -12782,7 +12812,7 @@ function MainApp() {
             </div>
 
             <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-              <button className="cta" onClick={() => setShowMetaShop(false)}>Cerrar Tienda</button>
+              <button className="cta" onClick={() => setShowMetaShop(false)}>{t('shop.close')}</button>
             </div>
           </div>
         </div>
@@ -12810,7 +12840,7 @@ function MainApp() {
               <button className="cta" type="button" onClick={() => void secretAddPokemon()} disabled={secretAddLoading} style={{ flex: 1 }}>
                 {secretAddLoading ? 'Añadiendo...' : 'Añadir'}
               </button>
-              <button className="cta" type="button" onClick={() => { setSecretAddOpen(false); setSecretAddError('') }} style={{ flex: 1, background: '#7d7ab5' }}>Cancelar</button>
+              <button className="cta" type="button" onClick={() => { setSecretAddOpen(false); setSecretAddError('') }} style={{ flex: 1, background: '#7d7ab5' }}>{t('common.cancel')}</button>
             </div>
           </div>
         </div>
@@ -12832,7 +12862,7 @@ function MainApp() {
             />
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
               <button className="cta" type="button" onClick={submitSecretPassword} style={{ flex: 1 }}>Confirmar</button>
-              <button className="cta" type="button" onClick={() => { setSecretModalOpen(false); setSecretPassword('') }} style={{ flex: 1, background: '#7d7ab5' }}>Cancelar</button>
+              <button className="cta" type="button" onClick={() => { setSecretModalOpen(false); setSecretPassword('') }} style={{ flex: 1, background: '#7d7ab5' }}>{t('common.cancel')}</button>
             </div>
           </div>
         </div>
@@ -12875,7 +12905,7 @@ function MainApp() {
                 <button className="tiny-btn" type="button" onClick={() => setCoopChatOpen(false)} style={{ padding: '2px 8px', color: '#ff8a80' }}>✕</button>
               </div>
               <div style={{ height: '220px', overflowY: 'auto', padding: '0.5rem 0.6rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                {coopChatMsgs.length === 0 && <p style={{ margin: 0, color: '#7d7ab5', fontSize: '0.75rem' }}>Aún no hay mensajes.</p>}
+                {coopChatMsgs.length === 0 && <p style={{ margin: 0, color: '#7d7ab5', fontSize: '0.75rem' }}>{t('coop.noMessages')}</p>}
                 {coopChatMsgs.map((m, i) => (
                   <div key={i} style={{ background: 'rgba(15,23,42,0.5)', borderRadius: '6px', padding: '0.35rem 0.5rem' }}>
                     <span style={{ color: '#37d16b', fontSize: '0.7rem', fontWeight: 'bold' }}>{m.username ?? '?'}: </span>
@@ -12897,7 +12927,7 @@ function MainApp() {
                   placeholder="Escribe un mensaje..."
                   style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', border: '1px solid #3f3f6e', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.8rem', outline: 'none', boxSizing: 'border-box' }}
                 />
-                <button className="cta" type="button" onClick={() => void coopSendChat(coopChatText)} style={{ padding: '6px 12px', fontSize: '0.8rem', marginTop: 0 }}>Enviar</button>
+                <button className="cta" type="button" onClick={() => void coopSendChat(coopChatText)} style={{ padding: '6px 12px', fontSize: '0.8rem', marginTop: 0 }}>{t('coop.send')}</button>
               </div>
             </div>
           )}

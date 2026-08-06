@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
+import { t } from '../game/i18n'
 
 const COLORS = [
-  { key: 'red', color: '#ff5252', glow: '#ff8a80', name: 'Rojo' },
-  { key: 'blue', color: '#448aff', glow: '#82b1ff', name: 'Azul' },
-  { key: 'green', color: '#34d399', glow: '#6ee7b7', name: 'Verde' },
-  { key: 'yellow', color: '#ffd740', glow: '#fff59d', name: 'Amarillo' },
+  { key: 'red', color: '#ff5252', glow: '#ff8a80', name: t('mg.simon.red') },
+  { key: 'blue', color: '#448aff', glow: '#82b1ff', name: t('mg.simon.blue') },
+  { key: 'green', color: '#34d399', glow: '#6ee7b7', name: t('mg.simon.green') },
+  { key: 'yellow', color: '#ffd740', glow: '#fff59d', name: t('mg.simon.yellow') },
 ]
 
 const MAX_ROUND = 8
@@ -126,7 +127,7 @@ export default function SimonGame({ onComplete }: CasinoMinigameProps): JSX.Elem
         {result === null && (
           <>
             <p style={{ color: '#cbd5e1', fontSize: '0.9rem', margin: '0 0 0.25rem' }}>
-              {round > 0 ? `Ronda ${round} / ${MAX_ROUND}` : 'Repite la secuencia de luces'}
+              {round > 0 ? `${t('mg.simon.round')} ${round} / ${MAX_ROUND}` : t('mg.simon.watch')}
             </p>
             {playerTurn && <p style={{ color: '#f0abfc', fontSize: '0.85rem', margin: 0 }}>👆 ¡Tu turno! Repite la secuencia</p>}
             {!playerTurn && round > 0 && <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>Observa la secuencia...</p>}

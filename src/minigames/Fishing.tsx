@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
 import { FISH_POOL, randomFrom, spriteUrl, type DexEntry } from './pokeData'
+import { t } from '../game/i18n'
 
 const W = 420
 const H = 300
@@ -329,18 +330,18 @@ export default function Fishing({ onComplete }: CasinoMinigameProps): JSX.Elemen
                     style={{ width: '64px', height: '64px', imageRendering: 'pixelated' }}
                   />
                   <p style={{ color: '#34d399', fontWeight: 'bold', fontSize: '0.95rem', margin: '2px 0 0', textTransform: 'capitalize' }}>
-                    ¡Atrapaste a {lastCatch.name}!
+                    {t('mg.fishing.caught', { name: lastCatch.name })}
                   </p>
                 </div>
               )}
               {phase === 'missed' && (
                 <p style={{ color: '#f59e0b', fontSize: '0.9rem', margin: 0, animation: 'casinoSlideUp 0.3s ease' }}>
-                  ⚠️ ¡Demasiado pronto! Espera a que el corcho se hunda.
+                  {t('mg.fishing.early')}
                 </p>
               )}
               {phase === 'escaped' && (
                 <p style={{ color: '#ff8a80', fontSize: '0.9rem', margin: 0, animation: 'casinoSlideUp 0.3s ease' }}>
-                  🐟 ¡Se escapó! Pulsa justo cuando se hunda.
+                  {t('mg.fishing.escaped')}
                 </p>
               )}
             </div>

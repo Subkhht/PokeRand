@@ -1,6 +1,7 @@
 import { useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playEvolution } from '../game/sound'
+import { t } from '../game/i18n'
 
 const SYMBOLS = ['🟠', '🍒', '💎', '⭐', '🎰', '👑']
 const REEL_COUNT = 3
@@ -92,7 +93,7 @@ export default function SlotMachine({ onComplete }: CasinoMinigameProps): JSX.El
       <div style={{ textAlign: 'center', minHeight: '3rem' }}>
         {result === null && (
           <button className="cta" type="button" onClick={spin} disabled={spinning} style={{ background: spinning ? '#475569' : '#f0abfc', color: '#1a1033' }}>
-            {spinning ? 'Girando...' : '🎰 ¡Tirar de la palanca!'}
+            {spinning ? t('mg.spinning') : '🎰 ¡Tirar de la palanca!'}
           </button>
         )}
         {result !== null && (

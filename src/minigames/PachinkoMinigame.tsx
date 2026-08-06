@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import { playClick, playHit } from '../game/sound'
 import boardBgUrl from '../assets/poke-pinball.png'
+import { t } from '../game/i18n'
 
 interface Peg {
   x: number
@@ -411,10 +412,10 @@ export default function PachinkoMinigame({ onComplete }: PachinkoMinigameProps):
           🎯 Soltar la bola
         </button>
       )}
-      {phase === 'dropping' && <p style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>Cayendo...</p>}
+      {phase === 'dropping' && <p style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>{t('mg.pachinko.dropping')}</p>}
       {stuckMsg && <p style={{ color: '#ff8a80', fontWeight: 'bold', fontSize: '0.9rem' }}>⚠️ La bola se quedó atascada. ¡Reiniciando tirada!</p>}
       {phase === 'settled' && score !== null && (
-        <p style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '1rem' }}>Has obtenido {score} puntos</p>
+        <p style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '1rem' }}>{t('mg.pachinko.scored', { score })}</p>
       )}
     </div>
   )

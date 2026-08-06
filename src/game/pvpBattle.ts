@@ -2,6 +2,7 @@ import type { Move, Pokemon, StatusType } from './types'
 import { applyDamage } from './engine'
 import { getTypeEffectiveness } from './typesChart'
 import type { PvpState, PvpPlayerState } from './pvp'
+import { t, moveName } from './i18n'
 
 export interface PvpAction {
   kind: 'move' | 'switch'
@@ -9,13 +10,13 @@ export interface PvpAction {
 }
 
 const STATUS_LABELS: Record<StatusType, string> = {
-  burn: '🔥 Quemado',
-  poison: '☠️ Envenenado',
-  paralysis: '⚡ Paralizado',
-  freeze: '🧊 Congelado',
-  sleep: '💤 Dormido',
-  confusion: '💫 Confundido',
-  flinch: '❕ Aturdido',
+  burn: t('status.burn'),
+  poison: t('status.poison'),
+  paralysis: t('status.paralysis'),
+  freeze: t('status.freeze'),
+  sleep: t('status.sleep'),
+  confusion: t('status.confusion'),
+  flinch: t('status.flinch'),
 }
 
 function getStageMultiplier(stage: number): number {
@@ -76,7 +77,7 @@ function finalizeTurn(state: PvpState, log: string[], a: PvpPlayerState, b: PvpP
 
   if (winner) {
     phase = 'finished'
-    const wName = winner === 'a' ? (a.username ?? 'Jugador A') : (b.username ?? 'Jugador B')
+    const wName = winner === 'a' ? (a.username ?? t('pvp.playerA')) : (b.username ?? t('pvp.playerB'))
     log.push(`🏆 ¡${wName} gana la batalla!`)
   } else if (aAllFainted && bAllFainted) {
     phase = 'finished'
@@ -88,11 +89,11 @@ function finalizeTurn(state: PvpState, log: string[], a: PvpPlayerState, b: PvpP
   } else if (curA.hp <= 0) {
     phase = 'switch'
     switchFor = 'a'
-    log.push(`💀 ${curA.name} se debilitó. El Jugador A elige su siguiente Pokémon.`)
+    log.push(t('b.faintedChoose', { name: curA.name, side: t('pvp.playerA') }))
   } else if (curB.hp <= 0) {
     phase = 'switch'
     switchFor = 'b'
-    log.push(`💀 ${curB.name} se debilitó. El Jugador B elige su siguiente Pokémon.`)
+    log.push(t('b.faintedChoose', { name: curB.name, side: t('pvp.playerB') }))
   } else {
     phase = 'picking'
   }
@@ -129,7 +130,7 @@ export function resolvePvpTurn(
       if (!action || action.kind !== 'switch') continue
       const ps = side === 'a' ? a : b
       if (doSwitch(ps, action.index)) {
-        const who = side === 'a' ? (a.username ?? 'Jugador A') : (b.username ?? 'Jugador B')
+        const who = side === 'a' ? (a.username ?? t('pvp.playerA')) : (b.username ?? t('pvp.playerB'))
         log.push(`🔁 ${who} saca a ${ps.team[ps.active].name}.`)
         changed = true
       }
@@ -152,11 +153,11 @@ export function resolvePvpTurn(
   if (switchA || switchB) {
     let changed = false
     if (switchA && doSwitch(a, actionA.index)) {
-      log.push(`🔁 ${a.username ?? 'Jugador A'} saca a ${a.team[a.active].name}.`)
+      log.push(t('b.switchOut', { side: a.username ?? t('pvp.playerA'), name: a.team[a.active].name }))
       changed = true
     }
     if (switchB && doSwitch(b, actionB.index)) {
-      log.push(`🔁 ${b.username ?? 'Jugador B'} saca a ${b.team[b.active].name}.`)
+      log.push(t('b.switchOut', { side: b.username ?? t('pvp.playerB'), name: b.team[b.active].name }))
       changed = true
     }
     if (!changed) return { state, changed: false }
@@ -277,29 +278,29 @@ function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boo
     case 'burn': {
       const burnDmg = Math.max(1, Math.floor(p.maxHp / 16))
       updated = { ...updated, hp: Math.max(0, updated.hp - burnDmg) }
-      logs.push(`🔥 ${updated.name} sufre daño por quemadura (${burnDmg}).`)
+      logs.push(t('b.burn', { name: updated.name, dmg: burnDmg }))
       break
     }
     case 'poison': {
       const poisonDmg = Math.max(1, Math.floor(p.maxHp / 8))
       updated = { ...updated, hp: Math.max(0, updated.hp - poisonDmg) }
-      logs.push(`☠️ ${updated.name} sufre daño por veneno (${poisonDmg}).`)
+      logs.push(t('b.poison', { name: updated.name, dmg: poisonDmg }))
       break
     }
     case 'paralysis': {
       if (Math.random() < 0.25) {
         skipTurn = true
-        logs.push(`⚡ ${updated.name} está paralizado y no puede moverse.`)
+        logs.push(t('b.paralysis', { name: updated.name }))
       }
       break
     }
     case 'freeze': {
       if (Math.random() < 0.20) {
         updated = { ...updated, status: undefined }
-        logs.push(`🧊 ${updated.name} se descongeló.`)
+        logs.push(t('b.thawed', { name: updated.name }))
       } else {
         skipTurn = true
-        logs.push(`🧊 ${updated.name} está congelado y no puede moverse.`)
+        logs.push(t('b.freeze', { name: updated.name }))
       }
       break
     }
@@ -307,11 +308,11 @@ function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boo
       const remaining = (p.status.turns ?? 2) - 1
       if (remaining <= 0) {
         updated = { ...updated, status: undefined }
-        logs.push(`💤 ${updated.name} se despertó.`)
+        logs.push(t('b.wokeUp', { name: updated.name }))
       } else {
         updated = { ...updated, status: { ...updated.status!, turns: remaining } }
         skipTurn = true
-        logs.push(`💤 ${updated.name} está dormido y no puede moverse.`)
+        logs.push(t('b.sleep', { name: updated.name }))
       }
       break
     }
@@ -319,7 +320,7 @@ function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boo
       const remaining = (p.status.turns ?? 3) - 1
       if (remaining <= 0) {
         updated = { ...updated, status: undefined }
-        logs.push(`💫 ${updated.name} se desconfundió.`)
+        logs.push(t('b.unconfused', { name: updated.name }))
       } else {
         updated = { ...updated, status: { ...updated.status!, turns: remaining } }
       }
@@ -328,7 +329,7 @@ function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boo
     case 'flinch': {
       skipTurn = true
       updated = { ...updated, status: undefined }
-      logs.push(`❕ ${updated.name} está aturdido y pierde su turno.`)
+      logs.push(t('b.flinch', { name: updated.name }))
       break
     }
   }
@@ -387,7 +388,7 @@ function performPvpHit(
       return {
         updatedDefender: defender,
         updatedAttacker: attacker,
-        lines: [`${attacker.name} usó ${move.name} pero falló.`],
+        lines: [t('b.missed', { attacker: attacker.name, move: moveName(move) })],
       }
     }
   }
@@ -415,9 +416,9 @@ function performPvpHit(
     totalDamage += finalDamage
 
     let hitLine = totalHits > 1
-      ? `${attacker.name} usa ${move.name} (${hit + 1}/${totalHits}): ${finalDamage} de daño.`
-      : `${attacker.name} usa ${move.name}: ${finalDamage} de daño.`
-    if (isCrit) hitLine += ' ¡Golpe crítico!'
+      ? t('b.usesHitMulti', { attacker: attacker.name, move: moveName(move), dmg: finalDamage, hit: hit + 1, total: totalHits })
+      : t('b.usesHit', { attacker: attacker.name, move: moveName(move), dmg: finalDamage })
+    if (isCrit) hitLine += t('b.critSuffix')
     if (message) hitLine += ` (${message})`
     lines.push(hitLine)
 

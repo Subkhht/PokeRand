@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
+import { t } from '../game/i18n'
 
 const W = 460
 const H = 320
@@ -267,7 +268,7 @@ export default function PokeballToss({ onComplete }: CasinoMinigameProps): JSX.E
       ctx.font = 'bold 9px sans-serif'
       ctx.textAlign = 'center'
       ctx.fillStyle = '#f0abfc'
-      ctx.fillText('¡OBJETIVO!', GOAL_CX, goalY - GOAL_R - 8)
+      ctx.fillText(t('mg.toss.target'), GOAL_CX, goalY - GOAL_R - 8)
 
       // Trajectory preview while charging
       if (chargingRef.current) {
@@ -389,7 +390,7 @@ export default function PokeballToss({ onComplete }: CasinoMinigameProps): JSX.E
             onPointerLeave={release}
             style={{ width: '100%', background: '#ee3b2f', color: '#fff', touchAction: 'none', userSelect: 'none' }}
           >
-            {charging ? `⚾ Cargando... ${Math.round(power * 100)}%` : 'Mantén pulsado para lanzar'}
+            {charging ? `⚾ ${t('mg.loading')}... ${Math.round(power * 100)}%` : t('mg.toss.hold')}
           </button>
           <p style={{ color: '#7d7ab5', fontSize: '0.72rem', margin: 0, textAlign: 'center' }}>
             Suelta cuando la trayectoria apunte al aro dorado 🎯

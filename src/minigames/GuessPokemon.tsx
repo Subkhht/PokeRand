@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
+import { t } from '../game/i18n'
 
 interface PokeEntry {
   name: string
@@ -254,7 +255,7 @@ export default function GuessPokemon({ onComplete }: CasinoMinigameProps): JSX.E
           </div>
 
           <p style={{ color: timedOut ? '#ff8a80' : '#94a3b8', fontSize: '0.85rem', margin: 0 }}>
-            {revealed ? (timedOut ? '⏰ ¡Tiempo agotado!' : `¡Es ${current.name}!`) : '¿Quién es ese Pokémon?'}
+            {revealed ? (timedOut ? t('mg.guessPoke.timeout') : t('mg.guessPoke.is', { name: current.name })) : t('mg.guessPoke.title')}
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', maxWidth: '360px', width: '100%' }}>
@@ -284,7 +285,7 @@ export default function GuessPokemon({ onComplete }: CasinoMinigameProps): JSX.E
       ) : null}
       {result !== null && (
         <p style={{ color: result >= 800 ? '#ffcb05' : result >= 400 ? '#34d399' : '#94a3b8', fontWeight: 'bold', fontSize: '1.2rem', margin: 0, animation: 'slideInRight 0.4s ease' }}>
-          {result >= 800 ? '🧑‍🏫 ¡Experto Pokémon!' : result >= 400 ? '🙂 ¡Buen ojo!' : '👀 ¡A entrenar!'} · {result} pts
+          {result >= 800 ? t('mg.guessPoke.expert') : result >= 400 ? '🙂 ¡Buen ojo!' : '👀 ¡A entrenar!'} · {result} pts
         </p>
       )}
     </div>

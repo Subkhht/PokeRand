@@ -2,6 +2,7 @@ import { useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
 import { shuffle } from './pokeData'
+import { t } from '../game/i18n'
 
 const SIZE = 5
 const VOLTORB_COUNT = 7
@@ -107,7 +108,7 @@ export default function VoltorbFlip({ onComplete }: CasinoMinigameProps): JSX.El
         <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
           <div style={{ fontSize: '3rem', animation: 'casinoBounce 0.9s ease infinite' }}>💣</div>
           <p style={{ color: '#cbd5e1', fontSize: '0.85rem', margin: 0, maxWidth: '360px' }}>
-            Cada fila y columna indica <strong style={{ color: '#ffcb05' }}>puntos/Voltorb</strong>. Voltea las casillas para sumar puntos
+            {t('mg.voltorb.introA')} <strong style={{ color: '#ffcb05' }}>{t('mg.voltorb.pointsVoltorb')}</strong>{t('mg.voltorb.introB')}
             sin tocar un Voltorb 💣. ¡Revela todas las seguras para ganar!
           </p>
           <button className="cta" type="button" onClick={start} style={{ background: '#f0abfc', color: '#1a1033' }}>
@@ -199,14 +200,14 @@ export default function VoltorbFlip({ onComplete }: CasinoMinigameProps): JSX.El
           </div>
           {status !== 'playing' && result === null && (
             <p style={{ color: status === 'won' ? '#34d399' : '#ff8a80', fontWeight: 'bold', fontSize: '1rem', margin: 0, animation: 'casinoSlideUp 0.3s ease' }}>
-              {status === 'won' ? '🎉 ¡Tablero completado!' : '💥 ¡BOOM! Encontraste un Voltorb.'}
+              {status === 'won' ? t('mg.voltorb.won') : t('mg.voltorb.boom')}
             </p>
           )}
         </>
       ) : null}
       {result !== null && (
         <p style={{ color: result >= 800 ? '#ffcb05' : result >= 400 ? '#34d399' : '#94a3b8', fontWeight: 'bold', fontSize: '1.2rem', margin: 0, animation: 'casinoSlideUp 0.4s ease' }}>
-          {result >= 800 ? '🧨 ¡Genio de la lógica!' : result >= 400 ? '💡 ¡Bien pensado!' : '🌀 ¡Cuidado con los Voltorb!'} · {result} pts
+          {result >= 800 ? t('mg.voltorb.logic') : result >= 400 ? '💡 ¡Bien pensado!' : '🌀 ¡Cuidado con los Voltorb!'} · {result} pts
         </p>
       )}
     </div>

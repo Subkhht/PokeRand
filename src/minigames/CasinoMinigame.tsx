@@ -2,6 +2,7 @@ import { useEffect, useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { CASINO_MINIGAMES } from './registry'
 import MinigamePlayer from './MinigamePlayer'
+import { minigameName } from '../game/i18n'
 
 export default function CasinoMinigame({ onComplete }: CasinoMinigameProps): JSX.Element {
   const [gameKey, setGameKey] = useState<string | null>(null)
@@ -12,11 +13,11 @@ export default function CasinoMinigame({ onComplete }: CasinoMinigameProps): JSX
     let current = 0
     const nameTimer = setInterval(() => {
       current = (current + 1) % CASINO_MINIGAMES.length
-      setRollingName(CASINO_MINIGAMES[current].name)
+      setRollingName(minigameName(CASINO_MINIGAMES[current].key))
     }, 90)
     const pickTimer = setTimeout(() => {
       clearInterval(nameTimer)
-      setRollingName(pick.name)
+      setRollingName(minigameName(pick.key))
       setTimeout(() => {
         setGameKey(pick.key)
       }, 600)
@@ -53,7 +54,7 @@ export default function CasinoMinigame({ onComplete }: CasinoMinigameProps): JSX
     <div style={{ animation: 'casinoSlideUp 0.35s ease' }}>
       <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
         <p style={{ color: '#f0abfc', fontWeight: 'bold', fontSize: '0.95rem', margin: 0 }}>
-          {CASINO_MINIGAMES.find(g => g.key === gameKey)?.name}
+          {minigameName(gameKey)}
         </p>
       </div>
       <MinigamePlayer gameKey={gameKey} onComplete={onComplete} />

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import type { CasinoMinigameProps } from './types'
 import { playClick, playHit, playEvolution } from '../game/sound'
+import { t } from '../game/i18n'
 
 interface Target {
   id: number
@@ -176,7 +177,7 @@ export default function TargetShoot({ onComplete }: CasinoMinigameProps): JSX.El
       {result !== null && (
         <div style={{ textAlign: 'center', animation: 'casinoSlideUp 0.4s ease' }}>
           <p style={{ color: result >= 800 ? '#ffcb05' : result >= 400 ? '#34d399' : '#94a3b8', fontWeight: 'bold', fontSize: '1.2rem', margin: 0 }}>
-            {result >= 800 ? '🏆 ¡Apunta como un sniper!' : `¡${result} puntos!`}
+            {result >= 800 ? t('mg.target.sniper') : `${t('mg.points')}: ${result}`}
           </p>
         </div>
       )}

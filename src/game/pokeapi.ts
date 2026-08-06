@@ -1,4 +1,5 @@
 import type { Move, Pokemon, RawLevelUpMove, StatusType, StatChange } from './types'
+import { getLanguage } from './i18n'
 
 const API_BASE = 'https://pokeapi.co/api/v2'
 
@@ -126,15 +127,18 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
   const resPokemon = await fetch(`${API_BASE}/pokemon/${id}`)
   const dataPokemon = await resPokemon.json()
 
-  let description = 'Sin descripción disponible.'
+  const lang = getLanguage()
+  const flavorLang = lang === 'en' ? 'en' : 'es'
+  const fallbackLang = lang === 'en' ? 'es' : 'en'
+  let description = lang === 'en' ? 'No description available.' : 'Sin descripción disponible.'
   try {
     const resSpecies = await fetch(`${API_BASE}/pokemon-species/${id}`)
     if (resSpecies.ok) {
       const dataSpecies = await resSpecies.json()
       const flavorEntry = dataSpecies.flavor_text_entries.find(
-        (entry: any) => entry.language.name === 'es'
+        (entry: any) => entry.language.name === flavorLang
       ) ?? dataSpecies.flavor_text_entries.find(
-        (entry: any) => entry.language.name === 'en'
+        (entry: any) => entry.language.name === fallbackLang
       )
       if (flavorEntry) {
         description = flavorEntry.flavor_text.replace(/[\n\f]/g, ' ')
@@ -145,14 +149,23 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
   const highResImage = dataPokemon.sprites.other?.['official-artwork']?.front_default 
     || dataPokemon.sprites.front_default
 
-  const STAT_NAMES: Record<string, string> = {
-    'hp': 'HP',
-    'attack': 'Ataque',
-    'defense': 'Defensa',
-    'special-attack': 'Atq. Esp.',
-    'special-defense': 'Def. Esp.',
-    'speed': 'Velocidad'
-  }
+  const STAT_NAMES: Record<string, string> = lang === 'en'
+    ? {
+      'hp': 'HP',
+      'attack': 'Attack',
+      'defense': 'Defense',
+      'special-attack': 'Sp. Atk',
+      'special-defense': 'Sp. Def',
+      'speed': 'Speed'
+    }
+    : {
+      'hp': 'HP',
+      'attack': 'Ataque',
+      'defense': 'Defensa',
+      'special-attack': 'Atq. Esp.',
+      'special-defense': 'Def. Esp.',
+      'speed': 'Velocidad'
+    }
 
   let evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string }> = []
   try {
@@ -338,6 +351,7 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
 
     const esName = data.names?.find((n: any) => n.language?.name === 'es')?.name
     const moveName = esName || capitalize(data.name.replace(/-/g, ' '))
+    const enName = data.names?.find((n: any) => n.language?.name === 'en')?.name || capitalize(data.name.replace(/-/g, ' '))
 
     const ailmentRaw = data.ailment?.name
     const flinchRaw = data.meta?.flinch_chance ?? 0
@@ -399,6 +413,7 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
 
     return {
       name: moveName,
+      enName,
       type: data.type.name,
       power: data.power,
       accuracy: data.accuracy ?? 100,
@@ -440,10 +455,10 @@ export function getMaxMovePowerForLevel(level: number, difficulty: string = 'med
 
 // Lista de ataques básicos de relleno por si el Pokémon tiene menos de 4 ataques de daño válidos
 const FALLBACK_MOVES: Move[] = [
-  { name: 'Placaje', type: 'normal', power: 40, accuracy: 100, description: 'Ataque físico básico.', priority: 0, damageClass: 'physical' },
-  { name: 'Ataque Rápido', type: 'normal', power: 40, accuracy: 100, description: 'Ataque rápido de daño directo.', priority: 1, damageClass: 'physical' },
-  { name: 'Cabezazo', type: 'normal', power: 70, accuracy: 100, description: 'Golpe de cabeza potente.', priority: 0, damageClass: 'physical' },
-  { name: 'Derribo', type: 'normal', power: 90, accuracy: 85, description: 'Carga contundente de gran impacto.', priority: 0, damageClass: 'physical' }
+  { name: 'Placaje', enName: 'Tackle', type: 'normal', power: 40, accuracy: 100, description: 'Ataque físico básico.', priority: 0, damageClass: 'physical' },
+  { name: 'Ataque Rápido', enName: 'Quick Attack', type: 'normal', power: 40, accuracy: 100, description: 'Ataque rápido de daño directo.', priority: 1, damageClass: 'physical' },
+  { name: 'Cabezazo', enName: 'Headbutt', type: 'normal', power: 70, accuracy: 100, description: 'Golpe de cabeza potente.', priority: 0, damageClass: 'physical' },
+  { name: 'Derribo', enName: 'Take Down', type: 'normal', power: 90, accuracy: 85, description: 'Carga contundente de gran impacto.', priority: 0, damageClass: 'physical' }
 ]
 
 // Procesa movimientos asignando solo aquellos acordes al nivel actual del Pokémon
@@ -531,6 +546,7 @@ export async function fetchPokemonMoves(
   while (validMoves.length < 4) {
     const basicTackle: Move = {
       name: `Tackle ${validMoves.length + 1}`,
+      enName: `Tackle ${validMoves.length + 1}`,
       type: 'normal',
       power: 40,
       accuracy: 100,
