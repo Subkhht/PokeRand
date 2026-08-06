@@ -9,6 +9,7 @@ const SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL = 20
 
 const generationSpeciesCache = new Map<number, number[]>()
 const pokemonCache = new Map<string | number, Pokemon>()
+const moveDetailsCache = new Map<string, Move>()
 const legendaryIdsCache = new Map<number, Promise<Set<number>>>()
 let allFormIdsPromise: Promise<number[]> | null = null
 let runSeed = 0
@@ -337,8 +338,10 @@ const AILMENT_MAP: Record<string, StatusType> = {
   'flinch': 'flinch',
 }
 export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
+  const cached = moveDetailsCache.get(moveUrl)
+  if (cached) return cached
   try {
-    const res = await fetch(`${moveUrl}?ts=${Date.now()}`, { cache: 'no-store' })
+    const res = await fetch(moveUrl)
     const data = await res.json()
 
     // Solo se aceptan movimientos de DAÑO (physical/special). Los movimientos de
@@ -424,7 +427,7 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
       esEntry?.short_effect || esEntry?.effect || enEntry?.short_effect || enEntry?.effect || 'Ataque de daño directo.'
     )
 
-    return {
+    const move: Move = {
       name: moveName,
       enName,
       type: data.type.name,
@@ -448,6 +451,8 @@ export async function getMoveDetails(moveUrl: string): Promise<Move | null> {
       statChance,
       metaCategory,
     }
+    moveDetailsCache.set(moveUrl, move)
+    return move
   } catch {
     return null
   }
