@@ -101,10 +101,13 @@ export async function signOut(): Promise<void> {
 export async function isUsernameTaken(username: string): Promise<boolean> {
   const client = await getClient()
   if (!client) return false
+  // ILIKE es insensible a mayúsculas, pero hay que escapar los comodines % y _
+  // para que "50%" no coincida con cualquier nombre que contenga "50".
+  const escaped = username.trim().replace(/[%_\\]/g, (ch) => `\\${ch}`)
   const { data, error } = await client
     .from('profiles')
     .select('username')
-    .eq('username', username.trim())
+    .ilike('username', escaped)
     .maybeSingle()
   if (error) return false
   return data !== null

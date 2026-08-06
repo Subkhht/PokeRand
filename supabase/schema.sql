@@ -8,6 +8,11 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
+-- La unicidad del username es insensible a mayúsculas/minúsculas: dos cuentas
+-- no pueden compartir nombre aunque difieran en mayúsculas ("Pikachu" vs "pikachu").
+create unique index if not exists profiles_username_lower_idx
+  on public.profiles (lower(username));
+
 -- 2) Al crear una cuenta (auth.users), se crea su perfil con el username
 --    elegido en el formulario de registro (user_metadata).
 create or replace function public.handle_new_user()

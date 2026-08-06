@@ -7975,6 +7975,12 @@ function MainApp() {
     if (/invalid login credentials/i.test(msg)) {
       return 'Email o contraseña incorrectos.'
     }
+    // La base de datos rechaza el registro si el nombre de usuario ya existe
+    // (la unicidad es insensible a mayúsculas). Supabase lo devuelve como un
+    // error genérico de "database error saving new user".
+    if (/database error saving new user|unique.*username|username.*already/i.test(msg)) {
+      return t('auth.usernameTaken')
+    }
     return msg
   }
 
