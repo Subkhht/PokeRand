@@ -85,7 +85,7 @@ function finalizeTurn(state: PvpState, log: string[], a: PvpPlayerState, b: PvpP
   } else if (curA.hp <= 0 && curB.hp <= 0) {
     phase = 'switch'
     switchFor = 'both'
-    log.push('💀 Ambos Pokémon se debilitaron. Cada jugador elige su siguiente Pokémon.')
+    log.push(t('b.bothFaintedChoose'))
   } else if (curA.hp <= 0) {
     phase = 'switch'
     switchFor = 'a'
@@ -131,7 +131,7 @@ export function resolvePvpTurn(
       const ps = side === 'a' ? a : b
       if (doSwitch(ps, action.index)) {
         const who = side === 'a' ? (a.username ?? t('pvp.playerA')) : (b.username ?? t('pvp.playerB'))
-        log.push(`🔁 ${who} saca a ${ps.team[ps.active].name}.`)
+        log.push(t('b.switchOut2', { side: who, name: ps.team[ps.active].name }))
         changed = true
       }
     }
@@ -257,7 +257,7 @@ export function resolvePvpTurn(
     if (defenderAfterFirst.hp > 0) {
       applyMove(second, second === 'a' ? 'b' : 'a')
     } else {
-      log.push(`💀 ${defenderAfterFirst.name} se debilitó y no pudo atacar.`)
+      log.push(t('b.faintedNoAttack', { name: defenderAfterFirst.name }))
     }
   }
 

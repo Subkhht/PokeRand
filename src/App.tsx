@@ -1570,41 +1570,25 @@ interface PokedexEntry {
 }
 
 function nodeTypeLabel(node: RouteNode): string {
+  const en = getLanguage() === 'en'
   switch (node.type) {
-    case 'battle':
-      return 'Combate'
-    case 'rest':
-      return 'Descanso'
-    case 'shop':
-      return 'Tienda'
-    case 'boss':
-      return 'Jefe'
-    case 'teamRocket':
-      return 'TeamR'
-    case 'spin':
-      return 'Spin'
-    case 'pokeRand':
-      return 'PokeRand'
-    case 'move':
-      return 'Move'
-    case 'mega':
-      return 'Mega'
-    case 'gmax':
-      return 'G-MAX'
-    case 'primal':
-      return 'Primal'
-    case 'trade':
-      return 'Intercambio'
-    case 'rival':
-      return 'Rival'
-    case 'blackmarket':
-      return 'Mercado Negro'
-    case 'double':
-      return 'Combate Doble'
-    case 'casino':
-      return 'Casino'
-    default:
-      return node.type
+    case 'battle': return en ? 'Battle' : 'Combate'
+    case 'rest': return en ? 'Rest' : 'Descanso'
+    case 'shop': return en ? 'Shop' : 'Tienda'
+    case 'boss': return en ? 'Boss' : 'Jefe'
+    case 'teamRocket': return 'TeamR'
+    case 'spin': return 'Spin'
+    case 'pokeRand': return 'PokeRand'
+    case 'move': return 'Move'
+    case 'mega': return 'Mega'
+    case 'gmax': return 'G-MAX'
+    case 'primal': return 'Primal'
+    case 'trade': return en ? 'Trade' : 'Intercambio'
+    case 'rival': return 'Rival'
+    case 'blackmarket': return en ? 'Black Market' : 'Mercado Negro'
+    case 'double': return en ? 'Double Battle' : 'Combate Doble'
+    case 'casino': return 'Casino'
+    default: return node.type
   }
 }
 
@@ -2069,6 +2053,7 @@ function MainApp() {
 
   // Opciones / Volumen
   const [showOptions, setShowOptions] = useState<boolean>(false)
+  const [showRestartConfirm, setShowRestartConfirm] = useState<boolean>(false)
   const [language, setLanguageState] = useState<Language>(getLanguage())
   const changeLanguage = (lang: Language): void => {
     setI18nLanguage(lang)
@@ -3469,39 +3454,39 @@ function MainApp() {
       }
 
       const challengeDescriptions: string[] = []
-      if (activeChallenges.noShops) challengeDescriptions.push('🚫 Desafío: Sin tiendas.')
-      if (activeChallenges.noRests) challengeDescriptions.push('🚫 Desafío: Sin descansos.')
-      if (activeChallenges.allShiny) challengeDescriptions.push('✨ Desafío: Todos los Pokémon son Shiny.')
-      if (activeChallenges.allTeamRocket) challengeDescriptions.push('🔴 Desafío: ¡Todos los nodos son TeamR!')
-      if (activeChallenges.nuzlocke) challengeDescriptions.push('💀 Desafío: Nuzlocke (muerte = liberación).')
-      if (activeChallenges.soloStarter) challengeDescriptions.push('🌟 Desafío: Solo Starter (sin capturas).')
-      if (activeChallenges.fixedTeam) challengeDescriptions.push('🔒 Desafío: Equipo Fijo.')
-      if (activeChallenges.noEvolution) challengeDescriptions.push('🚫 Desafío: Sin Evolución.')
-      if (activeChallenges.noItems) challengeDescriptions.push('🚫 Desafío: Sin Objetos en batalla.')
-      if (activeChallenges.restrictedMoves) challengeDescriptions.push('⚔️ Desafío: Solo 2 movimientos.')
-      if (activeChallenges.firstStrike) challengeDescriptions.push('⚡ Desafío: Primer Golpe (recoil).')
-      if (activeChallenges.fixedLevel) challengeDescriptions.push('📊 Desafío: Nivel Fijo.')
-      if (activeChallenges.noCrits) challengeDescriptions.push('🚫 Desafío: Sin Críticos.')
-      if (activeChallenges.typeRandomizer) challengeDescriptions.push('🎲 Desafío: Tipo Randomizado.')
-      if (activeChallenges.noPurchasing) challengeDescriptions.push('🚫 Desafío: Sin Compras.')
-      if (activeChallenges.blindRoute) challengeDescriptions.push('👁️‍🗨️ Desafío: Ruta Ciega.')
-      if (activeChallenges.bossRush) challengeDescriptions.push('🏆 Desafío: Boss Rush.')
-      if (activeChallenges.speedrun) challengeDescriptions.push('⏱️ Desafío: Speedrun (30s/turno).')
-      if (activeChallenges.noMoney) challengeDescriptions.push('💸 Desafío: Sin Dinero.')
-      if (activeChallenges.doubleModifiers) challengeDescriptions.push('🎰 Desafío: Modifiers Duplos.')
-      if (activeChallenges.scalingEnemies) challengeDescriptions.push('📈 Desafío: Enemigos Reforzados.')
-      if (activeChallenges.noHealing) challengeDescriptions.push('🚫 Desafío: Sin Curación.')
-      if (activeChallenges.ironman) challengeDescriptions.push('🔒 Desafío: Ironman (todo fijo).')
-      if (activeChallenges.totalRandomizer) challengeDescriptions.push('🎲 Desafío: Randomizer Total.')
-      if (activeChallenges.nuzlockeHardcore) challengeDescriptions.push('💀 Desafío: Nuzlocke Hardcore.')
-      if (activeChallenges.challengeGauntlet) challengeDescriptions.push('🎰 Desafío: Gauntlet (3 al azar).')
-      if (activeChallenges.egglocke) challengeDescriptions.push('🥚 Desafío: Egglocke.')
+      if (activeChallenges.noShops) challengeDescriptions.push(t('bch.noShops'))
+      if (activeChallenges.noRests) challengeDescriptions.push(t('bch.noRests'))
+      if (activeChallenges.allShiny) challengeDescriptions.push(t('bch.allShiny'))
+      if (activeChallenges.allTeamRocket) challengeDescriptions.push(t('bch.allTeamRocket'))
+      if (activeChallenges.nuzlocke) challengeDescriptions.push(t('bch.nuzlocke'))
+      if (activeChallenges.soloStarter) challengeDescriptions.push(t('bch.soloStarter'))
+      if (activeChallenges.fixedTeam) challengeDescriptions.push(t('bch.fixedTeam'))
+      if (activeChallenges.noEvolution) challengeDescriptions.push(t('bch.noEvolution'))
+      if (activeChallenges.noItems) challengeDescriptions.push(t('bch.noItems'))
+      if (activeChallenges.restrictedMoves) challengeDescriptions.push(t('bch.restrictedMoves'))
+      if (activeChallenges.firstStrike) challengeDescriptions.push(t('bch.firstStrike'))
+      if (activeChallenges.fixedLevel) challengeDescriptions.push(t('bch.fixedLevel'))
+      if (activeChallenges.noCrits) challengeDescriptions.push(t('bch.noCrits'))
+      if (activeChallenges.typeRandomizer) challengeDescriptions.push(t('bch.typeRandomizer'))
+      if (activeChallenges.noPurchasing) challengeDescriptions.push(t('bch.noPurchasing'))
+      if (activeChallenges.blindRoute) challengeDescriptions.push(t('bch.blindRoute'))
+      if (activeChallenges.bossRush) challengeDescriptions.push(t('bch.bossRush'))
+      if (activeChallenges.speedrun) challengeDescriptions.push(t('bch.speedrun'))
+      if (activeChallenges.noMoney) challengeDescriptions.push(t('bch.noMoney'))
+      if (activeChallenges.doubleModifiers) challengeDescriptions.push(t('bch.doubleModifiers'))
+      if (activeChallenges.scalingEnemies) challengeDescriptions.push(t('bch.scalingEnemies'))
+      if (activeChallenges.noHealing) challengeDescriptions.push(t('bch.noHealing'))
+      if (activeChallenges.ironman) challengeDescriptions.push(t('bch.ironman'))
+      if (activeChallenges.totalRandomizer) challengeDescriptions.push(t('bch.totalRandomizer'))
+      if (activeChallenges.nuzlockeHardcore) challengeDescriptions.push(t('bch.nuzlockeHardcore'))
+      if (activeChallenges.challengeGauntlet) challengeDescriptions.push(t('bch.challengeGauntlet'))
+      if (activeChallenges.egglocke) challengeDescriptions.push(t('bch.egglocke'))
 
       setBattleLog([
-        `Tu inicial es ${starter.name}${starter.shiny ? ' ✨' : ''}.`,
+        t('b.starter', { name: `${starter.name}${starter.shiny ? ' ✨' : ''}` }),
         `Modo: ${effectiveGen === 0 ? 'Random All-Stars' : `Gen ${effectiveGen}`}.`,
-        `${t('common.difficulty')}: ${difficultyLabel(language, effectiveDifficulty).title}${effectiveDifficulty === 'infinite' ? ' (Sin límite)' : ` (3 etapas de ${totalNodes} rutas)`}.`,
-        `Recibes $${activeChallenges.noMoney ? '0' : '100'} de inicio e item: ${run.item}.`,
+        `${t('common.difficulty')}: ${difficultyLabel(language, effectiveDifficulty).title}${effectiveDifficulty === 'infinite' ? t('b.noLimit') : t('b.threeStages', { n: totalNodes })}.`,
+        t('b.receiveStart', { money: activeChallenges.noMoney ? '0' : '100', item: run.item }),
         ...challengeDescriptions,
       ])
       const activeChallengeNames: string[] = []
@@ -3775,7 +3760,7 @@ function MainApp() {
           const updatedBadges = [...badges, newBadge]
           setBadges(updatedBadges)
           setCurrentStage(updatedBadges.length + 1)
-          setBattleLog((prev) => [`🏅 ¡Obtuviste la ${newBadge.name}! (${updatedBadges.length}/3)`, ...prev].slice(0, 15))
+          setBattleLog((prev) => [t('battle.obtainedBadge', { badge: newBadge.name, n: updatedBadges.length }), ...prev].slice(0, 15))
           const diffForCoins = coopModeRef.current ? (coopDiffRef.current || 'medium') : difficulty
           const stageCoins = Math.floor((diffForCoins === 'easy' ? 10 : diffForCoins === 'hard' ? 20 : 15) / 2)
           awardPokeCoins(stageCoins, `🏅 Bonus por completar la etapa ${updatedBadges.length} de 3`)
@@ -5100,7 +5085,7 @@ function MainApp() {
         hits.push({ kind: 'player', index: actives.indexOf(targetIdx), key: doubleHitKeyRef.current })
         playHit()
       }
-      if (hit.defender.hp <= 0) log.push(`💀 ${hit.defender.name} se debilitó.`)
+      if (hit.defender.hp <= 0) log.push(t('b.fainted', { name: hit.defender.name }))
     }
   }
 
@@ -5180,7 +5165,7 @@ function MainApp() {
         hits.push({ kind: 'enemy', index: sel.target, key: doubleHitKeyRef.current })
         playHit()
       }
-      if (hit.defender.hp <= 0) log.push(`💀 ${hit.defender.name} se debilitó.`)
+      if (hit.defender.hp <= 0) log.push(t('b.fainted', { name: hit.defender.name }))
     }
 
     // Los enemigos vivos contraatacan (objetivo aleatorio entre los activos vivos).
@@ -5211,7 +5196,7 @@ function MainApp() {
 
     // El cambio gasta el turno: el Pokémon que entra no ataca y los enemigos atacan.
     actives[slot] = teamIdx
-    log.push(`🔁 ¡${teamCopy[teamIdx].name} entró en combate!`)
+    log.push(t('b.enteredBattle', { name: teamCopy[teamIdx].name }))
 
     doubleEnemyCounterattack(teamCopy, actives, enemies, log, hits)
 
@@ -5874,7 +5859,7 @@ function MainApp() {
         setEnemy({ ...generatedEnemy, justEntered: true })
         seenInPokedex(generatedEnemy)
         setBattleLog((prev) => [
-          `🌿 ¡Un ${generatedEnemy.name} salvaje (Nv.${generatedEnemy.level}) apareció!`,
+          t('b.wildAppeared', { name: generatedEnemy.name, lvl: generatedEnemy.level }),
           ...prev
         ])
       }
@@ -7291,7 +7276,7 @@ function MainApp() {
       if (battleStartHPRef.current > 0 && battleMinHpRef.current >= battleStartHPRef.current) {
         unlockAchievement('perfect_battle')
       }
-      logMsg = `🌿 Derrotaste al ${nextEnemy.name} salvaje y ganaste $${moneyReward}. ¡Equipo fortalecido!`
+      logMsg = t('b.defeatedWild', { name: nextEnemy.name, money: moneyReward })
       setTeam(newTeam)
       setEnemy(nextEnemy)
       setBattleLog((prev) => [logMsg, ...logs, ...prev].slice(0, 15))
@@ -7877,7 +7862,7 @@ function MainApp() {
     setVoluntaryRunEnd(true)
     setDefeatSummary({
       finalTeam,
-      battleLog: [`🏁 Has terminado la aventura en el Nodo ${routeIndex + 1}.`, ...battleLog],
+      battleLog: [t('b.runEnded', { n: routeIndex + 1 }), ...battleLog],
       lastNodeLabel: currentNode?.label,
     })
     handleInfiniteRunDefeat(finalTeam)
@@ -8079,6 +8064,7 @@ function MainApp() {
   }
 
   function onRestartRun(): void {
+    setShowRestartConfirm(false)
     if (screen === 'pvp') {
       void pvpForfeit()
       return
@@ -8216,7 +8202,7 @@ function MainApp() {
               🎮 {t('topbar.minigames')}
             </button>
           )}
-          <button className="tiny-btn" type="button" onClick={onRestartRun}>
+          <button className="tiny-btn" type="button" onClick={() => { playClick(); if (screen === 'setup') { onRestartRun() } else { setShowRestartConfirm(true) } }}>
             {t('topbar.restart')}
           </button>
         </div>
@@ -8813,7 +8799,7 @@ function MainApp() {
                 className="pokedex-close-btn"
                 onClick={() => { setShowPokedex(false); setSelectedPokemonDetail(null); setPokedexSearch(''); }}
               >
-                CERRAR
+                {t('options.close')}
               </button>
             </div>
           </div>
@@ -9005,7 +8991,7 @@ function MainApp() {
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem', marginTop: '0.75rem' }}>
               <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
-                💾 Datos
+                {t('options.data')}
               </strong>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button className="tiny-btn" type="button" onClick={() => {
@@ -9019,9 +9005,9 @@ function MainApp() {
                   const url = URL.createObjectURL(blob)
                   const a = document.createElement('a'); a.href = url; a.download = 'pokerand_backup.json'; a.click()
                   URL.revokeObjectURL(url)
-                }} style={{ color: '#4d9bff' }}>📤 Exportar datos</button>
+                }} style={{ color: '#4d9bff' }}>{t('options.exportData')}</button>
                 <label className="tiny-btn" style={{ color: '#ffcb05', cursor: 'pointer', padding: '4px 10px', borderRadius: '6px', border: '1px solid #ffcb05', background: 'rgba(250,204,21,0.1)', fontSize: '0.75rem' }}>
-                  📥 Importar datos
+                  {t('options.importData')}
                   <input type="file" accept=".json" style={{ display: 'none' }} onChange={e => {
                     const file = e.target.files?.[0]; if (!file) return
                     const reader = new FileReader()
@@ -9041,13 +9027,38 @@ function MainApp() {
               </div>
             </div>
 
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem', marginTop: '0.75rem', padding: '0.85rem', background: 'rgba(255,154,214,0.08)', borderRadius: '10px', border: '1px solid rgba(255,154,214,0.35)' }}>
+              <strong style={{ fontSize: '1rem', color: '#ffd0ec', display: 'block', marginBottom: '0.5rem' }}>
+                {t('donate.title')}
+              </strong>
+              <p style={{ margin: '0 0 0.6rem', fontSize: '0.85rem', color: '#e6e2ff', lineHeight: '1.45' }}>
+                {t('donate.desc')}
+              </p>
+              <a
+                href="https://ko-fi.com/subkht"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  padding: '9px 16px', borderRadius: '8px',
+                  background: '#ff5fa8', color: '#ffffff', fontWeight: 'bold', fontSize: '0.85rem',
+                  border: '2px solid #ffd0ec',
+                  textDecoration: 'none', cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                }}
+                onClick={playClick}
+              >
+                {t('donate.button')}
+              </a>
+            </div>
+
             <div className="pokedex-controls">
               <div className="d-pad" title="D-Pad Options"></div>
               <button
                 className="pokedex-close-btn"
                 onClick={closeOptions}
               >
-                CERRAR
+                {t('options.close')}
               </button>
             </div>
           </div>
@@ -10163,13 +10174,13 @@ function MainApp() {
                       }
                       return (
                         <>
-                          <div className="tooltip-stat"><span>Nivel</span><strong>{pokemon.level}</strong></div>
-                          <div className="tooltip-stat"><span>HP</span><strong>{pokemon.hp}/{pokemon.maxHp}</strong></div>
-                          <div className="tooltip-stat"><span>Ataque</span>{fmt(pokemon.attack, eff.attack, stages.attack)}</div>
-                          <div className="tooltip-stat"><span>Defensa</span>{fmt(pokemon.defense, eff.defense, stages.defense)}</div>
-                          <div className="tooltip-stat"><span>At. Esp.</span>{fmt(pokemon.spAttack, eff.spAttack, stages.spAttack ?? 0)}</div>
-                          <div className="tooltip-stat"><span>Def. Esp.</span>{fmt(pokemon.spDefense, eff.spDefense, stages.spDefense ?? 0)}</div>
-                          <div className="tooltip-stat"><span>Velocidad</span>{fmt(pokemon.speed, eff.speed, stages.speed)}</div>
+                          <div className="tooltip-stat"><span>{t('stat.level')}</span><strong>{pokemon.level}</strong></div>
+                          <div className="tooltip-stat"><span>{t('stat.hp')}</span><strong>{pokemon.hp}/{pokemon.maxHp}</strong></div>
+                          <div className="tooltip-stat"><span>{t('stat.attack')}</span>{fmt(pokemon.attack, eff.attack, stages.attack)}</div>
+                          <div className="tooltip-stat"><span>{t('stat.defense')}</span>{fmt(pokemon.defense, eff.defense, stages.defense)}</div>
+                          <div className="tooltip-stat"><span>{t('stat.spAtk')}</span>{fmt(pokemon.spAttack, eff.spAttack, stages.spAttack ?? 0)}</div>
+                          <div className="tooltip-stat"><span>{t('stat.spDef')}</span>{fmt(pokemon.spDefense, eff.spDefense, stages.spDefense ?? 0)}</div>
+                          <div className="tooltip-stat"><span>{t('stat.speed')}</span>{fmt(pokemon.speed, eff.speed, stages.speed)}</div>
                         </>
                       )
                     })()}
@@ -10331,7 +10342,7 @@ function MainApp() {
                 const { positions, width, height } = getNodeMapLayout(route.length)
                 const points = positions.map((p) => `${p.x},${p.y}`).join(' ')
                 return (
-                  <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label="Mapa de la ruta">
+                  <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label={t('route.ariaMap')}>
                     <polyline points={points} fill="none" stroke="#3f3f6e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                     {route.map((node, index) => {
                       const pos = positions[index]
@@ -10838,7 +10849,7 @@ function MainApp() {
                         type="button"
                         style={{ width: 'auto', padding: '10px 24px' }}
                       >
-                        {team.length >= maxTeamSize ? `Capturar → PC (${pcStorage.length} en PC)` : `Capturar (${team.length}/${maxTeamSize})`}
+                        {team.length >= maxTeamSize ? t('route.captureToPC', { n: pcStorage.length }) : t('route.captureTeam', { n: team.length, max: maxTeamSize })}
                       </button>
                       <button
                         className="secondary"
@@ -10973,7 +10984,7 @@ function MainApp() {
                   </>
                 )}
                 <button className="cta" onClick={() => { completeCurrentNode(); setScreen('route') }} type="button" style={{ background: '#ff9ad6' }}>
-                  Continuar
+                  {t('route.continue')}
                 </button>
               </div>
             )}
@@ -11005,7 +11016,7 @@ function MainApp() {
                   </>
                 )}
                 <button className="cta" onClick={() => { completeCurrentNode(); setScreen('route') }} type="button" style={{ background: '#ff8a33' }}>
-                  Continuar
+                  {t('route.continue')}
                 </button>
               </div>
             )}
@@ -11021,7 +11032,7 @@ function MainApp() {
                 </div>
                 <div className="moves-grid" style={{ marginBottom: '1rem' }}>
                   <button className="cta" onClick={captureLegendaryPokemon} type="button" style={{ background: '#d97706' }}>
-                    {team.length >= maxTeamSize ? `Capturar → PC (${pcStorage.length} en PC)` : '¡Capturar Legendario!'}
+                    {team.length >= maxTeamSize ? t('route.captureToPC', { n: pcStorage.length }) : t('route.captureLegend')}
                   </button>
                   <button className="secondary" onClick={skipLegendaryCapture} type="button">
                     Skip
@@ -11033,7 +11044,7 @@ function MainApp() {
             {screen === 'route' && currentNode && currentNode.type !== 'rest' && !legendaryEncounter && (
               <div className="action-block">
                 <p>
-                  Next node: <strong>{currentNode.label}</strong> ({nodeTypeLabel(currentNode)})
+                  {t('route.nextNode', { name: `${nodeTypeLabel(currentNode)} #${currentNode.id}` })}
                 </p>
                 <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={enterNode} type="button" disabled={isLoading}>
                   {isLoading ? 'Searching rival...' : currentNode.type === 'teamRocket' ? '🔴 Enfrentar a TeamR!' : currentNode.type === 'spin' ? '🎰 ¡Girar la Ruleta!' : currentNode.type === 'pokeRand' ? '🎲 ¡Girar la Ruleta Pokémon!' : currentNode.type === 'mega' ? '💎 ¡Recoger Mega Piedra!' : currentNode.type === 'gmax' ? '⚡ ¡Enfrentar G-MAX!' : currentNode.type === 'primal' ? '🔮 ¡Recoger Prisma!' : currentNode.type === 'trade' ? '🤝 Intercambiar' : currentNode.type === 'rival' ? '👤 ¡Enfrentar al Rival!' : currentNode.type === 'blackmarket' ? '🕶️ Entrar al Mercado Negro' : currentNode.type === 'double' ? '🥊 ¡Combate Doble!' : currentNode.type === 'casino' ? '🃏 ¡Jugar al Casino!' : 'Enter node'}
@@ -11052,7 +11063,7 @@ function MainApp() {
                 </div>
                 <div className="moves-grid" style={{ marginBottom: '1rem' }}>
                   <button className="cta" onClick={captureRestPokemon} type="button">
-                    {team.length >= maxTeamSize ? `Capturar → PC (${pcStorage.length} en PC)` : 'Capturar'}
+                    {team.length >= maxTeamSize ? t('route.captureToPC', { n: pcStorage.length }) : 'Capturar'}
                   </button>
                   <button className="secondary" onClick={skipRestCapture} type="button">
                     Skip
@@ -11070,7 +11081,7 @@ function MainApp() {
             {screen === 'route' && currentNode && currentNode.type === 'rest' && !restEncounter && !legendaryEncounter && (
               <div className="action-block">
                 <p>
-                  Rest stop: <strong>{currentNode.label}</strong>.
+                  {t('b.restStop', { name: `${nodeTypeLabel(currentNode)} #${currentNode.id}` })}
                 </p>
                 <button className="cta" onClick={enterNode} type="button" disabled={isLoading}>
                   {isLoading ? 'Searching encounter...' : 'Enter rest'}
@@ -11117,7 +11128,7 @@ function MainApp() {
                 </div>
 
                 {doubleFinished ? (
-                  <button className="cta" type="button" onClick={doubleLeave} style={{ width: '100%' }}>Continuar</button>
+                  <button className="cta" type="button" onClick={doubleLeave} style={{ width: '100%' }}>{t('route.continue')}</button>
                 ) : (
                   <>
                     <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
@@ -11628,7 +11639,7 @@ function MainApp() {
         <div className="modal-backdrop" style={{ zIndex: 10001 }}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '360px', textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>🎒</div>
-            <h3 style={{ color: '#37d16b', margin: '0 0 0.5rem' }}>Entrando a la Aventura...</h3>
+            <h3 style={{ color: '#37d16b', margin: '0 0 0.5rem' }}>{t('coop.entering')}</h3>
             <div className="spin-anim" style={{ fontSize: '1.5rem', margin: '0.5rem 0' }}>⏳</div>
             <p style={{ color: '#9b98cf', margin: 0, fontSize: '0.85rem' }}>
               Generando tu run cooperativa...
@@ -11678,7 +11689,7 @@ function MainApp() {
             <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>{activeRandomEvent.icon}</div>
             <h3 style={{ color: '#ffcb05', margin: '0.5rem 0' }}>{runEventTitle(activeRandomEvent.id)}</h3>
             <p style={{ color: '#d9d6f2', marginBottom: '1.5rem' }}>{runEventDesc(activeRandomEvent.id)}</p>
-            <button className="cta" onClick={() => { playClick(); handleRandomEventChoice() }} style={{ background: '#ffcb05', color: '#000' }}>¡Continuar!</button>
+            <button className="cta" onClick={() => { playClick(); handleRandomEventChoice() }} style={{ background: '#ffcb05', color: '#000' }}>{t('route.continue')}</button>
           </div>
         </div>
       )}
@@ -11903,7 +11914,7 @@ function MainApp() {
                   fontFamily: 'var(--font-title)',
                 }}
               >
-                Reiniciando run...
+                {t('run.restarting')}
               </p>
               <p style={{ margin: '4px 0 0', color: '#9b98cf', fontSize: '0.8rem' }}>
                 Generando nuevos nodos
@@ -12453,6 +12464,24 @@ function MainApp() {
       )}
 
       {/* Meta Shop Modal */}
+      {/* Modal Confirmar Volver a inicio */}
+      {showRestartConfirm && (
+        <div className="modal-backdrop" onClick={() => setShowRestartConfirm(false)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '380px', padding: '1.5rem', textAlign: 'center' }}>
+            <h3 style={{ color: '#ffcb05', margin: '0 0 0.75rem' }}>{t('restart.title')}</h3>
+            <p style={{ color: '#d9d6f2', fontSize: '0.9rem', marginBottom: '1.25rem' }}>{t('restart.desc')}</p>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="cta" type="button" onClick={onRestartRun} style={{ flex: 1, background: '#ee3b2f', color: '#fff' }}>
+                {t('restart.confirm')}
+              </button>
+              <button className="cta" type="button" onClick={() => { playClick(); setShowRestartConfirm(false) }} style={{ flex: 1, background: '#7d7ab5' }}>
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showMetaShop && (
         <div className="modal-backdrop" onClick={() => setShowMetaShop(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>

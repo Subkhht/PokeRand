@@ -12,7 +12,15 @@ export default function BackgroundLayer({ backgroundId }: { backgroundId: string
   useEffect(() => {
     const def = BACKGROUNDS.find(b => b.id === backgroundId)
     const canvas = canvasRef.current
-    if (!canvas || !def || def.id === 'none') return
+    if (!canvas || !def) return
+    // Fondo "Ninguno": hay que LIMPIAR el canvas (si no, el último frame de la
+    // animación anterior se queda congelado) y ocultarlo.
+    if (def.id === 'none') {
+      canvas.style.opacity = '0'
+      const ctx = canvas.getContext('2d')
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
+      return
+    }
     canvas.style.opacity = String(def.opacity)
     const ctx = canvas.getContext('2d')
     if (!ctx) return
