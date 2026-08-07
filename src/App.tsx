@@ -30,7 +30,7 @@ import BackgroundPreview from './BackgroundPreview'
 import { BACKGROUNDS } from './game/backgrounds'
 import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
-import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, metaItemDesc, moveName, statusLabel, statusAppliedLine, themeName, themeDesc, bgName, bgDesc, type Language } from './game/i18n'
+import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, itemLocalizedName, metaItemDesc, moveName, statusLabel, statusAppliedLine, themeName, themeDesc, bgName, bgDesc, type Language, getChangelog } from './game/i18n'
 
 type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum'
@@ -596,6 +596,8 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'X Attack': { price: 75, desc: 'Aumenta permanentemente en +5 el ataque.' },
   'X Defense': { price: 75, desc: 'Aumenta permanentemente en +5 la defensa.' },
   'X Speed': { price: 75, desc: 'Aumenta permanentemente en +5 la velocidad.' },
+  'X Sp. Attack': { price: 75, desc: 'Aumenta permanentemente en +5 el Ataque Especial.' },
+  'X Sp. Defense': { price: 75, desc: 'Aumenta permanentemente en +5 la Defensa Especial.' },
   'Full Heal': { price: 80, desc: 'Restaura 40 HP y cura estados.' },
   'Antídoto': { price: 30, desc: 'Cura el envenenamiento de un Pokémon.' },
   'Antiquemar': { price: 30, desc: 'Cura las quemaduras de un Pokémon.' },
@@ -616,6 +618,8 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'X Attack 2': { price: 150, desc: 'Aumenta permanentemente en +10 el ataque.' },
   'X Defense 2': { price: 150, desc: 'Aumenta permanentemente en +10 la defensa.' },
   'X Speed 2': { price: 150, desc: 'Aumenta permanentemente en +10 la velocidad.' },
+  'X Sp. Attack 2': { price: 150, desc: 'Aumenta permanentemente en +10 el Ataque Especial.' },
+  'X Sp. Defense 2': { price: 150, desc: 'Aumenta permanentemente en +10 la Defensa Especial.' },
   'Cuerda Huida': { price: 200, desc: 'Permite escapar de cualquier combate de la aventura.' },
   'Moomoo Milk': { price: 120, desc: 'Restaura 100 HP de un Pokémon.' },
   'Berry Juice': { price: 40, desc: 'Restaura 20 HP de un Pokémon.' },
@@ -652,6 +656,7 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'Zinc': { price: 200, desc: 'Aumenta permanentemente en +15 la Defensa Especial de un Pokémon.' },
   'Carburante': { price: 200, desc: 'Aumenta permanentemente en +15 la velocidad de un Pokémon.' },
   'Sacred Ash': { price: 400, desc: 'Revive a todos los Pokémon debilitados con el HP completo.' },
+  'Perla Grande': { price: 1000, desc: 'Una perla grande y valiosa. Se vende por 500.' },
 }
 
 const EVOLUTION_STONES = ['Fire Stone', 'Water Stone', 'Thunder Stone', 'Leaf Stone', 'Moon Stone', 'Sun Stone', 'Shiny Stone', 'Dusk Stone', 'Dawn Stone', 'Ice Stone'] as const
@@ -712,6 +717,9 @@ const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
 // el resto se añaden según se desbloquean en la tienda meta.
 const BERRY_DROPS = ['Oran Berry', 'Lum Berry', 'Baya Zreza', 'Baya Atania', 'Baya Algama', 'Baya Safre', 'Baya Siendrepis', 'Baya Caquic']
 
+// Tesoros que pueden caer como drop (se filtran por desbloqueo).
+const TREASURE_DROPS = ['Perla Grande']
+
 // Ids de las evoluciones de Eevee (Vaporeon, Jolteon, Flareon, Espeon, Umbreon,
 // Leafeon, Glaceon, Sylveon). Se usan para el logro "Familia Eevee".
 const EEVEE_EVOLUTIONS = [134, 135, 136, 196, 197, 470, 471, 700]
@@ -724,6 +732,8 @@ const itemDescriptions: Record<string, string> = {
   'X Attack': 'Aumenta permanentemente en +5 el ataque.',
   'X Defense': 'Aumenta permanentemente en +5 la defensa.',
   'X Speed': 'Aumenta permanentemente en +5 la velocidad.',
+  'X Sp. Attack': 'Aumenta permanentemente en +5 el Ataque Especial.',
+  'X Sp. Defense': 'Aumenta permanentemente en +5 la Defensa Especial.',
   'Oran Berry': 'Restaura 15 HP al Pokémon activo.',
   'Lum Berry': 'Restaura 30 HP y cura estados.',
   'Full Heal': 'Restaura 40 HP y cura estados.',
@@ -746,6 +756,8 @@ const itemDescriptions: Record<string, string> = {
   'X Attack 2': 'Aumenta permanentemente en +10 el ataque.',
   'X Defense 2': 'Aumenta permanentemente en +10 la defensa.',
   'X Speed 2': 'Aumenta permanentemente en +10 la velocidad.',
+  'X Sp. Attack 2': 'Aumenta permanentemente en +10 el Ataque Especial.',
+  'X Sp. Defense 2': 'Aumenta permanentemente en +10 la Defensa Especial.',
   'Poké Ball': 'Una ball básica para capturar Pokémon salvajes.',
   'Great Ball': 'Una ball con mayor ratio de captura (x1.5).',
   'Ultra Ball': 'Una ball con alto ratio de captura (x2).',
@@ -778,6 +790,8 @@ const itemDescriptions: Record<string, string> = {
   'Zinc': 'Aumenta permanentemente en +15 la Defensa Especial del Pokémon activo.',
   'Carburante': 'Aumenta permanentemente en +15 la velocidad del Pokémon activo.',
   'Sacred Ash': 'Revive a todos los Pokémon debilitados con el HP completo.',
+  "King's Rock": 'Evoluciona a Politoed y Slowking.',
+  'Perla Grande': 'Se vende por $500.',
 }
 
 const ITEM_SPRITES: Record<string, string> = {
@@ -790,6 +804,8 @@ const ITEM_SPRITES: Record<string, string> = {
   'X Attack': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-attack.png',
   'X Defense': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-defense.png',
   'X Speed': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-speed.png',
+  'X Sp. Attack': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-sp-atk.png',
+  'X Sp. Defense': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-sp-def.png',
   'Full Heal': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/full-heal.png',
   'Antídoto': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/antidote.png',
   'Antiquemar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/burn-heal.png',
@@ -831,6 +847,8 @@ const ITEM_SPRITES: Record<string, string> = {
   'X Attack 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-attack.png',
   'X Defense 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-defense.png',
   'X Speed 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-speed.png',
+  'X Sp. Attack 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-sp-atk.png',
+  'X Sp. Defense 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-sp-def.png',
   'Dragon Fang': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dragon-fang.png',
   'Guardian Charm': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/guard-spec.png',
   'Berserker Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/macho-brace.png',
@@ -890,6 +908,7 @@ const ITEM_SPRITES: Record<string, string> = {
   'Zinc': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/zinc.png',
   'Carburante': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/carbos.png',
   'Sacred Ash': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sacred-ash.png',
+  'Perla Grande': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/big-pearl.png',
   'Luxury Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/luxury-ball.png',
   'Premier Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/premier-ball.png',
   'Fast Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fast-ball.png',
@@ -904,6 +923,7 @@ const ITEM_SPRITES: Record<string, string> = {
   'Oval Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/oval-stone.png',
   'Deep Sea Tooth': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/deep-sea-tooth.png',
   'Deep Sea Scale': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/deep-sea-scale.png',
+  "King's Rock": 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/kings-rock.png',
   'Repartir Exp': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/exp-share.png',
 }
 
@@ -1464,6 +1484,8 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_x_attack_2', name: 'X Attack 2', desc: '+10 ataque permanente.', price: 45, spriteKey: 'X Attack 2', category: 'consumable' },
   { id: 'unlock_x_defense_2', name: 'X Defense 2', desc: '+10 defensa permanente.', price: 45, spriteKey: 'X Defense 2', category: 'consumable' },
   { id: 'unlock_x_speed_2', name: 'X Speed 2', desc: '+10 velocidad permanente.', price: 45, spriteKey: 'X Speed 2', category: 'consumable' },
+  { id: 'unlock_x_sp_attack_2', name: 'X Sp. Attack 2', desc: '+10 Ataque Esp. permanente.', price: 45, spriteKey: 'X Sp. Attack 2', category: 'consumable' },
+  { id: 'unlock_x_sp_defense_2', name: 'X Sp. Defense 2', desc: '+10 Def. Esp. permanente.', price: 45, spriteKey: 'X Sp. Defense 2', category: 'consumable' },
   { id: 'unlock_smoke_ball', name: 'Cuerda Huida', desc: 'Escapa de cualquier combate. Aparece en tiendas (25%).', price: 60, spriteKey: 'Cuerda Huida', category: 'consumable' },
   { id: 'unlock_moomoo_milk', name: 'Moomoo Milk', desc: 'Restaura 100 HP. Aparece en tiendas.', price: 30, spriteKey: 'Moomoo Milk', category: 'consumable' },
   { id: 'unlock_berry_juice', name: 'Berry Juice', desc: 'Restaura 20 HP. Aparece en tiendas.', price: 15, spriteKey: 'Berry Juice', category: 'consumable' },
@@ -1552,12 +1574,13 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'music_menu_chill', name: 'Menú Relax', desc: 'Música de menú relajante y ambiental.', price: 40, spriteKey: 'Potion', category: 'music' },
   { id: 'music_battle_epic', name: 'Batalla Épica', desc: 'Música de batalla más intensa y rápida.', price: 60, spriteKey: 'Potion', category: 'music' },
   { id: 'unlock_disco_mt', name: 'Disco MT', desc: 'Desbloquea el Disco MT: un objeto consumible que enseña un movimiento a tu Pokémon, igual que el nodo Move Tutor. Aparece en tiendas.', price: 120, spriteKey: 'Disco MT', category: 'disco_mt' },
-  { id: 'unlock_protein', name: 'Proteína', desc: '+15 Ataque permanente. Aparece en tiendas.', price: 40, spriteKey: 'Proteína', category: 'consumable' },
-  { id: 'unlock_calcium', name: 'Calcio', desc: '+15 At. Esp. permanente. Aparece en tiendas.', price: 40, spriteKey: 'Calcio', category: 'consumable' },
-  { id: 'unlock_iron', name: 'Hierro', desc: '+15 Defensa permanente. Aparece en tiendas.', price: 40, spriteKey: 'Hierro', category: 'consumable' },
-  { id: 'unlock_zinc', name: 'Zinc', desc: '+15 Def. Esp. permanente. Aparece en tiendas.', price: 40, spriteKey: 'Zinc', category: 'consumable' },
-  { id: 'unlock_carbos', name: 'Carburante', desc: '+15 Velocidad permanente. Aparece en tiendas.', price: 40, spriteKey: 'Carburante', category: 'consumable' },
-  { id: 'unlock_sacred_ash', name: 'Sacred Ash', desc: 'Revive a todo el equipo debilitado. Aparece en tiendas.', price: 90, spriteKey: 'Sacred Ash', category: 'consumable' },
+  { id: 'unlock_protein', name: 'Proteína', desc: '+15 Ataque permanente. Aparece en tiendas.', price: 40, spriteKey: 'Proteína', category: 'consumable', requires: 'unlock_x_attack_2' },
+  { id: 'unlock_calcium', name: 'Calcio', desc: '+15 At. Esp. permanente. Aparece en tiendas.', price: 40, spriteKey: 'Calcio', category: 'consumable', requires: 'unlock_x_sp_attack_2' },
+  { id: 'unlock_iron', name: 'Hierro', desc: '+15 Defensa permanente. Aparece en tiendas.', price: 40, spriteKey: 'Hierro', category: 'consumable', requires: 'unlock_x_defense_2' },
+  { id: 'unlock_zinc', name: 'Zinc', desc: '+15 Def. Esp. permanente. Aparece en tiendas.', price: 40, spriteKey: 'Zinc', category: 'consumable', requires: 'unlock_x_sp_defense_2' },
+  { id: 'unlock_carbos', name: 'Carburante', desc: '+15 Velocidad permanente. Aparece en tiendas.', price: 40, spriteKey: 'Carburante', category: 'consumable', requires: 'unlock_x_speed_2' },
+  { id: 'unlock_sacred_ash', name: 'Sacred Ash', desc: 'Revive a todo el equipo debilitado. Aparece en tiendas.', price: 90, spriteKey: 'Sacred Ash', category: 'consumable', requires: 'unlock_max_revive' },
+  { id: 'unlock_perla_grande', name: 'Perla Grande', desc: 'Se vende por $500. Aparece en drops y Spin.', price: 60, spriteKey: 'Perla Grande', category: 'consumable' },
   { id: 'unlock_antidoto', name: 'Antídoto', desc: 'Cura el envenenamiento. Aparece en tiendas.', price: 15, spriteKey: 'Antídoto', category: 'consumable' },
   { id: 'unlock_antiquemar', name: 'Antiquemar', desc: 'Cura las quemaduras. Aparece en tiendas.', price: 15, spriteKey: 'Antiquemar', category: 'consumable' },
   { id: 'unlock_paralizador', name: 'Paralizador', desc: 'Cura la parálisis. Aparece en tiendas.', price: 15, spriteKey: 'Paralizador', category: 'consumable' },
@@ -2227,6 +2250,7 @@ function MainApp() {
   const [showOptions, setShowOptions] = useState<boolean>(false)
   const [showRestartConfirm, setShowRestartConfirm] = useState<boolean>(false)
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false)
+  const [showChangelog, setShowChangelog] = useState<boolean>(false)
   const [language, setLanguageState] = useState<Language>(getLanguage())
   const changeLanguage = (lang: Language): void => {
     setI18nLanguage(lang)
@@ -2719,6 +2743,8 @@ function MainApp() {
     unlock_x_attack_2: 'X Attack 2',
     unlock_x_defense_2: 'X Defense 2',
     unlock_x_speed_2: 'X Speed 2',
+    unlock_x_sp_attack_2: 'X Sp. Attack 2',
+    unlock_x_sp_defense_2: 'X Sp. Defense 2',
     unlock_smoke_ball: 'Cuerda Huida',
     unlock_moomoo_milk: 'Moomoo Milk',
     unlock_berry_juice: 'Berry Juice',
@@ -2732,6 +2758,7 @@ function MainApp() {
     unlock_zinc: 'Zinc',
     unlock_carbos: 'Carburante',
     unlock_sacred_ash: 'Sacred Ash',
+    unlock_perla_grande: 'Perla Grande',
     unlock_antidoto: 'Antídoto',
     unlock_antiquemar: 'Antiquemar',
     unlock_paralizador: 'Paralizador',
@@ -3189,7 +3216,7 @@ function MainApp() {
       case 'treasure_chest': {
         const gold = 50 + Math.floor(Math.random() * 100)
         setMoney(prev => prev + gold)
-        const items = ['Potion', 'X Attack', ...BERRY_DROPS.filter(isConsumableUnlocked)]
+        const items = ['Potion', 'X Attack', ...BERRY_DROPS.filter(isConsumableUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]
         const item = items[Math.floor(Math.random() * items.length)]
         setInventory(prev => [...prev, item])
         setBattleLog(prev => [t('b.coinChest', { gold, item }), ...prev])
@@ -5218,7 +5245,7 @@ function MainApp() {
     playClick()
     setMoney((prev) => prev - price)
     setInventory((prev) => [...prev, itemName])
-    setBattleLog((prev) => [t('b.boughtMarket', { item: itemName, price }), ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.boughtMarket', { item: itemLocalizedName(itemName), price }), ...prev].slice(0, 15))
   }
 
   function blackMarketSellItem(itemName: string): void {
@@ -5233,7 +5260,7 @@ function MainApp() {
     const data = ALL_SHOP_ITEMS[itemName] ?? HOLDABLE_ITEMS[itemName]
     const value = data ? Math.max(1, Math.floor(data.price * 0.5)) : 10
     setMoney((prev) => prev + value)
-    setBattleLog((prev) => [t('b.soldMarket', { item: itemName, value }), ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.soldMarket', { item: itemLocalizedName(itemName), value }), ...prev].slice(0, 15))
   }
 
   function blackMarketBuyPokemon(idx: number): void {
@@ -5486,7 +5513,7 @@ function MainApp() {
   }
 
   function generateShopStock(excludeStone?: string): string[] {
-    const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i])
+    const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i] && i !== 'Perla Grande')
     const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
     const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
     const shuffledHoldables = [...allHoldableKeys].sort(() => 0.5 - Math.random())
@@ -5546,7 +5573,7 @@ function MainApp() {
 
     if (currentNode.type === 'blackmarket') {
       // Mercado Negro: vende objetos/Pokémon y compra objetos baratos y Pokémon.
-      const blackItems = [...Object.keys(ALL_SHOP_ITEMS)].filter(i => isConsumableUnlocked(i))
+      const blackItems = [...Object.keys(ALL_SHOP_ITEMS)].filter(i => isConsumableUnlocked(i) && i !== 'Perla Grande')
       const shuffledItems = [...blackItems].sort(() => 0.5 - Math.random())
       setBlackMarketItems(shuffledItems.slice(0, 6))
       setBlackMarketPokemon([])
@@ -5827,12 +5854,12 @@ function MainApp() {
         const ballReward = Math.random() < 0.35 ? randomFrom(unlockedBalls) : null
         const rewardItem = ballReward ?? (runChallenges.noHealing
           ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
-          : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isConsumableUnlocked)]))
+          : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isConsumableUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]))
         setRestRewardItem(rewardItem)
         setInventory((previous) => [...previous, rewardItem])
         setBattleLog((prev) => [
           t('rest.eggFound', { name: eggEntry.name, n: eggEntry.hatchIn, label: currentNode.label }),
-          t('rest.eggItem', { item: rewardItem }),
+          t('rest.eggItem', { item: itemLocalizedName(rewardItem) }),
           ...prev
         ].slice(0, 15))
         completeCurrentNode()
@@ -5861,14 +5888,14 @@ function MainApp() {
       const ballReward = Math.random() < 0.35 ? randomFrom(unlockedBalls) : null
       const rewardItem = ballReward ?? (runChallenges.noHealing
         ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
-        : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isConsumableUnlocked)]))
+        : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isConsumableUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]))
 
       setRestEncounter(generatedEncounter)
       seenInPokedex(generatedEncounter)
       setRestRewardItem(rewardItem)
       setInventory((previous) => [...previous, rewardItem])
       setBattleLog((prev) => [
-        t('rest.found', { label: currentNode.label, name: generatedEncounter.name, item: rewardItem }),
+        t('rest.found', { label: currentNode.label, name: generatedEncounter.name, item: itemLocalizedName(rewardItem) }),
         ...prev
       ])
     } catch {
@@ -6443,7 +6470,7 @@ function MainApp() {
     setMoney((prev) => prev - total)
     setInventory((prev) => [...prev, ...Array(qty).fill(itemName)])
     setRunStats(prev => ({ ...prev, moneySpent: prev.moneySpent + total }))
-    setBattleLog((prev) => [t('b.bought', { qty, item: itemName, total }), ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.bought', { qty, item: itemLocalizedName(itemName), total }), ...prev].slice(0, 15))
     setShopQty(prev => ({ ...prev, [itemName]: 1 }))
   }
 
@@ -6470,7 +6497,7 @@ function MainApp() {
     setMoney((prev) => prev - finalPrice)
     setInventory((prev) => [...prev, itemName])
     setRunStats(prev => ({ ...prev, moneySpent: prev.moneySpent + finalPrice }))
-    setBattleLog((prev) => [t('b.bought', { qty: 1, item: itemName, total: finalPrice }), ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.bought', { qty: 1, item: itemLocalizedName(itemName), total: finalPrice }), ...prev].slice(0, 15))
   }
 
   function sellItems(itemName: string, qty: number) {
@@ -6495,7 +6522,7 @@ function MainApp() {
       }
       return out
     })
-    setBattleLog((prev) => [t('b.sold', { qty, item: itemName, total }), ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.sold', { qty, item: itemLocalizedName(itemName), total }), ...prev].slice(0, 15))
     setSellQty(prev => ({ ...prev, [itemName]: 1 }))
   }
 
@@ -6525,7 +6552,7 @@ function MainApp() {
       if (idx === -1) return prev
       return [...prev.slice(0, idx), ...prev.slice(idx + 1)]
     })
-    setBattleLog((prev) => [t('b.equipped', { item: itemName, name: pokemon.name }), ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.equipped', { item: itemLocalizedName(itemName), name: pokemon.name }), ...prev].slice(0, 15))
 
     const syn = SYNERGIES.find(s => s.items.includes(itemName))
     if (syn) {
@@ -6557,7 +6584,7 @@ function MainApp() {
       })
     )
     setInventory((prev) => [...prev, itemName])
-    setBattleLog((prev) => [t('b.unequipped', { item: itemName, name: pokemon.name }), ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.unequipped', { item: itemLocalizedName(itemName), name: pokemon.name }), ...prev].slice(0, 15))
   }
 
   function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boolean; log: string[] } {
@@ -7005,7 +7032,7 @@ function MainApp() {
             updatedPokemon = finalEvolved
             if (consumedItem && requiredItem && consumedItem === requiredItem) {
               updatedPokemon = { ...updatedPokemon, holdItem: undefined }
-              logs.push(t('b.itemConsumedEvo', { item: consumedItem }))
+              logs.push(t('b.itemConsumedEvo', { item: itemLocalizedName(consumedItem) }))
             }
             setRunStats(prev => ({ ...prev, evolutions: prev.evolutions + 1 }))
             logs.push(t('b.evolved', { name: updatedPokemon.name, evolved: finalEvolved.name }))
@@ -8024,6 +8051,10 @@ function MainApp() {
       updatedPokemon = { ...activePokemon, defense: activePokemon.defense + 5 }
     } else if (itemName === 'X Speed') {
       updatedPokemon = { ...activePokemon, speed: activePokemon.speed + 5 }
+    } else if (itemName === 'X Sp. Attack') {
+      updatedPokemon = { ...activePokemon, spAttack: activePokemon.spAttack + 5 }
+    } else if (itemName === 'X Sp. Defense') {
+      updatedPokemon = { ...activePokemon, spDefense: activePokemon.spDefense + 5 }
     } else if (itemName === 'Elixir' && activePokemon.hp < activePokemon.maxHp) {
       updatedPokemon = healPokemon(activePokemon, 80)
     } else if (itemName === 'Moomoo Milk' && activePokemon.hp < activePokemon.maxHp) {
@@ -8046,6 +8077,10 @@ function MainApp() {
       updatedPokemon = { ...activePokemon, defense: activePokemon.defense + 10 }
     } else if (itemName === 'X Speed 2') {
       updatedPokemon = { ...activePokemon, speed: activePokemon.speed + 10 }
+    } else if (itemName === 'X Sp. Attack 2') {
+      updatedPokemon = { ...activePokemon, spAttack: activePokemon.spAttack + 10 }
+    } else if (itemName === 'X Sp. Defense 2') {
+      updatedPokemon = { ...activePokemon, spDefense: activePokemon.spDefense + 10 }
     } else if (itemName === 'Proteína') {
       updatedPokemon = { ...activePokemon, attack: activePokemon.attack + 15 }
     } else if (itemName === 'Calcio') {
@@ -8065,7 +8100,7 @@ function MainApp() {
     )
     setInventory((previous) => previous.filter((_, index) => index !== itemIndex))
     setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
-    setBattleLog((prev) => [t('b.usedItem', { item: itemName, name: activePokemon.name }), ...prev].slice(0, 15))
+    setBattleLog((prev) => [t('b.usedItem', { item: itemLocalizedName(itemName), name: activePokemon.name }), ...prev].slice(0, 15))
   }
 
   function applyRevive(targetIndex: number): void {
@@ -8623,7 +8658,7 @@ function MainApp() {
                 />
               )}
               <div>
-                <h3 style={{ margin: 0, color: '#ffcb05', fontSize: '1.1rem' }}>{reviveModal.itemName}</h3>
+                <h3 style={{ margin: 0, color: '#ffcb05', fontSize: '1.1rem' }}>{itemLocalizedName(reviveModal.itemName)}</h3>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: '#9b98cf' }}>
                   {reviveModal.itemName === 'Max Revive' ? 'Revive con HP completo' : 'Revive con 50% HP'}
                 </p>
@@ -8719,7 +8754,7 @@ function MainApp() {
                 />
               )}
               <div>
-                <h3 style={{ margin: 0, color: '#cba3ff', fontSize: '1.1rem' }}>{equipModal.itemName}</h3>
+                <h3 style={{ margin: 0, color: '#cba3ff', fontSize: '1.1rem' }}>{itemLocalizedName(equipModal.itemName)}</h3>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: '#9b98cf' }}>
                   {itemDesc(equipModal.itemName)}
                 </p>
@@ -8775,7 +8810,7 @@ function MainApp() {
                       <strong style={{ display: 'block', fontSize: '0.95rem', textTransform: 'capitalize', color: canEquip ? '#f8fafc' : '#7d7ab5' }}>
                         {pkmn.name}
                         <StatusBadge status={pkmn.status} compact />
-                        {pkmn.holdItem && <span style={{ fontSize: '0.7rem', color: '#b8a1ff', marginLeft: '6px' }}>({pkmn.holdItem})</span>}
+                        {pkmn.holdItem && <span style={{ fontSize: '0.7rem', color: '#b8a1ff', marginLeft: '6px' }}>({itemLocalizedName(pkmn.holdItem)})</span>}
                         {isGmaxEquip && (
                           <span style={{ fontSize: '0.7rem', color: canUseTransform ? '#4ade80' : '#7d7ab5', marginLeft: '6px' }}>
                             {canUseTransform ? '✓ Puede Gigamax' : 'No puede'}
@@ -10526,7 +10561,7 @@ function MainApp() {
                       <img
                         src={ITEM_SPRITES[pokemon.holdItem]}
                         alt={pokemon.holdItem}
-                        title={`${pokemon.holdItem}: ${itemDesc(pokemon.holdItem ?? '')}`}
+                        title={`${itemLocalizedName(pokemon.holdItem ?? '')}: ${itemDesc(pokemon.holdItem ?? '')}`}
                         style={{ width: '18px', height: '18px', imageRendering: 'pixelated', position: 'absolute', bottom: '4px', right: '4px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
                       />
                     )}
@@ -10547,7 +10582,7 @@ function MainApp() {
                         {ITEM_SPRITES[pokemon.holdItem] && (
                           <img src={ITEM_SPRITES[pokemon.holdItem]} alt="" style={{ width: '14px', height: '14px', imageRendering: 'pixelated', verticalAlign: 'middle', marginRight: '3px' }} />
                         )}
-                        {pokemon.holdItem} — {itemDesc(pokemon.holdItem ?? '')}
+                        {itemLocalizedName(pokemon.holdItem ?? '')} — {itemDesc(pokemon.holdItem ?? '')}
                       </div>
                     )}
                     {pokemon.types && pokemon.types.length > 0 && (
@@ -10618,7 +10653,7 @@ function MainApp() {
                       style={{ background: '#7c3aed', color: '#fff', fontSize: '0.6rem', padding: '1px 4px' }}
                       onClick={(e) => { e.stopPropagation(); unequipItem(index) }}
                     >
-                      ✕ Quitar {pokemon.holdItem}
+                      ✕ Quitar {itemLocalizedName(pokemon.holdItem ?? '')}
                     </button>
                   )}
                   {pokemon.hp > 0 && team.length > 1 && (
@@ -10657,7 +10692,7 @@ function MainApp() {
                           <img
                             src={ITEM_SPRITES[pokemon.holdItem]}
                             alt={pokemon.holdItem}
-                            title={`${pokemon.holdItem}: ${itemDesc(pokemon.holdItem ?? '')}`}
+                            title={`${itemLocalizedName(pokemon.holdItem ?? '')}: ${itemDesc(pokemon.holdItem ?? '')}`}
                             style={{ width: '18px', height: '18px', imageRendering: 'pixelated', position: 'absolute', bottom: '4px', right: '4px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
                           />
                         )}
@@ -10856,7 +10891,7 @@ function MainApp() {
                             />
                           )}
                           <div>
-                            <strong style={{ color: isHoldable ? '#cba3ff' : '#4d9bff' }}>{itemName}</strong>
+                            <strong style={{ color: isHoldable ? '#cba3ff' : '#4d9bff' }}>{itemLocalizedName(itemName)}</strong>
                             <p style={{ margin: 0, fontSize: '0.75rem', color: '#9b98cf' }}>{itemDesc(itemName)}</p>
                             {isHoldable && <span style={{ fontSize: '0.65rem', color: '#b8a1ff' }}>objeto pasivo</span>}
                           </div>
@@ -10960,7 +10995,7 @@ function MainApp() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               {itemIcon && <img src={itemIcon} alt={entry.name} style={{ width: '24px', height: '24px', imageRendering: 'pixelated' }} />}
                               <span style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>
-                                {entry.name} {entry.count > 1 && <span style={{ color: '#ff8a80', fontWeight: 'bold' }}>×{entry.count}</span>}
+                                {itemLocalizedName(entry.name)} {entry.count > 1 && <span style={{ color: '#ff8a80', fontWeight: 'bold' }}>×{entry.count}</span>}
                               </span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -11020,7 +11055,7 @@ function MainApp() {
                       <div key={itemName} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {ITEM_SPRITES[itemName] && <img src={ITEM_SPRITES[itemName]} alt={itemName} style={{ width: '26px', height: '26px', imageRendering: 'pixelated' }} />}
-                          <strong style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{itemName}</strong>
+                          <strong style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{itemLocalizedName(itemName)}</strong>
                         </div>
                         <button className="tiny-btn" type="button" disabled={!canBuy} onClick={() => blackMarketBuyItem(itemName)} style={{ color: canBuy ? '#fb923c' : '#7d7ab5' }}>🪙 ${price}</button>
                       </div>
@@ -11039,7 +11074,7 @@ function MainApp() {
                       const value = data ? Math.max(1, Math.floor(data.price * 0.5)) : 10
                       return (
                         <div key={itemName} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '6px' }}>
-                          <span style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{itemName} ×{count}</span>
+                          <span style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{itemLocalizedName(itemName)} ×{count}</span>
                           <button className="tiny-btn" type="button" onClick={() => blackMarketSellItem(itemName)} style={{ color: '#37d16b' }}>Vender ${value}</button>
                         </div>
                       )
@@ -11111,7 +11146,7 @@ function MainApp() {
                         return (
                           <button key={itemName} type="button" className="tiny-btn" onClick={() => coopSelectItem(itemName)} style={{ background: selected ? '#37d16b' : '#2a2a55', color: '#fff', border: selected ? '2px solid #0f7a43' : '2px solid transparent' }}>
                             {ITEM_SPRITES[itemName] && <img src={ITEM_SPRITES[itemName]} alt="" style={{ width: '14px', height: '14px', verticalAlign: 'middle', marginRight: '4px', imageRendering: 'pixelated' }} />}
-                            {itemName} ×{count}
+                            {itemLocalizedName(itemName)} ×{count}
                           </button>
                         )
                       })}
@@ -11119,7 +11154,7 @@ function MainApp() {
                     </div>
                     {coopMyOffer && (
                       <p style={{ color: '#f3f1ff', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                        Tu oferta: <strong style={{ color: '#37d16b' }}>{coopMyOffer.kind === 'pokemon' ? `${coopMyOffer.name} (Nv.${coopMyOffer.level})` : coopMyOffer.itemName}</strong>
+                        Tu oferta: <strong style={{ color: '#37d16b' }}>{coopMyOffer.kind === 'pokemon' ? `${coopMyOffer.name} (Nv.${coopMyOffer.level})` : itemLocalizedName(coopMyOffer.itemName ?? '')}</strong>
                       </p>
                     )}
                     <button
@@ -11200,7 +11235,7 @@ function MainApp() {
                           {itemIcon && (
                             <img src={itemIcon} alt={item} className="roulette-item-icon" />
                           )}
-                          <span className="roulette-item-name">{item}</span>
+                          <span className="roulette-item-name">{itemLocalizedName(item)}</span>
                           <span className="roulette-item-desc">{itemDesc(item)}</span>
                         </div>
                       )
@@ -11218,7 +11253,7 @@ function MainApp() {
                 {spinRevealed && spinWinnerIndex !== null && (
                   <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
                     <p style={{ color: '#7ceb95', fontWeight: 'bold', fontSize: '1.1rem', margin: '0 0 0.5rem' }}>
-                      {t('spin.got', { item: spinItems[spinWinnerIndex] })}
+                      {t('spin.got', { item: itemLocalizedName(spinItems[spinWinnerIndex]) })}
                     </p>
                     <button className="cta spin-cta" onClick={claimSpinItem} type="button">
                       {t('spin.collect')}
@@ -11485,7 +11520,7 @@ function MainApp() {
                 <p>
                   <span dangerouslySetInnerHTML={{ __html: t('rest.waiting', { name: restEncounter.name + (restEncounter.shiny ? ' ✨' : '') }) }} />
                 </p>
-                <p className="muted">{t('rest.rewardAdded', { item: restRewardItem })}</p>
+                <p className="muted">{t('rest.rewardAdded', { item: itemLocalizedName(restRewardItem) })}</p>
                 <div className="capture-card" style={restEncounter.shiny ? { border: '2px solid #ffcb05', boxShadow: '0 0 12px rgba(250,204,21,0.4)' } : undefined}>
                   <img className="sprite" src={restEncounter.sprite} alt={restEncounter.name} onError={fallbackSprite} />
                 </div>
@@ -11892,7 +11927,7 @@ function MainApp() {
                           />
                         )}
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                          <strong style={{ color: '#cba3ff' }}>{entry.name}</strong>
+                          <strong style={{ color: '#cba3ff' }}>{itemLocalizedName(entry.name)}</strong>
                           <span style={{ fontSize: '0.6rem', color: '#7c3aed' }}>x{entry.count} · equipar</span>
                         </div>
                       </button>
@@ -11915,7 +11950,7 @@ function MainApp() {
                         />
                       )}
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                        <strong>{entry.name}</strong>
+                        <strong>{itemLocalizedName(entry.name)}</strong>
                         <span style={{ fontSize: '0.75rem', color: '#9b98cf' }}>x{entry.count}</span>
                       </div>
                     </button>
@@ -12196,11 +12231,11 @@ function MainApp() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       {ITEM_SPRITES[item.name] && <img src={ITEM_SPRITES[item.name]} alt={item.name} style={{ width: '32px', height: '32px' }} onError={fallbackSprite} />}
                       <div>
-                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{itemLocalizedName(item.name)}</div>
                         <div style={{ color: '#9b98cf', fontSize: '0.75rem' }}>${item.price}</div>
                       </div>
                     </div>
-                    <button className="cta" onClick={() => { if (money >= item.price) { setMoney(prev => prev - item.price); setInventory(prev => [...prev, item.name]); setBattleLog(prev => [`🧳 Compraste ${item.name} por $${item.price}.`, ...prev].slice(0, 15)) } }} disabled={!canBuy} style={{ fontSize: '0.8rem', padding: '4px 14px', background: canBuy ? '#ffcb05' : '#475569', color: '#000' }}>
+                    <button className="cta" onClick={() => { if (money >= item.price) { setMoney(prev => prev - item.price); setInventory(prev => [...prev, item.name]); setBattleLog(prev => [`🧳 Compraste ${itemLocalizedName(item.name)} por $${item.price}.`, ...prev].slice(0, 15)) } }} disabled={!canBuy} style={{ fontSize: '0.8rem', padding: '4px 14px', background: canBuy ? '#ffcb05' : '#475569', color: '#000' }}>
                       {canBuy ? 'Comprar' : 'No alcanza'}
                     </button>
                   </div>
@@ -12936,29 +12971,16 @@ function MainApp() {
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px', maxHeight: '86vh', overflow: 'auto', padding: '1.5rem', animation: 'casinoSlideUp 0.35s ease' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
               <h2 style={{ margin: 0, color: '#ffcb05' }}>❓ {t('help.title')} <span style={{ fontSize: '0.7rem', color: '#7d7ab5', fontWeight: 'normal' }}>{t('help.version')}</span></h2>
-              <button className="tiny-btn" type="button" onClick={() => setShowHelpModal(false)} style={{ color: '#ff8a80' }}>{t('common.close')}</button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowChangelog(true) }} title={t('changelog.title')}>
+                  📜 {t('changelog.button')}
+                </button>
+                <button className="tiny-btn" type="button" onClick={() => setShowHelpModal(false)} style={{ color: '#ff8a80' }}>{t('common.close')}</button>
+              </div>
             </div>
 
             <div style={{ color: '#d9d6f2', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1.25rem', animation: 'casinoFadeIn 0.5s ease' }}>
               {t('help.intro')}
-            </div>
-
-            <div className="help-section" style={{ marginBottom: '1.25rem', animation: 'casinoSlideUp 0.3s ease' }}>
-              <h3 style={{ color: '#37d16b', margin: '0 0 0.5rem', fontSize: '1rem' }}>{t('help.changesTitle')}</h3>
-              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#d9d6f2', fontSize: '0.88rem', lineHeight: '1.7' }}>
-                <li>{t('help.changes1')}</li>
-                <li>{t('help.changes2')}</li>
-                <li>{t('help.changes3')}</li>
-                <li>{t('help.changes4')}</li>
-                <li>{t('help.changes5')}</li>
-                <li>{t('help.changes6')}</li>
-                <li>{t('help.changes7')}</li>
-                <li>{t('help.changes8')}</li>
-                <li>{t('help.changes9')}</li>
-                <li>{t('help.changes10')}</li>
-                <li>{t('help.changes11')}</li>
-                <li>{t('help.changes12')}</li>
-              </ul>
             </div>
 
             <div className="help-section" style={{ marginBottom: '1.25rem', animation: 'casinoSlideUp 0.4s ease' }}>
@@ -13032,6 +13054,29 @@ function MainApp() {
 
             <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
               <button className="cta" onClick={() => setShowHelpModal(false)} style={{ background: '#ffcb05', color: '#000' }}>{t('help.close')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Historial de versiones */}
+      {showChangelog && (
+        <div className="modal-backdrop" onClick={() => setShowChangelog(false)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', maxHeight: '82vh', overflow: 'auto', padding: '1.5rem', animation: 'casinoSlideUp 0.35s ease' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ margin: 0, color: '#ffcb05' }}>{t('changelog.title')}</h2>
+              <button className="tiny-btn" type="button" onClick={() => setShowChangelog(false)} style={{ color: '#ff8a80' }}>{t('common.close')}</button>
+            </div>
+            {getChangelog().map(g => (
+              <div key={g.version} style={{ marginBottom: '1.25rem' }}>
+                <h3 style={{ color: '#4d9bff', margin: '0 0 0.5rem', fontSize: '1rem', borderBottom: '1px solid #3f3f6e', paddingBottom: '0.3rem' }}>{g.version}</h3>
+                <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#d9d6f2', fontSize: '0.88rem', lineHeight: '1.7' }}>
+                  {g.items.map((item, idx) => <li key={idx}>{item}</li>)}
+                </ul>
+              </div>
+            ))}
+            <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
+              <button className="cta" onClick={() => setShowChangelog(false)} style={{ background: '#ffcb05', color: '#000' }}>{t('help.close')}</button>
             </div>
           </div>
         </div>
@@ -13158,21 +13203,24 @@ function MainApp() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'consumable' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                const locked = item.requires ? !metaProgression.permanentlyUnlockedItems.includes(item.requires) : false
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem', opacity: locked ? 0.5 : 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
                         : <span style={{ fontSize: '1.5rem' }}>📦</span>
                       }
                       <div>
-                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{itemLocalizedName(item.name)}</div>
                         <div style={{ color: '#ff8a33', fontSize: '0.7rem' }}>{t('shop.catConsumable')}</div>
                       </div>
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
                       <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                    ) : locked ? (
+                      <div style={{ color: '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.requires', { name: META_SHOP_ITEMS.find(i => i.id === item.requires)?.name ?? (language === 'en' ? 'the previous upgrade' : 'la mejora anterior') })}</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
@@ -13198,7 +13246,7 @@ function MainApp() {
                         : <span style={{ fontSize: '1.5rem' }}>💿</span>
                       }
                       <div>
-                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{itemLocalizedName(item.name)}</div>
                         <div style={{ color: '#38bdf8', fontSize: '0.7rem' }}>{t('shop.catDisco')}</div>
                       </div>
                     </div>
@@ -13230,7 +13278,7 @@ function MainApp() {
                         : <span style={{ fontSize: '1.5rem' }}>🏐</span>
                       }
                       <div>
-                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{itemLocalizedName(item.name)}</div>
                         <div style={{ color: '#ee3b2f', fontSize: '0.7rem' }}>{t('shop.catPokeball')}</div>
                       </div>
                     </div>
@@ -13262,7 +13310,7 @@ function MainApp() {
                         : <span style={{ fontSize: '1.5rem' }}>💎</span>
                       }
                       <div>
-                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{itemLocalizedName(item.name)}</div>
                         <div style={{ color: '#a855f7', fontSize: '0.7rem' }}>{t('shop.catStone')}</div>
                       </div>
                     </div>
@@ -13294,7 +13342,7 @@ function MainApp() {
                         : <span style={{ fontSize: '1.5rem' }}>🔧</span>
                       }
                       <div>
-                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{itemLocalizedName(item.name)}</div>
                         <div style={{ color: '#ff8a33', fontSize: '0.7rem' }}>{t('shop.catEvoItem')}</div>
                       </div>
                     </div>
@@ -13328,7 +13376,7 @@ function MainApp() {
                           : item.spriteKey === 'money' ? '💰' : item.spriteKey === 'dice' ? '🎲' : '⚙️'}
                       </span>
                       <div>
-                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{itemLocalizedName(item.name)}</div>
                         <div style={{ color: '#22d3ee', fontSize: '0.7rem' }}>{t('shop.catUpgrade')}</div>
                       </div>
                     </div>
@@ -13359,7 +13407,7 @@ function MainApp() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       <span style={{ fontSize: '1.5rem' }}>🎵</span>
                       <div>
-                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{itemLocalizedName(item.name)}</div>
                         <div style={{ color: '#ff9ad6', fontSize: '0.7rem' }}>{t('shop.catMusic')}</div>
                       </div>
                     </div>
@@ -13392,7 +13440,7 @@ function MainApp() {
                         : <span style={{ fontSize: '1.5rem' }}>📦</span>
                       }
                       <div>
-                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{item.name}</div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{itemLocalizedName(item.name)}</div>
                         <div style={{ color: '#a855f7', fontSize: '0.7rem' }}>{t('shop.catHoldable')}</div>
                       </div>
                     </div>

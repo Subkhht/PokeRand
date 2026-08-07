@@ -127,6 +127,45 @@ function extractEvolutionLine(chainNode: EvolutionChainNode, targetId: number): 
   return result
 }
 
+// Resuelve el id de una variante regional (p. ej. graveler + '-alola' → 10110).
+// Devuelve null si esa variante no existe.
+async function resolveRegionalSpeciesId(speciesName: string, suffix: string): Promise<number | null> {
+  try {
+    // El endpoint /pokemon-species no acepta nombres regionales (404), pero
+    // /pokemon sí los resuelve al id de la variante regional.
+    const res = await fetch(`${API_BASE}/pokemon/${speciesName}${suffix}`)
+    if (!res.ok) return null
+    const data = await res.json()
+    return Number(data.id)
+  } catch {
+    return null
+  }
+}
+
+// Convierte una línea evolutiva base en su variante regional (p. ej.
+// geodude → geodude-alola). Si una etapa no tiene variante regional, se deja la
+// forma base.
+async function mapRegionalEvolutionLine(
+  line: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string }>,
+  suffix: string
+): Promise<Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string }>> {
+  const out: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string }> = []
+  for (const node of line) {
+    const regionalId = await resolveRegionalSpeciesId(node.name, suffix)
+    if (regionalId !== null) {
+      out.push({
+        ...node,
+        id: regionalId,
+        name: `${node.name}${suffix}`,
+        sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${regionalId}.png`,
+      })
+    } else {
+      out.push(node)
+    }
+  }
+  return out
+}
+
 export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
   const resPokemon = await fetch(`${API_BASE}/pokemon/${id}`)
   const dataPokemon = await resPokemon.json()
@@ -173,14 +212,23 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
 
   let evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string }> = []
   try {
-    const resSpecies = await fetch(`${API_BASE}/pokemon-species/${id}`)
+    // Las formas regionales (p. ej. geodude-alola) comparten la cadena evolutiva
+    // con la forma base: se resuelve la cadena base y luego se mapea a la variante.
+    const regionalSuffix = getRegionalSuffix(dataPokemon.name)
+    const baseName = regionalSuffix ? dataPokemon.name.slice(0, -regionalSuffix.length) : dataPokemon.name
+    const resSpecies = await fetch(`${API_BASE}/pokemon-species/${baseName}`)
     if (resSpecies.ok) {
       const dataSpecies = await resSpecies.json()
       if (dataSpecies.evolution_chain?.url) {
         const evoRes = await fetch(dataSpecies.evolution_chain.url)
         if (evoRes.ok) {
           const evoData = await evoRes.json()
-          evolutions = extractEvolutionLine(evoData.chain, id)
+          const baseId = Number(dataSpecies.id)
+          let line = extractEvolutionLine(evoData.chain, baseId)
+          if (regionalSuffix) {
+            line = await mapRegionalEvolutionLine(line, regionalSuffix)
+          }
+          evolutions = line
         }
       }
     }
