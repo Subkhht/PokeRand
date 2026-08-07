@@ -552,6 +552,11 @@ button {
   scrollbar-color: var(--border-light) transparent;
 }
 
+.route-map.is-infinite {
+  justify-content: flex-start;
+  overflow: auto;
+}
+
 .route-map::-webkit-scrollbar {
   width: 10px;
   height: 10px;

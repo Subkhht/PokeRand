@@ -35,7 +35,9 @@ export function applyDamage(
   const baseDamage = Math.floor((move.power * effectiveAttack) / Math.max(1, effectiveDefense))
   const finalDamage = Math.max(3, Math.floor(baseDamage * 0.45) + 2)
 
-  return { damage: finalDamage }
+  // Red de seguridad: nunca devolver NaN (si alguna stat llegó corrupta, se
+  // degrada a un valor mínimo de daño en lugar de romper el combate).
+  return { damage: Number.isFinite(finalDamage) ? finalDamage : 3 }
 }
 
 export function healPokemon(pokemon: Pokemon, amount: number): Pokemon {

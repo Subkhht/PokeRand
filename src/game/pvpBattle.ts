@@ -359,14 +359,14 @@ function performPvpHit(
 
   const effectiveAttacker: Pokemon = {
     ...attacker,
-    attack: Math.round(attacker.attack * burnNerf * getStageMultiplier(atkStages.attack)),
-    spAttack: Math.round(attacker.spAttack * getStageMultiplier(atkStages.spAttack ?? 0)),
-    speed: Math.round(attacker.speed * paralysisSpdNerf * getStageMultiplier(atkStages.speed)),
+    attack: Math.round((Number.isFinite(attacker.attack) ? attacker.attack : 10) * burnNerf * getStageMultiplier(atkStages.attack)),
+    spAttack: Math.round((Number.isFinite(attacker.spAttack) ? attacker.spAttack : 10) * getStageMultiplier(atkStages.spAttack ?? 0)),
+    speed: Math.round((Number.isFinite(attacker.speed) ? attacker.speed : 10) * paralysisSpdNerf * getStageMultiplier(atkStages.speed)),
   }
   const effectiveDefender: Pokemon = {
     ...defender,
-    defense: Math.round(defender.defense * getStageMultiplier(defStages.defense)),
-    spDefense: Math.round(defender.spDefense * getStageMultiplier(defStages.spDefense ?? 0)),
+    defense: Math.round((Number.isFinite(defender.defense) ? defender.defense : 10) * getStageMultiplier(defStages.defense)),
+    spDefense: Math.round((Number.isFinite(defender.spDefense) ? defender.spDefense : 10) * getStageMultiplier(defStages.spDefense ?? 0)),
   }
 
   const defTypes = (defender as any).types ?? []
@@ -394,14 +394,19 @@ function performPvpHit(
 
   for (let hit = 0; hit < totalHits; hit++) {
     const result = applyDamage(effectiveAttacker, currentDefender, move)
-    let finalDamage = Math.floor(result.damage * effectiveness * stabBonus)
+    let finalDamage = Number.isFinite(result.damage) ? Math.floor(result.damage * effectiveness * stabBonus) : 3
+
+    if (typeof console !== 'undefined' && (finalDamage > 1000 || !Number.isFinite(result.damage))) {
+      console.warn('[PVPDMG]', move.name, '| atk.spAttack:', effectiveAttacker.spAttack, '| atk.spDefense:', effectiveAttacker.spDefense, '| def.spDefense:', effectiveDefender.spDefense, '| def.defense:', effectiveDefender.defense, '| power:', move.power, '| effectiveness:', effectiveness, '| base:', result.damage)
+    }
 
     const moveCritStage = move.critRatio ?? 0
     const moveCritChance = moveCritStage >= 3 ? 0.5 : moveCritStage === 2 ? 0.25 : moveCritStage === 1 ? 0.125 : 0
     const isCrit = moveCritChance > 0 && Math.random() < moveCritChance
     if (isCrit) finalDamage = Math.floor(finalDamage * 1.5)
 
-    const newHp = Math.max(0, currentDefender.hp - finalDamage)
+    const curHp = Number.isFinite(currentDefender.hp) ? currentDefender.hp : currentDefender.maxHp
+    const newHp = Math.max(0, curHp - finalDamage)
     currentDefender = { ...currentDefender, hp: newHp }
     totalDamage += finalDamage
 

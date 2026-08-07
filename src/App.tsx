@@ -1923,6 +1923,9 @@ function MainApp() {
   const [route, setRoute] = useState<RouteNode[]>([])
   const [routeIndex, setRouteIndex] = useState<number>(0)
 
+  // Tamaño de nodos por lote en el modo Infinite (configurable en el setup).
+  const [infiniteNodeSize, setInfiniteNodeSize] = useState<number>(5)
+
   // Combate de entrenador
   const [isTrainerBattle, setIsTrainerBattle] = useState<boolean>(false)
   const [trainerTeam, setTrainerTeam] = useState<Pokemon[]>([])
@@ -3371,7 +3374,7 @@ function MainApp() {
       } else if (activeChallenges.bossRush) {
         customRoute = generateBossRushRoute(totalNodes)
       } else if (effectiveDifficulty === 'infinite') {
-        for (let i = 1; i <= 5; i++) {
+        for (let i = 1; i <= infiniteNodeSize; i++) {
           customRoute.push(generateRandomNodeType(i, rr))
         }
       } else {
@@ -3825,7 +3828,7 @@ function MainApp() {
         if (routeIndex >= 49) unlockAchievement('infinite_50')
         if (routeIndex >= 99) unlockAchievement('infinite_100')
         const nextId = route.length + 1
-        const batch = Array.from({ length: 5 }, (_, k) => generateRandomNodeType(nextId + k, routeRandRef.current))
+        const batch = Array.from({ length: infiniteNodeSize }, (_, k) => generateRandomNodeType(nextId + k, routeRandRef.current))
         setRoute((previous) => [...previous, ...batch])
         setBattleLog((prev) => [
           t('b.infiniteNewRoutes'),
@@ -9939,6 +9942,37 @@ function MainApp() {
                 </button>
               )
             })()}
+            {difficulty === 'infinite' && (
+              <div
+                className="panel"
+                style={{
+                  marginTop: '0.5rem',
+                  padding: '0.75rem 1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem',
+                }}
+              >
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                  <span>{language === 'en' ? 'Nodes per batch' : 'Nodos por lote'}</span>
+                  <strong style={{ color: '#cba3ff' }}>{infiniteNodeSize}</strong>
+                </label>
+                <input
+                  type="range"
+                  min={3}
+                  max={12}
+                  step={1}
+                  value={infiniteNodeSize}
+                  onChange={(e) => setInfiniteNodeSize(Number(e.target.value))}
+                  style={{ width: '100%', accentColor: '#a855f7' }}
+                />
+                <span className="muted" style={{ fontSize: '0.7rem' }}>
+                  {language === 'en'
+                    ? `Each stage shows ${infiniteNodeSize} nodes. Lower = shorter, faster stages. Higher = longer routes.`
+                    : `Cada etapa muestra ${infiniteNodeSize} nodos. Menos = etapas más cortas y rápidas. Más = rutas más largas.`}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
@@ -10519,17 +10553,32 @@ function MainApp() {
               </div>
             )}
             <div
-              className="route-map"
+              className={difficulty === 'infinite' ? 'route-map is-infinite' : 'route-map'}
               ref={difficulty === 'infinite' ? routeMapRef : undefined}
               style={difficulty === 'infinite'
-                ? { paddingRight: '4px', maxHeight: '340px', overflowY: 'auto' }
+                ? { paddingRight: '4px', maxHeight: '340px', overflowY: 'auto', overflowX: 'auto' }
                 : { paddingRight: '4px' }}
             >
               {(() => {
                 const { positions, width, height } = getNodeMapLayout(route.length)
                 const points = positions.map((p) => `${p.x},${p.y}`).join(' ')
+                const isInfiniteMap = difficulty === 'infinite'
+                // En Infinite, el mapa no se comprime: se muestra a escala 1:1
+                // (cada nodo mantiene su tamaño) y el contenedor hace scroll.
+                const displayWidth = isInfiniteMap ? Math.max(width, 480) : width
+                const displayHeight = isInfiniteMap ? Math.max(height, 340) : height
                 return (
-                  <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label={t('route.ariaMap')}>
+                  <svg
+                    viewBox={`0 0 ${width} ${height}`}
+                    style={{
+                      width: isInfiniteMap ? `${displayWidth * 0.9}px` : '100%',
+                      height: isInfiniteMap ? `${displayHeight * 0.9}px` : 'auto',
+                      display: 'block',
+                      maxWidth: isInfiniteMap ? 'none' : '100%',
+                    }}
+                    role="img"
+                    aria-label={t('route.ariaMap')}
+                  >
                     <polyline points={points} fill="none" stroke="#3f3f6e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                     {route.map((node, index) => {
                       const pos = positions[index]
@@ -11104,6 +11153,7 @@ function MainApp() {
                           className="move-btn move-opt-btn"
                           type="button"
                           onClick={() => setSelectedNewMove(move)}
+                          title={moveTooltip(move)}
                           style={{ borderColor: TYPE_COLORS[move.type] ?? '#475569' }}
                         >
                           <strong>{moveName(move)}</strong>
@@ -11133,6 +11183,7 @@ function MainApp() {
                           className="move-btn move-opt-btn"
                           type="button"
                           onClick={() => replaceTeamMove(idx)}
+                          title={moveTooltip(move)}
                           style={{ borderColor: TYPE_COLORS[move.type] ?? '#475569' }}
                         >
                           <strong>{moveName(move)}</strong>
