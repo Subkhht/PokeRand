@@ -12955,6 +12955,9 @@ function MainApp() {
                 <li>{t('help.changes7')}</li>
                 <li>{t('help.changes8')}</li>
                 <li>{t('help.changes9')}</li>
+                <li>{t('help.changes10')}</li>
+                <li>{t('help.changes11')}</li>
+                <li>{t('help.changes12')}</li>
               </ul>
             </div>
 
