@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, Component, type ReactNode, type CSSProperties } from 'react'
+import { useMemo, useState, useEffect, useRef, useCallback, Component, type ReactNode, type CSSProperties } from 'react'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
 import { playHover, playClick, playHit, playEvolution, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
@@ -79,6 +79,40 @@ function StatusBadge({ status, compact = false }: { status?: Pokemon['status']; 
   )
 }
 
+// Insignia verde para el estado de Drenadoras (Leech Seed), igual que StatusBadge.
+function LeechSeedBadge({ compact = false }: { compact?: boolean }) {
+  const color = '#4ade80'
+  const label = statusLabel('leechSeed')
+  const emoji = label.split(' ')[0]
+  const text = label.split(' ').slice(1).join(' ')
+  return (
+    <span
+      title={label}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '3px',
+        padding: compact ? '1px 6px' : '2px 8px',
+        borderRadius: '999px',
+        background: `${color}2e`,
+        border: `1.5px solid ${color}`,
+        color,
+        fontWeight: 'bold',
+        fontSize: compact ? '0.6rem' : '0.72rem',
+        marginLeft: '5px',
+        lineHeight: 1.5,
+        whiteSpace: 'nowrap',
+        verticalAlign: 'middle',
+        boxShadow: `0 0 8px ${color}66`,
+        animation: 'casinoPulse 1.8s ease infinite',
+      }}
+    >
+      <span style={{ fontSize: compact ? '0.62rem' : '0.78rem' }}>{emoji}</span>
+      {!compact && <span>{text}</span>}
+    </span>
+  )
+}
+
 // Indicador visual flotante sobre el sprite del Pokémon para su estado/Drenadoras.
 function StatusFloat({ pokemon }: { pokemon?: Pokemon }) {
   if (!pokemon) return null
@@ -108,18 +142,22 @@ function StatusFloat({ pokemon }: { pokemon?: Pokemon }) {
 }
 
 // Clase CSS de animación sobre el sprite según el estado del Pokémon.
-function statusSpriteClass(status?: Pokemon['status']): string {
-  if (!status) return ''
-  switch (status.type) {
-    case 'burn': return 'status-burn'
-    case 'poison': return 'status-poison'
-    case 'paralysis': return 'status-paralysis'
-    case 'freeze': return 'status-freeze'
-    case 'sleep': return 'status-sleep'
-    case 'confusion': return 'status-confusion'
-    case 'flinch': return 'status-flinch'
-    default: return ''
+function statusSpriteClass(status?: Pokemon['status'], leechSeed?: boolean): string {
+  let cls = ''
+  if (status) {
+    switch (status.type) {
+      case 'burn': cls = 'status-burn'; break
+      case 'poison': cls = 'status-poison'; break
+      case 'paralysis': cls = 'status-paralysis'; break
+      case 'freeze': cls = 'status-freeze'; break
+      case 'sleep': cls = 'status-sleep'; break
+      case 'confusion': cls = 'status-confusion'; break
+      case 'flinch': cls = 'status-flinch'; break
+      default: cls = ''
+    }
   }
+  if (leechSeed) return `${cls} status-leech`.trim()
+  return cls
 }
 
 function CopyCodeButton({ code }: { code: string }) {
@@ -559,6 +597,17 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'X Defense': { price: 75, desc: 'Aumenta permanentemente en +5 la defensa.' },
   'X Speed': { price: 75, desc: 'Aumenta permanentemente en +5 la velocidad.' },
   'Full Heal': { price: 80, desc: 'Restaura 40 HP y cura estados.' },
+  'Antídoto': { price: 30, desc: 'Cura el envenenamiento de un Pokémon.' },
+  'Antiquemar': { price: 30, desc: 'Cura las quemaduras de un Pokémon.' },
+  'Paralizador': { price: 30, desc: 'Cura la parálisis de un Pokémon.' },
+  'Despertar': { price: 30, desc: 'Despierta a un Pokémon dormido.' },
+  'Descongelar': { price: 30, desc: 'Descongela a un Pokémon congelado.' },
+  'Baya Caquic': { price: 35, desc: 'Cura la confusión de un Pokémon.' },
+  'Baya Zreza': { price: 30, desc: 'Cura la parálisis de un Pokémon.' },
+  'Baya Atania': { price: 30, desc: 'Cura las quemaduras de un Pokémon.' },
+  'Baya Algama': { price: 30, desc: 'Cura el envenenamiento de un Pokémon.' },
+  'Baya Safre': { price: 30, desc: 'Descongela a un Pokémon congelado.' },
+  'Baya Siendrepis': { price: 30, desc: 'Despierta a un Pokémon dormido.' },
   'Revive': { price: 150, desc: 'Revive a un Pokémon debilitado con el 50% de su HP.' },
   'Max Revive': { price: 300, desc: 'Revive a un Pokémon debilitado con el HP completo.' },
   'Elixir': { price: 120, desc: 'Restaura 80 HP de un Pokémon.' },
@@ -659,6 +708,10 @@ const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
   'Deep Sea Scale': 'unlock_deep_sea_scale',
 }
 
+// Bayas que pueden aparecer como drop. Oran y Lum siempre están disponibles;
+// el resto se añaden según se desbloquean en la tienda meta.
+const BERRY_DROPS = ['Oran Berry', 'Lum Berry', 'Baya Zreza', 'Baya Atania', 'Baya Algama', 'Baya Safre', 'Baya Siendrepis', 'Baya Caquic']
+
 const itemDescriptions: Record<string, string> = {
   Potion: 'Restaura 25 HP al Pokémon activo.',
   'Super Potion': 'Restaura 50 HP al Pokémon activo.',
@@ -670,6 +723,17 @@ const itemDescriptions: Record<string, string> = {
   'Oran Berry': 'Restaura 15 HP al Pokémon activo.',
   'Lum Berry': 'Restaura 30 HP y cura estados.',
   'Full Heal': 'Restaura 40 HP y cura estados.',
+  'Antídoto': 'Cura el envenenamiento del Pokémon activo.',
+  'Antiquemar': 'Cura las quemaduras del Pokémon activo.',
+  'Paralizador': 'Cura la parálisis del Pokémon activo.',
+  'Despertar': 'Despierta al Pokémon activo.',
+  'Descongelar': 'Descongela al Pokémon activo.',
+  'Baya Caquic': 'Cura la confusión del Pokémon activo.',
+  'Baya Zreza': 'Cura la parálisis del Pokémon activo.',
+  'Baya Atania': 'Cura las quemaduras del Pokémon activo.',
+  'Baya Algama': 'Cura el envenenamiento del Pokémon activo.',
+  'Baya Safre': 'Descongela al Pokémon activo.',
+  'Baya Siendrepis': 'Despierta al Pokémon activo.',
   'Revive': 'Revive a un Pokémon debilitado con 50% HP.',
   'Max Revive': 'Revive a un Pokémon debilitado con el HP completo.',
   'Elixir': 'Restaura 80 HP al Pokémon activo.',
@@ -723,6 +787,17 @@ const ITEM_SPRITES: Record<string, string> = {
   'X Defense': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-defense.png',
   'X Speed': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-speed.png',
   'Full Heal': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/full-heal.png',
+  'Antídoto': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/antidote.png',
+  'Antiquemar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/burn-heal.png',
+  'Paralizador': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/paralyze-heal.png',
+  'Despertar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/awakening.png',
+  'Descongelar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ice-heal.png',
+  'Baya Caquic': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/persim-berry.png',
+  'Baya Zreza': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/cheri-berry.png',
+  'Baya Atania': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rawst-berry.png',
+  'Baya Algama': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/pecha-berry.png',
+  'Baya Safre': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/aspear-berry.png',
+  'Baya Siendrepis': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/chesto-berry.png',
   'Revive': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/revive.png',
   'Max Revive': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-revive.png',
   'Muscle Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/muscle-band.png',
@@ -825,6 +900,7 @@ const ITEM_SPRITES: Record<string, string> = {
   'Oval Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/oval-stone.png',
   'Deep Sea Tooth': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/deep-sea-tooth.png',
   'Deep Sea Scale': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/deep-sea-scale.png',
+  'Repartir Exp': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/exp-share.png',
 }
 
 interface HoldableItem {
@@ -847,6 +923,7 @@ interface HoldableItem {
   isMegaStone?: boolean
   isGmaxBand?: boolean
   isPrimalOrb?: boolean
+  isExpShare?: boolean
 }
 
 const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
@@ -905,6 +982,7 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Oval Stone': { name: 'Oval Stone', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Deep Sea Tooth': { name: 'Deep Sea Tooth', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Deep Sea Scale': { name: 'Deep Sea Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Repartir Exp': { name: 'Repartir Exp', desc: 'Todos los Pokémon del PC ganan 1 nivel tras cada combate.', price: 130, isExpShare: true },
 }
 
 const HOLDABLE_ITEM_NAMES = Object.keys(HOLDABLE_ITEMS)
@@ -1473,6 +1551,17 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_zinc', name: 'Zinc', desc: '+15 Def. Esp. permanente. Aparece en tiendas.', price: 40, spriteKey: 'Zinc', category: 'consumable' },
   { id: 'unlock_carbos', name: 'Carburante', desc: '+15 Velocidad permanente. Aparece en tiendas.', price: 40, spriteKey: 'Carburante', category: 'consumable' },
   { id: 'unlock_sacred_ash', name: 'Sacred Ash', desc: 'Revive a todo el equipo debilitado. Aparece en tiendas.', price: 90, spriteKey: 'Sacred Ash', category: 'consumable' },
+  { id: 'unlock_antidoto', name: 'Antídoto', desc: 'Cura el envenenamiento. Aparece en tiendas.', price: 15, spriteKey: 'Antídoto', category: 'consumable' },
+  { id: 'unlock_antiquemar', name: 'Antiquemar', desc: 'Cura las quemaduras. Aparece en tiendas.', price: 15, spriteKey: 'Antiquemar', category: 'consumable' },
+  { id: 'unlock_paralizador', name: 'Paralizador', desc: 'Cura la parálisis. Aparece en tiendas.', price: 15, spriteKey: 'Paralizador', category: 'consumable' },
+  { id: 'unlock_despertar', name: 'Despertar', desc: 'Despierta a un Pokémon dormido. Aparece en tiendas.', price: 15, spriteKey: 'Despertar', category: 'consumable' },
+  { id: 'unlock_descongelar', name: 'Descongelar', desc: 'Descongela a un Pokémon congelado. Aparece en tiendas.', price: 15, spriteKey: 'Descongelar', category: 'consumable' },
+  { id: 'unlock_baya_caquic', name: 'Baya Caquic', desc: 'Cura la confusión. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Caquic', category: 'consumable' },
+  { id: 'unlock_baya_zreza', name: 'Baya Zreza', desc: 'Cura la parálisis. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Zreza', category: 'consumable' },
+  { id: 'unlock_baya_atania', name: 'Baya Atania', desc: 'Cura las quemaduras. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Atania', category: 'consumable' },
+  { id: 'unlock_baya_algama', name: 'Baya Algama', desc: 'Cura el envenenamiento. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Algama', category: 'consumable' },
+  { id: 'unlock_baya_safre', name: 'Baya Safre', desc: 'Descongela a un Pokémon congelado. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Safre', category: 'consumable' },
+  { id: 'unlock_baya_siendrepis', name: 'Baya Siendrepis', desc: 'Despierta a un Pokémon dormido. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Siendrepis', category: 'consumable' },
   { id: 'unlock_luxury_ball', name: 'Luxury Ball', desc: 'Ratio de captura x1.2. Aparece en tiendas y descansos.', price: 30, spriteKey: 'Luxury Ball', category: 'pokeball' },
   { id: 'unlock_premier_ball', name: 'Premier Ball', desc: 'Ratio estándar, elegante. Aparece en tiendas y descansos.', price: 25, spriteKey: 'Premier Ball', category: 'pokeball' },
   { id: 'unlock_fast_ball', name: 'Fast Ball', desc: 'x4 contra Pokémon muy rápidos. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Fast Ball', category: 'pokeball' },
@@ -1487,6 +1576,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_oval_stone', name: 'Oval Stone', desc: 'Evoluciona a Happiny en Chansey. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Oval Stone', category: 'evolution_item' },
   { id: 'unlock_deep_sea_tooth', name: 'Deep Sea Tooth', desc: 'Evoluciona a Clamperl en Huntail. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Deep Sea Tooth', category: 'evolution_item' },
   { id: 'unlock_deep_sea_scale', name: 'Deep Sea Scale', desc: 'Evoluciona a Clamperl en Gorebyss. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Deep Sea Scale', category: 'evolution_item' },
+  { id: 'unlock_repartir_exp', name: 'Repartir Exp', desc: 'Todos los Pokémon del PC ganan 1 nivel tras cada combate.', price: 130, spriteKey: 'Repartir Exp', category: 'holdable' },
 ]
 
 function fallbackSprite(e: React.SyntheticEvent<HTMLImageElement>) {
@@ -2632,6 +2722,17 @@ function MainApp() {
     unlock_zinc: 'Zinc',
     unlock_carbos: 'Carburante',
     unlock_sacred_ash: 'Sacred Ash',
+    unlock_antidoto: 'Antídoto',
+    unlock_antiquemar: 'Antiquemar',
+    unlock_paralizador: 'Paralizador',
+    unlock_despertar: 'Despertar',
+    unlock_descongelar: 'Descongelar',
+    unlock_baya_caquic: 'Baya Caquic',
+    unlock_baya_zreza: 'Baya Zreza',
+    unlock_baya_atania: 'Baya Atania',
+    unlock_baya_algama: 'Baya Algama',
+    unlock_baya_safre: 'Baya Safre',
+    unlock_baya_siendrepis: 'Baya Siendrepis',
   }
   const LOCKED_HOLDABLE_MAP: Record<string, string> = {
     unlock_muscle_band: 'Muscle Band',
@@ -2668,6 +2769,7 @@ function MainApp() {
     unlock_assault_vest_2: 'Assault Vest II',
     unlock_leftovers_2: 'Leftovers II',
     unlock_quick_claw_2: 'Quick Claw II',
+    unlock_repartir_exp: 'Repartir Exp',
   }
   const LOCKED_POKEBALL_MAP: Record<string, string> = {}
   for (const [ballName, unlockId] of Object.entries(POKEBALL_UNLOCK_IDS)) {
@@ -3070,7 +3172,7 @@ function MainApp() {
       case 'treasure_chest': {
         const gold = 50 + Math.floor(Math.random() * 100)
         setMoney(prev => prev + gold)
-        const items = ['Potion', 'X Attack', 'Oran Berry', 'Lum Berry']
+        const items = ['Potion', 'X Attack', ...BERRY_DROPS.filter(isConsumableUnlocked)]
         const item = items[Math.floor(Math.random() * items.length)]
         setInventory(prev => [...prev, item])
         setBattleLog(prev => [t('b.coinChest', { gold, item }), ...prev])
@@ -5702,7 +5804,7 @@ function MainApp() {
         const ballReward = Math.random() < 0.35 ? randomFrom(unlockedBalls) : null
         const rewardItem = ballReward ?? (runChallenges.noHealing
           ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
-          : randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry']))
+          : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isConsumableUnlocked)]))
         setRestRewardItem(rewardItem)
         setInventory((previous) => [...previous, rewardItem])
         setBattleLog((prev) => [
@@ -5736,7 +5838,7 @@ function MainApp() {
       const ballReward = Math.random() < 0.35 ? randomFrom(unlockedBalls) : null
       const rewardItem = ballReward ?? (runChallenges.noHealing
         ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
-        : randomFrom(['Potion', 'Super Potion', 'X Attack', 'Oran Berry']))
+        : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isConsumableUnlocked)]))
 
       setRestEncounter(generatedEncounter)
       seenInPokedex(generatedEncounter)
@@ -6170,7 +6272,7 @@ function MainApp() {
       const item = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null
       return { label: t('casino.goodPrize'), money: 150, item }
     }
-    const basicItems = ['Poké Ball', 'Potion', 'Oran Berry'].filter(i => unlockedItems.includes(i))
+    const basicItems = ['Poké Ball', 'Potion', ...BERRY_DROPS.filter(isConsumableUnlocked)].filter(i => unlockedItems.includes(i))
     const item = basicItems.length > 0 ? basicItems[Math.floor(Math.random() * basicItems.length)] : null
     return { label: t('casino.consolation'), money: 60, item }
   }
@@ -6820,6 +6922,78 @@ function MainApp() {
     }
   }
 
+  // Subida de nivel tras un combate (equipo activo y PC con Repartir Exp).
+  // Aplica +1 nivel, estadísticas y la auto-evolución al alcanzar el nivel.
+  async function levelUpPokemonAfterBattle(pokemon: Pokemon, levelsGained: number, logs: string[]): Promise<Pokemon> {
+    if (pokemon.hp <= 0) return pokemon
+
+    const hpGain = levelsGained * 3
+    const atkGain = levelsGained * 2
+    const defGain = levelsGained * 2
+    const spaGain = levelsGained * 2
+    const spDefGain = levelsGained * 2
+    const spdGain = levelsGained * 2
+    const oldLevel = pokemon.level
+    const newLevel = oldLevel + levelsGained
+    const newMaxHp = pokemon.maxHp + hpGain
+
+    let updatedPokemon: Pokemon = {
+      ...pokemon,
+      level: runChallenges.fixedLevel ? 50 : newLevel,
+      maxHp: newMaxHp,
+      hp: Math.min(newMaxHp, pokemon.hp + (difficulty === 'coliseum' ? 0 : Math.round(newMaxHp * 0.10)) + hpGain),
+      attack: pokemon.attack + atkGain,
+      defense: pokemon.defense + defGain,
+      spAttack: pokemon.spAttack + spaGain,
+      spDefense: pokemon.spDefense + spDefGain,
+      speed: pokemon.speed + spdGain
+    }
+
+    if (levelsGained > 0) {
+      updatedPokemon = { ...updatedPokemon, level: newLevel }
+    }
+
+    // Auto-evolución al alcanzar el nivel de evolución
+    if (!runChallenges.noEvolution && updatedPokemon.evolutionLevel && updatedPokemon.level >= updatedPokemon.evolutionLevel) {
+      // Si el Pokémon evoluciona con objeto (p. ej. Clamperl → Huntail con
+      // Deep Sea Tooth o → Gorebyss con Deep Sea Scale), se elige la rama
+      // según el objeto equipado. Sin objeto, no evoluciona por esta vía.
+      const itemEvolutions = updatedPokemon.heldItemEvolutions ?? []
+      const hasItemEvolutions = itemEvolutions.length > 0
+      const matched = hasItemEvolutions
+        ? itemEvolutions.find(e => e.item === updatedPokemon.holdItem)
+        : null
+      const itemOk = !hasItemEvolutions || !!matched
+      if (itemOk) {
+        try {
+          // El objeto que el Pokémon necesita para evolucionar a su forma
+          // especial (p. ej. Gorra de Ash para Greninja-Ash). Solo se
+          // consume si esta evolución es exactamente la del objeto.
+          const requiredItem = matched ? matched.item : undefined
+          const targetName = matched ? matched.target : undefined
+          const evolved = await evolvePokemon(updatedPokemon, targetName)
+          if (evolved) {
+            const consumedItem = updatedPokemon.holdItem
+            const { updatedPokemon: finalEvolved } = await checkAndLearnNewMove(evolved, oldLevel, updatedPokemon.level, difficulty)
+            registerInPokedex(finalEvolved)
+            playEvolution()
+            setEvoPopup({ oldSprite: updatedPokemon.sprite, newSprite: finalEvolved.sprite, oldName: updatedPokemon.name, newName: finalEvolved.name })
+            setTimeout(() => setEvoPopup(null), 2000)
+            updatedPokemon = finalEvolved
+            if (consumedItem && requiredItem && consumedItem === requiredItem) {
+              updatedPokemon = { ...updatedPokemon, holdItem: undefined }
+              logs.push(t('b.itemConsumedEvo', { item: consumedItem }))
+            }
+            setRunStats(prev => ({ ...prev, evolutions: prev.evolutions + 1 }))
+            logs.push(t('b.evolved', { name: updatedPokemon.name, evolved: finalEvolved.name }))
+          }
+        } catch {}
+      }
+    }
+
+    return updatedPokemon
+  }
+
   async function onPlayerMove(move: Move): Promise<void> {
     if (!activePokemon || !enemy) return
 
@@ -7169,80 +7343,32 @@ function MainApp() {
       const baseLevelsGained = runChallenges.fixedLevel ? 0 : 1
 
       // Subida de nivel para TODOS los miembros vivos del equipo
-      const updatedTeamPromises = nextTeam.map(async (pokemon) => {
-        if (pokemon.hp <= 0) return pokemon
-
-        const levelsGained = baseLevelsGained
-
-        const hpGain = levelsGained * 3
-        const atkGain = levelsGained * 2
-        const defGain = levelsGained * 2
-        const spaGain = levelsGained * 2
-        const spDefGain = levelsGained * 2
-        const spdGain = levelsGained * 2
-        const oldLevel = pokemon.level
-        const newLevel = oldLevel + levelsGained
-        const newMaxHp = pokemon.maxHp + hpGain
-
-        let updatedPokemon: Pokemon = {
-          ...pokemon,
-          level: runChallenges.fixedLevel ? 50 : newLevel,
-          maxHp: newMaxHp,
-          hp: Math.min(newMaxHp, pokemon.hp + (difficulty === 'coliseum' ? 0 : Math.round(newMaxHp * 0.10)) + hpGain),
-          attack: pokemon.attack + atkGain,
-          defense: pokemon.defense + defGain,
-          spAttack: pokemon.spAttack + spaGain,
-          spDefense: pokemon.spDefense + spDefGain,
-          speed: pokemon.speed + spdGain
-        }
-
-        if (levelsGained > 0) {
-          updatedPokemon = { ...updatedPokemon, level: newLevel }
-        }
-
-        // Auto-evolución al alcanzar el nivel de evolución
-        if (!runChallenges.noEvolution && updatedPokemon.evolutionLevel && updatedPokemon.level >= updatedPokemon.evolutionLevel) {
-          // Si el Pokémon evoluciona con objeto (p. ej. Clamperl → Huntail con
-          // Deep Sea Tooth o → Gorebyss con Deep Sea Scale), se elige la rama
-          // según el objeto equipado. Sin objeto, no evoluciona por esta vía.
-          const itemEvolutions = updatedPokemon.heldItemEvolutions ?? []
-          const hasItemEvolutions = itemEvolutions.length > 0
-          const matched = hasItemEvolutions
-            ? itemEvolutions.find(e => e.item === updatedPokemon.holdItem)
-            : null
-          const itemOk = !hasItemEvolutions || !!matched
-          if (itemOk) {
-            try {
-              // El objeto que el Pokémon necesita para evolucionar a su forma
-              // especial (p. ej. Gorra de Ash para Greninja-Ash). Solo se
-              // consume si esta evolución es exactamente la del objeto.
-              const requiredItem = matched ? matched.item : undefined
-              const targetName = matched ? matched.target : undefined
-              const evolved = await evolvePokemon(updatedPokemon, targetName)
-              if (evolved) {
-                const consumedItem = updatedPokemon.holdItem
-                const { updatedPokemon: finalEvolved } = await checkAndLearnNewMove(evolved, oldLevel, updatedPokemon.level, difficulty)
-                registerInPokedex(finalEvolved)
-                playEvolution()
-                setEvoPopup({ oldSprite: updatedPokemon.sprite, newSprite: finalEvolved.sprite, oldName: updatedPokemon.name, newName: finalEvolved.name })
-                setTimeout(() => setEvoPopup(null), 2000)
-                updatedPokemon = finalEvolved
-                if (consumedItem && requiredItem && consumedItem === requiredItem) {
-                  updatedPokemon = { ...updatedPokemon, holdItem: undefined }
-                  logs.push(t('b.itemConsumedEvo', { item: consumedItem }))
-                }
-                setRunStats(prev => ({ ...prev, evolutions: prev.evolutions + 1 }))
-                logs.push(t('b.evolved', { name: updatedPokemon.name, evolved: finalEvolved.name }))
-              }
-            } catch {}
-          }
-        }
-
-        return updatedPokemon
-      })
+      const updatedTeamPromises = nextTeam.map(async (pokemon) =>
+        levelUpPokemonAfterBattle(pokemon, baseLevelsGained, logs)
+      )
 
       const newTeam = await Promise.all(updatedTeamPromises)
       const pendingPc: Pokemon[] = []
+
+      // Repartir Exp: si algún Pokémon (equipo o PC) lo lleva equipado, todos
+      // los Pokémon del PC ganan la misma experiencia tras el combate que el
+      // equipo activo (1 nivel).
+      const hasExpShare = [...nextTeam, ...pcStorage].some(p => {
+        const h = p.holdItem ? HOLDABLE_ITEMS[p.holdItem] : null
+        return !!h?.isExpShare
+      })
+      if (hasExpShare && pcStorage.length > 0) {
+        const updatedPc = await Promise.all(
+          pcStorage.map(async (pokemon) => levelUpPokemonAfterBattle(pokemon, baseLevelsGained, logs))
+        )
+        const leveledNames = updatedPc
+          .filter((p, i) => p.level > (pcStorage[i]?.level ?? 0))
+          .map(p => p.name)
+        if (leveledNames.length > 0) {
+          logs.push(t('b.expShareGain', { names: leveledNames.join(', ') }))
+        }
+        setPcStorage(updatedPc)
+      }
 
       const baseMoneyReward = Math.floor((40 + nextEnemy.level * 5) / (isTrainerBattle ? trainerTeam.length : 1))
       const hardMoneyPenalty = difficulty === 'hard' ? 0.6 : difficulty === 'infinite' ? 0.55 : 1
@@ -7847,6 +7973,28 @@ function MainApp() {
       updatedPokemon = { ...healPokemon(activePokemon, 30), status: undefined }
     } else if (itemName === 'Full Heal' && (activePokemon.hp < activePokemon.maxHp || activePokemon.status)) {
       updatedPokemon = { ...healPokemon(activePokemon, 40), status: undefined }
+    } else if (itemName === 'Antídoto' && activePokemon.status?.type === 'poison') {
+      updatedPokemon = { ...activePokemon, status: undefined }
+    } else if (itemName === 'Antiquemar' && activePokemon.status?.type === 'burn') {
+      updatedPokemon = { ...activePokemon, status: undefined }
+    } else if (itemName === 'Paralizador' && activePokemon.status?.type === 'paralysis') {
+      updatedPokemon = { ...activePokemon, status: undefined }
+    } else if (itemName === 'Despertar' && activePokemon.status?.type === 'sleep') {
+      updatedPokemon = { ...activePokemon, status: undefined }
+    } else if (itemName === 'Descongelar' && activePokemon.status?.type === 'freeze') {
+      updatedPokemon = { ...activePokemon, status: undefined }
+    } else if (itemName === 'Baya Caquic' && activePokemon.status?.type === 'confusion') {
+      updatedPokemon = { ...activePokemon, status: undefined }
+    } else if (itemName === 'Baya Zreza' && activePokemon.status?.type === 'paralysis') {
+      updatedPokemon = { ...activePokemon, status: undefined }
+    } else if (itemName === 'Baya Atania' && activePokemon.status?.type === 'burn') {
+      updatedPokemon = { ...activePokemon, status: undefined }
+    } else if (itemName === 'Baya Algama' && activePokemon.status?.type === 'poison') {
+      updatedPokemon = { ...activePokemon, status: undefined }
+    } else if (itemName === 'Baya Safre' && activePokemon.status?.type === 'freeze') {
+      updatedPokemon = { ...activePokemon, status: undefined }
+    } else if (itemName === 'Baya Siendrepis' && activePokemon.status?.type === 'sleep') {
+      updatedPokemon = { ...activePokemon, status: undefined }
     } else if (itemName === 'X Attack') {
       updatedPokemon = { ...activePokemon, attack: activePokemon.attack + 5 }
     } else if (itemName === 'X Defense') {
@@ -8257,33 +8405,37 @@ function MainApp() {
   const startNewRunRef = useRef(startNewRun)
   startNewRunRef.current = startNewRun
 
+  const quickReset = useCallback((): void => {
+    if (coopModeRef.current) return
+    if (isDailyRunRef.current) return
+    if (document.querySelector('.modal-backdrop')) return
+    const tag = document.activeElement?.tagName
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+    const adventure =
+      screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' ||
+      screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' ||
+      screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double' ||
+      screen === 'casino'
+    if (!adventure) return
+    if (resetPendingRef.current) return
+    resetPendingRef.current = true
+    playClick()
+    setShowResetModal(true)
+    setTimeout(() => {
+      setShowResetModal(false)
+      resetPendingRef.current = false
+      void startNewRunRef.current(false)
+    }, 1500)
+  }, [screen])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key.toLowerCase() !== 'r' || e.ctrlKey || e.metaKey || e.altKey) return
-      const tag = document.activeElement?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      if (document.querySelector('.modal-backdrop')) return
-      if (coopModeRef.current) return
-      if (isDailyRunRef.current) return
-      const adventure =
-        screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' ||
-        screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' ||
-        screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double' ||
-        screen === 'casino'
-      if (!adventure) return
-      if (resetPendingRef.current) return
-      resetPendingRef.current = true
-      playClick()
-      setShowResetModal(true)
-      setTimeout(() => {
-        setShowResetModal(false)
-        resetPendingRef.current = false
-        void startNewRunRef.current(false)
-      }, 1500)
+      quickReset()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [screen])
+  }, [quickReset])
 
   function closeOptions(): void {
     const wasInBattle = optionsBeganInBattle.current
@@ -8394,6 +8546,16 @@ function MainApp() {
           <button className="tiny-btn" type="button" onClick={() => { playClick(); if (screen === 'setup') { onRestartRun() } else { setShowRestartConfirm(true) } }}>
             {t('topbar.restart')}
           </button>
+          {!coopMode && (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double' || screen === 'casino') && (
+            <button
+              className="tiny-btn"
+              type="button"
+              onClick={() => { playClick(); quickReset() }}
+              style={{ color: '#ff8a33', borderColor: '#ff8a33' }}
+            >
+              {t('topbar.quickRestart')}
+            </button>
+          )}
         </div>
         <h1>PokeRand</h1>
         <div className="record-box">
@@ -9463,10 +9625,11 @@ function MainApp() {
                       return (
                         <>
                           <div style={{ fontSize: '0.8rem', color: '#9b98cf', fontWeight: 'bold', marginBottom: '2px' }}>{nm}</div>
-                          <img key={hit ? pvpHit.key : undefined} className={`${hit ? 'pvp-hit-flash' : ''} ${statusSpriteClass(pk?.status)}`} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '128px', height: '128px', imageRendering: 'pixelated' }} />
+                          <img key={hit ? pvpHit.key : undefined} className={`${hit ? 'pvp-hit-flash' : ''} ${statusSpriteClass(pk?.status, pk?.leechSeed)}`} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '128px', height: '128px', imageRendering: 'pixelated' }} />
                           <div style={{ fontSize: '0.95rem', color: '#f3f1ff', fontWeight: 'bold' }}>{pk?.name}</div>
                           <div style={{ fontSize: '0.8rem', color: '#7d7ab5' }}>Nv.{pk?.level}</div>
                           {pk?.status && <div style={{ marginTop: '2px' }}><StatusBadge status={pk.status} compact /></div>}
+                          {pk?.leechSeed && <div style={{ marginTop: '2px' }}><LeechSeedBadge compact /></div>}
                           {hpBar(pk)}
                         </>
                       )
@@ -9482,10 +9645,11 @@ function MainApp() {
                       return (
                         <>
                           <div style={{ fontSize: '0.8rem', color: '#9b98cf', fontWeight: 'bold', marginBottom: '2px' }}>{nm}</div>
-                          <img key={hit ? pvpHit.key : undefined} className={`${hit ? 'pvp-hit-flash' : ''} ${statusSpriteClass(pk?.status)}`} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '128px', height: '128px', imageRendering: 'pixelated' }} />
+                          <img key={hit ? pvpHit.key : undefined} className={`${hit ? 'pvp-hit-flash' : ''} ${statusSpriteClass(pk?.status, pk?.leechSeed)}`} src={pk?.sprite} alt={pk?.name} onError={fallbackSprite} style={{ width: '128px', height: '128px', imageRendering: 'pixelated' }} />
                           <div style={{ fontSize: '0.95rem', color: '#f3f1ff', fontWeight: 'bold' }}>{pk?.name}</div>
                           <div style={{ fontSize: '0.8rem', color: '#7d7ab5' }}>Nv.{pk?.level}</div>
                           {pk?.status && <div style={{ marginTop: '2px' }}><StatusBadge status={pk.status} compact /></div>}
+                          {pk?.leechSeed && <div style={{ marginTop: '2px' }}><LeechSeedBadge compact /></div>}
                           {hpBar(pk)}
                         </>
                       )
@@ -10304,12 +10468,12 @@ function MainApp() {
           <article className="panel trainer-panel">
             <p className="muted small-tag">{t('route.trainer')}</p>
             <div style={{ position: 'relative', display: 'block', width: 'fit-content', margin: '0 auto' }}>
-              <img className={`sprite trainer-sprite${activePokemon.megaEvolved ? ' mega-active' : ''}${activePokemon.gmaxEvolved ? ' gmax-active' : ''} ${statusSpriteClass(activePokemon.status)}`} src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
+              <img className={`sprite trainer-sprite${activePokemon.megaEvolved ? ' mega-active' : ''}${activePokemon.gmaxEvolved ? ' gmax-active' : ''} ${statusSpriteClass(activePokemon.status, activePokemon.leechSeed)}`} src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
               <StatusFloat pokemon={activePokemon} />
             </div>
             <h2>
               {activePokemon.name}{activePokemon.shiny ? ' ✨' : ''}
-              {activePokemon.leechSeed && <span title="Drenadoras" style={{ marginLeft: '5px' }}>🌱</span>}
+              {activePokemon.leechSeed && <LeechSeedBadge />}
               <StatusBadge status={activePokemon.status} />
             </h2>
             <p className="muted" style={{ fontSize: '1.2rem' }}>
@@ -10343,7 +10507,7 @@ function MainApp() {
                         style={{ width: '18px', height: '18px', imageRendering: 'pixelated', position: 'absolute', bottom: '4px', right: '4px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
                       />
                     )}
-                    <strong>{pokemon.name}{pokemon.shiny ? ' ✨' : ''}{pokemon.leechSeed ? ' 🌱' : ''}</strong>
+                    <strong>{pokemon.name}{pokemon.shiny ? ' ✨' : ''}{pokemon.leechSeed && <LeechSeedBadge compact />}</strong>
                     <span>
                       {pokemon.hp}/{pokemon.maxHp}
                       <StatusBadge status={pokemon.status} compact />
@@ -10352,6 +10516,7 @@ function MainApp() {
                   <div className="sprite-tooltip">
                     <div className="tooltip-name">
                       {pokemon.name}
+                      {pokemon.leechSeed && <LeechSeedBadge />}
                       <StatusBadge status={pokemon.status} />
                     </div>
                     {pokemon.holdItem && (
@@ -11338,8 +11503,8 @@ function MainApp() {
                     const hit = doubleHits.find(h => h.kind === 'enemy' && h.index === idx)
                     return (
                       <div key={idx} style={{ textAlign: 'center', flex: 1, maxWidth: 180, opacity: enemy.hp <= 0 ? 0.35 : 1 }}>
-                        <img key={hit ? hit.key : undefined} className={`${hit ? 'pvp-hit-flash' : ''} ${statusSpriteClass(enemy.status)}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={{ width: 72, height: 72, imageRendering: 'pixelated' }} />
-                        <div style={{ fontSize: '0.8rem', color: '#f3f1ff', fontWeight: 'bold' }}>{enemy.name}{enemy.hp <= 0 ? ' (debilitado)' : ''}<StatusBadge status={enemy.status} compact /></div>
+                        <img key={hit ? hit.key : undefined} className={`${hit ? 'pvp-hit-flash' : ''} ${statusSpriteClass(enemy.status, enemy.leechSeed)}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={{ width: 72, height: 72, imageRendering: 'pixelated' }} />
+                        <div style={{ fontSize: '0.8rem', color: '#f3f1ff', fontWeight: 'bold' }}>{enemy.name}{enemy.hp <= 0 ? ' (debilitado)' : ''}<StatusBadge status={enemy.status} compact />{enemy.leechSeed && <LeechSeedBadge compact />}</div>
                         <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>HP {Math.max(0, enemy.hp)}/{enemy.maxHp}</div>
                       </div>
                     )
@@ -11354,8 +11519,8 @@ function MainApp() {
                     const hit = doubleHits.find(h => h.kind === 'player' && h.index === slot)
                     return (
                       <div key={slot} style={{ textAlign: 'center', flex: 1, maxWidth: 180 }}>
-                        <img key={hit ? hit.key : undefined} className={`${hit ? 'pvp-hit-flash' : ''} ${statusSpriteClass(pokemon.status)}`} src={pokemon.sprite} alt={pokemon.name} onError={fallbackSprite} style={{ width: 72, height: 72, imageRendering: 'pixelated' }} />
-                        <div style={{ fontSize: '0.8rem', color: '#ffcb05', fontWeight: 'bold' }}>{pokemon.name}<StatusBadge status={pokemon.status} compact /></div>
+                        <img key={hit ? hit.key : undefined} className={`${hit ? 'pvp-hit-flash' : ''} ${statusSpriteClass(pokemon.status, pokemon.leechSeed)}`} src={pokemon.sprite} alt={pokemon.name} onError={fallbackSprite} style={{ width: 72, height: 72, imageRendering: 'pixelated' }} />
+                        <div style={{ fontSize: '0.8rem', color: '#ffcb05', fontWeight: 'bold' }}>{pokemon.name}<StatusBadge status={pokemon.status} compact />{pokemon.leechSeed && <LeechSeedBadge compact />}</div>
                         <div style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>HP {Math.max(0, pokemon.hp)}/{pokemon.maxHp}</div>
                       </div>
                     )
@@ -11574,12 +11739,12 @@ function MainApp() {
 
                 <p style={{ margin: '0 0 4px 0', fontSize: '1.2rem' }}>
                   <strong style={{ textTransform: 'capitalize' }}>{enemy.name}{enemy.shiny ? ' ✨' : ''}</strong>
-                  {enemy.leechSeed && <span title="Drenadoras" style={{ marginLeft: '5px' }}>🌱</span>}
+                  {enemy.leechSeed && <LeechSeedBadge />}
                   <StatusBadge status={enemy.status} />
                   {' · '}Nv. {enemy.level}
                 </p>
                 <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <img className={`sprite enemy-sprite${enemy.gmaxEvolved ? ' gmax-active' : ''} ${statusSpriteClass(enemy.status)}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={enemyHitFlash ? { filter: 'brightness(1.5) sepia(1) hue-rotate(-40deg) saturate(5)', transition: 'filter 0.05s' } : { transition: 'filter 0.3s' }} />
+                  <img className={`sprite enemy-sprite${enemy.gmaxEvolved ? ' gmax-active' : ''} ${statusSpriteClass(enemy.status, enemy.leechSeed)}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={enemyHitFlash ? { filter: 'brightness(1.5) sepia(1) hue-rotate(-40deg) saturate(5)', transition: 'filter 0.05s' } : { transition: 'filter 0.3s' }} />
                   <StatusFloat pokemon={enemy} />
                 </div>
                 <div className="hp-line">
@@ -12034,7 +12199,7 @@ function MainApp() {
               Has derrotado al líder de gimnasio. ¿Deseas entrar a la <strong style={{ color: '#4d9bff' }}>Liga Pokémon</strong>?
             </p>
             <p style={{ color: '#9b98cf', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-              Deberás elegir 6 Pokémon de tu equipo y PC. Una vez dentro no podrás cambiarlos.
+              Deberás elegir entre 1 y 6 Pokémon de tu equipo y PC. Una vez dentro no podrás cambiarlos.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
               <button className="cta" onClick={() => { setLeagueOffer(false); setLeagueTeamSelection(true) }} style={{ background: '#4d9bff', color: '#000' }}>
@@ -12054,9 +12219,9 @@ function MainApp() {
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
             <h3 style={{ color: '#4d9bff', margin: '0 0 0.5rem' }}>🏆 Equipo para la Liga</h3>
             <p style={{ color: '#9b98cf', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-              Selecciona 6 Pokémon de tu equipo y PC ({tempLeagueTeam.length}/6)
+              Selecciona entre 1 y 6 Pokémon de tu equipo y PC ({tempLeagueTeam.length}/6)
             </p>
-            {tempLeagueTeam.length === 6 && (
+            {tempLeagueTeam.length >= 1 && (
               <button className="cta" onClick={async () => {
                 setLeagueTeamSelection(false)
                 const healed = tempLeagueTeam.map(p => ({ ...p, hp: p.maxHp, status: undefined }))

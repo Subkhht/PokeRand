@@ -2128,6 +2128,12 @@ button {
 }
 .status-flinch { animation: status-flinch-kf 0.25s ease-in-out infinite; }
 
+@keyframes status-leech-kf {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 2px rgba(74, 222, 128, 0.3)); }
+  50% { filter: brightness(1.15) saturate(1.4) hue-rotate(15deg) drop-shadow(0 0 10px rgba(74, 222, 128, 0.95)); }
+}
+.status-leech { animation: status-leech-kf 1.3s ease-in-out infinite; }
+
 /* ---- Casino: minijuegos ---- */
 @keyframes casinoFadeIn {
   from { opacity: 0; }
