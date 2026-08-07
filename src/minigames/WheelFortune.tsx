@@ -98,8 +98,8 @@ export default function WheelFortune({ onComplete }: CasinoMinigameProps): JSX.E
                 <stop offset="1" stopColor="#f59e0b" />
               </linearGradient>
             </defs>
-            <path d="M17 2 L30 40 L17 31 L4 40 Z" fill="url(#pointerGrad)" stroke="#1a1033" strokeWidth="2" strokeLinejoin="round" />
-            <path d="M17 8 L25 33 L17 28 L9 33 Z" fill="#fff" opacity="0.25" />
+            <path d="M4 2 L30 2 L17 40 Z" fill="url(#pointerGrad)" stroke="#1a1033" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M9 8 L25 8 L17 34 Z" fill="#fff" opacity="0.25" />
           </svg>
         </div>
 

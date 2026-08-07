@@ -270,6 +270,8 @@ const EVOLUTION_ITEM_REVERSE: Record<string, string> = {
   'oval-stone': 'Oval Stone',
   'deep-sea-tooth': 'Deep Sea Tooth',
   'deep-sea-scale': 'Deep Sea Scale',
+  'scroll-of-darkness': 'Manuscrito sombras',
+  'scroll-of-waters': 'Manuscrito aguas',
 }
 
 export function getEvolutionItemDisplayName(pokeApiName: string): string {
@@ -1085,7 +1087,9 @@ function findEvolutionForSpecies(chainNode: EvolutionChainNode, speciesName: str
       const trigger = details?.trigger?.name ?? 'level-up'
       const evoLevel = FRIENDSHIP_EVOLVE_LEVEL_25.includes(chainNode.species.name.toLowerCase())
         ? 25
-        : (minLevel ?? (trigger === 'trade' ? 35 : (FRIENDSHIP_EVOLVE_LEVEL_10.includes(chainNode.species.name.toLowerCase()) ? 10 : 45)))
+        : (chainNode.species.name.toLowerCase() === 'kubfu'
+          ? 30
+          : (minLevel ?? (trigger === 'trade' ? 35 : (FRIENDSHIP_EVOLVE_LEVEL_10.includes(chainNode.species.name.toLowerCase()) ? 10 : 45))))
       const heldItem = details?.held_item?.name ?? null
       // La API ya devuelve el nombre con sufijo regional para las formas
       // regionales (p. ej. dugtrio-alola). Solo se añade el sufijo si el nombre
@@ -1106,6 +1110,13 @@ interface HeldItemEvo {
   level: number
 }
 
+// Kubfu evoluciona con un objeto a sus dos formas (la cadena de la API solo
+// apunta a una especie, así que se mapean manualmente los dos manuscritos).
+const KUBFU_ITEM_EVOLUTIONS: Record<string, { target: string; level: number }> = {
+  'scroll-of-darkness': { target: 'urshifu-single-strike', level: 30 },
+  'scroll-of-waters': { target: 'urshifu-rapid-strike', level: 30 },
+}
+
 function findHeldItemEvolutions(chainNode: EvolutionChainNode, speciesName: string): HeldItemEvo[] {
   const baseName = getBaseName(speciesName)
   const matchName = (name: string) => name.toLowerCase() === speciesName.toLowerCase() || name.toLowerCase() === baseName.toLowerCase()
@@ -1118,7 +1129,24 @@ function findHeldItemEvolutions(chainNode: EvolutionChainNode, speciesName: stri
   if (matchName(chainNode.species.name)) {
     const result: HeldItemEvo[] = []
     for (const evo of chainNode.evolves_to || []) {
-      const details = evo.evolution_details?.[0]
+      const detailsArr = evo.evolution_details ?? []
+      // Evoluciones por objeto de uso (p. ej. Kubfu → Urshifu con Manuscrito):
+      // la cadena de Kubfu agrupa todos los detalles en un solo nodo, así que
+      // se recorren todos y se buscan los de tipo "use-item".
+      for (const details of detailsArr) {
+        const trigger = details?.trigger?.name ?? 'level-up'
+        const useItem = details?.item?.name ?? null
+        if (trigger === 'use-item' && useItem) {
+          const kubfuTarget = KUBFU_ITEM_EVOLUTIONS[useItem]
+          result.push({
+            item: getEvolutionItemDisplayName(useItem),
+            target: kubfuTarget ? kubfuTarget.target : evo.species.name,
+            level: kubfuTarget ? kubfuTarget.level : 30,
+          })
+        }
+      }
+      if (result.length > 0) continue
+      const details = detailsArr[0]
       const heldItem = details?.held_item?.name ?? null
       if (!heldItem) continue
       const trigger = details?.trigger?.name ?? 'level-up'

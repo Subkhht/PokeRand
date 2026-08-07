@@ -568,7 +568,7 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v1.10', en: 'v1.10' },
+  'help.version': { es: 'v1.11', en: 'v1.11' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
   'changelog.button': { es: 'Ver cambios', en: 'See changes' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
@@ -1217,6 +1217,8 @@ const ITEM_DESC: Record<string, { es: string; en: string }> = {
   'Dynamax Band': { es: 'Permite gigamaximar 1 vez por combate (3 turnos).', en: 'Allows Gigantamax once per battle (3 turns).' },
   'Prisma Rojo': { es: 'Despierta la Primal Reversion de Groudon (1 vez por combate).', en: "Awakens Groudon\\'s Primal Reversion (once per battle)." },
   'Prisma Azul': { es: 'Despierta la Primal Reversion de Kyogre (1 vez por combate).', en: "Awakens Kyogre\\'s Primal Reversion (once per battle)." },
+  'Diamansfera': { es: '+20% daño en movimientos Acero y Dragón si lo lleva Dialga.', en: '+20% damage on Steel and Dragon moves if held by Dialga.' },
+  'Lustresfera': { es: '+20% daño en movimientos Agua y Dragón si lo lleva Palkia.', en: '+20% damage on Water and Dragon moves if held by Palkia.' },
   'Muscle Band': { es: '+15% Ataque', en: '+15% Attack' },
   'Wise Glasses': { es: '+15% At. Esp.', en: '+15% Sp. Atk' },
   'Choice Band': { es: '+25% Ataque', en: '+25% Attack' },
@@ -1252,6 +1254,8 @@ const ITEM_DESC: Record<string, { es: string; en: string }> = {
   'Leftovers II': { es: 'Recupera 12 HP por turno', en: 'Recovers 12 HP per turn' },
   'Quick Claw II': { es: '+30% Velocidad', en: '+30% Speed' },
   'Repartir Exp': { es: 'Todos los Pokémon del PC ganan 1 nivel tras cada combate.', en: 'All PC Pokémon gain 1 level after each battle.' },
+  'Manuscrito sombras': { es: 'Evoluciona a Kubfu en Urshifu Brusco al subir de nivel.', en: 'Evolves Kubfu into Single Strike Urshifu when it levels up.' },
+  'Manuscrito aguas': { es: 'Evoluciona a Kubfu en Urshifu Fluido al subir de nivel.', en: 'Evolves Kubfu into Rapid Strike Urshifu when it levels up.' },
   "King's Rock": { es: 'Evoluciona a Politoed y Slowking.', en: 'Evolves into Politoed and Slowking.' },
   'Perla Grande': { es: 'Se vende por $500.', en: 'Sells for $500.' },
 }
@@ -1388,7 +1392,11 @@ const ITEM_NAMES: Record<string, { es: string; en: string }> = {
   'Dynamax Band': { es: 'Banda Dynamax', en: 'Dynamax Band' },
   'Prisma Rojo': { es: 'Prisma Rojo', en: 'Red Prism' },
   'Prisma Azul': { es: 'Prisma Azul', en: 'Blue Prism' },
+  'Diamansfera': { es: 'Diamansfera', en: 'Adamant Orb' },
+  'Lustresfera': { es: 'Lustresfera', en: 'Lustrous Orb' },
   'Repartir Exp': { es: 'Repartir Exp', en: 'Exp Share' },
+  'Manuscrito sombras': { es: 'Manuscrito sombras', en: 'Scroll of Darkness' },
+  'Manuscrito aguas': { es: 'Manuscrito aguas', en: 'Scroll of Waters' },
   'Focus Sash II': { es: 'Cinta Focus II', en: 'Focus Sash II' },
   'Scope Lens II': { es: 'Lente Especial II', en: 'Scope Lens II' },
   'Shell Bell II': { es: 'Campana Concha II', en: 'Shell Bell II' },
@@ -1532,12 +1540,16 @@ const META_ITEM_DESC: Record<string, { es: string; en: string }> = {
   'unlock_assault_vest_2': { es: '+30% Def. Esp.', en: '+30% Sp. Def.' },
   'unlock_leftovers_2': { es: 'Recupera 12 HP por turno.', en: 'Recovers 12 HP per turn.' },
   'unlock_quick_claw_2': { es: '+30% Velocidad.', en: '+30% Speed.' },
+  'unlock_diamansfera': { es: '+20% daño en movimientos Acero y Dragón para Dialga.', en: '+20% damage on Steel and Dragon moves for Dialga.' },
+  'unlock_lustresfera': { es: '+20% daño en movimientos Agua y Dragón para Palkia.', en: '+20% damage on Water and Dragon moves for Palkia.' },
   'unlock_repartir_exp': { es: 'Todos los Pokémon del PC ganan 1 nivel tras cada combate.', en: 'All PC Pokémon gain 1 level after each battle.' },
   'unlock_razor_claw': { es: 'Evoluciona a Sneasel en Weavile. Aparece con el Comerciante Misterioso.', en: 'Evolves Sneasel into Weavile. Appears with the Mysterious Merchant.' },
   'unlock_razor_fang': { es: 'Evoluciona a Gligar en Gliscor. Aparece con el Comerciante Misterioso.', en: 'Evolves Gligar into Gliscor. Appears with the Mysterious Merchant.' },
   'unlock_oval_stone': { es: 'Evoluciona a Happiny en Chansey. Aparece con el Comerciante Misterioso.', en: 'Evolves Happiny into Chansey. Appears with the Mysterious Merchant.' },
   'unlock_deep_sea_tooth': { es: 'Evoluciona a Clamperl en Huntail. Aparece con el Comerciante Misterioso.', en: 'Evolves Clamperl into Huntail. Appears with the Mysterious Merchant.' },
   'unlock_deep_sea_scale': { es: 'Evoluciona a Clamperl en Gorebyss. Aparece con el Comerciante Misterioso.', en: 'Evolves Clamperl into Gorebyss. Appears with the Mysterious Merchant.' },
+  'unlock_manuscrito_sombras': { es: 'Evoluciona a Kubfu en Urshifu Brusco. Aparece con el Comerciante Misterioso.', en: 'Evolves Kubfu into Single Strike Urshifu. Appears with the Mysterious Merchant.' },
+  'unlock_manuscrito_aguas': { es: 'Evoluciona a Kubfu en Urshifu Fluido. Aparece con el Comerciante Misterioso.', en: 'Evolves Kubfu into Rapid Strike Urshifu. Appears with the Mysterious Merchant.' },
 }
 
 export function metaItemDesc(id: string): string {
@@ -1547,6 +1559,18 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v1.11',
+    items: [
+      { es: '🐛 Corregido un bug en modo Infinite: los eventos aleatorios dejaban de aparecer tras usarse una vez; ahora siguen apareciendo.', en: '🐛 Fixed an Infinite mode bug: random events stopped appearing after being used once; they now keep appearing.' },
+      { es: '🎡 Corregida la aguja de la Rueda de la Fortuna, que estaba del revés.', en: '🎡 Fixed the Wheel of Fortune pointer, which was upside down.' },
+      { es: '🏷️ El botón de versión ahora está en la barra superior junto al título, con fuente legible.', en: '🏷️ The version button now sits on the top bar next to the title, with a readable font.' },
+      { es: '⚡ En modo Infinite, completar un nodo G-MAX (2º, 3º, 4º...) ahora entrega el Dynamax Band en lugar de PokéCoins.', en: '⚡ In Infinite mode, completing a G-MAX node (2nd, 3rd, 4th...) now gives the Dynamax Band instead of PokéCoins.' },
+      { es: '🐻 Kubfu ya evoluciona de verdad: con el "Manuscrito sombras" a Urshifu Brusco y con el "Manuscrito aguas" a Urshifu Fluido.', en: '🐻 Kubfu now truly evolves: with "Scroll of Darkness" into Single Strike Urshifu and with "Scroll of Waters" into Rapid Strike Urshifu.' },
+      { es: '⚔️ Cada Urshifu Gigamaxiza a su forma correspondiente (Brusco y Fluido).', en: '⚔️ Each Urshifu Gigantamaxes into its own form (Single Strike and Rapid Strike).' },
+      { es: '💎 Nuevos objetos Diamansfera y Lustresfera: +20% de daño en movimientos Acero/Dragón para Dialga y Agua/Dragón para Palkia. Se compran en la tienda meta.', en: '💎 New Adamant Orb and Lustrous Orb items: +20% damage on Steel/Dragon moves for Dialga and Water/Dragon for Palkia. Bought in the meta shop.' },
+    ],
+  },
   {
     version: 'v1.10',
     items: [

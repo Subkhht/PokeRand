@@ -711,6 +711,8 @@ const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
   'Oval Stone': 'unlock_oval_stone',
   'Deep Sea Tooth': 'unlock_deep_sea_tooth',
   'Deep Sea Scale': 'unlock_deep_sea_scale',
+  'Manuscrito sombras': 'unlock_manuscrito_sombras',
+  'Manuscrito aguas': 'unlock_manuscrito_aguas',
 }
 
 // Bayas que pueden aparecer como drop. Oran y Lum siempre están disponibles;
@@ -792,6 +794,10 @@ const itemDescriptions: Record<string, string> = {
   'Sacred Ash': 'Revive a todos los Pokémon debilitados con el HP completo.',
   "King's Rock": 'Evoluciona a Politoed y Slowking.',
   'Perla Grande': 'Se vende por $500.',
+  'Manuscrito sombras': 'Evoluciona a Kubfu en Urshifu Brusco.',
+  'Manuscrito aguas': 'Evoluciona a Kubfu en Urshifu Fluido.',
+  'Diamansfera': '+20% daño en movimientos Acero y Dragón para Dialga.',
+  'Lustresfera': '+20% daño en movimientos Agua y Dragón para Palkia.',
 }
 
 const ITEM_SPRITES: Record<string, string> = {
@@ -861,6 +867,8 @@ const ITEM_SPRITES: Record<string, string> = {
   'Dynamax Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png',
   'Prisma Rojo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/red-orb.png',
   'Prisma Azul': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/blue-orb.png',
+  'Diamansfera': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/adamant-orb.png',
+  'Lustresfera': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/lustrous-orb.png',
   'Poké Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png',
   'Great Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/great-ball.png',
   'Ultra Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ultra-ball.png',
@@ -948,6 +956,7 @@ interface HoldableItem {
   isGmaxBand?: boolean
   isPrimalOrb?: boolean
   isExpShare?: boolean
+  typeBoost?: { types: string[]; boost: number; onlyIds?: number[] }
 }
 
 const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
@@ -983,6 +992,8 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Dynamax Band': { name: 'Dynamax Band', desc: 'Permite gigamaximar 1 vez por combate (3 turnos)', price: 0, isGmaxBand: true },
   'Prisma Rojo': { name: 'Prisma Rojo', desc: 'Despierta la Primal Reversion de Groudon (1 vez por combate)', price: 0, isPrimalOrb: true },
   'Prisma Azul': { name: 'Prisma Azul', desc: 'Despierta la Primal Reversion de Kyogre (1 vez por combate)', price: 0, isPrimalOrb: true },
+  'Diamansfera': { name: 'Diamansfera', desc: '+20% daño en movimientos Acero y Dragón si lo lleva Dialga.', price: 700, typeBoost: { types: ['steel', 'dragon'], boost: 0.20, onlyIds: [483] } },
+  'Lustresfera': { name: 'Lustresfera', desc: '+20% daño en movimientos Agua y Dragón si lo lleva Palkia.', price: 700, typeBoost: { types: ['water', 'dragon'], boost: 0.20, onlyIds: [484] } },
   'Metal Coat': { name: 'Metal Coat', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   "King's Rock": { name: "King's Rock", desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Dragon Scale': { name: 'Dragon Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
@@ -1006,6 +1017,8 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Oval Stone': { name: 'Oval Stone', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Deep Sea Tooth': { name: 'Deep Sea Tooth', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Deep Sea Scale': { name: 'Deep Sea Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
+  'Manuscrito sombras': { name: 'Manuscrito sombras', desc: 'Evoluciona a Kubfu en Urshifu Brusco al subir de nivel.', price: 400 },
+  'Manuscrito aguas': { name: 'Manuscrito aguas', desc: 'Evoluciona a Kubfu en Urshifu Fluido al subir de nivel.', price: 400 },
   'Repartir Exp': { name: 'Repartir Exp', desc: 'Todos los Pokémon del PC ganan 1 nivel tras cada combate.', price: 130, isExpShare: true },
 }
 
@@ -1148,7 +1161,7 @@ const MEGA_FORM_IDS: Record<number, number | number[]> = {
 const GMAX_CAPABLE_IDS = new Set([
   3, 6, 9, 12, 25, 52, 68, 94, 99, 131, 133, 143, 569, 809,
   812, 815, 818, 823, 826, 834, 839, 841, 842, 844, 849, 851,
-  858, 861, 869, 879, 884, 892,
+  858, 861, 869, 879, 884, 892, 10191,
 ])
 
 const GMAX_FORM_IDS: Record<number, number | number[]> = {
@@ -1158,7 +1171,7 @@ const GMAX_FORM_IDS: Record<number, number | number[]> = {
   823: 10212, 826: 10213, 834: 10214, 839: 10215, 841: 10216,
   842: 10217, 844: 10218, 849: [10219, 10228], 851: 10220,
   858: 10221, 861: 10222, 869: 10223, 879: 10224, 884: 10225,
-  892: [10226, 10227],
+  892: 10226, 10191: 10227,
 }
 
 const PRIMAL_CAPABLE_IDS = new Set([
@@ -1522,8 +1535,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_cursed_blade', name: 'Cursed Blade', desc: '+35% ATK, -5 HP/turno.', price: 90, spriteKey: 'Cursed Blade', category: 'holdable' },
   { id: 'unlock_mega_node', name: 'Nodo Mega', desc: 'Desbloquea nodos de Mega Piedra en Hard/Infinite.', price: 150, spriteKey: 'Mega Stone', category: 'upgrade' },
   { id: 'unlock_gmax_node', name: 'Nodo G-MAX', desc: 'Desbloquea nodos G-MAX en Hard/Infinite.', price: 200, spriteKey: 'Dynamax Band', category: 'upgrade' },
-  { id: 'unlock_primal_node', name: 'Nodo Primal', desc: 'Desbloquea nodos Primal en Hard/Infinite. Otorgan Prisma Rojo o Azul.', price: 250, spriteKey: 'Prisma Rojo', category: 'upgrade' },
-  { id: 'unlock_casino_node', name: 'Nodo Casino', desc: 'Desbloquea nodos Casino en Hard/Infinite. Juega al Pachinko para ganar premios según tu puntuación.', price: 220, spriteKey: 'money', category: 'upgrade' },
+  { id: 'unlock_primal_node', name: 'Nodo Primal', desc: 'Desbloquea nodos Primal en Hard/Infinite. Otorgan Prisma Rojo o Azul.', price: 250, spriteKey: 'Prisma Rojo', category: 'upgrade' },  { id: 'unlock_casino_node', name: 'Nodo Casino', desc: 'Desbloquea nodos Casino en Hard/Infinite. Juega al Pachinko para ganar premios según tu puntuación.', price: 220, spriteKey: 'money', category: 'upgrade' },
   { id: 'unlock_reroll', name: 'Reroll', desc: 'Permite rerollear la tienda 1 vez por visita.', price: 120, spriteKey: 'dice', category: 'upgrade' },
   { id: 'unlock_reroll_2', name: 'Reroll II', desc: 'Otorga 1 reroll extra de tienda por visita.', price: 200, spriteKey: 'dice', category: 'upgrade', requires: 'unlock_reroll' },
   { id: 'unlock_shop_slot', name: 'Espacio de Tienda', desc: 'Las tiendas ofrecen 1 objeto más.', price: 100, spriteKey: 'money', category: 'upgrade' },
@@ -1601,11 +1613,15 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_assault_vest_2', name: 'Assault Vest II', desc: '+30% Def. Esp.', price: 90, spriteKey: 'Assault Vest II', category: 'holdable', requires: 'unlock_assault_vest' },
   { id: 'unlock_leftovers_2', name: 'Leftovers II', desc: 'Recupera 12 HP por turno.', price: 90, spriteKey: 'Leftovers II', category: 'holdable', requires: 'unlock_leftovers' },
   { id: 'unlock_quick_claw_2', name: 'Quick Claw II', desc: '+30% Velocidad.', price: 70, spriteKey: 'Quick Claw II', category: 'holdable', requires: 'unlock_quick_claw' },
+  { id: 'unlock_diamansfera', name: 'Diamansfera', desc: '+20% daño en movimientos Acero y Dragón para Dialga.', price: 80, spriteKey: 'Diamansfera', category: 'holdable' },
+  { id: 'unlock_lustresfera', name: 'Lustresfera', desc: '+20% daño en movimientos Agua y Dragón para Palkia.', price: 80, spriteKey: 'Lustresfera', category: 'holdable' },
   { id: 'unlock_razor_claw', name: 'Razor Claw', desc: 'Evoluciona a Sneasel en Weavile. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Razor Claw', category: 'evolution_item' },
   { id: 'unlock_razor_fang', name: 'Razor Fang', desc: 'Evoluciona a Gligar en Gliscor. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Razor Fang', category: 'evolution_item' },
   { id: 'unlock_oval_stone', name: 'Oval Stone', desc: 'Evoluciona a Happiny en Chansey. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Oval Stone', category: 'evolution_item' },
   { id: 'unlock_deep_sea_tooth', name: 'Deep Sea Tooth', desc: 'Evoluciona a Clamperl en Huntail. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Deep Sea Tooth', category: 'evolution_item' },
   { id: 'unlock_deep_sea_scale', name: 'Deep Sea Scale', desc: 'Evoluciona a Clamperl en Gorebyss. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Deep Sea Scale', category: 'evolution_item' },
+  { id: 'unlock_manuscrito_sombras', name: 'Manuscrito sombras', desc: 'Evoluciona a Kubfu en Urshifu Brusco. Aparece con el Comerciante Misterioso.', price: 60, spriteKey: 'Manuscrito sombras', category: 'evolution_item' },
+  { id: 'unlock_manuscrito_aguas', name: 'Manuscrito aguas', desc: 'Evoluciona a Kubfu en Urshifu Fluido. Aparece con el Comerciante Misterioso.', price: 60, spriteKey: 'Manuscrito aguas', category: 'evolution_item' },
   { id: 'unlock_repartir_exp', name: 'Repartir Exp', desc: 'Todos los Pokémon del PC ganan 1 nivel tras cada combate.', price: 130, spriteKey: 'Repartir Exp', category: 'holdable' },
 ]
 
@@ -2807,6 +2823,8 @@ function MainApp() {
     unlock_leftovers_2: 'Leftovers II',
     unlock_quick_claw_2: 'Quick Claw II',
     unlock_repartir_exp: 'Repartir Exp',
+    unlock_diamansfera: 'Diamansfera',
+    unlock_lustresfera: 'Lustresfera',
   }
   const LOCKED_POKEBALL_MAP: Record<string, string> = {}
   for (const [ballName, unlockId] of Object.entries(POKEBALL_UNLOCK_IDS)) {
@@ -3146,7 +3164,13 @@ function MainApp() {
 
   function triggerRandomEvent(routeProgress: number): void {
     if (Math.random() > 0.25) return
-    const eligible = RANDOM_EVENTS.filter(e => routeProgress >= e.minRouteProgress && !randomEventUsed.has(e.id))
+    let eligible = RANDOM_EVENTS.filter(e => routeProgress >= e.minRouteProgress && !randomEventUsed.has(e.id))
+    // En modo Infinite la run es infinita: si ya se usaron todos los eventos,
+    // se reinicia el conjunto para que sigan apareciendo más adelante.
+    if (eligible.length === 0 && difficulty === 'infinite' && randomEventUsed.size > 0) {
+      setRandomEventUsed(new Set())
+      eligible = RANDOM_EVENTS.filter(e => routeProgress >= e.minRouteProgress)
+    }
     if (eligible.length === 0) return
     const totalWeight = eligible.reduce((s, e) => s + e.weight, 0)
     let roll = Math.random() * totalWeight
@@ -6797,6 +6821,12 @@ function MainApp() {
       if (attackerItem?.damageBoost) {
         finalDamage = Math.floor(finalDamage * (1 + attackerItem.damageBoost))
       }
+      // Potenciadores por tipo y Pokémon (Diamansfera/Lustresfera): solo afectan
+      // a Dialga/Palkia y a movimientos de los tipos indicados.
+      const typeBoost = attackerItem?.typeBoost
+      if (typeBoost && (!typeBoost.onlyIds || typeBoost.onlyIds.includes(attacker.id)) && typeBoost.types.includes(effectiveMove.type)) {
+        finalDamage = Math.floor(finalDamage * (1 + typeBoost.boost))
+      }
       if (attackerItem?.lowHpBonus && attacker.hp < attacker.maxHp * 0.3) {
         finalDamage = Math.floor(finalDamage * (1 + attackerItem.lowHpBonus))
       }
@@ -7553,7 +7583,8 @@ function MainApp() {
 
           if (currentNode.type === 'gmax') {
             const alreadyHas = inventory.includes('Dynamax Band') || team.some(p => p.holdItem === 'Dynamax Band')
-            if (!alreadyHas) {
+            // En modo Infinite siempre se entrega el objeto, incluso si ya hay uno.
+            if (!alreadyHas || difficulty === 'infinite') {
               setInventory(prev => [...prev, 'Dynamax Band'])
               logs.push(t('b.dynamaxBandGot'))
             } else {
@@ -7589,7 +7620,8 @@ function MainApp() {
       // --- G-MAX miniboss reward ---
       if (currentNode.type === 'gmax') {
         const alreadyHas = inventory.includes('Dynamax Band') || team.some(p => p.holdItem === 'Dynamax Band')
-        if (!alreadyHas) {
+        // En modo Infinite siempre se entrega el objeto, incluso si ya hay uno.
+        if (!alreadyHas || difficulty === 'infinite') {
           setInventory(prev => [...prev, 'Dynamax Band'])
           logs.push(t('b.dynamaxBandGot'))
         } else {
@@ -8534,21 +8566,6 @@ function MainApp() {
   return (
     <main className="app-shell">
       <BackgroundLayer backgroundId={metaProgression.activeBackground} />
-      <button
-        type="button"
-        onClick={() => { playClick(); setShowHelpModal(true) }}
-        title={t('help.title')}
-        style={{
-          position: 'fixed', bottom: '6px', right: '10px', zIndex: 5,
-          background: 'transparent', border: 'none', color: 'rgba(155,152,207,0.5)',
-          fontSize: '0.7rem', cursor: 'pointer', fontFamily: 'inherit', opacity: 0.6,
-          transition: 'opacity 0.2s',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
-        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6' }}
-      >
-        {t('help.version')}
-      </button>
       <header className="topbar">
         <TopbarCanvas />
         <div className="left-toolbar">
@@ -8615,7 +8632,25 @@ function MainApp() {
             </button>
           )}
         </div>
-        <h1>PokeRand</h1>
+        <h1 style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+          PokeRand
+          <button
+            type="button"
+            onClick={() => { playClick(); setShowHelpModal(true) }}
+            title={t('help.title')}
+            style={{
+              background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(155,152,207,0.4)',
+              color: '#9b98cf', fontSize: '0.62rem', fontFamily: "'Courier New', monospace", cursor: 'pointer',
+              padding: '3px 9px', borderRadius: '999px', lineHeight: 1,
+              WebkitTextFillColor: '#9b98cf', textTransform: 'none', letterSpacing: '0',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; e.currentTarget.style.webkitTextFillColor = '#ffcb05'; e.currentTarget.style.color = '#ffcb05' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.webkitTextFillColor = '#9b98cf'; e.currentTarget.style.color = '#9b98cf' }}
+          >
+            {t('help.version')}
+          </button>
+        </h1>
         <div className="record-box">
           {winStreak >= 2 && <span style={{ color: '#ff8a33', fontWeight: 'bold', marginRight: '0.5rem' }}>🔥 {winStreak}</span>}
           <span style={{ color: '#ffcb05', fontWeight: 'bold' }}>🪙 {metaProgression.pokeCoins}</span>
@@ -8837,6 +8872,7 @@ function MainApp() {
                         {item.healPerTurn && item.healPerTurn > 0 && <div>+{item.healPerTurn} HP/turno</div>}
                         {item.healPerTurn && item.healPerTurn < 0 && <div>{item.healPerTurn} HP/turno</div>}
                         {item.damageBoost && <div>+{Math.round(item.damageBoost * 100)}% daño</div>}
+                        {item.typeBoost && <div>+{Math.round(item.typeBoost.boost * 100)}% daño {item.typeBoost.types.map(t => t === 'steel' ? 'Acero' : t === 'dragon' ? 'Dragón' : t === 'water' ? 'Agua' : t).join('/')} ({item.typeBoost.onlyIds?.includes(483) ? 'Dialga' : item.typeBoost.onlyIds?.includes(484) ? 'Palkia' : 'específico'})</div>}
                       </div>
                     )}
                     {!isAlive && (
