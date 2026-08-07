@@ -610,11 +610,20 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'Baya Algama': { price: 30, desc: 'Cura el envenenamiento de un Pokémon.' },
   'Baya Safre': { price: 30, desc: 'Descongela a un Pokémon congelado.' },
   'Baya Siendrepis': { price: 30, desc: 'Despierta a un Pokémon dormido.' },
+  'Baya Cuaja': { price: 50, desc: 'Restaura 25 HP de un Pokémon.' },
+  'Baya Wiki': { price: 70, desc: 'Restaura 35 HP de un Pokémon.' },
+  'Baya Mago': { price: 90, desc: 'Restaura 45 HP de un Pokémon.' },
+  'Baya Aguav': { price: 110, desc: 'Restaura 55 HP de un Pokémon.' },
+  'Baya Ango': { price: 130, desc: 'Restaura 65 HP de un Pokémon.' },
   'Revive': { price: 150, desc: 'Revive a un Pokémon debilitado con el 50% de su HP.' },
   'Max Revive': { price: 300, desc: 'Revive a un Pokémon debilitado con el HP completo.' },
   'Elixir': { price: 120, desc: 'Restaura 80 HP de un Pokémon.' },
   'Super Elixir': { price: 250, desc: 'Restaura 200 HP de un Pokémon.' },
   'Full Elixir': { price: 400, desc: 'Restaura todo el HP y cura todos los estados.' },
+  'Polvo Energía': { price: 60, desc: 'Restaura 60 HP de un Pokémon.' },
+  'Raíz Energía': { price: 120, desc: 'Restaura 120 HP de un Pokémon.' },
+  'Polvo Curación': { price: 80, desc: 'Cura los problemas de estado de un Pokémon.' },
+  'Más PS': { price: 200, desc: 'Aumenta permanentemente en +15 el HP máximo de un Pokémon.' },
   'X Attack 2': { price: 150, desc: 'Aumenta permanentemente en +10 el ataque.' },
   'X Defense 2': { price: 150, desc: 'Aumenta permanentemente en +10 la defensa.' },
   'X Speed 2': { price: 150, desc: 'Aumenta permanentemente en +10 la velocidad.' },
@@ -657,6 +666,23 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'Carburante': { price: 200, desc: 'Aumenta permanentemente en +15 la velocidad de un Pokémon.' },
   'Sacred Ash': { price: 400, desc: 'Revive a todos los Pokémon debilitados con el HP completo.' },
   'Perla Grande': { price: 1000, desc: 'Una perla grande y valiosa. Se vende por 500.' },
+  'Polvo Estelar': { price: 200, desc: 'Polvo de estrella. Se vende por 100.' },
+  'Perla': { price: 200, desc: 'Una perla valiosa. Se vende por 100.' },
+  'Corazón Marino': { price: 300, desc: 'Un corazón brillante. Se vende por 150.' },
+  'Seta Pequeña': { price: 100, desc: 'Una seta pequeña. Se vende por 50.' },
+  'Seta Grande': { price: 200, desc: 'Una seta grande. Se vende por 100.' },
+  'Correo Aéreo': { price: 600, desc: 'Una carta con alas. Se vende por 300.' },
+  'Fragmento Estelar': { price: 800, desc: 'Un fragmento de estrella. Se vende por 400.' },
+  'Pieza Dorada': { price: 1000, desc: 'Una pieza de oro. Se vende por 500.' },
+  'Perla Rara': { price: 1600, desc: 'Una perla rara muy valiosa. Se vende por 800.' },
+  'Cometa': { price: 2000, desc: 'Un fragmento de cometa. Se vende por 1000.' },
+  'Pieza Dorada II': { price: 3000, desc: 'Una pieza de oro enorme. Se vende por 1500.' },
+  'Hueso Raro': { price: 500, desc: 'Un hueso valioso. Se vende por 250.' },
+  'Miel': { price: 300, desc: 'Miel dulce. Se vende por 150.' },
+  'Fragmento Rojo': { price: 200, desc: 'Un fragmento rojo. Se vende por 100.' },
+  'Fragmento Azul': { price: 200, desc: 'Un fragmento azul. Se vende por 100.' },
+  'Fragmento Amarillo': { price: 200, desc: 'Un fragmento amarillo. Se vende por 100.' },
+  'Fragmento Verde': { price: 200, desc: 'Un fragmento verde. Se vende por 100.' },
 }
 
 const EVOLUTION_STONES = ['Fire Stone', 'Water Stone', 'Thunder Stone', 'Leaf Stone', 'Moon Stone', 'Sun Stone', 'Shiny Stone', 'Dusk Stone', 'Dawn Stone', 'Ice Stone'] as const
@@ -715,12 +741,18 @@ const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
   'Manuscrito aguas': 'unlock_manuscrito_aguas',
 }
 
-// Bayas que pueden aparecer como drop. Oran y Lum siempre están disponibles;
-// el resto se añaden según se desbloquean en la tienda meta.
-const BERRY_DROPS = ['Oran Berry', 'Lum Berry', 'Baya Zreza', 'Baya Atania', 'Baya Algama', 'Baya Safre', 'Baya Siendrepis', 'Baya Caquic']
+// Bayas que pueden aparecer como drop. Las que están en la tienda meta se
+// filtran por su desbloqueo (consumibles o equipables).
+const BERRY_DROPS = [
+  'Oran Berry', 'Lum Berry', 'Baya Zreza', 'Baya Atania', 'Baya Algama', 'Baya Safre', 'Baya Siendrepis', 'Baya Caquic',
+  'Baya Cuaja', 'Baya Wiki', 'Baya Mago', 'Baya Aguav', 'Baya Ango',
+  'Sitrus Berry', 'Babiri Berry', 'Baya Oca', 'Baya Kasib', 'Baya Meloc', 'Baya Zidra', 'Baya Aou',
+  'Baya Perismon', 'Baya Colbur', 'Baya Waca', 'Baya Rindo', 'Baya Chilan',
+]
 
-// Tesoros que pueden caer como drop (se filtran por desbloqueo).
-const TREASURE_DROPS = ['Perla Grande']
+// Tesoros que pueden caer como drop (se filtran por desbloqueo en la tienda meta).
+const TREASURES = ['Seta Pequeña', 'Polvo Estelar', 'Seta Grande', 'Perla', 'Corazón Marino', 'Correo Aéreo', 'Fragmento Estelar', 'Perla Grande', 'Pieza Dorada', 'Perla Rara', 'Cometa', 'Pieza Dorada II', 'Hueso Raro', 'Miel', 'Fragmento Rojo', 'Fragmento Azul', 'Fragmento Amarillo', 'Fragmento Verde']
+const TREASURE_DROPS = TREASURES
 
 // Ids de las evoluciones de Eevee (Vaporeon, Jolteon, Flareon, Espeon, Umbreon,
 // Leafeon, Glaceon, Sylveon). Se usan para el logro "Familia Eevee".
@@ -750,11 +782,20 @@ const itemDescriptions: Record<string, string> = {
   'Baya Algama': 'Cura el envenenamiento del Pokémon activo.',
   'Baya Safre': 'Descongela al Pokémon activo.',
   'Baya Siendrepis': 'Despierta al Pokémon activo.',
+  'Baya Cuaja': 'Restaura 25 HP al Pokémon activo.',
+  'Baya Wiki': 'Restaura 35 HP al Pokémon activo.',
+  'Baya Mago': 'Restaura 45 HP al Pokémon activo.',
+  'Baya Aguav': 'Restaura 55 HP al Pokémon activo.',
+  'Baya Ango': 'Restaura 65 HP al Pokémon activo.',
   'Revive': 'Revive a un Pokémon debilitado con 50% HP.',
   'Max Revive': 'Revive a un Pokémon debilitado con el HP completo.',
   'Elixir': 'Restaura 80 HP al Pokémon activo.',
   'Super Elixir': 'Restaura 200 HP al Pokémon activo.',
   'Full Elixir': 'Restaura todo el HP y cura estados.',
+  'Polvo Energía': 'Restaura 60 HP al Pokémon activo.',
+  'Raíz Energía': 'Restaura 120 HP al Pokémon activo.',
+  'Polvo Curación': 'Cura los problemas de estado del Pokémon activo.',
+  'Más PS': 'Aumenta permanentemente en +15 el HP máximo del Pokémon activo.',
   'X Attack 2': 'Aumenta permanentemente en +10 el ataque.',
   'X Defense 2': 'Aumenta permanentemente en +10 la defensa.',
   'X Speed 2': 'Aumenta permanentemente en +10 la velocidad.',
@@ -794,10 +835,38 @@ const itemDescriptions: Record<string, string> = {
   'Sacred Ash': 'Revive a todos los Pokémon debilitados con el HP completo.',
   "King's Rock": 'Evoluciona a Politoed y Slowking.',
   'Perla Grande': 'Se vende por $500.',
+  'Polvo Estelar': 'Se vende por $100.',
+  'Perla': 'Se vende por $100.',
+  'Corazón Marino': 'Se vende por $150.',
+  'Seta Pequeña': 'Se vende por $50.',
+  'Seta Grande': 'Se vende por $100.',
+  'Correo Aéreo': 'Se vende por $300.',
+  'Fragmento Estelar': 'Se vende por $400.',
+  'Pieza Dorada': 'Se vende por $500.',
+  'Perla Rara': 'Se vende por $800.',
+  'Cometa': 'Se vende por $1000.',
+  'Pieza Dorada II': 'Se vende por $1500.',
+  'Hueso Raro': 'Se vende por $250.',
+  'Miel': 'Se vende por $150.',
+  'Fragmento Rojo': 'Se vende por $100.',
+  'Fragmento Azul': 'Se vende por $100.',
+  'Fragmento Amarillo': 'Se vende por $100.',
+  'Fragmento Verde': 'Se vende por $100.',
+  'Baya Oca': '15% Reducción de Daño.',
+  'Baya Kasib': '15% Reducción de Daño.',
+  'Baya Meloc': '+15 HP máximos.',
+  'Baya Zidra': '+10% Ataque.',
+  'Baya Aou': '+10% Defensa.',
+  'Baya Perismon': '+10% Ataque Especial.',
+  'Baya Colbur': '+10% Defensa Especial.',
+  'Baya Waca': '+10% Velocidad.',
+  'Baya Rindo': '10% Golpe Crítico.',
+  'Baya Chilan': '10% Robo de Vida.',
   'Manuscrito sombras': 'Evoluciona a Kubfu en Urshifu Brusco.',
   'Manuscrito aguas': 'Evoluciona a Kubfu en Urshifu Fluido.',
   'Diamansfera': '+20% daño en movimientos Acero y Dragón para Dialga.',
   'Lustresfera': '+20% daño en movimientos Agua y Dragón para Palkia.',
+  'Griseosfera': '+20% daño en movimientos Dragón y Fantasma para Giratina.',
 }
 
 const ITEM_SPRITES: Record<string, string> = {
@@ -824,6 +893,11 @@ const ITEM_SPRITES: Record<string, string> = {
   'Baya Algama': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/pecha-berry.png',
   'Baya Safre': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/aspear-berry.png',
   'Baya Siendrepis': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/chesto-berry.png',
+  'Baya Cuaja': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/figy-berry.png',
+  'Baya Wiki': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/wiki-berry.png',
+  'Baya Mago': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mago-berry.png',
+  'Baya Aguav': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/aguav-berry.png',
+  'Baya Ango': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/iapapa-berry.png',
   'Revive': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/revive.png',
   'Max Revive': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-revive.png',
   'Muscle Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/muscle-band.png',
@@ -850,6 +924,10 @@ const ITEM_SPRITES: Record<string, string> = {
   'Elixir': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/elixir.png',
   'Super Elixir': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-elixir.png',
   'Full Elixir': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-potion.png',
+  'Polvo Energía': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/energy-powder.png',
+  'Raíz Energía': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/energy-root.png',
+  'Polvo Curación': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/heal-powder.png',
+  'Más PS': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/hp-up.png',
   'X Attack 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-attack.png',
   'X Defense 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-defense.png',
   'X Speed 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-speed.png',
@@ -869,6 +947,17 @@ const ITEM_SPRITES: Record<string, string> = {
   'Prisma Azul': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/blue-orb.png',
   'Diamansfera': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/adamant-orb.png',
   'Lustresfera': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/lustrous-orb.png',
+  'Griseosfera': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/griseous-orb.png',
+  'Baya Oca': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/occa-berry.png',
+  'Baya Kasib': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/kasib-berry.png',
+  'Baya Meloc': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/charti-berry.png',
+  'Baya Zidra': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/coba-berry.png',
+  'Baya Aou': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tanga-berry.png',
+  'Baya Perismon': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/payapa-berry.png',
+  'Baya Colbur': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/colbur-berry.png',
+  'Baya Waca': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/wacan-berry.png',
+  'Baya Rindo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rindo-berry.png',
+  'Baya Chilan': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/chilan-berry.png',
   'Poké Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png',
   'Great Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/great-ball.png',
   'Ultra Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ultra-ball.png',
@@ -917,9 +1006,31 @@ const ITEM_SPRITES: Record<string, string> = {
   'Carburante': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/carbos.png',
   'Sacred Ash': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sacred-ash.png',
   'Perla Grande': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/big-pearl.png',
+  'Polvo Estelar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/stardust.png',
+  'Perla': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/pearl.png',
+  'Corazón Marino': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/heart-scale.png',
+  'Seta Pequeña': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tiny-mushroom.png',
+  'Seta Grande': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/big-mushroom.png',
+  'Correo Aéreo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/air-mail.png',
+  'Fragmento Estelar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/star-piece.png',
+  'Pieza Dorada': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/nugget.png',
+  'Perla Rara': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/pearl-string.png',
+  'Cometa': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/comet-shard.png',
+  'Pieza Dorada II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/big-nugget.png',
+  'Hueso Raro': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rare-bone.png',
+  'Miel': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/honey.png',
+  'Fragmento Rojo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/red-shard.png',
+  'Fragmento Azul': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/blue-shard.png',
+  'Fragmento Amarillo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/yellow-shard.png',
+  'Fragmento Verde': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/green-shard.png',
+  'Caja Bonguri': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/apricorn-box.png',
   'Luxury Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/luxury-ball.png',
   'Premier Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/premier-ball.png',
   'Fast Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fast-ball.png',
+  'Nidobola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/nest-ball.png',
+  'Buceobola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dive-ball.png',
+  'Sanabola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/heal-ball.png',
+  'Safaribola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/safari-ball.png',
   'Focus Sash II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/focus-sash.png',
   'Scope Lens II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/scope-lens.png',
   'Shell Bell II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shell-bell.png',
@@ -994,6 +1105,17 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Prisma Azul': { name: 'Prisma Azul', desc: 'Despierta la Primal Reversion de Kyogre (1 vez por combate)', price: 0, isPrimalOrb: true },
   'Diamansfera': { name: 'Diamansfera', desc: '+20% daño en movimientos Acero y Dragón si lo lleva Dialga.', price: 700, typeBoost: { types: ['steel', 'dragon'], boost: 0.20, onlyIds: [483] } },
   'Lustresfera': { name: 'Lustresfera', desc: '+20% daño en movimientos Agua y Dragón si lo lleva Palkia.', price: 700, typeBoost: { types: ['water', 'dragon'], boost: 0.20, onlyIds: [484] } },
+  'Griseosfera': { name: 'Griseosfera', desc: '+20% daño en movimientos Dragón y Fantasma si la lleva Giratina.', price: 700, typeBoost: { types: ['dragon', 'ghost'], boost: 0.20, onlyIds: [487] } },
+  'Baya Oca': { name: 'Baya Oca', desc: '15% Reducción de Daño', price: 200, damageReduction: 0.15 },
+  'Baya Kasib': { name: 'Baya Kasib', desc: '15% Reducción de Daño', price: 200, damageReduction: 0.15 },
+  'Baya Meloc': { name: 'Baya Meloc', desc: '+15 HP máximos', price: 200, maxHpMod: 15 },
+  'Baya Zidra': { name: 'Baya Zidra', desc: '+10% Ataque', price: 200, attackMod: 0.10 },
+  'Baya Aou': { name: 'Baya Aou', desc: '+10% Defensa', price: 200, defenseMod: 0.10 },
+  'Baya Perismon': { name: 'Baya Perismon', desc: '+10% Ataque Especial', price: 200, spAttackMod: 0.10 },
+  'Baya Colbur': { name: 'Baya Colbur', desc: '+10% Defensa Especial', price: 200, spDefenseMod: 0.10 },
+  'Baya Waca': { name: 'Baya Waca', desc: '+10% Velocidad', price: 200, speedMod: 0.10 },
+  'Baya Rindo': { name: 'Baya Rindo', desc: '10% Golpe Crítico', price: 200, critChance: 0.10 },
+  'Baya Chilan': { name: 'Baya Chilan', desc: '10% Robo de Vida', price: 200, lifesteal: 0.10 },
   'Metal Coat': { name: 'Metal Coat', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   "King's Rock": { name: "King's Rock", desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Dragon Scale': { name: 'Dragon Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
@@ -1052,6 +1174,10 @@ const POKEBALLS: PokeBallDef[] = [
   { name: 'Luxury Ball', rate: 1.2, desc: 'Un poco más efectiva que la Poké Ball (x1.2).', price: 40, spriteKey: 'luxury-ball' },
   { name: 'Premier Ball', rate: 1, desc: 'Una ball estándar y elegante.', price: 30, spriteKey: 'premier-ball' },
   { name: 'Fast Ball', rate: 1, desc: 'Más efectiva contra Pokémon muy rápidos (x4).', price: 60, spriteKey: 'fast-ball', rateFn: (target) => target.speed >= 100 ? 4 : 1 },
+  { name: 'Nidobola', rate: 1, desc: 'Más efectiva contra Pokémon de nivel bajo.', price: 60, spriteKey: 'nest-ball', rateFn: (target) => { const lv = target.level; return lv < 15 ? 4 : lv < 25 ? 3 : lv < 35 ? 2 : 1; } },
+  { name: 'Buceobola', rate: 1, desc: 'Más efectiva contra Pokémon de tipo Agua (x3.5).', price: 60, spriteKey: 'dive-ball', rateFn: (target) => target.types?.some(t => t === 'water') ? 3.5 : 1 },
+  { name: 'Sanabola', rate: 1, desc: 'Cura al Pokémon capturado.', price: 40, spriteKey: 'heal-ball' },
+  { name: 'Safaribola', rate: 1.5, desc: 'Una ball de la Zona Safari (x1.5).', price: 40, spriteKey: 'safari-ball' },
 ]
 
 const POKEBALL_NAMES = POKEBALLS.map(b => b.name)
@@ -1079,6 +1205,10 @@ const POKEBALL_UNLOCK_IDS: Record<string, string> = {
   'Luxury Ball': 'unlock_luxury_ball',
   'Premier Ball': 'unlock_premier_ball',
   'Fast Ball': 'unlock_fast_ball',
+  'Nidobola': 'unlock_nido_ball',
+  'Buceobola': 'unlock_buceo_ball',
+  'Sanabola': 'unlock_sana_ball',
+  'Safaribola': 'unlock_safari_ball',
 }
 
 function getPokeBallRate(ballName: string, target: Pokemon, turns: number, alreadyCaught: boolean, playerLevel?: number): number {
@@ -1477,7 +1607,7 @@ interface MetaShopItem {
   desc: string
   price: number
   spriteKey: string
-  category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' | 'pokeball' | 'evolution_stone' | 'evolution_item' | 'disco_mt'
+  category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' | 'pokeball' | 'evolution_stone' | 'evolution_item' | 'disco_mt' | 'treasure' | 'berry'
   requires?: string
 }
 
@@ -1518,10 +1648,20 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_scope_lens', name: 'Scope Lens', desc: '20% Golpe Crítico.', price: 70, spriteKey: 'Scope Lens', category: 'holdable' },
   { id: 'unlock_shell_bell', name: 'Shell Bell', desc: '20% Lifesteal.', price: 90, spriteKey: 'Shell Bell', category: 'holdable' },
   { id: 'unlock_choice_scarf', name: 'Choice Scarf', desc: '+30% Velocidad.', price: 70, spriteKey: 'Choice Scarf', category: 'holdable' },
-  { id: 'unlock_babiri_berry', name: 'Babiri Berry', desc: '20% Reducción de Daño.', price: 50, spriteKey: 'Babiri Berry', category: 'holdable' },
+  { id: 'unlock_babiri_berry', name: 'Babiri Berry', desc: '20% Reducción de Daño.', price: 50, spriteKey: 'Babiri Berry', category: 'berry' },
   { id: 'unlock_big_root', name: 'Big Root', desc: '25% Lifesteal.', price: 90, spriteKey: 'Big Root', category: 'holdable' },
   { id: 'unlock_wide_lens', name: 'Wide Lens', desc: '15% Crítico, +10% Velocidad.', price: 40, spriteKey: 'Wide Lens', category: 'holdable' },
-  { id: 'unlock_sitrus_berry', name: 'Sitrus Berry', desc: '+15 HP máx, +8 HP/turno.', price: 40, spriteKey: 'Sitrus Berry', category: 'holdable' },
+  { id: 'unlock_sitrus_berry', name: 'Sitrus Berry', desc: '+15 HP máx, +8 HP/turno.', price: 40, spriteKey: 'Sitrus Berry', category: 'berry' },
+  { id: 'unlock_baya_oca', name: 'Baya Oca', desc: '15% Reducción de Daño.', price: 40, spriteKey: 'Baya Oca', category: 'berry' },
+  { id: 'unlock_baya_kasib', name: 'Baya Kasib', desc: '15% Reducción de Daño.', price: 40, spriteKey: 'Baya Kasib', category: 'berry' },
+  { id: 'unlock_baya_meloc', name: 'Baya Meloc', desc: '+15 HP máximos.', price: 40, spriteKey: 'Baya Meloc', category: 'berry' },
+  { id: 'unlock_baya_zidra', name: 'Baya Zidra', desc: '+10% Ataque.', price: 40, spriteKey: 'Baya Zidra', category: 'berry' },
+  { id: 'unlock_baya_aou', name: 'Baya Aou', desc: '+10% Defensa.', price: 40, spriteKey: 'Baya Aou', category: 'berry' },
+  { id: 'unlock_baya_perismon', name: 'Baya Perismon', desc: '+10% At. Esp.', price: 40, spriteKey: 'Baya Perismon', category: 'berry' },
+  { id: 'unlock_baya_colbur', name: 'Baya Colbur', desc: '+10% Def. Esp.', price: 40, spriteKey: 'Baya Colbur', category: 'berry' },
+  { id: 'unlock_baya_waca', name: 'Baya Waca', desc: '+10% Velocidad.', price: 40, spriteKey: 'Baya Waca', category: 'berry' },
+  { id: 'unlock_baya_rindo', name: 'Baya Rindo', desc: '10% Golpe Crítico.', price: 40, spriteKey: 'Baya Rindo', category: 'berry' },
+  { id: 'unlock_baya_chilan', name: 'Baya Chilan', desc: '10% Robo de Vida.', price: 40, spriteKey: 'Baya Chilan', category: 'berry' },
   { id: 'unlock_guts_band', name: 'Guts Band', desc: '+20% ATK, +15% bajo 30% HP.', price: 60, spriteKey: 'Guts Band', category: 'holdable' },
   { id: 'unlock_vest_protector', name: 'Vest Protector', desc: '+25% DEF, -15% daño.', price: 80, spriteKey: 'Vest Protector', category: 'holdable' },
   { id: 'unlock_focus_band', name: 'Focus Band', desc: '25% Crítico, +10% ATK.', price: 60, spriteKey: 'Focus Band', category: 'holdable' },
@@ -1541,6 +1681,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_shop_slot', name: 'Espacio de Tienda', desc: 'Las tiendas ofrecen 1 objeto más.', price: 100, spriteKey: 'money', category: 'upgrade' },
   { id: 'unlock_shop_slot_2', name: 'Espacio de Tienda II', desc: 'Las tiendas ofrecen 1 objeto más (se suma a la anterior).', price: 180, spriteKey: 'money', category: 'upgrade', requires: 'unlock_shop_slot' },
   { id: 'start_pokeballs_5', name: 'Inicio: +5 Poké Balls', desc: 'Empiezas cada aventura con 5 Poké Balls extra.', price: 180, spriteKey: 'Poké Ball', category: 'upgrade' },
+  { id: 'unlock_caja_bonguri', name: 'Caja Bonguri', desc: 'Empiezas cada aventura con 2 Poké Balls y 1 ball de bonguri aleatoria.', price: 150, spriteKey: 'Caja Bonguri', category: 'upgrade' },
   { id: 'start_potion_1', name: 'Inicio: +1 Poción', desc: 'Empiezas cada aventura con 1 Poción extra.', price: 140, spriteKey: 'Potion', category: 'upgrade' },
   { id: 'start_potion_2', name: 'Inicio: +1 Poción II', desc: 'Empiezas cada aventura con 1 Poción extra (se suma a la anterior).', price: 180, spriteKey: 'Potion', category: 'upgrade', requires: 'start_potion_1' },
   { id: 'start_money_1', name: 'Inicio: +$100', desc: 'Empiezas cada aventura con $100 extra.', price: 120, spriteKey: 'money', category: 'upgrade' },
@@ -1592,21 +1733,51 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_zinc', name: 'Zinc', desc: '+15 Def. Esp. permanente. Aparece en tiendas.', price: 40, spriteKey: 'Zinc', category: 'consumable', requires: 'unlock_x_sp_defense_2' },
   { id: 'unlock_carbos', name: 'Carburante', desc: '+15 Velocidad permanente. Aparece en tiendas.', price: 40, spriteKey: 'Carburante', category: 'consumable', requires: 'unlock_x_speed_2' },
   { id: 'unlock_sacred_ash', name: 'Sacred Ash', desc: 'Revive a todo el equipo debilitado. Aparece en tiendas.', price: 90, spriteKey: 'Sacred Ash', category: 'consumable', requires: 'unlock_max_revive' },
-  { id: 'unlock_perla_grande', name: 'Perla Grande', desc: 'Se vende por $500. Aparece en drops y Spin.', price: 60, spriteKey: 'Perla Grande', category: 'consumable' },
+  { id: 'unlock_polvo_energia', name: 'Polvo Energía', desc: 'Restaura 60 HP. Aparece en tiendas.', price: 20, spriteKey: 'Polvo Energía', category: 'consumable' },
+  { id: 'unlock_raiz_energia', name: 'Raíz Energía', desc: 'Restaura 120 HP. Aparece en tiendas.', price: 40, spriteKey: 'Raíz Energía', category: 'consumable' },
+  { id: 'unlock_polvo_curacion', name: 'Polvo Curación', desc: 'Cura problemas de estado. Aparece en tiendas.', price: 25, spriteKey: 'Polvo Curación', category: 'consumable' },
+  { id: 'unlock_mas_ps', name: 'Más PS', desc: '+15 HP máximo permanente. Aparece en tiendas.', price: 40, spriteKey: 'Más PS', category: 'consumable' },
+  { id: 'unlock_perla_grande', name: 'Perla Grande', desc: 'Se vende por $500. Aparece en drops y Spin.', price: 60, spriteKey: 'Perla Grande', category: 'treasure' },
+  { id: 'unlock_seta_pequena', name: 'Seta Pequeña', desc: 'Se vende por $50. Aparece en drops.', price: 20, spriteKey: 'Seta Pequeña', category: 'treasure' },
+  { id: 'unlock_polvo_estelar', name: 'Polvo Estelar', desc: 'Se vende por $100. Aparece en drops.', price: 25, spriteKey: 'Polvo Estelar', category: 'treasure' },
+  { id: 'unlock_seta_grande', name: 'Seta Grande', desc: 'Se vende por $100. Aparece en drops.', price: 25, spriteKey: 'Seta Grande', category: 'treasure' },
+  { id: 'unlock_perla', name: 'Perla', desc: 'Se vende por $100. Aparece en drops.', price: 25, spriteKey: 'Perla', category: 'treasure' },
+  { id: 'unlock_corazon_marino', name: 'Corazón Marino', desc: 'Se vende por $150. Aparece en drops.', price: 30, spriteKey: 'Corazón Marino', category: 'treasure' },
+  { id: 'unlock_correo_aereo', name: 'Correo Aéreo', desc: 'Se vende por $300. Aparece en drops.', price: 40, spriteKey: 'Correo Aéreo', category: 'treasure' },
+  { id: 'unlock_fragmento_estelar', name: 'Fragmento Estelar', desc: 'Se vende por $400. Aparece en drops.', price: 45, spriteKey: 'Fragmento Estelar', category: 'treasure' },
+  { id: 'unlock_pieza_dorada', name: 'Pieza Dorada', desc: 'Se vende por $500. Aparece en drops.', price: 60, spriteKey: 'Pieza Dorada', category: 'treasure' },
+  { id: 'unlock_perla_rara', name: 'Perla Rara', desc: 'Se vende por $800. Aparece en drops.', price: 80, spriteKey: 'Perla Rara', category: 'treasure' },
+  { id: 'unlock_cometa', name: 'Cometa', desc: 'Se vende por $1000. Aparece en drops.', price: 90, spriteKey: 'Cometa', category: 'treasure' },
+  { id: 'unlock_pieza_dorada_2', name: 'Pieza Dorada II', desc: 'Se vende por $1500. Aparece en drops.', price: 110, spriteKey: 'Pieza Dorada II', category: 'treasure' },
+  { id: 'unlock_hueso_raro', name: 'Hueso Raro', desc: 'Se vende por $250. Aparece en drops.', price: 50, spriteKey: 'Hueso Raro', category: 'treasure' },
+  { id: 'unlock_miel', name: 'Miel', desc: 'Se vende por $150. Aparece en drops.', price: 35, spriteKey: 'Miel', category: 'treasure' },
+  { id: 'unlock_fragmento_rojo', name: 'Fragmento Rojo', desc: 'Se vende por $100. Aparece en drops.', price: 25, spriteKey: 'Fragmento Rojo', category: 'treasure' },
+  { id: 'unlock_fragmento_azul', name: 'Fragmento Azul', desc: 'Se vende por $100. Aparece en drops.', price: 25, spriteKey: 'Fragmento Azul', category: 'treasure' },
+  { id: 'unlock_fragmento_amarillo', name: 'Fragmento Amarillo', desc: 'Se vende por $100. Aparece en drops.', price: 25, spriteKey: 'Fragmento Amarillo', category: 'treasure' },
+  { id: 'unlock_fragmento_verde', name: 'Fragmento Verde', desc: 'Se vende por $100. Aparece en drops.', price: 25, spriteKey: 'Fragmento Verde', category: 'treasure' },
   { id: 'unlock_antidoto', name: 'Antídoto', desc: 'Cura el envenenamiento. Aparece en tiendas.', price: 15, spriteKey: 'Antídoto', category: 'consumable' },
   { id: 'unlock_antiquemar', name: 'Antiquemar', desc: 'Cura las quemaduras. Aparece en tiendas.', price: 15, spriteKey: 'Antiquemar', category: 'consumable' },
   { id: 'unlock_paralizador', name: 'Paralizador', desc: 'Cura la parálisis. Aparece en tiendas.', price: 15, spriteKey: 'Paralizador', category: 'consumable' },
   { id: 'unlock_despertar', name: 'Despertar', desc: 'Despierta a un Pokémon dormido. Aparece en tiendas.', price: 15, spriteKey: 'Despertar', category: 'consumable' },
   { id: 'unlock_descongelar', name: 'Descongelar', desc: 'Descongela a un Pokémon congelado. Aparece en tiendas.', price: 15, spriteKey: 'Descongelar', category: 'consumable' },
-  { id: 'unlock_baya_caquic', name: 'Baya Caquic', desc: 'Cura la confusión. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Caquic', category: 'consumable' },
-  { id: 'unlock_baya_zreza', name: 'Baya Zreza', desc: 'Cura la parálisis. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Zreza', category: 'consumable' },
-  { id: 'unlock_baya_atania', name: 'Baya Atania', desc: 'Cura las quemaduras. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Atania', category: 'consumable' },
-  { id: 'unlock_baya_algama', name: 'Baya Algama', desc: 'Cura el envenenamiento. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Algama', category: 'consumable' },
-  { id: 'unlock_baya_safre', name: 'Baya Safre', desc: 'Descongela a un Pokémon congelado. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Safre', category: 'consumable' },
-  { id: 'unlock_baya_siendrepis', name: 'Baya Siendrepis', desc: 'Despierta a un Pokémon dormido. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Siendrepis', category: 'consumable' },
+  { id: 'unlock_baya_caquic', name: 'Baya Caquic', desc: 'Cura la confusión. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Caquic', category: 'berry' },
+  { id: 'unlock_baya_zreza', name: 'Baya Zreza', desc: 'Cura la parálisis. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Zreza', category: 'berry' },
+  { id: 'unlock_baya_atania', name: 'Baya Atania', desc: 'Cura las quemaduras. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Atania', category: 'berry' },
+  { id: 'unlock_baya_algama', name: 'Baya Algama', desc: 'Cura el envenenamiento. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Algama', category: 'berry' },
+  { id: 'unlock_baya_safre', name: 'Baya Safre', desc: 'Descongela a un Pokémon congelado. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Safre', category: 'berry' },
+  { id: 'unlock_baya_siendrepis', name: 'Baya Siendrepis', desc: 'Despierta a un Pokémon dormido. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Siendrepis', category: 'berry' },
+  { id: 'unlock_baya_cuaja', name: 'Baya Cuaja', desc: 'Restaura 25 HP. Aparece en tiendas y drops.', price: 20, spriteKey: 'Baya Cuaja', category: 'berry' },
+  { id: 'unlock_baya_wiki', name: 'Baya Wiki', desc: 'Restaura 35 HP. Aparece en tiendas y drops.', price: 25, spriteKey: 'Baya Wiki', category: 'berry' },
+  { id: 'unlock_baya_mago', name: 'Baya Mago', desc: 'Restaura 45 HP. Aparece en tiendas y drops.', price: 30, spriteKey: 'Baya Mago', category: 'berry' },
+  { id: 'unlock_baya_aguav', name: 'Baya Aguav', desc: 'Restaura 55 HP. Aparece en tiendas y drops.', price: 35, spriteKey: 'Baya Aguav', category: 'berry' },
+  { id: 'unlock_baya_ango', name: 'Baya Ango', desc: 'Restaura 65 HP. Aparece en tiendas y drops.', price: 40, spriteKey: 'Baya Ango', category: 'berry' },
   { id: 'unlock_luxury_ball', name: 'Luxury Ball', desc: 'Ratio de captura x1.2. Aparece en tiendas y descansos.', price: 30, spriteKey: 'Luxury Ball', category: 'pokeball' },
   { id: 'unlock_premier_ball', name: 'Premier Ball', desc: 'Ratio estándar, elegante. Aparece en tiendas y descansos.', price: 25, spriteKey: 'Premier Ball', category: 'pokeball' },
   { id: 'unlock_fast_ball', name: 'Fast Ball', desc: 'x4 contra Pokémon muy rápidos. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Fast Ball', category: 'pokeball' },
+  { id: 'unlock_nido_ball', name: 'Nidobola', desc: 'Mejor contra Pokémon de nivel bajo. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Nidobola', category: 'pokeball' },
+  { id: 'unlock_buceo_ball', name: 'Buceobola', desc: 'x3.5 contra Pokémon de tipo Agua. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Buceobola', category: 'pokeball' },
+  { id: 'unlock_sana_ball', name: 'Sanabola', desc: 'Cura al Pokémon capturado. Aparece en tiendas y descansos.', price: 30, spriteKey: 'Sanabola', category: 'pokeball' },
+  { id: 'unlock_safari_ball', name: 'Safaribola', desc: 'Ratio base x1.5. Aparece en tiendas y descansos.', price: 30, spriteKey: 'Safaribola', category: 'pokeball' },
   { id: 'unlock_focus_sash_2', name: 'Focus Sash II', desc: '+40 HP máximos.', price: 70, spriteKey: 'Focus Sash II', category: 'holdable', requires: 'unlock_focus_sash' },
   { id: 'unlock_scope_lens_2', name: 'Scope Lens II', desc: '30% Golpe Crítico.', price: 70, spriteKey: 'Scope Lens II', category: 'holdable', requires: 'unlock_scope_lens' },
   { id: 'unlock_shell_bell_2', name: 'Shell Bell II', desc: '30% Robo de Vida.', price: 90, spriteKey: 'Shell Bell II', category: 'holdable', requires: 'unlock_shell_bell' },
@@ -1615,6 +1786,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_quick_claw_2', name: 'Quick Claw II', desc: '+30% Velocidad.', price: 70, spriteKey: 'Quick Claw II', category: 'holdable', requires: 'unlock_quick_claw' },
   { id: 'unlock_diamansfera', name: 'Diamansfera', desc: '+20% daño en movimientos Acero y Dragón para Dialga.', price: 80, spriteKey: 'Diamansfera', category: 'holdable' },
   { id: 'unlock_lustresfera', name: 'Lustresfera', desc: '+20% daño en movimientos Agua y Dragón para Palkia.', price: 80, spriteKey: 'Lustresfera', category: 'holdable' },
+  { id: 'unlock_griseosfera', name: 'Griseosfera', desc: '+20% daño en movimientos Dragón y Fantasma para Giratina.', price: 80, spriteKey: 'Griseosfera', category: 'holdable' },
   { id: 'unlock_razor_claw', name: 'Razor Claw', desc: 'Evoluciona a Sneasel en Weavile. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Razor Claw', category: 'evolution_item' },
   { id: 'unlock_razor_fang', name: 'Razor Fang', desc: 'Evoluciona a Gligar en Gliscor. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Razor Fang', category: 'evolution_item' },
   { id: 'unlock_oval_stone', name: 'Oval Stone', desc: 'Evoluciona a Happiny en Chansey. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Oval Stone', category: 'evolution_item' },
@@ -2774,7 +2946,28 @@ function MainApp() {
     unlock_zinc: 'Zinc',
     unlock_carbos: 'Carburante',
     unlock_sacred_ash: 'Sacred Ash',
+    unlock_polvo_energia: 'Polvo Energía',
+    unlock_raiz_energia: 'Raíz Energía',
+    unlock_polvo_curacion: 'Polvo Curación',
+    unlock_mas_ps: 'Más PS',
     unlock_perla_grande: 'Perla Grande',
+    unlock_seta_pequena: 'Seta Pequeña',
+    unlock_polvo_estelar: 'Polvo Estelar',
+    unlock_seta_grande: 'Seta Grande',
+    unlock_perla: 'Perla',
+    unlock_corazon_marino: 'Corazón Marino',
+    unlock_correo_aereo: 'Correo Aéreo',
+    unlock_fragmento_estelar: 'Fragmento Estelar',
+    unlock_pieza_dorada: 'Pieza Dorada',
+    unlock_perla_rara: 'Perla Rara',
+    unlock_cometa: 'Cometa',
+    unlock_pieza_dorada_2: 'Pieza Dorada II',
+    unlock_hueso_raro: 'Hueso Raro',
+    unlock_miel: 'Miel',
+    unlock_fragmento_rojo: 'Fragmento Rojo',
+    unlock_fragmento_azul: 'Fragmento Azul',
+    unlock_fragmento_amarillo: 'Fragmento Amarillo',
+    unlock_fragmento_verde: 'Fragmento Verde',
     unlock_antidoto: 'Antídoto',
     unlock_antiquemar: 'Antiquemar',
     unlock_paralizador: 'Paralizador',
@@ -2786,6 +2979,11 @@ function MainApp() {
     unlock_baya_algama: 'Baya Algama',
     unlock_baya_safre: 'Baya Safre',
     unlock_baya_siendrepis: 'Baya Siendrepis',
+    unlock_baya_cuaja: 'Baya Cuaja',
+    unlock_baya_wiki: 'Baya Wiki',
+    unlock_baya_mago: 'Baya Mago',
+    unlock_baya_aguav: 'Baya Aguav',
+    unlock_baya_ango: 'Baya Ango',
   }
   const LOCKED_HOLDABLE_MAP: Record<string, string> = {
     unlock_muscle_band: 'Muscle Band',
@@ -2825,6 +3023,17 @@ function MainApp() {
     unlock_repartir_exp: 'Repartir Exp',
     unlock_diamansfera: 'Diamansfera',
     unlock_lustresfera: 'Lustresfera',
+    unlock_griseosfera: 'Griseosfera',
+    unlock_baya_oca: 'Baya Oca',
+    unlock_baya_kasib: 'Baya Kasib',
+    unlock_baya_meloc: 'Baya Meloc',
+    unlock_baya_zidra: 'Baya Zidra',
+    unlock_baya_aou: 'Baya Aou',
+    unlock_baya_perismon: 'Baya Perismon',
+    unlock_baya_colbur: 'Baya Colbur',
+    unlock_baya_waca: 'Baya Waca',
+    unlock_baya_rindo: 'Baya Rindo',
+    unlock_baya_chilan: 'Baya Chilan',
   }
   const LOCKED_POKEBALL_MAP: Record<string, string> = {}
   for (const [ballName, unlockId] of Object.entries(POKEBALL_UNLOCK_IDS)) {
@@ -2839,6 +3048,13 @@ function MainApp() {
   const isHoldableUnlocked = (name: string) => !Object.values(LOCKED_HOLDABLE_MAP).includes(name) || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_HOLDABLE_MAP[k] === name)
   const isPokeballUnlocked = (name: string) => name === 'Poké Ball' || !POKEBALL_UNLOCK_IDS[name] || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_POKEBALL_MAP[k] === name)
   const isEvolutionStoneUnlocked = (name: string) => !EVOLUTION_STONE_UNLOCK_IDS[name] || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_EVOLUTION_STONE_MAP[k] === name)
+  // Una baya está desbloqueada según el mapa al que pertenezca (consumible o
+  // equipable). Las que no están en ningún mapa (Oran/Lum) siempre están libres.
+  const isBerryUnlocked = (name: string) => {
+    if (Object.values(LOCKED_CONSUMABLE_MAP).includes(name)) return isConsumableUnlocked(name)
+    if (Object.values(LOCKED_HOLDABLE_MAP).includes(name)) return isHoldableUnlocked(name)
+    return true
+  }
 
   function isGenUnlocked(gen: number): boolean {
     if (gen === 1) return true
@@ -3240,7 +3456,7 @@ function MainApp() {
       case 'treasure_chest': {
         const gold = 50 + Math.floor(Math.random() * 100)
         setMoney(prev => prev + gold)
-        const items = ['Potion', 'X Attack', ...BERRY_DROPS.filter(isConsumableUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]
+        const items = ['Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]
         const item = items[Math.floor(Math.random() * items.length)]
         setInventory(prev => [...prev, item])
         setBattleLog(prev => [t('b.coinChest', { gold, item }), ...prev])
@@ -3709,6 +3925,12 @@ function MainApp() {
       for (let i = 0; i < 5 + extraBalls; i++) startingItems.push('Poké Ball')
       for (let i = 0; i < extraPotions; i++) startingItems.push('Potion')
       if (startItems.includes('start_revive_1')) startingItems.push('Revive')
+      // Caja Bonguri: 2 Poké Balls + 1 ball de bonguri aleatoria.
+      if (startItems.includes('unlock_caja_bonguri')) {
+        startingItems.push('Poké Ball', 'Poké Ball')
+        const apricornBalls = ['Level Ball', 'Friend Ball', 'Love Ball', 'Heavy Ball', 'Fast Ball'].filter(isPokeballUnlocked)
+        startingItems.push(apricornBalls.length > 0 ? apricornBalls[Math.floor(Math.random() * apricornBalls.length)] : 'Poké Ball')
+      }
       setInventory(startingItems)
       setModifier(run.modifier)
       setRoute(customRoute)
@@ -5537,7 +5759,7 @@ function MainApp() {
   }
 
   function generateShopStock(excludeStone?: string): string[] {
-    const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i] && i !== 'Perla Grande')
+    const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i] && !TREASURES.includes(i))
     const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
     const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
     const shuffledHoldables = [...allHoldableKeys].sort(() => 0.5 - Math.random())
@@ -5597,7 +5819,7 @@ function MainApp() {
 
     if (currentNode.type === 'blackmarket') {
       // Mercado Negro: vende objetos/Pokémon y compra objetos baratos y Pokémon.
-      const blackItems = [...Object.keys(ALL_SHOP_ITEMS)].filter(i => isConsumableUnlocked(i) && i !== 'Perla Grande')
+      const blackItems = [...Object.keys(ALL_SHOP_ITEMS)].filter(i => isConsumableUnlocked(i) && !TREASURES.includes(i))
       const shuffledItems = [...blackItems].sort(() => 0.5 - Math.random())
       setBlackMarketItems(shuffledItems.slice(0, 6))
       setBlackMarketPokemon([])
@@ -5878,7 +6100,7 @@ function MainApp() {
         const ballReward = Math.random() < 0.35 ? randomFrom(unlockedBalls) : null
         const rewardItem = ballReward ?? (runChallenges.noHealing
           ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
-          : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isConsumableUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]))
+          : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]))
         setRestRewardItem(rewardItem)
         setInventory((previous) => [...previous, rewardItem])
         setBattleLog((prev) => [
@@ -5912,7 +6134,7 @@ function MainApp() {
       const ballReward = Math.random() < 0.35 ? randomFrom(unlockedBalls) : null
       const rewardItem = ballReward ?? (runChallenges.noHealing
         ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
-        : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isConsumableUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]))
+        : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]))
 
       setRestEncounter(generatedEncounter)
       seenInPokedex(generatedEncounter)
@@ -6346,7 +6568,7 @@ function MainApp() {
       const item = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null
       return { label: t('casino.goodPrize'), money: 150, item }
     }
-    const basicItems = ['Poké Ball', 'Potion', ...BERRY_DROPS.filter(isConsumableUnlocked)].filter(i => unlockedItems.includes(i))
+    const basicItems = ['Poké Ball', 'Potion', ...BERRY_DROPS.filter(isBerryUnlocked)].filter(i => unlockedItems.includes(i) || isHoldableUnlocked(i))
     const item = basicItems.length > 0 ? basicItems[Math.floor(Math.random() * basicItems.length)] : null
     return { label: t('casino.consolation'), money: 60, item }
   }
@@ -8077,6 +8299,16 @@ function MainApp() {
       updatedPokemon = { ...activePokemon, status: undefined }
     } else if (itemName === 'Baya Siendrepis' && activePokemon.status?.type === 'sleep') {
       updatedPokemon = { ...activePokemon, status: undefined }
+    } else if (itemName === 'Baya Cuaja' && activePokemon.hp < activePokemon.maxHp) {
+      updatedPokemon = healPokemon(activePokemon, 25)
+    } else if (itemName === 'Baya Wiki' && activePokemon.hp < activePokemon.maxHp) {
+      updatedPokemon = healPokemon(activePokemon, 35)
+    } else if (itemName === 'Baya Mago' && activePokemon.hp < activePokemon.maxHp) {
+      updatedPokemon = healPokemon(activePokemon, 45)
+    } else if (itemName === 'Baya Aguav' && activePokemon.hp < activePokemon.maxHp) {
+      updatedPokemon = healPokemon(activePokemon, 55)
+    } else if (itemName === 'Baya Ango' && activePokemon.hp < activePokemon.maxHp) {
+      updatedPokemon = healPokemon(activePokemon, 65)
     } else if (itemName === 'X Attack') {
       updatedPokemon = { ...activePokemon, attack: activePokemon.attack + 5 }
     } else if (itemName === 'X Defense') {
@@ -8103,6 +8335,14 @@ function MainApp() {
       updatedPokemon = healPokemon(activePokemon, 200)
     } else if (itemName === 'Full Elixir') {
       updatedPokemon = { ...activePokemon, hp: activePokemon.maxHp, status: undefined }
+    } else if (itemName === 'Polvo Energía' && activePokemon.hp < activePokemon.maxHp) {
+      updatedPokemon = healPokemon(activePokemon, 60)
+    } else if (itemName === 'Raíz Energía' && activePokemon.hp < activePokemon.maxHp) {
+      updatedPokemon = healPokemon(activePokemon, 120)
+    } else if (itemName === 'Polvo Curación' && activePokemon.status) {
+      updatedPokemon = { ...activePokemon, status: undefined }
+    } else if (itemName === 'Más PS') {
+      updatedPokemon = { ...activePokemon, maxHp: activePokemon.maxHp + 15, hp: activePokemon.hp + 15 }
     } else if (itemName === 'X Attack 2') {
       updatedPokemon = { ...activePokemon, attack: activePokemon.attack + 10 }
     } else if (itemName === 'X Defense 2') {
@@ -8872,7 +9112,7 @@ function MainApp() {
                         {item.healPerTurn && item.healPerTurn > 0 && <div>+{item.healPerTurn} HP/turno</div>}
                         {item.healPerTurn && item.healPerTurn < 0 && <div>{item.healPerTurn} HP/turno</div>}
                         {item.damageBoost && <div>+{Math.round(item.damageBoost * 100)}% daño</div>}
-                        {item.typeBoost && <div>+{Math.round(item.typeBoost.boost * 100)}% daño {item.typeBoost.types.map(t => t === 'steel' ? 'Acero' : t === 'dragon' ? 'Dragón' : t === 'water' ? 'Agua' : t).join('/')} ({item.typeBoost.onlyIds?.includes(483) ? 'Dialga' : item.typeBoost.onlyIds?.includes(484) ? 'Palkia' : 'específico'})</div>}
+                        {item.typeBoost && <div>+{Math.round(item.typeBoost.boost * 100)}% daño {item.typeBoost.types.map(t => t === 'steel' ? 'Acero' : t === 'dragon' ? 'Dragón' : t === 'water' ? 'Agua' : t === 'ghost' ? 'Fantasma' : t).join('/')} ({item.typeBoost.onlyIds?.includes(483) ? 'Dialga' : item.typeBoost.onlyIds?.includes(484) ? 'Palkia' : item.typeBoost.onlyIds?.includes(487) ? 'Giratina' : 'específico'})</div>}
                       </div>
                     )}
                     {!isAlive && (
@@ -13257,6 +13497,70 @@ function MainApp() {
                       <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
                     ) : locked ? (
                       <div style={{ color: '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.requires', { name: META_SHOP_ITEMS.find(i => i.id === item.requires)?.name ?? (language === 'en' ? 'the previous upgrade' : 'la mejora anterior') })}</div>
+                    ) : (
+                      <button className="cta" onClick={() => buyMetaItem(item)}
+                        disabled={metaProgression.pokeCoins < item.price}
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#ffcb05' : '#475569', color: '#000' }}>
+                        🪙 {item.price}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <h3 style={{ color: '#fbbf24', marginBottom: '0.5rem' }}>💰 {t('shop.treasures')}</h3>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.treasuresDesc')}</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {META_SHOP_ITEMS.filter(item => item.category === 'treasure' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
+                const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                return (
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      {ITEM_SPRITES[item.spriteKey]
+                        ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
+                        : <span style={{ fontSize: '1.5rem' }}>💰</span>
+                      }
+                      <div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{itemLocalizedName(item.name)}</div>
+                        <div style={{ color: '#fbbf24', fontSize: '0.7rem' }}>{t('shop.catTreasure')}</div>
+                      </div>
+                    </div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
+                    {owned ? (
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                    ) : (
+                      <button className="cta" onClick={() => buyMetaItem(item)}
+                        disabled={metaProgression.pokeCoins < item.price}
+                        style={{ fontSize: '0.8rem', padding: '6px 16px', background: metaProgression.pokeCoins >= item.price ? '#ffcb05' : '#475569', color: '#000' }}>
+                        🪙 {item.price}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <h3 style={{ color: '#78c850', marginBottom: '0.5rem' }}>🫐 {t('shop.berries')}</h3>
+            <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.berriesDesc')}</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {META_SHOP_ITEMS.filter(item => item.category === 'berry' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
+                const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                return (
+                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      {ITEM_SPRITES[item.spriteKey]
+                        ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
+                        : <span style={{ fontSize: '1.5rem' }}>🫐</span>
+                      }
+                      <div>
+                        <div style={{ color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>{itemLocalizedName(item.name)}</div>
+                        <div style={{ color: '#78c850', fontSize: '0.7rem' }}>{t('shop.catBerry')}</div>
+                      </div>
+                    </div>
+                    <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
+                    {owned ? (
+                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
