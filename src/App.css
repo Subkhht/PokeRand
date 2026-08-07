@@ -2188,6 +2188,12 @@ button {
   100% { transform: scale(1); }
 }
 
+@keyframes wheelBulb {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+.wheel-bulb { animation: wheelBulb 0.55s ease-in-out infinite; }
+
 
 /* ---- Menu principal (setup) rediseñado ---- */
 .setup-hero {

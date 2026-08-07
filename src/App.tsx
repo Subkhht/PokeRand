@@ -712,6 +712,10 @@ const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
 // el resto se añaden según se desbloquean en la tienda meta.
 const BERRY_DROPS = ['Oran Berry', 'Lum Berry', 'Baya Zreza', 'Baya Atania', 'Baya Algama', 'Baya Safre', 'Baya Siendrepis', 'Baya Caquic']
 
+// Ids de las evoluciones de Eevee (Vaporeon, Jolteon, Flareon, Espeon, Umbreon,
+// Leafeon, Glaceon, Sylveon). Se usan para el logro "Familia Eevee".
+const EEVEE_EVOLUTIONS = [134, 135, 136, 196, 197, 470, 471, 700]
+
 const itemDescriptions: Record<string, string> = {
   Potion: 'Restaura 25 HP al Pokémon activo.',
   'Super Potion': 'Restaura 50 HP al Pokémon activo.',
@@ -1259,6 +1263,7 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: 'coop_trades_10', name: 'Mercader Cooperativo', desc: 'Completa 10 intercambios en total', icon: '💼', hidden: false, reward: 60 },
   { id: 'coop_hard_win', name: 'Dúo Imparable', desc: 'Gana una partida cooperativa en dificultad Difícil', icon: '⚡', hidden: false, reward: 60 },
   { id: 'meta_complete', name: 'Magnate del PokéShop', desc: 'Compra todos los objetos de la Tienda Meta', icon: '🛍️', hidden: false, reward: 250 },
+  { id: 'eevee_master', name: 'Familia Eevee', desc: 'Obtén todas las evoluciones de Eevee en una partida', icon: '🦊', hidden: false, reward: 250 },
 ]
 
 const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (pokemon: Pokemon) => Partial<Pokemon> }> = [
@@ -1499,6 +1504,8 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_casino_node', name: 'Nodo Casino', desc: 'Desbloquea nodos Casino en Hard/Infinite. Juega al Pachinko para ganar premios según tu puntuación.', price: 220, spriteKey: 'money', category: 'upgrade' },
   { id: 'unlock_reroll', name: 'Reroll', desc: 'Permite rerollear la tienda 1 vez por visita.', price: 120, spriteKey: 'dice', category: 'upgrade' },
   { id: 'unlock_reroll_2', name: 'Reroll II', desc: 'Otorga 1 reroll extra de tienda por visita.', price: 200, spriteKey: 'dice', category: 'upgrade', requires: 'unlock_reroll' },
+  { id: 'unlock_shop_slot', name: 'Espacio de Tienda', desc: 'Las tiendas ofrecen 1 objeto más.', price: 100, spriteKey: 'money', category: 'upgrade' },
+  { id: 'unlock_shop_slot_2', name: 'Espacio de Tienda II', desc: 'Las tiendas ofrecen 1 objeto más (se suma a la anterior).', price: 180, spriteKey: 'money', category: 'upgrade', requires: 'unlock_shop_slot' },
   { id: 'start_pokeballs_5', name: 'Inicio: +5 Poké Balls', desc: 'Empiezas cada aventura con 5 Poké Balls extra.', price: 180, spriteKey: 'Poké Ball', category: 'upgrade' },
   { id: 'start_potion_1', name: 'Inicio: +1 Poción', desc: 'Empiezas cada aventura con 1 Poción extra.', price: 140, spriteKey: 'Potion', category: 'upgrade' },
   { id: 'start_potion_2', name: 'Inicio: +1 Poción II', desc: 'Empiezas cada aventura con 1 Poción extra (se suma a la anterior).', price: 180, spriteKey: 'Potion', category: 'upgrade', requires: 'start_potion_1' },
@@ -2150,6 +2157,9 @@ function MainApp() {
   const [doubleFinished, setDoubleFinished] = useState<boolean>(false)
   const [doubleHits, setDoubleHits] = useState<Array<{ kind: 'enemy' | 'player'; index: number; key: number }>>([])
   const doubleHitKeyRef = useRef(0)
+
+  // Evoluciones de Eevee obtenidas en la run actual (para el logro Familia Eevee).
+  const eeveeEvolutionsRef = useRef<Set<number>>(new Set())
 
   // Si el slot activo queda vacío o su Pokémon está debilitado, cambia
   // automáticamente al primer slot con un Pokémon vivo.
@@ -2876,6 +2886,13 @@ function MainApp() {
   }
 
   function registerInPokedex(pokemon: Pokemon): void {
+    // Logro Familia Eevee: acumula las evoluciones de Eevee obtenidas en la run.
+    if (EEVEE_EVOLUTIONS.includes(Number(pokemon.id))) {
+      eeveeEvolutionsRef.current.add(Number(pokemon.id))
+      if (eeveeEvolutionsRef.current.size >= EEVEE_EVOLUTIONS.length) {
+        unlockAchievement('eevee_master')
+      }
+    }
     setPokedex((prev) => {
       let pokemonId = Number(pokemon.id)
 
@@ -3442,6 +3459,9 @@ function MainApp() {
         activeChallenges = { ...activeChallenges, noEvolution: true, fixedTeam: true, noHealing: true }
         setRunChallenges(activeChallenges)
       }
+
+      // Reinicia el conteo de evoluciones de Eevee para la run nueva.
+      eeveeEvolutionsRef.current = new Set()
 
       const starter = await getRandomStarterByGeneration(targetGen, activeChallenges.allShiny, effectiveDifficulty)
       const config: RunConfig = { generation: targetGen }
@@ -5470,7 +5490,10 @@ function MainApp() {
     const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
     const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
     const shuffledHoldables = [...allHoldableKeys].sort(() => 0.5 - Math.random())
-    const selectedConsumables = shuffledConsumables.slice(0, 2)
+    // Mejoras de Espacio de Tienda: +1 objeto por cada versión desbloqueada.
+    const extraSlots = (metaProgression.permanentlyUnlockedItems.includes('unlock_shop_slot') ? 1 : 0) +
+      (metaProgression.permanentlyUnlockedItems.includes('unlock_shop_slot_2') ? 1 : 0)
+    const selectedConsumables = shuffledConsumables.slice(0, 2 + extraSlots)
     const selectedHoldables = shuffledHoldables.slice(0, 1)
     const unlockedNonBasicBalls = POKEBALL_NAMES.filter(b => b !== 'Poké Ball' && isPokeballUnlocked(b))
     const rareBalls = unlockedNonBasicBalls.length > 0
@@ -12918,6 +12941,21 @@ function MainApp() {
 
             <div style={{ color: '#d9d6f2', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1.25rem', animation: 'casinoFadeIn 0.5s ease' }}>
               {t('help.intro')}
+            </div>
+
+            <div className="help-section" style={{ marginBottom: '1.25rem', animation: 'casinoSlideUp 0.3s ease' }}>
+              <h3 style={{ color: '#37d16b', margin: '0 0 0.5rem', fontSize: '1rem' }}>{t('help.changesTitle')}</h3>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#d9d6f2', fontSize: '0.88rem', lineHeight: '1.7' }}>
+                <li>{t('help.changes1')}</li>
+                <li>{t('help.changes2')}</li>
+                <li>{t('help.changes3')}</li>
+                <li>{t('help.changes4')}</li>
+                <li>{t('help.changes5')}</li>
+                <li>{t('help.changes6')}</li>
+                <li>{t('help.changes7')}</li>
+                <li>{t('help.changes8')}</li>
+                <li>{t('help.changes9')}</li>
+              </ul>
             </div>
 
             <div className="help-section" style={{ marginBottom: '1.25rem', animation: 'casinoSlideUp 0.4s ease' }}>

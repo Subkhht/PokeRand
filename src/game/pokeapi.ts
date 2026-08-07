@@ -1015,6 +1015,12 @@ function getRegionalSuffix(name: string): string {
   return ''
 }
 
+// Pokémon de evolución por amistad (sin nivel mínimo en la API) que en este
+// juego evolucionan a nivel 10.
+const FRIENDSHIP_EVOLVE_LEVEL_10 = ['pichu', 'cleffa', 'igglybuff', 'togepi', 'azurill', 'budew', 'chingling']
+// Pokémon que en este juego evolucionan a nivel 25.
+const FRIENDSHIP_EVOLVE_LEVEL_25 = ['buneary', 'woobat', 'swadloon', 'snom']
+
 function findEvolutionForSpecies(chainNode: EvolutionChainNode, speciesName: string): { speciesName: string; level: number; trigger: string; heldItem: string | null } | null {
   const baseName = getBaseName(speciesName)
   const matchName = (name: string) => name.toLowerCase() === speciesName.toLowerCase() || name.toLowerCase() === baseName.toLowerCase()
@@ -1029,7 +1035,9 @@ function findEvolutionForSpecies(chainNode: EvolutionChainNode, speciesName: str
       const details = chainNode.evolves_to[0].evolution_details?.[0]
       const minLevel = details?.min_level ?? null
       const trigger = details?.trigger?.name ?? 'level-up'
-      const evoLevel = minLevel ?? (trigger === 'trade' ? 35 : 45)
+      const evoLevel = FRIENDSHIP_EVOLVE_LEVEL_25.includes(chainNode.species.name.toLowerCase())
+        ? 25
+        : (minLevel ?? (trigger === 'trade' ? 35 : (FRIENDSHIP_EVOLVE_LEVEL_10.includes(chainNode.species.name.toLowerCase()) ? 10 : 45)))
       const heldItem = details?.held_item?.name ?? null
       // La API ya devuelve el nombre con sufijo regional para las formas
       // regionales (p. ej. dugtrio-alola). Solo se añade el sufijo si el nombre

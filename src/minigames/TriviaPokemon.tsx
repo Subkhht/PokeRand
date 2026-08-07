@@ -33,7 +33,7 @@ const QUESTIONS: Array<{ q: string; options: string[]; correct: number }> = [
   { q: 'Which has more base HP?', options: ['Snorlax', 'Charizard', 'Blastoise', 'Pikachu'], correct: 0 },
   { q: 'What is the region of the first generation?', options: ['Kanto', 'Johto', 'Hoenn', 'Sinnoh'], correct: 0 },
   { q: 'What type is super effective against Dragon?', options: ['Fairy', 'Electric', 'Water', 'Fire'], correct: 0 },
-  { q: 'Which of these Pokémon is Fighting type?', options: ['Hitmonlee', 'Drowzee', 'Machop', 'Hitmonlee'], correct: 0 },
+  { q: 'Which of these Pokémon is Fighting type?', options: ['Hitmonlee', 'Drowzee', 'Machop', 'Krabby'], correct: 0 },
   { q: 'What type is weak against Electric?', options: ['Flying', 'Rock', 'Grass', 'Ice'], correct: 0 },
   { q: 'What is the Grass starter of Johto?', options: ['Chikorita', 'Treecko', 'Turtwig', 'Snivy'], correct: 0 },
   { q: 'Which Pokémon is Bug/Flying type?', options: ['Butterfree', 'Gengar', 'Onix', 'Pikachu'], correct: 0 },
@@ -57,6 +57,17 @@ const QUESTIONS: Array<{ q: string; options: string[]; correct: number }> = [
 ]
 const ROUNDS = 6
 
+// Baraja las opciones de una pregunta y recalcula la posición de la correcta,
+// para que no esté siempre en la misma casilla (arriba a la izquierda).
+function prepareQuestion(q: (typeof QUESTIONS)[number]): Question {
+  const options = [...q.options]
+  for (let i = options.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[options[i], options[j]] = [options[j], options[i]]
+  }
+  return { q: q.q, options, correct: options.indexOf(q.options[q.correct]) }
+}
+
 export default function TriviaPokemon({ onComplete }: CasinoMinigameProps): JSX.Element {
   const [started, setStarted] = useState(false)
   const [round, setRound] = useState(1)
@@ -71,7 +82,7 @@ export default function TriviaPokemon({ onComplete }: CasinoMinigameProps): JSX.
     playClick()
     const idx = Math.floor(Math.random() * QUESTIONS.length)
     setUsed(new Set([idx]))
-    setCurrent(QUESTIONS[idx])
+    setCurrent(prepareQuestion(QUESTIONS[idx]))
     setRound(1)
     setCorrect(0)
     setResult(null)
@@ -84,7 +95,7 @@ export default function TriviaPokemon({ onComplete }: CasinoMinigameProps): JSX.
     const pool = QUESTIONS.map((_, i) => i).filter(i => !used.has(i))
     const idx = pool[Math.floor(Math.random() * pool.length)]
     setUsed(prev => new Set(prev).add(idx))
-    setCurrent(QUESTIONS[idx])
+    setCurrent(prepareQuestion(QUESTIONS[idx]))
     setRound(r => r + 1)
     setRevealed(false)
     setSelected(null)
