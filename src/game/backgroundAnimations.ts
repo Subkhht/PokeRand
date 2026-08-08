@@ -126,6 +126,7 @@ function glowSprite(size: number, stops: Array<[number, string]>): HTMLCanvasEle
 const FIRE_SPRITE = glowSprite(96, [[0, 'rgba(255, 220, 120, 1)'], [0.5, 'rgba(255, 110, 40, 1)'], [1, 'rgba(200, 30, 10, 0)']])
 const LAVA_SPRITE = glowSprite(96, [[0, 'rgba(255, 220, 140, 1)'], [0.4, 'rgba(255, 120, 40, 1)'], [1, 'rgba(180, 40, 10, 0)']])
 const GHOST_SPRITE = glowSprite(96, [[0, 'rgba(190, 240, 255, 1)'], [0.5, 'rgba(100, 180, 255, 1)'], [1, 'rgba(40, 90, 200, 0)']])
+const FIREFLY_SPRITE = glowSprite(48, [[0, 'rgba(255, 245, 170, 1)'], [0.5, 'rgba(255, 205, 80, 1)'], [1, 'rgba(255, 180, 40, 0)']])
 
 // ---------------------------------------------------------------- stars
 function stepStars(ctx: CanvasRenderingContext2D, s: BgState, dt: number, w: number, h: number, t: number): void {
@@ -523,8 +524,7 @@ function stepGhost(ctx: CanvasRenderingContext2D, s: BgState, dt: number, w: num
 }
 
 // ---------------------------------------------------------------- interactive ripples
-function stepRipples(
-  ctx: CanvasRenderingContext2D,
+function stepRipples(  ctx: CanvasRenderingContext2D,
   s: BgState,
   dt: number,
   w: number,
@@ -568,6 +568,204 @@ function stepRipples(
   }
 }
 
+// ---------------------------------------------------------------- leaves
+interface Leaf {
+  x: number
+  y: number
+  r: number
+  vy: number
+  vx: number
+  rot: number
+  vr: number
+  phase: number
+  color: string
+}
+
+const LEAF_COLORS = ['#8fbf5a', '#c98a3d', '#8a5a2a', '#5a9a4a']
+function stepLeaves(ctx: CanvasRenderingContext2D, s: BgState, dt: number, w: number, h: number, t: number): void {
+  const leaves = getState<Leaf[]>(s, 'leaves', () =>
+    Array.from({ length: Math.max(5, Math.floor((w * h) / 4200)) }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      r: rand(4, 9),
+      vy: rand(24, 60),
+      vx: rand(-18, 18),
+      rot: Math.random() * Math.PI * 2,
+      vr: rand(-2, 2),
+      phase: Math.random() * Math.PI * 2,
+      color: LEAF_COLORS[Math.floor(Math.random() * LEAF_COLORS.length)],
+    }))
+  )
+  for (const lf of leaves) {
+    lf.y += lf.vy * dt
+    lf.x += (lf.vx + Math.sin(t * 1.5 + lf.phase) * 24) * dt
+    lf.rot += lf.vr * dt
+    if (lf.y > h + 12) { lf.y = -12; lf.x = Math.random() * w }
+    ctx.save()
+    ctx.translate(lf.x, lf.y)
+    ctx.rotate(lf.rot)
+    ctx.globalAlpha = 0.85
+    ctx.fillStyle = lf.color
+    ctx.beginPath()
+    ctx.ellipse(0, 0, lf.r, lf.r * 0.5, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(-lf.r, 0)
+    ctx.lineTo(lf.r, 0)
+    ctx.stroke()
+    ctx.restore()
+  }
+  ctx.globalAlpha = 1
+}
+
+// ---------------------------------------------------------------- sakura petals
+interface Petal {
+  x: number
+  y: number
+  r: number
+  vy: number
+  vx: number
+  rot: number
+  vr: number
+  phase: number
+}
+
+const SAKURA_COLORS = ['#ffb7d5', '#ff8fc0', '#ffd1e3']
+function stepSakura(ctx: CanvasRenderingContext2D, s: BgState, dt: number, w: number, h: number, t: number): void {
+  const petals = getState<Petal[]>(s, 'sakura', () =>
+    Array.from({ length: Math.max(6, Math.floor((w * h) / 3600)) }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      r: rand(3, 7),
+      vy: rand(22, 52),
+      vx: rand(-16, 16),
+      rot: Math.random() * Math.PI * 2,
+      vr: rand(-2.4, 2.4),
+      phase: Math.random() * Math.PI * 2,
+    }))
+  )
+  for (const p of petals) {
+    p.y += p.vy * dt
+    p.x += (p.vx + Math.sin(t * 1.8 + p.phase) * 26) * dt
+    p.rot += p.vr * dt
+    if (p.y > h + 10) { p.y = -10; p.x = Math.random() * w }
+    ctx.save()
+    ctx.translate(p.x, p.y)
+    ctx.rotate(p.rot)
+    ctx.globalAlpha = 0.8
+    ctx.fillStyle = SAKURA_COLORS[Math.floor(Math.random() * SAKURA_COLORS.length)]
+    ctx.beginPath()
+    ctx.ellipse(0, 0, p.r, p.r * 0.55, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+  ctx.globalAlpha = 1
+}
+
+// ---------------------------------------------------------------- fireflies
+interface Firefly {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  phase: number
+  size: number
+}
+function stepFireflies(ctx: CanvasRenderingContext2D, s: BgState, dt: number, w: number, h: number, t: number): void {
+  const flies = getState<Firefly[]>(s, 'fireflies', () =>
+    Array.from({ length: Math.max(4, Math.floor((w * h) / 9000)) }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vx: rand(-10, 10),
+      vy: rand(-10, 10),
+      phase: Math.random() * Math.PI * 2,
+      size: rand(3, 7),
+    }))
+  )
+  ctx.globalCompositeOperation = 'lighter'
+  for (const f of flies) {
+    f.x += (f.vx + Math.sin(t * 0.8 + f.phase) * 12) * dt
+    f.y += (f.vy + Math.cos(t * 0.7 + f.phase) * 10) * dt
+    if (f.x < -20) f.x = w + 20
+    if (f.x > w + 20) f.x = -20
+    if (f.y < -20) f.y = h + 20
+    if (f.y > h + 20) f.y = -20
+    const a = 0.25 + 0.75 * Math.abs(Math.sin(t * 1.8 + f.phase))
+    const r = f.size * 3
+    ctx.globalAlpha = a
+    ctx.drawImage(FIREFLY_SPRITE, f.x - r / 2, f.y - r / 2, r, r)
+  }
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.globalAlpha = 1
+}
+
+// ---------------------------------------------------------------- thunderstorm
+function stepThunder(ctx: CanvasRenderingContext2D, s: BgState, dt: number, w: number, h: number, _t: number): void {
+  const drops = getState<Drop[]>(s, 'thunderRain', () =>
+    Array.from({ length: Math.max(8, Math.floor((w * h) / 1800)) }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vy: rand(480, 760),
+      len: rand(12, 24),
+    }))
+  )
+  ctx.strokeStyle = 'rgba(170, 200, 255, 0.5)'
+  ctx.lineWidth = 1
+  for (const d of drops) {
+    d.y += d.vy * dt
+    if (d.y > h + d.len) { d.y = -d.len; d.x = Math.random() * w }
+    ctx.beginPath()
+    ctx.moveTo(d.x, d.y)
+    ctx.lineTo(d.x - 2, d.y + d.len)
+    ctx.stroke()
+  }
+  const flash = getState<{ a: number }>(s, 'thunderFlash', () => ({ a: 0 }))
+  if (Math.random() < dt * 0.14) flash.a = 0.85
+  flash.a -= dt * 1.8
+  if (flash.a > 0) {
+    ctx.fillStyle = `rgba(215, 225, 255, ${Math.max(0, flash.a)})`
+    ctx.fillRect(0, 0, w, h)
+  }
+}
+
+// ---------------------------------------------------------------- galaxy
+interface GalaxyStar {
+  angle: number
+  dist: number
+  size: number
+  phase: number
+}
+function stepGalaxy(ctx: CanvasRenderingContext2D, s: BgState, _dt: number, w: number, h: number, t: number): void {
+  const stars = getState<GalaxyStar[]>(s, 'galaxy', () => {
+    const n = Math.max(60, Math.floor((w * h) / 260))
+    const golden = Math.PI * (3 - Math.sqrt(5))
+    return Array.from({ length: n }, (_, i) => ({
+      angle: i * golden,
+      dist: Math.sqrt(Math.random()) * Math.min(w, h) * 0.48,
+      size: rand(0.6, 2.2),
+      phase: Math.random() * Math.PI * 2,
+    }))
+  })
+  const cx = w / 2
+  const cy = h / 2
+  ctx.globalCompositeOperation = 'lighter'
+  for (const st of stars) {
+    const a = st.angle + t * 0.16
+    const x = cx + Math.cos(a) * st.dist
+    const y = cy + Math.sin(a) * st.dist * 0.72
+    const alpha = 0.2 + 0.8 * Math.abs(Math.sin(t * 1.2 + st.phase))
+    ctx.globalAlpha = alpha
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    ctx.arc(x, y, st.size, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.globalAlpha = 1
+}
+
 // ---------------------------------------------------------------- dispatcher
 export function drawBackground(
   ctx: CanvasRenderingContext2D,
@@ -595,6 +793,11 @@ export function drawBackground(
     case 'confetti': stepConfetti(ctx, s, dt, w, h, t); break
     case 'ghost': stepGhost(ctx, s, dt, w, h, t); break
     case 'ripples': stepRipples(ctx, s, dt, w, h, t, mouse, opts); break
+    case 'leaves': stepLeaves(ctx, s, dt, w, h, t); break
+    case 'sakura': stepSakura(ctx, s, dt, w, h, t); break
+    case 'fireflies': stepFireflies(ctx, s, dt, w, h, t); break
+    case 'thunder': stepThunder(ctx, s, dt, w, h, t); break
+    case 'galaxy': stepGalaxy(ctx, s, dt, w, h, t); break
     default: break
   }
 }

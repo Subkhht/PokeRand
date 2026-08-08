@@ -24,4 +24,9 @@ export const BACKGROUNDS: BackgroundDef[] = [
   { id: 'confetti', name: 'Confeti', desc: 'Confeti de colores cayendo.', price: 40, icon: '🎉', preview: 'linear-gradient(180deg, #241a4a 0%, #3a2a6e 100%)', opacity: 0.45 },
   { id: 'ghost', name: 'Fuego Fantasma', desc: 'Llamas espectrales de color cian.', price: 45, icon: '👻', preview: 'linear-gradient(180deg, #0a0a1a 0%, #14263a 100%)', opacity: 0.55 },
   { id: 'ripples', name: 'Olas Interactivas', desc: 'Crea ondas con el movimiento del ratón y los clics.', price: 50, icon: '🌊', preview: 'linear-gradient(180deg, #001a2a 0%, #003d5a 100%)', opacity: 0.55 },
+  { id: 'leaves', name: 'Hojas de Otoño', desc: 'Hojas que caen girando con el viento.', price: 40, icon: '🍂', preview: 'linear-gradient(180deg, #1a1206 0%, #3a2a12 100%)', opacity: 0.6 },
+  { id: 'sakura', name: 'Pétalos de Cerezo', desc: 'Pétalos rosas cayendo suavemente.', price: 40, icon: '🌸', preview: 'linear-gradient(180deg, #2a0a1a 0%, #4a1228 100%)', opacity: 0.6 },
+  { id: 'fireflies', name: 'Luciérnagas', desc: 'Puntos de luz que parpadean y flotan.', price: 45, icon: '🪲', preview: 'linear-gradient(180deg, #061a12 0%, #0a2a1a 100%)', opacity: 0.55 },
+  { id: 'thunder', name: 'Tormenta', desc: 'Lluvia intensa con relámpagos.', price: 50, icon: '⛈️', preview: 'linear-gradient(180deg, #0a0f1a 0%, #18263f 100%)', opacity: 0.55 },
+  { id: 'galaxy', name: 'Galaxia', desc: 'Espiral giratoria de estrellas.', price: 50, icon: '🌌', preview: 'radial-gradient(circle at 50% 50%, #2a1450 0%, #0a0620 100%)', opacity: 0.55 },
 ]

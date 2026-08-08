@@ -72,6 +72,7 @@ export interface Pokemon {
   megaEvolved?: boolean
   gmaxEvolved?: boolean
   primalEvolved?: boolean
+  originEvolved?: boolean
   gmaxTurnsLeft?: number
   megaOrig?: { sprite: string; attack: number; defense: number; spAttack: number; spDefense: number; speed: number }
   status?: StatusCondition
@@ -86,7 +87,7 @@ export interface Pokemon {
 
 export interface RouteNode {
   id: number
-  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'rival' | 'blackmarket' | 'double' | 'casino'
+  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'rival' | 'blackmarket' | 'double' | 'casino' | 'elite'
   label: string
   done: boolean
 }

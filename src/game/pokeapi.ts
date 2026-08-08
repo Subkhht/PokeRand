@@ -234,6 +234,15 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
     }
   } catch {}
 
+  // Meltan y Melmetal no están enlazados en la cadena de PokeAPI (evolución por
+  // caramelos en Pokémon GO), así que se muestran como una línea evolutiva manual.
+  if (dataPokemon.id === 808 || dataPokemon.id === 809) {
+    evolutions = [
+      { id: 808, name: 'meltan', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/808.png', level: null, trigger: 'level-up' },
+      { id: 809, name: 'melmetal', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/809.png', level: null, trigger: 'level-up' },
+    ]
+  }
+
   return {
     id: dataPokemon.id,
     name: dataPokemon.name,
@@ -323,6 +332,10 @@ const REGIONAL_FORM_RANGES = [
   [10272, 10277],
 ]
 
+// Formas Origen de Dialga, Palkia y Giratina: no deben aparecer como salvajes,
+// solo se obtienen transformando al legendario con su esfera.
+const EXCLUDED_FORM_IDS = new Set([10007, 10245, 10246])
+
 async function getAllFormIds(): Promise<number[]> {
   if (allFormIdsPromise) return allFormIdsPromise
 
@@ -331,7 +344,7 @@ async function getAllFormIds(): Promise<number[]> {
       `${API_BASE}/pokemon?limit=1351&offset=0`
     )
     const allIds = data.results.map(r => extractIdFromResourceUrl(r.url))
-    return allIds.filter(id => REGIONAL_FORM_RANGES.some(([lo, hi]) => id >= lo && id <= hi))
+    return allIds.filter(id => REGIONAL_FORM_RANGES.some(([lo, hi]) => id >= lo && id <= hi) && !EXCLUDED_FORM_IDS.has(id))
   })()
 
   return allFormIdsPromise

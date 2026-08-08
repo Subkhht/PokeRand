@@ -439,6 +439,7 @@ const DICT: Record<string, Entry> = {
   'b.enemySendsOut': { es: '{trainer} envía a {name} Nv.{lvl}!', en: '{trainer} sends out {name} Lv.{lvl}!' },
   'b.leaderChallenge': { es: '🏆 ¡El Líder {name} quiere combatir! ({badge})', en: '🏆 Leader {name} wants to battle! ({badge})' },
   'b.trainerChallenge': { es: '⚔️ ¡{name} quiere combatir! Tiene {n} Pokémon.', en: '⚔️ {name} wants to battle! They have {n} Pokémon.' },
+  'b.eliteChallenge': { es: '🗻 ¡{name} te reta en la Calle Victoria! Tiene {n} Pokémon.', en: '🗻 {name} challenges you on Victory Road! They have {n} Pokémon.' },
   'b.defeatedWild2': { es: '🌿 Derrotaste a {name}. ¡Todo el equipo ganó experiencia!', en: '🌿 You defeated {name}. The whole team gained XP!' },
   'b.defeatedWildMoney': { es: '🌿 Derrotaste a {name}. ¡Todo el equipo ganó experiencia! +${money}', en: '🌿 You defeated {name}. The whole team gained XP! +${money}' },
   'b.defeatedTrainer': { es: '🏆 ¡Derrotaste al entrenador {name}! +${money}', en: '🏆 You defeated trainer {name}! +${money}' },
@@ -574,7 +575,7 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v1.12', en: 'v1.12' },
+  'help.version': { es: 'v1.13', en: 'v1.13' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
   'changelog.button': { es: 'Ver cambios', en: 'See changes' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
@@ -614,6 +615,7 @@ const DICT: Record<string, Entry> = {
   'help.modes1': { es: 'Infinite: rutas infinitas con ranking mundial.', en: 'Infinite: endless routes with a world ranking.' },
   'help.modes2': { es: 'COLISEUM: 8 jefes a nivel 50 con tu Pokédex.', en: 'COLISEUM: 8 bosses at level 50 using your Pokédex.' },
   'help.modes3': { es: 'PvP 1vs1 online, Co-op con amigos y Desafío Diario.', en: 'Online 1vs1 PvP, Co-op with friends and the Daily Challenge.' },
+  'help.modes4': { es: 'Original: eliges tu inicial y superas 8 etapas (10 nodos con Tienda/Combate/Descanso/Rival y un jefe con medalla cada una). Con 8 medallas entras en la Calle Victoria y la Liga, obligatorias. Al completarlo desbloqueas una insignia especial.', en: 'Original: pick your starter and beat 8 stages (10 nodes with Shop/Battle/Rest/Rival and a medal-giving boss each). With 8 medals you enter Victory Road and the League, mandatory. Completing it unlocks a special badge.' },
   'help.chalTitle': { es: '🎯 Desafíos', en: '🎯 Challenges' },
   'help.chal1': { es: 'Activa desafíos (Nuzlocke, Solo Starter, Speedrun...) para más recompensas.', en: 'Enable challenges (Nuzlocke, Solo Starter, Speedrun...) for more rewards.' },
   // ---------- Minigames ----------
@@ -883,9 +885,12 @@ const DICT: Record<string, Entry> = {
   'b.rerolled': { es: '🎲 ¡Has rerolleado la tienda! ({used}/{max})', en: '🎲 You rerolled the shop! ({used}/{max})' },
   'b.claimRewardAch': { es: '🏅 Reclamaste la recompensa de "{name}" (+{coins} PokéCoins)', en: '🏅 You claimed the "{name}" reward (+{coins} PokéCoins)' },
   'b.leagueWelcome': { es: '🏆 ¡Bienvenido a la Liga Pokémon! 4 jefes te esperan (Nv.{lvl}).', en: '🏆 Welcome to the Pokémon League! 4 bosses await (Lv.{lvl}).' },
+  'b.victoryRoadWelcome': { es: '🗻 ¡Calle Victoria! Supera 8 entrenadores y 2 tiendas antes de la Liga (Nv.{lvl}).', en: '🗻 Victory Road! Beat 8 trainers and 2 shops before the League (Lv.{lvl}).' },
+  'b.originalMedal': { es: '🏅 ¡Jefe derrotado! Medalla {n}/{total} del Modo Original.', en: '🏅 Boss defeated! Medal {n}/{total} of Original Mode.' },
   'b.megaEvolved': { es: '💥 ¡{name} ha mega-evolucionado! Stats aumentados un 15%.', en: '💥 {name} Mega Evolved! Stats increased by 15%.' },
   'b.gmaxEvolved': { es: '⚡ ¡{name} ha gigamaximado! Stats aumentados un 15% por 3 turnos.', en: '⚡ {name} Gigantamaxed! Stats increased by 15% for 3 turns.' },
   'b.primalEvolved': { es: '🔮 ¡{name} ha despertado su Primal Reversion! Stats aumentados un 15%.', en: '🔮 {name} awakened its Primal Reversion! Stats increased by 15%.' },
+  'b.originEvolved': { es: '🌀 ¡{name} ha adoptado su Forma Origen! Stats aumentados un 15%.', en: '🌀 {name} took its Origin Forme! Stats increased by 15%.' },
   'b.megaStoneGot': { es: '💎 ¡Recibes una Mega Piedra! Un Pokémon puede equiparla para mega-evolucionar en combate.', en: '💎 You received a Mega Stone! A Pokémon can equip it to Mega Evolve in battle.' },
   'b.dynamaxBandGot': { es: '⚡ ¡Has obtenido la Banda Dynamax! Equípala para gigamaximar en combate.', en: '⚡ You got the Dynamax Band! Equip it to Gigantamax in battle.' },
   'b.alreadyHaveCoin': { es: '⚡ Ya tienes una Banda Dynamax. Recibes {coins} PokéCoins en su lugar.', en: '⚡ You already have a Dynamax Band. You receive {coins} PokéCoins instead.' },
@@ -1242,9 +1247,9 @@ const ITEM_DESC: Record<string, { es: string; en: string }> = {
   'Dynamax Band': { es: 'Permite gigamaximar 1 vez por combate (3 turnos).', en: 'Allows Gigantamax once per battle (3 turns).' },
   'Prisma Rojo': { es: 'Despierta la Primal Reversion de Groudon (1 vez por combate).', en: "Awakens Groudon\\'s Primal Reversion (once per battle)." },
   'Prisma Azul': { es: 'Despierta la Primal Reversion de Kyogre (1 vez por combate).', en: "Awakens Kyogre\\'s Primal Reversion (once per battle)." },
-  'Diamansfera': { es: '+20% daño en movimientos Acero y Dragón si lo lleva Dialga.', en: '+20% damage on Steel and Dragon moves if held by Dialga.' },
-  'Lustresfera': { es: '+20% daño en movimientos Agua y Dragón si lo lleva Palkia.', en: '+20% damage on Water and Dragon moves if held by Palkia.' },
-  'Griseosfera': { es: '+20% daño en movimientos Dragón y Fantasma si la lleva Giratina.', en: '+20% damage on Dragon and Ghost moves if held by Giratina.' },
+  'Diamansfera': { es: '+20% daño en movimientos Acero y Dragón si lo lleva Dialga. Transforma a Dialga en su Forma Origen.', en: '+20% damage on Steel and Dragon moves if held by Dialga. Transforms Dialga into its Origin Forme.' },
+  'Lustresfera': { es: '+20% daño en movimientos Agua y Dragón si lo lleva Palkia. Transforma a Palkia en su Forma Origen.', en: '+20% damage on Water and Dragon moves if held by Palkia. Transforms Palkia into its Origin Forme.' },
+  'Griseosfera': { es: '+20% daño en movimientos Dragón y Fantasma si la lleva Giratina. Transforma a Giratina en su Forma Origen.', en: '+20% damage on Dragon and Ghost moves if held by Giratina. Transforms Giratina into its Origin Forme.' },
   'Polvo Energía': { es: 'Restaura 60 HP de un Pokémon.', en: 'Restores 60 HP of a Pokémon.' },
   'Raíz Energía': { es: 'Restaura 120 HP de un Pokémon.', en: 'Restores 120 HP of a Pokémon.' },
   'Polvo Curación': { es: 'Cura los problemas de estado de un Pokémon.', en: 'Cures a Pokémon\'s status conditions.' },
@@ -1655,9 +1660,9 @@ const META_ITEM_DESC: Record<string, { es: string; en: string }> = {
   'unlock_assault_vest_2': { es: '+30% Def. Esp.', en: '+30% Sp. Def.' },
   'unlock_leftovers_2': { es: 'Recupera 12 HP por turno.', en: 'Recovers 12 HP per turn.' },
   'unlock_quick_claw_2': { es: '+30% Velocidad.', en: '+30% Speed.' },
-  'unlock_diamansfera': { es: '+20% daño en movimientos Acero y Dragón para Dialga.', en: '+20% damage on Steel and Dragon moves for Dialga.' },
-  'unlock_lustresfera': { es: '+20% daño en movimientos Agua y Dragón para Palkia.', en: '+20% damage on Water and Dragon moves for Palkia.' },
-  'unlock_griseosfera': { es: '+20% daño en movimientos Dragón y Fantasma para Giratina.', en: '+20% damage on Dragon and Ghost moves for Giratina.' },
+  'unlock_diamansfera': { es: '+20% daño en movimientos Acero y Dragón para Dialga. Transforma a Dialga en su Forma Origen.', en: '+20% damage on Steel and Dragon moves for Dialga. Transforms Dialga into its Origin Forme.' },
+  'unlock_lustresfera': { es: '+20% daño en movimientos Agua y Dragón para Palkia. Transforma a Palkia en su Forma Origen.', en: '+20% damage on Water and Dragon moves for Palkia. Transforms Palkia into its Origin Forme.' },
+  'unlock_griseosfera': { es: '+20% daño en movimientos Dragón y Fantasma para Giratina. Transforma a Giratina en su Forma Origen.', en: '+20% damage on Dragon and Ghost moves for Giratina. Transforms Giratina into its Origin Forme.' },
   'unlock_polvo_energia': { es: 'Restaura 60 HP. Aparece en tiendas.', en: 'Restores 60 HP. Appears in shops.' },
   'unlock_raiz_energia': { es: 'Restaura 120 HP. Aparece en tiendas.', en: 'Restores 120 HP. Appears in shops.' },
   'unlock_polvo_curacion': { es: 'Cura problemas de estado. Aparece en tiendas.', en: 'Cures status conditions. Appears in shops.' },
@@ -1689,6 +1694,17 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v1.13',
+    items: [
+      { es: '🌀 Las esferas Diamansfera, Lustresfera y Griseosfera transforman a Dialga, Palkia y Giratina en su Forma Origen en combate. Las formas Origen ya no salen salvajes.', en: '🌀 The Adamant, Lustrous and Griseous Orbs transform Dialga, Palkia and Giratina into their Origin Forme in battle. Origin Formes no longer appear in the wild.' },
+      { es: '🧐 Minijuego "Adivina la Pokédex": ampliado a ~470 Pokémon de todas las generaciones (1-9).', en: '🧐 "Guess the Pokédex" minigame: expanded to ~470 Pokémon from all generations (1-9).' },
+      { es: '🖼️ 5 nuevos fondos animados en la tienda meta: Hojas de Otoño, Pétalos de Cerezo, Luciérnagas, Tormenta y Galaxia.', en: '🖼️ 5 new animated backgrounds in the meta shop: Autumn Leaves, Cherry Blossoms, Fireflies, Thunderstorm and Galaxy.' },
+      { es: '🛠️ Pokédex: Meltan y Melmetal ahora se muestran como línea evolutiva (Meltan → Melmetal), que PokeAPI no enlazaba.', en: '🛠️ Pokédex: Meltan and Melmetal now show as an evolution line (Meltan → Melmetal), which PokeAPI didn\'t link.' },
+      { es: '🗻 Nueva "Calle Victoria" antes de la Liga: 4 entrenadores → tienda → 4 entrenadores → tienda, en un mapa propio. Después vienen los 4 jefes de la Liga.', en: '🗻 New "Victory Road" before the League: 4 trainers → shop → 4 trainers → shop, on its own map. Then the 4 League bosses follow.' },
+      { es: '⭐ Nuevo "Modo Original": eliges tu inicial, 8 etapas de 10 nodos (Tienda/Combate/Descanso/Rival) cada una con jefe que da medalla, y al tener 8 entras en la Calle Victoria y la Liga (obligatorias). Insignia ⭐ al completar la run.', en: '⭐ New "Original Mode": pick your starter, 8 stages of 10 nodes (Shop/Battle/Rest/Rival) each with a medal-giving boss; with 8 medals you enter Victory Road and the League (mandatory). ⭐ badge on run completion.' },
+    ],
+  },
   {
     version: 'v1.12',
     items: [
@@ -1859,6 +1875,11 @@ const BG_TEXT: Record<string, { name: { es: string; en: string }; desc: { es: st
   confetti: { name: { es: 'Confeti', en: 'Confetti' }, desc: { es: 'Confeti de colores cayendo.', en: 'Colorful confetti falling.' } },
   ghost: { name: { es: 'Fuego Fantasma', en: 'Ghost Fire' }, desc: { es: 'Llamas espectrales de color cian.', en: 'Spectral cyan flames.' } },
   ripples: { name: { es: 'Olas Interactivas', en: 'Interactive Waves' }, desc: { es: 'Crea ondas con el movimiento del ratón y los clics.', en: 'Create ripples with mouse movement and clicks.' } },
+  leaves: { name: { es: 'Hojas de Otoño', en: 'Autumn Leaves' }, desc: { es: 'Hojas que caen girando con el viento.', en: 'Leaves falling and spinning in the wind.' } },
+  sakura: { name: { es: 'Pétalos de Cerezo', en: 'Cherry Blossoms' }, desc: { es: 'Pétalos rosas cayendo suavemente.', en: 'Pink petals falling gently.' } },
+  fireflies: { name: { es: 'Luciérnagas', en: 'Fireflies' }, desc: { es: 'Puntos de luz que parpadean y flotan.', en: 'Glowing lights blinking and drifting.' } },
+  thunder: { name: { es: 'Tormenta', en: 'Thunderstorm' }, desc: { es: 'Lluvia intensa con relámpagos.', en: 'Heavy rain with lightning flashes.' } },
+  galaxy: { name: { es: 'Galaxia', en: 'Galaxy' }, desc: { es: 'Espiral giratoria de estrellas.', en: 'Spinning spiral of stars.' } },
 }
 
 export function bgName(id: string): string {

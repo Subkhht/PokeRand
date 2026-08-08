@@ -12,6 +12,7 @@ import {
   getMoveDetails,
   getSpeciesIdsByGeneration,
   buildPokemonFromApi,
+  startersByGen,
   makeShinySprite,
   canEvolveWithStone,
   stripRegional,
@@ -33,7 +34,7 @@ import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, R
 import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, itemLocalizedName, metaItemDesc, moveName, statusLabel, statusAppliedLine, themeName, themeDesc, bgName, bgDesc, type Language, getChangelog } from './game/i18n'
 
 type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
-type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum'
+type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum' | 'original'
 
 const STATUS_COLORS: Record<StatusType, string> = {
   burn: '#ff8a33',
@@ -533,7 +534,8 @@ const difficultyNodeCounts: Record<Difficulty, number> = {
   medium: 10,
   hard: 25,
   infinite: 0,
-  coliseum: 8
+  coliseum: 8,
+  original: 10
 }
 
 const authInputStyle: CSSProperties = {
@@ -553,6 +555,7 @@ const difficultyLabels: Record<Difficulty, { title: string; desc: string }> = {
   hard: { title: 'Difícil', desc: '3 insignias · 25 rutas por etapa' },
   infinite: { title: 'Infinite', desc: 'Sin límite (Aventura infinita)' },
   coliseum: { title: 'COLISEUM', desc: '8 jefes a nivel 50' },
+  original: { title: 'Original', desc: '10 nodos · 8 etapas (Tienda/Combate/Descanso/Rival)' },
 }
 
 function difficultyLabel(lang: Language, d: Difficulty): { title: string; desc: string } {
@@ -563,6 +566,7 @@ function difficultyLabel(lang: Language, d: Difficulty): { title: string; desc: 
       hard: { title: 'Hard', desc: '3 badges · 25 routes per stage' },
       infinite: { title: 'Infinite', desc: 'No limit (endless adventure)' },
       coliseum: { title: 'COLISEUM', desc: '8 bosses at level 50' },
+      original: { title: 'Original', desc: '10 nodes · 8 stages (Shop/Battle/Rest/Rival)' },
     }
     return map[d]
   }
@@ -864,9 +868,9 @@ const itemDescriptions: Record<string, string> = {
   'Baya Chilan': '10% Robo de Vida.',
   'Manuscrito sombras': 'Evoluciona a Kubfu en Urshifu Brusco.',
   'Manuscrito aguas': 'Evoluciona a Kubfu en Urshifu Fluido.',
-  'Diamansfera': '+20% daño en movimientos Acero y Dragón para Dialga.',
-  'Lustresfera': '+20% daño en movimientos Agua y Dragón para Palkia.',
-  'Griseosfera': '+20% daño en movimientos Dragón y Fantasma para Giratina.',
+  'Diamansfera': '+20% daño en movimientos Acero y Dragón para Dialga. Transforma a Dialga en su Forma Origen.',
+  'Lustresfera': '+20% daño en movimientos Agua y Dragón para Palkia. Transforma a Palkia en su Forma Origen.',
+  'Griseosfera': '+20% daño en movimientos Dragón y Fantasma para Giratina. Transforma a Giratina en su Forma Origen.',
 }
 
 const ITEM_SPRITES: Record<string, string> = {
@@ -1103,9 +1107,9 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Dynamax Band': { name: 'Dynamax Band', desc: 'Permite gigamaximar 1 vez por combate (3 turnos)', price: 0, isGmaxBand: true },
   'Prisma Rojo': { name: 'Prisma Rojo', desc: 'Despierta la Primal Reversion de Groudon (1 vez por combate)', price: 0, isPrimalOrb: true },
   'Prisma Azul': { name: 'Prisma Azul', desc: 'Despierta la Primal Reversion de Kyogre (1 vez por combate)', price: 0, isPrimalOrb: true },
-  'Diamansfera': { name: 'Diamansfera', desc: '+20% daño en movimientos Acero y Dragón si lo lleva Dialga.', price: 700, typeBoost: { types: ['steel', 'dragon'], boost: 0.20, onlyIds: [483] } },
-  'Lustresfera': { name: 'Lustresfera', desc: '+20% daño en movimientos Agua y Dragón si lo lleva Palkia.', price: 700, typeBoost: { types: ['water', 'dragon'], boost: 0.20, onlyIds: [484] } },
-  'Griseosfera': { name: 'Griseosfera', desc: '+20% daño en movimientos Dragón y Fantasma si la lleva Giratina.', price: 700, typeBoost: { types: ['dragon', 'ghost'], boost: 0.20, onlyIds: [487] } },
+  'Diamansfera': { name: 'Diamansfera', desc: '+20% daño en movimientos Acero y Dragón si lo lleva Dialga. Transforma a Dialga en su Forma Origen.', price: 700, typeBoost: { types: ['steel', 'dragon'], boost: 0.20, onlyIds: [483] } },
+  'Lustresfera': { name: 'Lustresfera', desc: '+20% daño en movimientos Agua y Dragón si lo lleva Palkia. Transforma a Palkia en su Forma Origen.', price: 700, typeBoost: { types: ['water', 'dragon'], boost: 0.20, onlyIds: [484] } },
+  'Griseosfera': { name: 'Griseosfera', desc: '+20% daño en movimientos Dragón y Fantasma si la lleva Giratina. Transforma a Giratina en su Forma Origen.', price: 700, typeBoost: { types: ['dragon', 'ghost'], boost: 0.20, onlyIds: [487] } },
   'Baya Oca': { name: 'Baya Oca', desc: '15% Reducción de Daño', price: 200, damageReduction: 0.15 },
   'Baya Kasib': { name: 'Baya Kasib', desc: '15% Reducción de Daño', price: 200, damageReduction: 0.15 },
   'Baya Meloc': { name: 'Baya Meloc', desc: '+15 HP máximos', price: 200, maxHpMod: 15 },
@@ -1311,6 +1315,15 @@ const PRIMAL_CAPABLE_IDS = new Set([
 const PRIMAL_FORM_IDS: Record<number, number> = {
   382: 10077,
   383: 10078,
+}
+
+// Formas Origen de Dialga, Palkia y Giratina mediante las esferas.
+const ORIGIN_CAPABLE_IDS = new Set([483, 484, 487])
+
+const ORIGIN_FORM_IDS: Record<number, number> = {
+  483: 10245,
+  484: 10246,
+  487: 10007,
 }
 
 const ACHIEVEMENTS: Achievement[] = [
@@ -1911,6 +1924,7 @@ function nodeTypeLabel(node: RouteNode): string {
     case 'blackmarket': return en ? 'Black Market' : 'Mercado Negro'
     case 'double': return en ? 'Double Battle' : 'Combate Doble'
     case 'casino': return 'Casino'
+    case 'elite': return en ? 'Elite' : 'Elite'
     default: return node.type
   }
 }
@@ -1918,6 +1932,19 @@ function nodeTypeLabel(node: RouteNode): string {
 // Genera un tramo de ruta cooperativa (nodos + jefe final) con nodos de
 // intercambio en posiciones proporcionales. Usa el RNG con semilla para que
 // ambos jugadores generen exactamente el mismo tramo.
+// Ruta de una etapa del Modo Original: 9 nodos (Tienda/Combate/Descanso/Rival)
+// + 1 jefe que otorga una medalla al final.
+function buildOriginalStageRoute(stageNum: number): RouteNode[] {
+  const types: Array<'battle' | 'shop' | 'rest' | 'rival'> = ['battle', 'battle', 'rest', 'battle', 'shop', 'rival', 'battle', 'rest', 'shop']
+  const nodes: RouteNode[] = []
+  for (let i = 0; i < types.length; i++) {
+    const label = types[i] === 'battle' ? `Combate #${i + 1}` : types[i] === 'rest' ? 'Descanso' : types[i] === 'shop' ? 'Tienda' : 'Rival'
+    nodes.push({ id: 3000 + stageNum * 100 + i, type: types[i], label, done: false })
+  }
+  nodes.push({ id: 4000 + stageNum, type: 'boss', label: `Jefe #${stageNum}`, done: false })
+  return nodes
+}
+
 function generateCoopRouteSegment(startId: number, totalNodes: number, rr: () => number, challenges: RunChallenges, difficulty: Difficulty = 'medium'): RouteNode[] {
   const segment: RouteNode[] = []
   let tradeCount = 2
@@ -1971,6 +1998,7 @@ const NODE_EMOJIS: Record<string, string> = {
   blackmarket: '🕶️',
   double: '🥊',
   casino: '🃏',
+  elite: '🗻',
 }
 
 const NODE_TYPE_COLORS: Record<string, string> = {
@@ -1990,6 +2018,7 @@ const NODE_TYPE_COLORS: Record<string, string> = {
   blackmarket: '#fb923c',
   double: '#facc15',
   casino: '#f0abfc',
+  elite: '#cba3ff',
 }
 
 function getNodeMapLayout(nodeCount: number): { positions: Array<{ x: number; y: number }>; width: number; height: number } {
@@ -2164,6 +2193,7 @@ interface ProgressionData {
   completedHard: number[]
   completedColiseum: number[]
   completedLeague: number[]
+  completedOriginal: number[]
 }
 
 interface VictoryUnlocks {
@@ -2201,6 +2231,10 @@ function MainApp() {
   const [difficulty, setDifficulty] = useState<Difficulty>('medium')
   const [currentRunGen, setCurrentRunGen] = useState<number>(1)
   const [victoryUnlocks, setVictoryUnlocks] = useState<VictoryUnlocks | null>(null)
+  const [starterOptions, setStarterOptions] = useState<Pokemon[]>([])
+  const [showStarterSelect, setShowStarterSelect] = useState(false)
+  const chosenStarterIdRef = useRef<number | null>(null)
+  const [originalMedals, setOriginalMedals] = useState<number>(0)
 
   const [progression, setProgression] = useState<ProgressionData>(() => {
     try {
@@ -2212,13 +2246,14 @@ function MainApp() {
           completedAny: Array.isArray(parsed.completedAny) ? parsed.completedAny : [],
           completedHard: Array.isArray(parsed.completedHard) ? parsed.completedHard : [],
           completedColiseum: Array.isArray(parsed.completedColiseum) ? parsed.completedColiseum : [],
-          completedLeague: Array.isArray(parsed.completedLeague) ? parsed.completedLeague : []
+          completedLeague: Array.isArray(parsed.completedLeague) ? parsed.completedLeague : [],
+          completedOriginal: Array.isArray(parsed.completedOriginal) ? parsed.completedOriginal : []
         }
       }
     } catch {
       // fallback
     }
-    return { completedMedium: [], completedAny: [], completedHard: [], completedColiseum: [], completedLeague: [] }
+    return { completedMedium: [], completedAny: [], completedHard: [], completedColiseum: [], completedLeague: [], completedOriginal: [] }
   })
 
   const [team, setTeam] = useState<Pokemon[]>([])
@@ -2404,6 +2439,7 @@ function MainApp() {
   const [battleMegaUsed, setBattleMegaUsed] = useState(false)
   const [battleGmaxUsed, setBattleGmaxUsed] = useState(false)
   const [battlePrimalUsed, setBattlePrimalUsed] = useState(false)
+  const [battleOriginUsed, setBattleOriginUsed] = useState(false)
 
   const runStartTimeRef = useRef<number>(0)
   const pendingScoreRef = useRef<InfiniteScoreInsert | null>(null)
@@ -2738,12 +2774,13 @@ function MainApp() {
       setTeam(prev => prev.map((p) => {
         const reset = { statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
         const orig = p.megaOrig
-        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...orig, ...reset }
-        return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...reset }
+        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...orig, ...reset }
+        return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...reset }
       }))
       setBattleMegaUsed(false)
       setBattleGmaxUsed(false)
       setBattlePrimalUsed(false)
+      setBattleOriginUsed(false)
     }
   }, [screen])
 
@@ -3591,6 +3628,32 @@ function MainApp() {
       if (!coopSessionCode) { setCoopError(t('coop.needSession')); return }
       if (coopMyRole === 'a' && !coopPartnerJoined) { setCoopError('Espera a que tu compañero se una a la sesión.'); return }
     }
+    if (difficulty === 'original') {
+      void openStarterSelect()
+      return
+    }
+    startNewRun()
+  }
+
+  async function openStarterSelect(): Promise<void> {
+    setIsLoading(true)
+    setApiError('')
+    try {
+      const targetGen = getEffectiveGen()
+      const ids = startersByGen[targetGen] ?? startersByGen[1]
+      const options = await Promise.all(ids.map(id => buildPokemonFromApi(id, targetGen, 10, false, 'original')))
+      setStarterOptions(options)
+      setShowStarterSelect(true)
+    } catch {
+      setApiError('No se pudieron cargar los iniciales.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  function confirmOriginalStarter(starter: Pokemon): void {
+    chosenStarterIdRef.current = starter.id
+    setShowStarterSelect(false)
     startNewRun()
   }
 
@@ -3730,7 +3793,14 @@ function MainApp() {
       // Reinicia el conteo de evoluciones de Eevee para la run nueva.
       eeveeEvolutionsRef.current = new Set()
 
-      const starter = await getRandomStarterByGeneration(targetGen, activeChallenges.allShiny, effectiveDifficulty)
+      // En Modo Original el jugador elige su inicial (chosenStarterIdRef).
+      let starter: Pokemon
+      if (effectiveDifficulty === 'original') {
+        const starterId = chosenStarterIdRef.current ?? randomFrom(startersByGen[targetGen] ?? startersByGen[1])
+        starter = await buildPokemonFromApi(starterId, targetGen, 10, activeChallenges.allShiny, 'original')
+      } else {
+        starter = await getRandomStarterByGeneration(targetGen, activeChallenges.allShiny, effectiveDifficulty)
+      }
       const config: RunConfig = { generation: targetGen }
       const run = startRun(config, activeChallenges.doubleModifiers)
 
@@ -3762,6 +3832,10 @@ function MainApp() {
         customRoute = generateCoopRouteSegment(1, coopNodes, rr, activeChallenges, coopDiffRef.current || 'medium')
       } else if (activeChallenges.bossRush) {
         customRoute = generateBossRushRoute(totalNodes)
+      } else if (effectiveDifficulty === 'original') {
+        // Modo Original: 8 etapas; cada una termina en un jefe que da una medalla.
+        setOriginalMedals(0)
+        customRoute = buildOriginalStageRoute(1)
       } else if (effectiveDifficulty === 'infinite') {
         for (let i = 1; i <= infiniteNodeSize; i++) {
           customRoute.push(generateRandomNodeType(i, rr))
@@ -4082,7 +4156,10 @@ function MainApp() {
       completedColiseum: progression.completedColiseum,
       completedLeague: currentNode && currentNode.id >= 1000
         ? Array.from(new Set([...progression.completedLeague, genPlayed]))
-        : progression.completedLeague
+        : progression.completedLeague,
+      completedOriginal: difficulty === 'original'
+        ? Array.from(new Set([...progression.completedOriginal, genPlayed]))
+        : progression.completedOriginal
     }
 
     localStorage.setItem('pokerand_progression', JSON.stringify(updatedProgression))
@@ -4195,11 +4272,12 @@ function MainApp() {
     setSpeedrunSeconds(0)
     setTeam(prev => prev.map((p) => {
       const orig = p.megaOrig
-      if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...orig }
-      return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined }
+      if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...orig }
+      return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined }
     }))
     setBattleGmaxUsed(false)
     setBattlePrimalUsed(false)
+    setBattleOriginUsed(false)
     setRoute((previous) =>
       previous.map((node, index) => (index === routeIndex ? { ...node, done: true } : node))
     )
@@ -4218,6 +4296,34 @@ function MainApp() {
     }
 
     if (routeIndex >= route.length - 1) {
+      // Modo Original: al derrotar el jefe de una etapa se gana una medalla.
+      // Con 8 medallas, la Calle Victoria y la Liga son obligatorias.
+      if (currentNode && currentNode.id >= 4000 && difficulty === 'original') {
+        const newMedals = originalMedals + 1
+        setOriginalMedals(newMedals)
+        if (newMedals >= 8) {
+          setLeagueTeamSelection(true)
+          return
+        }
+        setRoute(buildOriginalStageRoute(newMedals + 1))
+        setRouteIndex(0)
+        setScreen('route')
+        setBattleLog((prev) => [t('b.originalMedal', { n: newMedals, total: 8 }), ...prev].slice(0, 15))
+        return
+      }
+      // Calle Victoria completada → Liga (4 jefes en un mapa nuevo).
+      if (currentNode && currentNode.id >= 2000) {
+        const maxLvl = Math.max(...team.map(p => p.level)) + 2
+        const leagueRoute: RouteNode[] = []
+        for (let i = 0; i < 4; i++) {
+          leagueRoute.push({ id: 1000 + i, type: 'boss', label: `Liga #${i + 1}`, done: false })
+        }
+        setRoute(leagueRoute)
+        setRouteIndex(0)
+        setScreen('route')
+        setBattleLog(prev => [t('b.leagueWelcome', { lvl: maxLvl }), ...prev].slice(0, 15))
+        return
+      }
       if (difficulty === 'infinite') {
         if (routeIndex >= 19) unlockAchievement('infinite_20')
         if (routeIndex >= 49) unlockAchievement('infinite_50')
@@ -6252,7 +6358,8 @@ function MainApp() {
           ...prev
         ])
       } else {
-        const willBeTrainer = isBoss || Math.random() < 0.5
+        const isElite = currentNode.type === 'elite'
+        const willBeTrainer = isBoss || isElite || Math.random() < 0.5
 
       if (willBeTrainer) {
         const isLeague = currentNode.id >= 1000
@@ -6311,7 +6418,7 @@ function MainApp() {
           chosenBadge = leader.badge
         } else {
           const trainer = randomFrom(TRAINER_TYPES)
-          chosenName = `${trainer.label} ${trainer.name}`
+          chosenName = isElite ? `Elite ${trainer.label} ${trainer.name}` : `${trainer.label} ${trainer.name}`
           chosenSprite = trainer.sprite
           chosenBadge = ''
         }
@@ -6352,7 +6459,9 @@ function MainApp() {
         setBattleLog((prev) => [
           isBoss
             ? t('b.leaderChallenge', { name: chosenName, badge: chosenBadge })
-            : t('b.trainerChallenge', { name: chosenName, n: teamSize }),
+            : isElite
+              ? t('b.eliteChallenge', { name: chosenName, n: teamSize })
+              : t('b.trainerChallenge', { name: chosenName, n: teamSize }),
           t('b.sendsOut', { name: firstEnemy.name, lvl: firstEnemy.level }),
           ...prev
         ])
@@ -6403,12 +6512,13 @@ function MainApp() {
       setTeam(prev => prev.map((p, i) => {
         const orig = p.megaOrig
         const entered = i === activeIndex
-        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: entered, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
-        return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: entered, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
+        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: entered, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
+        return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: entered, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
       }))
       setBattleMegaUsed(false)
       setBattleGmaxUsed(false)
       setBattlePrimalUsed(false)
+      setBattleOriginUsed(false)
       battleStartHPRef.current = activePokemon.hp
       battleMinHpRef.current = activePokemon.hp
       setBattleTurns(0)
@@ -8065,6 +8175,33 @@ function MainApp() {
     setBattleLog(prev => [t('b.primalEvolved', { name: activePokemon.name }), ...prev].slice(0, 15))
   }
 
+  function originEvolveActive(): void {
+    if (!activePokemon || !activePokemon.holdItem) return
+    const orb = activePokemon.holdItem
+    if (orb !== 'Diamansfera' && orb !== 'Lustresfera' && orb !== 'Griseosfera') return
+    if (battleOriginUsed || activePokemon.megaEvolved || activePokemon.gmaxEvolved || activePokemon.primalEvolved || !ORIGIN_CAPABLE_IDS.has(activePokemon.id)) return
+    const formId = ORIGIN_FORM_IDS[activePokemon.id]
+    const originSprite = formId
+      ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${formId}.png`
+      : null
+    setTeam(prev => prev.map((p, i) => i === activeIndex ? {
+      ...p,
+      originEvolved: true,
+      megaOrig: { sprite: p.sprite, attack: p.attack, defense: p.defense, spAttack: p.spAttack, spDefense: p.spDefense, speed: p.speed },
+      sprite: originSprite ?? p.sprite,
+      attack: Math.floor(p.attack * 1.15),
+      defense: Math.floor(p.defense * 1.15),
+      spAttack: Math.floor(p.spAttack * 1.15),
+      spDefense: Math.floor(p.spDefense * 1.15),
+      speed: Math.floor(p.speed * 1.15),
+    } : p))
+    if (formId) {
+      registerInPokedex({ ...activePokemon, id: formId, sprite: originSprite ?? activePokemon.sprite })
+    }
+    setBattleOriginUsed(true)
+    setBattleLog(prev => [t('b.originEvolved', { name: activePokemon.name }), ...prev].slice(0, 15))
+  }
+
   function switchActive(index: number): void {
     const target = team[index]
     if (!target || target.hp <= 0 || index === activeIndex) return
@@ -8072,7 +8209,7 @@ function MainApp() {
     setTeam(prev => prev.map((p, i) => {
       // Al cambiar de Pokémon se pierden Drenadoras y Anulación (como en los juegos reales),
       // y el que entra cuenta como "recién llegado" para Sorpresa/Abatimiento.
-      if (i === activeIndex && orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false, ...orig }
+      if (i === activeIndex && orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false, ...orig }
       if (i === activeIndex) return { ...p, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false }
       if (i === index) return { ...p, justEntered: true }
       return p
@@ -9046,8 +9183,9 @@ function MainApp() {
                 const isGmaxEquip = equipModal.itemName === 'Dynamax Band'
                 const isMegaEquip = equipModal.itemName === 'Mega Stone'
                 const isPrimalEquip = equipModal.itemName === 'Prisma Rojo' || equipModal.itemName === 'Prisma Azul'
-                const canUseTransform = isGmaxEquip ? GMAX_CAPABLE_IDS.has(pkmn.id) : isMegaEquip ? MEGA_CAPABLE_IDS.has(pkmn.id) : isPrimalEquip ? PRIMAL_CAPABLE_IDS.has(pkmn.id) : false
-                const highlightGreen = canEquip && (isGmaxEquip || isMegaEquip || isPrimalEquip) && canUseTransform
+                const isOriginEquip = equipModal.itemName === 'Diamansfera' || equipModal.itemName === 'Lustresfera' || equipModal.itemName === 'Griseosfera'
+                const canUseTransform = isGmaxEquip ? GMAX_CAPABLE_IDS.has(pkmn.id) : isMegaEquip ? MEGA_CAPABLE_IDS.has(pkmn.id) : isPrimalEquip ? PRIMAL_CAPABLE_IDS.has(pkmn.id) : isOriginEquip ? ORIGIN_CAPABLE_IDS.has(pkmn.id) : false
+                const highlightGreen = canEquip && (isGmaxEquip || isMegaEquip || isPrimalEquip || isOriginEquip) && canUseTransform
                 return (
                   <button
                     key={`equip-target-${idx}`}
@@ -9094,6 +9232,11 @@ function MainApp() {
                         {isMegaEquip && (
                           <span style={{ fontSize: '0.7rem', color: canUseTransform ? '#4ade80' : '#7d7ab5', marginLeft: '6px' }}>
                             {canUseTransform ? '✓ Puede Mega' : 'No puede'}
+                          </span>
+                        )}
+                        {isOriginEquip && (
+                          <span style={{ fontSize: '0.7rem', color: canUseTransform ? '#4ade80' : '#7d7ab5', marginLeft: '6px' }}>
+                            {canUseTransform ? '✓ Puede Forma Origen' : 'No puede'}
                           </span>
                         )}
                       </strong>
@@ -10228,6 +10371,7 @@ function MainApp() {
               const completedHard = progression.completedHard.includes(gen)
               const completedColiseum = progression.completedColiseum.includes(gen)
               const completedLeague = progression.completedLeague.includes(gen)
+              const completedOriginal = progression.completedOriginal.includes(gen)
 
               return (
                 <button
@@ -10253,6 +10397,9 @@ function MainApp() {
                       )}
                       {completedLeague && (
                         <span className="badge-medium" title={language === 'en' ? 'Completed on the League' : 'Completado en Liga'}>🏅</span>
+                      )}
+                      {completedOriginal && (
+                        <span className="badge-medium" title={language === 'en' ? 'Completed on Original' : 'Completado en Modo Original'}>⭐</span>
                       )}
                     </span>
                   </div>
@@ -10389,6 +10536,26 @@ function MainApp() {
                 </button>
               )
             })}
+            <button
+              className={`gen-tile ${difficulty === 'original' ? 'is-active' : ''}`}
+              onClick={() => { playClick(); handleSelectDifficulty('original') }}
+              onMouseEnter={playHover}
+              type="button"
+              disabled={isLoading}
+              style={{
+                borderColor: difficulty === 'original' ? '#4d9bff' : 'rgba(77, 155, 255, 0.5)',
+                background: difficulty === 'original' ? 'rgba(77, 155, 255, 0.25)' : 'rgba(77, 155, 255, 0.06)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                padding: '10px',
+              }}
+            >
+              <span style={{ fontSize: '1rem', color: '#4d9bff', whiteSpace: 'nowrap' }}>⭐ {language === 'en' ? 'Original' : 'Original'}</span>
+              <strong style={{ fontSize: '1.1rem', color: '#9b98cf' }}>{language === 'en' ? 'Pick starter' : 'Elige inicial'}</strong>
+            </button>
           </div>
 
           <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
@@ -11015,7 +11182,24 @@ function MainApp() {
                 </button>
               </div>
             )}
-            {difficulty !== 'infinite' && difficulty !== 'coliseum' && (
+            {difficulty === 'original' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', padding: '6px 10px', background: 'rgba(77,155,255,0.1)', borderRadius: '8px', border: '1px solid rgba(77,155,255,0.35)' }}>
+                <span style={{ fontSize: '0.85rem', color: '#4d9bff', fontWeight: 'bold' }}>🏅 {language === 'en' ? 'Medals' : 'Medallas'}: {originalMedals}/8</span>
+                <div style={{ display: 'flex', gap: '3px' }}>
+                  {Array.from({ length: 8 }, (_, i) => (
+                    <div key={i} style={{
+                      width: '18px', height: '18px', borderRadius: '50%',
+                      background: i < originalMedals ? 'rgba(77,155,255,0.3)' : 'rgba(255,255,255,0.05)',
+                      border: i < originalMedals ? '2px solid #4d9bff' : '2px dashed #475569',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {i < originalMedals ? <span style={{ fontSize: '0.6rem' }}>🏅</span> : <span style={{ fontSize: '0.55rem', color: '#475569' }}>?</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {difficulty !== 'infinite' && difficulty !== 'coliseum' && difficulty !== 'original' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', padding: '6px 10px', background: 'rgba(250,204,21,0.08)', borderRadius: '8px', border: '1px solid rgba(250,204,21,0.2)' }}>
                 <span style={{ fontSize: '0.85rem', color: '#ffcb05', fontWeight: 'bold' }}>{t('route.stage')} {currentStage}/3</span>
                 <div style={{ display: 'flex', gap: '4px' }}>
@@ -12172,6 +12356,16 @@ function MainApp() {
                     🔮 ¡Primal Reversion!
                   </button>
                 )}
+                {(activePokemon.holdItem === 'Diamansfera' || activePokemon.holdItem === 'Lustresfera' || activePokemon.holdItem === 'Griseosfera') && !battleOriginUsed && !activePokemon.megaEvolved && !activePokemon.gmaxEvolved && !activePokemon.primalEvolved && !activePokemon.originEvolved && ORIGIN_CAPABLE_IDS.has(activePokemon.id) && (
+                  <button
+                    className="cta"
+                    onClick={originEvolveActive}
+                    type="button"
+                    style={{ marginTop: '8px', width: '100%', background: '#4d9bff' }}
+                  >
+                    🌀 ¡Forma Origen!
+                  </button>
+                )}
               </div>
             )}
 
@@ -12523,6 +12717,49 @@ function MainApp() {
         </div>
       )}
 
+      {/* Selección de inicial en Modo Original */}
+      {showStarterSelect && (
+        <div className="modal-backdrop" onClick={() => { playClick(); setShowStarterSelect(false); setScreen('setup') }}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', padding: '1.5rem', animation: 'casinoSlideUp 0.35s ease' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h2 style={{ margin: 0, color: '#4d9bff' }}>🔵 Modo Original — Elige tu inicial</h2>
+              <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowStarterSelect(false); setScreen('setup') }} style={{ color: '#ff8a80' }}>{t('common.close')}</button>
+            </div>
+            <p style={{ color: '#9b98cf', fontSize: '0.85rem', margin: '0 0 1rem' }}>
+              {language === 'en'
+                ? 'Pick the Pokémon you will start with. This run has no badges: just 10 nodes, then Victory Road and the League are mandatory.'
+                : 'Elige el Pokémon con el que empezarás. Esta run no tiene insignias: solo 10 nodos, y después la Calle Victoria y la Liga son obligatorias.'}
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.75rem' }}>
+              {starterOptions.map(starter => (
+                <button
+                  key={starter.id}
+                  type="button"
+                  onClick={() => { playClick(); confirmOriginalStarter(starter) }}
+                  onMouseEnter={playHover}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+                    padding: '10px', borderRadius: '12px', cursor: 'pointer',
+                    background: 'rgba(77, 155, 255, 0.1)', border: '2px solid rgba(77, 155, 255, 0.5)',
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(77, 155, 255, 0.25)' }}
+                  onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(77, 155, 255, 0.1)' }}
+                >
+                  <img src={starter.sprite} alt={starter.name} onError={fallbackSprite} style={{ width: '72px', height: '72px', imageRendering: 'pixelated' }} />
+                  <strong style={{ textTransform: 'capitalize', color: '#f3f1ff', fontSize: '0.85rem' }}>{starter.name}</strong>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {starter.types?.map(tp => (
+                      <span key={tp} style={{ fontSize: '0.6rem', padding: '2px 6px', borderRadius: '999px', background: `${TYPE_COLORS[tp] ?? '#475569'}`, color: '#fff' }}>{tp}</span>
+                    ))}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* League Offer Modal */}
       {leagueOffer && (
         <div className="modal-backdrop" onClick={() => { setLeagueOffer(false); finalizeRunVictory() }}>
@@ -12560,18 +12797,20 @@ function MainApp() {
                 setLeagueTeamSelection(false)
                 const healed = tempLeagueTeam.map(p => ({ ...p, hp: p.maxHp, status: undefined }))
                 const maxLvl = Math.max(...healed.map(p => p.level)) + 2
-                const leagueRoute: RouteNode[] = []
-                for (let i = 0; i < 4; i++) {
-                  leagueRoute.push({ id: 1000 + i, type: 'boss', label: `Liga #${i + 1}`, done: false })
-                }
+                // Calle Victoria: 4 entrenadores → tienda → 4 entrenadores → tienda.
+                const victoryRoute: RouteNode[] = []
+                for (let i = 0; i < 4; i++) victoryRoute.push({ id: 2000 + i, type: 'elite', label: `Calle Victoria #${i + 1}`, done: false })
+                victoryRoute.push({ id: 2010, type: 'shop', label: `Tienda`, done: false })
+                for (let i = 0; i < 4; i++) victoryRoute.push({ id: 2020 + i, type: 'elite', label: `Calle Victoria #${5 + i}`, done: false })
+                victoryRoute.push({ id: 2030, type: 'shop', label: `Tienda`, done: false })
                 setTeam(healed)
                 setPcStorage([])
-                setRoute(leagueRoute)
+                setRoute(victoryRoute)
                 setRouteIndex(0)
                 setScreen('route')
-                setBattleLog(prev => [t('b.leagueWelcome', { lvl: maxLvl }), ...prev].slice(0, 15))
+                setBattleLog(prev => [t('b.victoryRoadWelcome', { lvl: maxLvl }), ...prev].slice(0, 15))
               }} style={{ background: '#4d9bff', color: '#000', width: '100%', marginBottom: '1rem' }}>
-                🏆 ¡Comenzar Liga!
+                🗻 ¡Comenzar la Calle Victoria!
               </button>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '6px' }}>
@@ -13320,6 +13559,7 @@ function MainApp() {
                 <li>{t('help.modes1')}</li>
                 <li>{t('help.modes2')}</li>
                 <li>{t('help.modes3')}</li>
+                <li>{t('help.modes4')}</li>
               </ul>
             </div>
 

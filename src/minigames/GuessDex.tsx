@@ -157,6 +157,7 @@ export default function GuessDex({ onComplete }: CasinoMinigameProps): JSX.Eleme
                   <img
                     src={spriteUrl(opt.id)}
                     alt={opt.name}
+                    onError={(e) => { (e.target as HTMLImageElement).style.visibility = 'hidden' }}
                     style={{ width: '72px', height: '72px', imageRendering: 'pixelated', display: 'block', margin: '0 auto' }}
                   />
                 </button>
