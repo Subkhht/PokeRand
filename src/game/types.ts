@@ -211,6 +211,7 @@ export interface MetaProgression {
   ownedMusic: string[]
   activeMenuMusic: string
   activeBattleMusic: string
+  gameboyMode: boolean
   totalMegas: number
   totalGmax: number
   coopRuns: number

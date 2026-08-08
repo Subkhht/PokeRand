@@ -2372,7 +2372,8 @@ button {
 }
 .topbar > .left-toolbar,
 .topbar > h1,
-.topbar > .record-box {
+.topbar > .record-box,
+.topbar > .topbar-right {
   position: relative;
   z-index: 1;
 }
@@ -2398,4 +2399,165 @@ button {
 }
 .pvp-sprite-bob {
   animation: pvpSpriteBob 1.6s ease-in-out infinite;
+}
+
+/* ---- Tooltip de nivel en el historial de partidas ---- */
+.match-team-slot {
+  position: relative;
+}
+.match-team-slot:hover .match-level-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+.match-level-tooltip {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e1b3a;
+  border: 1px solid #f0abfc;
+  color: #f0abfc;
+  font-size: 0.65rem;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+
+/* ---- Rediseño: Consola Game Boy ---- */
+html[data-gameboy] {
+  --panel-bg2: #1b4d1b;
+  --border-light: #8bac0f;
+  --accent-red: #c4372f;
+  --accent-red-dark: #a02a23;
+  --accent-yellow: #9bbc0f;
+  --accent-green: #9bbc0f;
+  --shadow-hard: 4px 4px 0 0 rgba(0, 0, 0, 0.6);
+  --shadow-hard-sm: 3px 3px 0 0 rgba(0, 0, 0, 0.55);
+}
+
+html[data-gameboy] body {
+  background-color: #0f380f;
+  background-image: none;
+}
+
+html[data-gameboy] .app-shell {
+  background-color: #0f380f;
+}
+
+/* Sprites de Pokémon en tonos verdosos estilo consola */
+html[data-gameboy] img {
+  image-rendering: pixelated;
+  filter: grayscale(1) sepia(1) hue-rotate(75deg) saturate(2) brightness(0.9) contrast(1.08);
+}
+
+/* Líneas horizontales (escaneo) de la pantalla LCD de la Game Boy */
+html[data-gameboy] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.18) 3px,
+    rgba(0, 0, 0, 0.18) 4px
+  );
+  mix-blend-mode: multiply;
+}
+
+/* Cristal LCD: leve brillo verdoso en el centro */
+html[data-gameboy] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: radial-gradient(ellipse at center, rgba(155, 188, 15, 0.06) 0%, rgba(15, 56, 15, 0) 70%);
+  mix-blend-mode: screen;
+}
+
+/* Marco tipo consola: bordes gruesos, esquinas suaves y sombra dura */
+html[data-gameboy] .topbar {
+  background: #0f380f;
+  border: 4px solid #306230;
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 2px #8bac0f, 4px 4px 0 0 rgba(0, 0, 0, 0.5);
+}
+
+html[data-gameboy] .panel {
+  border: 4px solid #306230;
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 2px #8bac0f, 4px 4px 0 0 rgba(0, 0, 0, 0.5);
+}
+
+html[data-gameboy] .record-box {
+  background: #1b4d1b;
+  border: 3px solid #8bac0f;
+  border-radius: 6px;
+}
+
+html[data-gameboy] .modal-backdrop {
+  background: rgba(5, 20, 5, 0.86);
+}
+
+/* Botones tipo consola */
+html[data-gameboy] .cta {
+  background: #8bac0f;
+  color: #0f380f;
+  border: 3px solid #306230;
+  border-radius: 4px;
+  box-shadow: 3px 3px 0 0 rgba(0, 0, 0, 0.5);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+html[data-gameboy] .tiny-btn {
+  background: #1b4d1b;
+  color: #9bbc0f;
+  border: 2px solid #8bac0f;
+  border-radius: 4px;
+}
+
+html[data-gameboy] input[type="text"],
+html[data-gameboy] input[type="number"],
+html[data-gameboy] select {
+  background: #1b4d1b;
+  color: #9bbc0f;
+  border: 2px solid #8bac0f;
+  border-radius: 4px;
+}
+
+html[data-gameboy] input::placeholder {
+  color: #7ca35c;
+}
+
+/* Barras de vida con el verde de la consola */
+html[data-gameboy] .meter > div,
+html[data-gameboy] .enemy-meter > div {
+  background: #8bac0f;
+}
+
+/* Scrollbars de la consola */
+html[data-gameboy] ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+html[data-gameboy] ::-webkit-scrollbar-track {
+  background: #0f380f;
+}
+html[data-gameboy] ::-webkit-scrollbar-thumb {
+  background: #306230;
+  border: 2px solid #0f380f;
+}
+html[data-gameboy] * {
+  scrollbar-color: #306230 #0f380f;
 }

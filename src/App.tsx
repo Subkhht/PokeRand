@@ -36,6 +36,38 @@ import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runMo
 type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum' | 'original'
 
+// Historial local de partidas finalizadas (victorias/derrotas). Solo se
+// registran runs que terminan de verdad: no se cuentan reinicios ni abandonos.
+interface MatchRecord {
+  result: 'win' | 'loss'
+  date: number
+  mode: Difficulty
+  generation: number
+  duration: number
+  team: Array<{ name: string; sprite: string; shiny?: boolean; level?: number }>
+  challenges: string[]
+}
+
+const MATCH_HISTORY_KEY = 'pokerand_match_history'
+const MAX_MATCH_HISTORY = 20
+
+function loadMatchHistory(): MatchRecord[] {
+  try {
+    const raw = localStorage.getItem(MATCH_HISTORY_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function saveMatchRecord(entry: MatchRecord): void {
+  const history = loadMatchHistory()
+  history.unshift(entry)
+  localStorage.setItem(MATCH_HISTORY_KEY, JSON.stringify(history.slice(0, MAX_MATCH_HISTORY)))
+}
+
 const STATUS_COLORS: Record<StatusType, string> = {
   burn: '#ff8a33',
   poison: '#a855f7',
@@ -634,6 +666,8 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'X Sp. Attack 2': { price: 150, desc: 'Aumenta permanentemente en +10 el Ataque Especial.' },
   'X Sp. Defense 2': { price: 150, desc: 'Aumenta permanentemente en +10 la Defensa Especial.' },
   'Cuerda Huida': { price: 200, desc: 'Permite escapar de cualquier combate de la aventura.' },
+  'Poké Radar': { price: 250, desc: 'Garantiza que el próximo Pokémon salvaje o de descanso sea shiny.' },
+  'Flauta Celeste': { price: 400, desc: 'Garantiza que el próximo Pokémon salvaje sea legendario.' },
   'Moomoo Milk': { price: 120, desc: 'Restaura 100 HP de un Pokémon.' },
   'Berry Juice': { price: 40, desc: 'Restaura 20 HP de un Pokémon.' },
   'Fresh Water': { price: 60, desc: 'Restaura 30 HP de un Pokémon.' },
@@ -823,6 +857,8 @@ const itemDescriptions: Record<string, string> = {
   'Prisma Rojo': 'Despierta la Primal Reversion de Groudon (1 vez por combate).',
   'Prisma Azul': 'Despierta la Primal Reversion de Kyogre (1 vez por combate).',
   'Cuerda Huida': 'Escapa de cualquier combate de la aventura.',
+  'Poké Radar': 'Garantiza que el próximo Pokémon salvaje o de descanso sea shiny.',
+  'Flauta Celeste': 'Garantiza que el próximo Pokémon salvaje sea legendario.',
   'Moomoo Milk': 'Restaura 100 HP de un Pokémon.',
   'Berry Juice': 'Restaura 20 HP de un Pokémon.',
   'Fresh Water': 'Restaura 30 HP de un Pokémon.',
@@ -997,6 +1033,12 @@ const ITEM_SPRITES: Record<string, string> = {
   'Sachet': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sachet.png',
   'Whipped Dream': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/whipped-dream.png',
   'Cuerda Huida': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/escape-rope.png',
+  'Poké Radar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-radar.png',
+  'Flauta Celeste': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/azure-flute.png',
+  'gameboy': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/game-boy.png',
+  'rule-book': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rule-book.png',
+  'Detector de Objetos': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dowsing-machine.png',
+  'Telescopio': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/zoom-lens.png',
   'Moomoo Milk': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/moomoo-milk.png',
   'Berry Juice': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/berry-juice.png',
   'Fresh Water': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fresh-water.png',
@@ -1035,6 +1077,9 @@ const ITEM_SPRITES: Record<string, string> = {
   'Buceobola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dive-ball.png',
   'Sanabola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/heal-ball.png',
   'Safaribola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/safari-ball.png',
+  'Sueñobola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dream-ball.png',
+  'Ball Luna': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/moon-ball.png',
+  'Entebola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/beast-ball.png',
   'Focus Sash II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/focus-sash.png',
   'Scope Lens II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/scope-lens.png',
   'Shell Bell II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shell-bell.png',
@@ -1067,6 +1112,7 @@ interface HoldableItem {
   lifesteal?: number
   lowHpBonus?: number
   firstStrikeBonus?: number
+  accuracyMod?: number
   isMegaStone?: boolean
   isGmaxBand?: boolean
   isPrimalOrb?: boolean
@@ -1086,6 +1132,7 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Life Orb': { name: 'Life Orb', desc: '+30% Daño, -5 HP por turno', price: 400, damageBoost: 0.30, healPerTurn: -5 },
   'Rocky Helmet': { name: 'Rocky Helmet', desc: '+15% Defensa', price: 200, defenseMod: 0.15 },
   'Scope Lens': { name: 'Scope Lens', desc: '20% Golpe Crítico', price: 250, critChance: 0.20 },
+  'Telescopio': { name: 'Telescopio', desc: '+20% precisión si el rival ya atacó este turno', price: 300, accuracyMod: 0.20 },
   'Shell Bell': { name: 'Shell Bell', desc: '20% Robo de Vida', price: 300, lifesteal: 0.20 },
   'Choice Scarf': { name: 'Choice Scarf', desc: '+30% Velocidad', price: 350, speedMod: 0.30 },
   'Babiri Berry': { name: 'Babiri Berry', desc: '20% Reducción de Daño', price: 250, damageReduction: 0.20 },
@@ -1161,6 +1208,9 @@ interface PokeBallDef {
   rateFn?: (target: Pokemon, turns: number, alreadyCaught: boolean, playerLevel?: number) => number
 }
 
+// Familias que evolucionan con Piedra Lunar (Bonus de la Ball Luna).
+const MOON_STONE_FAMILY = [29, 30, 31, 32, 33, 34, 35, 36, 39, 40, 300, 301, 517, 518]
+
 const POKEBALLS: PokeBallDef[] = [
   { name: 'Poké Ball', rate: 1, desc: 'Una ball básica para capturar Pokémon.', price: 20, spriteKey: 'poke-ball' },
   { name: 'Great Ball', rate: 1.5, desc: 'Una ball con mayor ratio de captura.', price: 50, spriteKey: 'great-ball' },
@@ -1182,6 +1232,9 @@ const POKEBALLS: PokeBallDef[] = [
   { name: 'Buceobola', rate: 1, desc: 'Más efectiva contra Pokémon de tipo Agua (x3.5).', price: 60, spriteKey: 'dive-ball', rateFn: (target) => target.types?.some(t => t === 'water') ? 3.5 : 1 },
   { name: 'Sanabola', rate: 1, desc: 'Cura al Pokémon capturado.', price: 40, spriteKey: 'heal-ball' },
   { name: 'Safaribola', rate: 1.5, desc: 'Una ball de la Zona Safari (x1.5).', price: 40, spriteKey: 'safari-ball' },
+  { name: 'Sueñobola', rate: 1, desc: 'Más efectiva contra Pokémon dormidos (x4).', price: 60, spriteKey: 'dream-ball', rateFn: (target) => target.status?.type === 'sleep' ? 4 : 1 },
+  { name: 'Ball Luna', rate: 1, desc: 'Más efectiva contra Pokémon que evolucionan con Piedra Lunar (x4).', price: 60, spriteKey: 'moon-ball', rateFn: (target) => MOON_STONE_FAMILY.includes(Number(target.id)) ? 4 : 1 },
+  { name: 'Entebola', rate: 1, desc: 'Más efectiva contra Pokémon legendarios (x5).', price: 100, spriteKey: 'beast-ball', rateFn: (target) => Object.values(REGION_LEGENDARIES).flat().includes(Number(target.id)) ? 5 : 1 },
 ]
 
 const POKEBALL_NAMES = POKEBALLS.map(b => b.name)
@@ -1213,6 +1266,9 @@ const POKEBALL_UNLOCK_IDS: Record<string, string> = {
   'Buceobola': 'unlock_buceo_ball',
   'Sanabola': 'unlock_sana_ball',
   'Safaribola': 'unlock_safari_ball',
+  'Sueñobola': 'unlock_sueno_ball',
+  'Ball Luna': 'unlock_luna_ball',
+  'Entebola': 'unlock_ente_ball',
 }
 
 function getPokeBallRate(ballName: string, target: Pokemon, turns: number, alreadyCaught: boolean, playerLevel?: number): number {
@@ -1627,13 +1683,25 @@ const THEMES: Array<{ id: string; name: string; desc: string; price: number; col
   { id: 'tropical', name: 'Tropical', desc: 'Paraíso aguamarina y mango', price: 85, colors: { bg: '#00141a', surface: '#063238', border: '#0f6b6b', text: '#e8ffff', accent: '#ffb340', muted: '#6fc7b8' } },
 ]
 
+// Rediseños: modos visuales completos que cambian la interfaz y los sprites.
+const REDESIGNS: Array<{ id: string; name: string; desc: string; price: number; icon: string; colors: Record<string, string> }> = [
+  {
+    id: 'gameboy',
+    name: 'Rediseño Game Boy',
+    desc: 'Lleva toda la interfaz y los sprites al clásico de 8 bits, con la paleta verde y las líneas de la consola original.',
+    price: 200,
+    icon: '🕹️',
+    colors: { bg: '#0f380f', surface: '#306230', border: '#8bac0f', text: '#9bbc0f' },
+  },
+]
+
 interface MetaShopItem {
   id: string
   name: string
   desc: string
   price: number
   spriteKey: string
-  category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' | 'pokeball' | 'evolution_stone' | 'evolution_item' | 'disco_mt' | 'treasure' | 'berry'
+  category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' | 'pokeball' | 'evolution_stone' | 'evolution_item' | 'disco_mt' | 'treasure' | 'berry' | 'redesign'
   requires?: string
 }
 
@@ -1656,6 +1724,8 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_x_sp_attack_2', name: 'X Sp. Attack 2', desc: '+10 Ataque Esp. permanente.', price: 45, spriteKey: 'X Sp. Attack 2', category: 'consumable' },
   { id: 'unlock_x_sp_defense_2', name: 'X Sp. Defense 2', desc: '+10 Def. Esp. permanente.', price: 45, spriteKey: 'X Sp. Defense 2', category: 'consumable' },
   { id: 'unlock_smoke_ball', name: 'Cuerda Huida', desc: 'Escapa de cualquier combate. Aparece en tiendas (25%).', price: 60, spriteKey: 'Cuerda Huida', category: 'consumable' },
+  { id: 'unlock_poke_radar', name: 'Poké Radar', desc: 'Garantiza que el próximo Pokémon salvaje o de descanso sea shiny. Aparece en tiendas y Spin.', price: 150, spriteKey: 'Poké Radar', category: 'consumable' },
+  { id: 'unlock_azure_flute', name: 'Flauta Celeste', desc: 'Garantiza que el próximo Pokémon salvaje sea legendario. Aparece en tiendas y Spin.', price: 250, spriteKey: 'Flauta Celeste', category: 'consumable' },
   { id: 'unlock_moomoo_milk', name: 'Moomoo Milk', desc: 'Restaura 100 HP. Aparece en tiendas.', price: 30, spriteKey: 'Moomoo Milk', category: 'consumable' },
   { id: 'unlock_berry_juice', name: 'Berry Juice', desc: 'Restaura 20 HP. Aparece en tiendas.', price: 15, spriteKey: 'Berry Juice', category: 'consumable' },
   { id: 'unlock_fresh_water', name: 'Fresh Water', desc: 'Restaura 30 HP. Aparece en tiendas.', price: 20, spriteKey: 'Fresh Water', category: 'consumable' },
@@ -1672,6 +1742,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_life_orb', name: 'Life Orb', desc: '+30% Daño, -5 HP/turno.', price: 100, spriteKey: 'Life Orb', category: 'holdable' },
   { id: 'unlock_rocky_helmet', name: 'Rocky Helmet', desc: '+15% Defensa.', price: 40, spriteKey: 'Rocky Helmet', category: 'holdable' },
   { id: 'unlock_scope_lens', name: 'Scope Lens', desc: '20% Golpe Crítico.', price: 70, spriteKey: 'Scope Lens', category: 'holdable' },
+  { id: 'unlock_telescopio', name: 'Telescopio', desc: '+20% precisión si el rival ya atacó este turno.', price: 80, spriteKey: 'Telescopio', category: 'holdable' },
   { id: 'unlock_shell_bell', name: 'Shell Bell', desc: '20% Lifesteal.', price: 90, spriteKey: 'Shell Bell', category: 'holdable' },
   { id: 'unlock_choice_scarf', name: 'Choice Scarf', desc: '+30% Velocidad.', price: 70, spriteKey: 'Choice Scarf', category: 'holdable' },
   { id: 'unlock_babiri_berry', name: 'Babiri Berry', desc: '20% Reducción de Daño.', price: 50, spriteKey: 'Babiri Berry', category: 'berry' },
@@ -1705,9 +1776,12 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_reroll', name: 'Reroll', desc: 'Permite rerollear la tienda 1 vez por visita.', price: 120, spriteKey: 'dice', category: 'upgrade' },
   { id: 'unlock_reroll_2', name: 'Reroll II', desc: 'Otorga 1 reroll extra de tienda por visita.', price: 200, spriteKey: 'dice', category: 'upgrade', requires: 'unlock_reroll' },
   { id: 'unlock_shop_slot', name: 'Espacio de Tienda', desc: 'Las tiendas ofrecen 1 objeto más.', price: 100, spriteKey: 'money', category: 'upgrade' },
+  { id: 'unlock_history', name: 'Historial', desc: 'Desbloquea el historial de partidas en la barra superior.', price: 10, spriteKey: 'rule-book', category: 'upgrade' },
   { id: 'unlock_shop_slot_2', name: 'Espacio de Tienda II', desc: 'Las tiendas ofrecen 1 objeto más (se suma a la anterior).', price: 180, spriteKey: 'money', category: 'upgrade', requires: 'unlock_shop_slot' },
   { id: 'start_pokeballs_5', name: 'Inicio: +5 Poké Balls', desc: 'Empiezas cada aventura con 5 Poké Balls extra.', price: 180, spriteKey: 'Poké Ball', category: 'upgrade' },
   { id: 'unlock_caja_bonguri', name: 'Caja Bonguri', desc: 'Empiezas cada aventura con 2 Poké Balls y 1 ball de bonguri aleatoria.', price: 150, spriteKey: 'Caja Bonguri', category: 'upgrade' },
+  { id: 'unlock_dowsing', name: 'Detector de Objetos', desc: 'Los descansos dan 1 objeto extra.', price: 140, spriteKey: 'Detector de Objetos', category: 'upgrade' },
+  { id: 'unlock_dowsing_2', name: 'Detector de Objetos II', desc: 'Los descansos dan 1 objeto extra más (2 en total).', price: 200, spriteKey: 'Detector de Objetos', category: 'upgrade', requires: 'unlock_dowsing' },
   { id: 'start_potion_1', name: 'Inicio: +1 Poción', desc: 'Empiezas cada aventura con 1 Poción extra.', price: 140, spriteKey: 'Potion', category: 'upgrade' },
   { id: 'start_potion_2', name: 'Inicio: +1 Poción II', desc: 'Empiezas cada aventura con 1 Poción extra (se suma a la anterior).', price: 180, spriteKey: 'Potion', category: 'upgrade', requires: 'start_potion_1' },
   { id: 'start_money_1', name: 'Inicio: +$100', desc: 'Empiezas cada aventura con $100 extra.', price: 120, spriteKey: 'money', category: 'upgrade' },
@@ -1804,6 +1878,9 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_buceo_ball', name: 'Buceobola', desc: 'x3.5 contra Pokémon de tipo Agua. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Buceobola', category: 'pokeball' },
   { id: 'unlock_sana_ball', name: 'Sanabola', desc: 'Cura al Pokémon capturado. Aparece en tiendas y descansos.', price: 30, spriteKey: 'Sanabola', category: 'pokeball' },
   { id: 'unlock_safari_ball', name: 'Safaribola', desc: 'Ratio base x1.5. Aparece en tiendas y descansos.', price: 30, spriteKey: 'Safaribola', category: 'pokeball' },
+  { id: 'unlock_sueno_ball', name: 'Sueñobola', desc: 'x4 contra Pokémon dormidos. Aparece en tiendas y descansos.', price: 40, spriteKey: 'Sueñobola', category: 'pokeball' },
+  { id: 'unlock_luna_ball', name: 'Ball Luna', desc: 'x4 contra Pokémon que evolucionan con Piedra Lunar. Aparece en tiendas y descansos.', price: 40, spriteKey: 'Ball Luna', category: 'pokeball' },
+  { id: 'unlock_ente_ball', name: 'Entebola', desc: 'x5 contra Pokémon legendarios. Aparece en tiendas y descansos.', price: 60, spriteKey: 'Entebola', category: 'pokeball' },
   { id: 'unlock_focus_sash_2', name: 'Focus Sash II', desc: '+40 HP máximos.', price: 70, spriteKey: 'Focus Sash II', category: 'holdable', requires: 'unlock_focus_sash' },
   { id: 'unlock_scope_lens_2', name: 'Scope Lens II', desc: '30% Golpe Crítico.', price: 70, spriteKey: 'Scope Lens II', category: 'holdable', requires: 'unlock_scope_lens' },
   { id: 'unlock_shell_bell_2', name: 'Shell Bell II', desc: '30% Robo de Vida.', price: 90, spriteKey: 'Shell Bell II', category: 'holdable', requires: 'unlock_shell_bell' },
@@ -1916,6 +1993,8 @@ interface PokedexEntry {
   types: string[]
   seen: boolean
   caught: boolean
+  shinySeen?: boolean
+  shinyCaught?: boolean
 }
 
 function nodeTypeLabel(node: RouteNode): string {
@@ -2336,6 +2415,7 @@ function MainApp() {
   const [apiError, setApiError] = useState<string>('')
   const [restEncounter, setRestEncounter] = useState<Pokemon | null>(null)
   const [restRewardItem, setRestRewardItem] = useState<string>('')
+  const [restExtraItems, setRestExtraItems] = useState<string[]>([])
   const [legendaryEncounter, setLegendaryEncounter] = useState<Pokemon | null>(null)
 
   // Resumen de derrota
@@ -2482,6 +2562,7 @@ function MainApp() {
 
   // Pokédex
   const [showPokedex, setShowPokedex] = useState<boolean>(false)
+  const [pokedexMode, setPokedexMode] = useState<'normal' | 'shiny'>('normal')
   const [pokedexSearch, setPokedexSearch] = useState<string>('')
   const [selectedPokemonDetail, setSelectedPokemonDetail] = useState<PokemonDetails | null>(null)
   const [isLoadingDetail, setIsLoadingDetail] = useState<boolean>(false)
@@ -2533,6 +2614,11 @@ function MainApp() {
     return { wins, losses }
   })
 
+  const [matchHistory, setMatchHistory] = useState<MatchRecord[]>(() => loadMatchHistory())
+  const [showMatchHistory, setShowMatchHistory] = useState(false)
+  const [matchFilter, setMatchFilter] = useState<'all' | 'win' | 'loss'>('all')
+  const [hoveredPoke, setHoveredPoke] = useState<{ idx: number; slot: number } | null>(null)
+
   const [winStreak, setWinStreak] = useState<number>(() => Number(localStorage.getItem('pokerand_streak') ?? '0'))
   const [bestStreak, setBestStreak] = useState<number>(() => Number(localStorage.getItem('pokerand_best_streak') ?? '0'))
   const [runStats, setRunStats] = useState<RunStats>({
@@ -2562,10 +2648,11 @@ function MainApp() {
         if (typeof data.totalGmax !== 'number') data.totalGmax = 0
         if (!Array.isArray(data.ownedBackgrounds)) data.ownedBackgrounds = ['none']
         if (!data.activeBackground) data.activeBackground = 'none'
+        if (typeof data.gameboyMode !== 'boolean') data.gameboyMode = false
         return data
       }
     } catch {}
-    return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark', ownedBackgrounds: ['none'], activeBackground: 'none', ownedMusic: [], activeMenuMusic: 'default', activeBattleMusic: 'default', totalMegas: 0, totalGmax: 0, coopRuns: 0, coopWins: 0, coopTrades: 0 }
+    return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark', ownedBackgrounds: ['none'], activeBackground: 'none', ownedMusic: [], activeMenuMusic: 'default', activeBattleMusic: 'default', gameboyMode: false, totalMegas: 0, totalGmax: 0, coopRuns: 0, coopWins: 0, coopTrades: 0 }
   })
 
   const [secretModalOpen, setSecretModalOpen] = useState(false)
@@ -2582,6 +2669,7 @@ function MainApp() {
   const [showResetModal, setShowResetModal] = useState<boolean>(false)
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null)
   const [shinyNextEncounter, setShinyNextEncounter] = useState<boolean>(false)
+  const [legendaryNextEncounter, setLegendaryNextEncounter] = useState<boolean>(false)
   const dailySeed = (() => {
     const d = new Date()
     return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
@@ -2818,6 +2906,7 @@ function MainApp() {
       handleInfiniteRunDefeat(team)
       const losses = record.losses + 1
       persistRecord(record.wins, losses)
+      recordFinishedRun('loss', team)
       if (isDailyRunRef.current) {
         setDailyPlayed(true)
         localStorage.setItem('pokerand_daily', dailySeed)
@@ -2831,6 +2920,7 @@ function MainApp() {
   useEffect(() => {
     const theme = THEMES.find(t => t.id === metaProgression.activeTheme) ?? THEMES[0]
     const root = document.documentElement
+    root.setAttribute('data-theme', theme.id)
     if (theme.id === 'dark') {
       root.style.removeProperty('--bg-dark')
       root.style.removeProperty('--surface')
@@ -2849,6 +2939,13 @@ function MainApp() {
     }
     document.body.style.color = theme.colors.text
   }, [metaProgression.activeTheme])
+
+  // Rediseño Game Boy: aplica el atributo que activa el estilo de consola.
+  useEffect(() => {
+    const root = document.documentElement
+    if (metaProgression.gameboyMode) root.setAttribute('data-gameboy', 'true')
+    else root.removeAttribute('data-gameboy')
+  }, [metaProgression.gameboyMode])
 
   // Código secreto: escribir "adminsub" abre el modal de contraseña del modo secreto.
   useEffect(() => {
@@ -2942,6 +3039,7 @@ function MainApp() {
     }
     if (metaProgression.permanentlyUnlockedItems.includes(item.id)) return
     const updated = { ...metaProgression, pokeCoins: metaProgression.pokeCoins - item.price, permanentlyUnlockedItems: [...metaProgression.permanentlyUnlockedItems, item.id] }
+    if (item.id === 'gameboy') updated.gameboyMode = true
     setMetaProgression(updated)
     localStorage.setItem('pokerand_meta', JSON.stringify(updated))
     setUnlockPopup({ name: item.name, spriteKey: 'spriteKey' in item ? (item as MetaShopItem).spriteKey : 'Potion' })
@@ -2987,6 +3085,8 @@ function MainApp() {
     unlock_x_sp_attack_2: 'X Sp. Attack 2',
     unlock_x_sp_defense_2: 'X Sp. Defense 2',
     unlock_smoke_ball: 'Cuerda Huida',
+    unlock_poke_radar: 'Poké Radar',
+    unlock_azure_flute: 'Flauta Celeste',
     unlock_moomoo_milk: 'Moomoo Milk',
     unlock_berry_juice: 'Berry Juice',
     unlock_fresh_water: 'Fresh Water',
@@ -3218,17 +3318,20 @@ function MainApp() {
       }
 
       if (isNaN(pokemonId) || !pokemonId) return prev
-      if (prev[pokemonId]?.caught) return prev
+      if (prev[pokemonId]?.caught && !pokemon.shiny) return prev
+      if (pokemon.shiny && prev[pokemonId]?.shinyCaught) return prev
 
+      const current = prev[pokemonId] ?? { id: pokemonId, name: pokemon.name, sprite: pokemon.sprite, types: (pokemon as any).types ?? [], seen: true, caught: false }
       const updated: Record<number, PokedexEntry> = {
         ...prev,
         [pokemonId]: {
-          id: pokemonId,
+          ...current,
           name: pokemon.name,
           sprite: pokemon.sprite,
           types: (pokemon as any).types ?? [],
           seen: true,
-          caught: true
+          caught: true,
+          ...(pokemon.shiny ? { shinySeen: true, shinyCaught: true } : {})
         }
       }
       localStorage.setItem('pokerand_pokedex', JSON.stringify(updated))
@@ -3248,17 +3351,20 @@ function MainApp() {
       }
 
       if (isNaN(pokemonId) || !pokemonId) return prev
-      if (prev[pokemonId]) return prev
+      if (prev[pokemonId] && !pokemon.shiny) return prev
+      if (pokemon.shiny && prev[pokemonId]?.shinySeen) return prev
 
+      const current = prev[pokemonId] ?? { id: pokemonId, name: pokemon.name, sprite: pokemon.sprite, types: (pokemon as any).types ?? [], seen: true, caught: false }
       const updated: Record<number, PokedexEntry> = {
         ...prev,
         [pokemonId]: {
-          id: pokemonId,
+          ...current,
           name: pokemon.name,
           sprite: pokemon.sprite,
           types: (pokemon as any).types ?? [],
           seen: true,
-          caught: false
+          caught: false,
+          ...(pokemon.shiny ? { shinySeen: true, shinyCaught: current.shinyCaught ?? false } : {})
         }
       }
       localStorage.setItem('pokerand_pokedex', JSON.stringify(updated))
@@ -3270,6 +3376,26 @@ function MainApp() {
     localStorage.setItem('pokerand_wins', String(nextWins))
     localStorage.setItem('pokerand_losses', String(nextLosses))
     setRecord({ wins: nextWins, losses: nextLosses })
+  }
+
+  // Registra una partida finalizada (victoria o derrota real) en el historial.
+  function recordFinishedRun(result: 'win' | 'loss', finalTeam: Pokemon[]): void {
+    const duration = Math.max(0, Math.round((Date.now() - runStartTimeRef.current) / 1000))
+    const challenges = (Object.keys(runChallenges) as Array<keyof RunChallenges>)
+      .filter((k) => runChallenges[k])
+    const entry: MatchRecord = {
+      result,
+      date: Date.now(),
+      mode: difficulty,
+      generation: currentRunGen,
+      duration,
+      team: finalTeam
+        .filter((p) => p && p.name)
+        .map((p) => ({ name: p.name, sprite: p.sprite, shiny: !!p.shiny, level: p.level })),
+      challenges,
+    }
+    saveMatchRecord(entry)
+    setMatchHistory((prev) => [entry, ...prev].slice(0, MAX_MATCH_HISTORY))
   }
 
   function unlockAchievement(id: string): void {
@@ -4108,6 +4234,7 @@ function MainApp() {
       })
       setRandomEventUsed(new Set())
       setShinyNextEncounter(false)
+      setLegendaryNextEncounter(false)
       setActiveRandomEvent(null)
 
       runStartTimeRef.current = Date.now()
@@ -4157,6 +4284,7 @@ function MainApp() {
   function finalizeRunVictory(): void {
     const wins = record.wins + 1
     persistRecord(wins, record.losses)
+    recordFinishedRun('win', team)
     // Actualizar progresión de desbloqueos
     const genPlayed = currentRunGen
     const isMediumOrHard = difficulty === 'medium' || difficulty === 'hard'
@@ -4287,6 +4415,7 @@ function MainApp() {
 
     setRestEncounter(null)
     setRestRewardItem('')
+    setRestExtraItems([])
     setLegendaryEncounter(null)
     setBattleTurns(0)
     if (speedrunTimerRef.current) {
@@ -4361,6 +4490,7 @@ function MainApp() {
         return
       }
       if (difficulty === 'infinite') {
+        if ((routeIndex + 1) % 10 === 0) awardPokeCoins(5, t('b.infiniteBonus10'))
         if (routeIndex >= 19) unlockAchievement('infinite_20')
         if (routeIndex >= 49) unlockAchievement('infinite_50')
         if (routeIndex >= 99) unlockAchievement('infinite_100')
@@ -4469,6 +4599,7 @@ function MainApp() {
 
     setRouteIndex((previous) => previous + 1)
     setRunStats(prev => ({ ...prev, nodesCleared: prev.nodesCleared + 1 }))
+    if (difficulty === 'infinite' && (routeIndex + 1) % 10 === 0) awardPokeCoins(5, t('b.infiniteBonus10'))
     const progress = route.length > 0 ? (routeIndex + 1) / route.length : 0
     // En la Liga (ids 1000-1999) no hay PC ni eventos aleatorios: es una
     // sucesión de jefes sin ningún tipo de curación entre combates.
@@ -4529,6 +4660,7 @@ function MainApp() {
       // para que ambos reciban el mismo trato (récord, racha y PokéCoins).
       const losses = record.losses + 1
       persistRecord(record.wins, losses)
+      recordFinishedRun('loss', team)
       setWinStreak(0)
       localStorage.setItem('pokerand_streak', '0')
       setMetaProgression(prev => {
@@ -5783,6 +5915,7 @@ function MainApp() {
       setDoubleFinished(true)
       const losses = record.losses + 1
       persistRecord(record.wins, losses)
+      recordFinishedRun('loss', teamCopy)
       handleInfiniteRunDefeat(teamCopy)
       if (isDailyRunRef.current) {
         setDailyPlayed(true)
@@ -6280,11 +6413,19 @@ function MainApp() {
         const rewardItem = ballReward ?? (runChallenges.noHealing
           ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
           : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]))
+        const dowsingExtraEgg = (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing') ? 1 : 0) + (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing_2') ? 1 : 0)
+        const restExtraPoolEgg = runChallenges.noHealing
+          ? ['X Attack', 'X Defense', 'X Speed']
+          : ['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked), ...unlockedBalls]
+        const extraItemsEgg: string[] = []
+        for (let i = 0; i < dowsingExtraEgg; i++) extraItemsEgg.push(randomFrom(restExtraPoolEgg))
         setRestRewardItem(rewardItem)
-        setInventory((previous) => [...previous, rewardItem])
+        setRestExtraItems(extraItemsEgg)
+        setInventory((previous) => [...previous, rewardItem, ...extraItemsEgg])
         setBattleLog((prev) => [
           t('rest.eggFound', { name: eggEntry.name, n: eggEntry.hatchIn, label: currentNode.label }),
           t('rest.eggItem', { item: itemLocalizedName(rewardItem) }),
+          ...extraItemsEgg.map(item => t('rest.dowsingFound', { item: itemLocalizedName(item) })),
           ...prev
         ].slice(0, 15))
         completeCurrentNode()
@@ -6314,13 +6455,21 @@ function MainApp() {
       const rewardItem = ballReward ?? (runChallenges.noHealing
         ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
         : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]))
+      const dowsingExtra = (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing') ? 1 : 0) + (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing_2') ? 1 : 0)
+      const restExtraPool = runChallenges.noHealing
+        ? ['X Attack', 'X Defense', 'X Speed']
+        : ['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked), ...unlockedBalls]
+      const extraItems: string[] = []
+      for (let i = 0; i < dowsingExtra; i++) extraItems.push(randomFrom(restExtraPool))
 
       setRestEncounter(generatedEncounter)
       seenInPokedex(generatedEncounter)
       setRestRewardItem(rewardItem)
-      setInventory((previous) => [...previous, rewardItem])
+      setRestExtraItems(extraItems)
+      setInventory((previous) => [...previous, rewardItem, ...extraItems])
       setBattleLog((prev) => [
         t('rest.found', { label: currentNode.label, name: generatedEncounter.name, item: itemLocalizedName(rewardItem) }),
+        ...extraItems.map(item => t('rest.dowsingFound', { item: itemLocalizedName(item) })),
         ...prev
       ])
     } catch {
@@ -6517,15 +6666,19 @@ function MainApp() {
           }
           return p
         })
-        setTrainerTeam(megaTeam.map(p => ({ ...p, statStages: p.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } })))
-        newTrainerTeam.forEach(p => seenInPokedex(p))
+        const trainerTeamShiny = !runChallenges.allShiny && Math.random() < 0.01
+        const shinyTrainerTeam = trainerTeamShiny
+          ? megaTeam.map(p => ({ ...p, shiny: true, sprite: makeShinySprite(p.sprite, p.id) }))
+          : megaTeam
+        setTrainerTeam(shinyTrainerTeam.map(p => ({ ...p, statStages: p.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } })))
+        shinyTrainerTeam.forEach(p => seenInPokedex(p))
         setTrainerPokemonIndex(0)
         setTrainerName(chosenName)
         setTrainerSprite(chosenSprite)
         setTrainerBadge(chosenBadge)
         // Primer combate de la run: se suaviza al rival para que no pueda
         // debilitar al starter de un golpe y el jugador pueda empezar a actuar.
-        let firstEnemy: Pokemon = { ...megaTeam[0], statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
+        let firstEnemy: Pokemon = { ...shinyTrainerTeam[0], statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
         if (routeIndex === 0 && !isBoss) {
           firstEnemy = { ...softenFirstBattleEnemy(firstEnemy, team), statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
         }
@@ -6561,6 +6714,21 @@ function MainApp() {
           }
         }
         generatedEnemy = { ...generatedEnemy, holdItem: null, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
+        if (legendaryNextEncounter) {
+          const ids = REGION_LEGENDARIES[getEffectiveGen()] ?? REGION_LEGENDARIES[1]
+          const legendId = ids[Math.floor(Math.random() * ids.length)]
+          const legendBase = await buildPokemonFromApi(legendId, getEffectiveGen(), Math.max(targetLevel, 40), runChallenges.allShiny || shinyNextEncounter, difficulty, true)
+          generatedEnemy = scalePokemonForNode(legendBase, currentNode, routeIndex, 0, difficulty)
+          generatedEnemy = { ...generatedEnemy, holdItem: null, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
+          setLegendaryNextEncounter(false)
+          if (shinyNextEncounter) setShinyNextEncounter(false)
+        }
+        if (shinyNextEncounter) {
+          generatedEnemy = { ...generatedEnemy, shiny: true, sprite: makeShinySprite(generatedEnemy.sprite, generatedEnemy.id) }
+          setShinyNextEncounter(false)
+        } else if (!runChallenges.allShiny && Math.random() < 0.02) {
+          generatedEnemy = { ...generatedEnemy, shiny: true, sprite: makeShinySprite(generatedEnemy.sprite, generatedEnemy.id) }
+        }
         // Primer combate de la run: se suaviza al rival para que no pueda
         // debilitar al starter de un golpe y el jugador pueda empezar a actuar.
         if (routeIndex === 0 && !isBoss) {
@@ -7120,7 +7288,8 @@ function MainApp() {
     attacker: Pokemon,
     defender: Pokemon,
     move: Move,
-    isEnemyHit: boolean
+    isEnemyHit: boolean,
+    defenderMovedFirst = false
   ): { updatedDefender: Pokemon; updatedAttacker: Pokemon; lines: string[]; attackerHeal: number; crits: number; superEffective: boolean } {
     // El defensor está protegido (Protección/Protect): se bloquea el ataque.
     if (defender.protected) {
@@ -7195,8 +7364,13 @@ function MainApp() {
 
     // --- Accuracy check ---
     if (move.accuracy !== null && move.accuracy < 100) {
+      const attackerItem = attacker.holdItem ? HOLDABLE_ITEMS[attacker.holdItem] : null
+      let effectiveAccuracy = move.accuracy
+      if (defenderMovedFirst && attackerItem?.accuracyMod) {
+        effectiveAccuracy = Math.min(100, move.accuracy * (1 + attackerItem.accuracyMod))
+      }
       const accRoll = Math.random() * 100
-      if (accRoll >= move.accuracy) {
+      if (accRoll >= effectiveAccuracy) {
         return {
           updatedDefender: defender,
           updatedAttacker: { ...attacker, protected: false },
@@ -7563,6 +7737,7 @@ function MainApp() {
         handleInfiniteRunDefeat(nextTeam)
         const losses = record.losses + 1
         persistRecord(record.wins, losses)
+        recordFinishedRun('loss', nextTeam)
         setWinStreak(0)
         localStorage.setItem('pokerand_streak', '0')
         setMetaProgression(prev => {
@@ -7642,7 +7817,7 @@ function MainApp() {
     const doPlayerAttack = async () => {
       if (nextPlayer.hp <= 0 || nextEnemy.hp <= 0 || playerSkipped || playerConfusedSelfHit) return
       if (move.name !== 'Furia') nextPlayer = { ...nextPlayer, furiaActive: false }
-      const playerHit = performHit(nextPlayer, nextEnemy, move, false)
+      const playerHit = performHit(nextPlayer, nextEnemy, move, false, !playerStarts)
       const prevEnemyHp = nextEnemy.hp
       nextEnemy = playerHit.updatedDefender
       nextPlayer = playerHit.updatedAttacker
@@ -7688,7 +7863,7 @@ function MainApp() {
         }
       }
       if (enemyMove.name !== 'Furia') nextEnemy = { ...nextEnemy, furiaActive: false }
-      const enemyHit = performHit(nextEnemy, nextPlayer, enemyMove, true)
+      const enemyHit = performHit(nextEnemy, nextPlayer, enemyMove, true, playerStarts)
       nextPlayer = enemyHit.updatedDefender
       nextEnemy = enemyHit.updatedAttacker
       if (enemyHit.attackerHeal > 0) {
@@ -7779,6 +7954,7 @@ function MainApp() {
         handleInfiniteRunDefeat(nextTeam)
         const losses = record.losses + 1
         persistRecord(record.wins, losses)
+        recordFinishedRun('loss', nextTeam)
         setWinStreak(0)
         localStorage.setItem('pokerand_streak', '0')
         setMetaProgression(prev => {
@@ -7968,6 +8144,7 @@ function MainApp() {
                     handleInfiniteRunDefeat(remainingTeam)
                     const losses = record.losses + 1
                     persistRecord(record.wins, losses)
+                    recordFinishedRun('loss', remainingTeam)
                     if (isDailyRunRef.current) {
                       setDailyPlayed(true)
                       localStorage.setItem('pokerand_daily', dailySeed)
@@ -8443,6 +8620,38 @@ function MainApp() {
       return
     }
 
+    if (itemName === 'Poké Radar') {
+      if (screen !== 'route') {
+        setBattleLog((prev) => [t('b.pokeRadarRouteOnly'), ...prev].slice(0, 15))
+        return
+      }
+      if (shinyNextEncounter) {
+        setBattleLog((prev) => [t('b.pokeRadarActive'), ...prev].slice(0, 15))
+        return
+      }
+      setInventory(prev => prev.filter((_, i) => i !== itemIndex))
+      setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
+      setShinyNextEncounter(true)
+      setBattleLog((prev) => [t('b.pokeRadarUsed'), ...prev].slice(0, 15))
+      return
+    }
+
+    if (itemName === 'Flauta Celeste') {
+      if (screen !== 'route') {
+        setBattleLog((prev) => [t('b.azureFluteRouteOnly'), ...prev].slice(0, 15))
+        return
+      }
+      if (legendaryNextEncounter) {
+        setBattleLog((prev) => [t('b.azureFluteActive'), ...prev].slice(0, 15))
+        return
+      }
+      setInventory(prev => prev.filter((_, i) => i !== itemIndex))
+      setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
+      setLegendaryNextEncounter(true)
+      setBattleLog((prev) => [t('b.azureFluteUsed'), ...prev].slice(0, 15))
+      return
+    }
+
     if (runChallenges.noItems) {
       setBattleLog((prev) => [t('b.challengeNoItemsBattle'), ...prev].slice(0, 15))
       return
@@ -8876,6 +9085,7 @@ function MainApp() {
     setApiError('')
     setRestEncounter(null)
     setRestRewardItem('')
+    setRestExtraItems([])
     setLegendaryEncounter(null)
     setDefeatSummary(null)
     setVictoryUnlocks(null)
@@ -9014,11 +9224,15 @@ function MainApp() {
   const pokedexList = Object.values(pokedex)
   const pokedexSeen = pokedexList.filter(p => p.seen).length
     const pokedexCaught = pokedexList.filter(p => p.caught).length
+  const shinyDexList = pokedexList.filter(p => p.shinySeen)
+  const shinyDexSeen = shinyDexList.length
+  const shinyDexCaught = shinyDexList.filter(p => p.shinyCaught).length
+  const activeDexList = pokedexMode === 'shiny' ? shinyDexList : pokedexList
 
   const leaderboardActiveEntries: LeaderboardEntry[] = leaderboardGen === 0
     ? Object.values(leaderboardByGen).flat().sort((a, b) => (b.node - a.node) || (a.duration_seconds - b.duration_seconds))
     : (leaderboardByGen[leaderboardGen] ?? [])
-  const filteredPokedex = pokedexList.filter((pkmn) => {
+  const filteredPokedex = activeDexList.filter((pkmn) => {
     const term = pokedexSearch.toLowerCase().trim()
     if (!term) return true
     const formattedId = `#${String(pkmn.id).padStart(3, '0')}`
@@ -9123,23 +9337,44 @@ function MainApp() {
             {t('help.version')}
           </button>
         </h1>
-        <div className="record-box">
-          {winStreak >= 2 && <span style={{ color: '#ff8a33', fontWeight: 'bold', marginRight: '0.5rem' }}>🔥 {winStreak}</span>}
-          <span style={{ color: '#ffcb05', fontWeight: 'bold' }}>🪙 {metaProgression.pokeCoins}</span>
-          {secretUnlocked && (
-            <button
-              className="tiny-btn"
-              type="button"
-              onClick={addSecretCoins}
-              title="Modo secreto: +100 PokéCoins"
-              style={{ marginLeft: '0.4rem', color: '#ffcb05', background: '#2a2a55', fontWeight: 'bold', padding: '2px 8px' }}
-            >
-              +
-            </button>
-          )}
-          <span style={{ color: '#ffcb05', fontWeight: 'bold', marginLeft: '0.5rem' }}>💵 ${screen === 'setup' ? 100 + startMoneyBonus : money}</span>
-          <span style={{ color: '#10b981', fontWeight: 'bold' }}>W {record.wins}</span>
-          <span style={{ color: '#ee3b2f', fontWeight: 'bold' }}>L {record.losses}</span>
+        <div className="topbar-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+          <div className="record-box">
+            {winStreak >= 2 && <span style={{ color: '#ff8a33', fontWeight: 'bold', marginRight: '0.5rem' }}>🔥 {winStreak}</span>}
+            <span style={{ color: '#ffcb05', fontWeight: 'bold' }}>🪙 {metaProgression.pokeCoins}</span>
+            {secretUnlocked && (
+              <button
+                className="tiny-btn"
+                type="button"
+                onClick={addSecretCoins}
+                title="Modo secreto: +100 PokéCoins"
+                style={{ marginLeft: '0.4rem', color: '#ffcb05', background: '#2a2a55', fontWeight: 'bold', padding: '2px 8px' }}
+              >
+                +
+              </button>
+            )}
+            <span style={{ color: '#ffcb05', fontWeight: 'bold', marginLeft: '0.5rem' }}>💵 ${screen === 'setup' ? 100 + startMoneyBonus : money}</span>
+            <span style={{ color: '#10b981', fontWeight: 'bold' }}>W {record.wins}</span>
+            <span style={{ color: '#ee3b2f', fontWeight: 'bold' }}>L {record.losses}</span>
+          </div>
+          <button
+            className="tiny-btn"
+            type="button"
+            onClick={() => {
+              playClick()
+              if (metaProgression.permanentlyUnlockedItems.includes('unlock_history')) {
+                setShowMatchHistory(true)
+              } else {
+                setShowMetaShop(true)
+              }
+            }}
+            title={metaProgression.permanentlyUnlockedItems.includes('unlock_history')
+              ? (language === 'en' ? 'Match history' : 'Historial de partidas')
+              : (language === 'en' ? 'Buy the Match History in the meta shop' : 'Compra el Historial en la tienda meta')}
+            style={{ color: '#4d9bff', borderColor: metaProgression.permanentlyUnlockedItems.includes('unlock_history') ? 'rgba(77,155,255,0.5)' : 'rgba(155,152,207,0.4)' }}
+          >
+            {language === 'en' ? 'History' : 'Historial'}
+            {!metaProgression.permanentlyUnlockedItems.includes('unlock_history') && ' 🔒'}
+          </button>
         </div>
       </header>
 
@@ -9602,7 +9837,7 @@ function MainApp() {
                                   src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${evo.id}.gif`}
                                   alt={evo.name}
                                   onError={(e) => { (e.target as HTMLImageElement).src = evo.sprite }}
-                                  style={{ width: '56px', height: '56px', imageRendering: 'pixelated', filter: known ? 'none' : 'brightness(0) invert(0)' }}
+                                  style={{ width: '56px', height: '56px', imageRendering: 'pixelated', filter: known ? undefined : 'brightness(0) invert(0)' }}
                                 />
                                 <strong style={{ textTransform: 'capitalize', fontSize: '0.75rem', color: evo.id === selectedPokemonDetail.id ? '#4d9bff' : '#f3f1ff', textAlign: 'center' }}>
                                   {known ? evo.name : '???'}
@@ -9638,10 +9873,37 @@ function MainApp() {
               ) : (
                 <>
                   <div className="modal-header" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <h2 style={{ fontSize: '0.65rem', color: '#4d9bff', margin: 0 }}>
-                        Pokédex ({pokedexSeen} {t('pokedex.seen2b')} · {pokedexCaught} {t('pokedex.caught2b')})
+                        {pokedexMode === 'shiny' ? '✨ Shiny Pokédex' : 'Pokédex'} (
+                        {pokedexMode === 'shiny' ? `${shinyDexSeen} ${t('pokedex.seen2b')} · ${shinyDexCaught} ${t('pokedex.caught2b')}` : `${pokedexSeen} ${t('pokedex.seen2b')} · ${pokedexCaught} ${t('pokedex.caught2b')}`})
                       </h2>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          type="button"
+                          onClick={() => { playClick(); setPokedexMode('normal') }}
+                          style={{
+                            background: pokedexMode === 'normal' ? 'rgba(77,155,255,0.25)' : 'rgba(255,255,255,0.05)',
+                            border: `1px solid ${pokedexMode === 'normal' ? '#4d9bff' : '#3f3f6e'}`,
+                            color: pokedexMode === 'normal' ? '#4d9bff' : '#9b98cf',
+                            borderRadius: '999px', padding: '2px 10px', fontSize: '0.62rem', fontWeight: 'bold', cursor: 'pointer'
+                          }}
+                        >
+                          {language === 'en' ? 'Normal' : 'Normal'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { playClick(); setPokedexMode('shiny') }}
+                          style={{
+                            background: pokedexMode === 'shiny' ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.05)',
+                            border: `1px solid ${pokedexMode === 'shiny' ? '#ffcb05' : '#3f3f6e'}`,
+                            color: pokedexMode === 'shiny' ? '#ffcb05' : '#9b98cf',
+                            borderRadius: '999px', padding: '2px 10px', fontSize: '0.62rem', fontWeight: 'bold', cursor: 'pointer'
+                          }}
+                        >
+                          ✨ Shiny
+                        </button>
+                      </div>
                     </div>
 
                     <div style={{ position: 'relative', width: '100%' }}>
@@ -9686,9 +9948,11 @@ function MainApp() {
 
                   {isLoadingDetail ? (
                     <p className="muted" style={{ textAlign: 'center', padding: '2rem 0' }}>Cargando datos oficiales...</p>
-                  ) : pokedexList.length === 0 ? (
+                  ) : (pokedexMode === 'shiny' ? shinyDexList.length : pokedexList.length) === 0 ? (
                     <p className="muted" style={{ padding: '1rem 0', textAlign: 'center' }}>
-                      {t('pokedex.empty2')}
+                      {pokedexMode === 'shiny'
+                        ? (language === 'en' ? 'No shiny Pokémon found yet. Use a Poké Radar or keep exploring!' : 'Aún no hay Pokémon shiny vistos. ¡Usa un Poké Radar o sigue explorando!')
+                        : t('pokedex.empty2')}
                     </p>
                   ) : filteredPokedex.length === 0 ? (
                     <p className="muted" style={{ padding: '2rem 0', textAlign: 'center' }}>
@@ -9696,20 +9960,31 @@ function MainApp() {
                     </p>
                   ) : (
                     <div className="pokedex-grid">
-                      {filteredPokedex.sort((a, b) => a.id - b.id).map((pkmn) => (
-                        <div
-                          key={pkmn.id}
-                          className="pokedex-card clickable"
-                          onClick={() => pkmn.caught ? handleSelectPokedexPokemon(pkmn.id) : undefined}
-                          style={!pkmn.caught ? { opacity: 0.6 } : undefined}
-                        >
-                          <span className="pokedex-id">#{String(pkmn.id).padStart(3, '0')}</span>
-                          <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pkmn.id}.gif`} alt={pkmn.name} onError={fallbackSprite} style={{ width: '60px', height: '60px', filter: pkmn.caught ? 'none' : 'brightness(0) invert(0)', imageRendering: pkmn.caught ? undefined : 'auto' }} />
-                          <strong style={{ textTransform: 'capitalize', display: 'block', fontSize: '0.85rem' }}>
-                            {pkmn.caught ? pkmn.name : '???'}
-                          </strong>
-                        </div>
-                      ))}
+                      {filteredPokedex.sort((a, b) => a.id - b.id).map((pkmn) => {
+                        const isShiny = pokedexMode === 'shiny'
+                        const known = isShiny ? (pkmn.shinyCaught ?? false) : pkmn.caught
+                        return (
+                          <div
+                            key={pkmn.id}
+                            className="pokedex-card clickable"
+                            onClick={() => known ? handleSelectPokedexPokemon(pkmn.id) : undefined}
+                            style={!known ? { opacity: 0.6 } : undefined}
+                          >
+                            <span className="pokedex-id">#{String(pkmn.id).padStart(3, '0')}</span>
+                            <img
+                              src={isShiny
+                                ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/shiny/${pkmn.id}.gif`
+                                : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pkmn.id}.gif`}
+                              alt={pkmn.name}
+                              onError={fallbackSprite}
+                              style={{ width: '60px', height: '60px', filter: known ? undefined : 'brightness(0) invert(0)', imageRendering: known ? undefined : 'auto' }}
+                            />
+                            <strong style={{ textTransform: 'capitalize', display: 'block', fontSize: '0.85rem' }}>
+                              {known ? (isShiny ? `${pkmn.name} ✨` : pkmn.name) : '???'}
+                            </strong>
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </>
@@ -9808,6 +10083,22 @@ function MainApp() {
                     </button>
                   ))}
                 </div>
+                {metaProgression.permanentlyUnlockedItems.includes('gameboy') && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.6rem', cursor: 'pointer', fontSize: '0.8rem', color: '#9b98cf' }}>
+                    <input
+                      type="checkbox"
+                      checked={metaProgression.gameboyMode}
+                      onChange={(e) => {
+                        playClick()
+                        const updated = { ...metaProgression, gameboyMode: e.target.checked }
+                        setMetaProgression(updated)
+                        localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+                      }}
+                      style={{ width: '16px', height: '16px', accentColor: '#8bac0f', cursor: 'pointer' }}
+                    />
+                    🕹️ {language === 'en' ? 'Game Boy redesign' : 'Rediseño Game Boy'}
+                  </label>
+                )}
               </div>
 
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
@@ -12078,6 +12369,11 @@ function MainApp() {
                   <span dangerouslySetInnerHTML={{ __html: t('rest.waiting', { name: restEncounter.name + (restEncounter.shiny ? ' ✨' : '') }) }} />
                 </p>
                 <p className="muted">{t('rest.rewardAdded', { item: itemLocalizedName(restRewardItem) })}</p>
+                {restExtraItems.length > 0 && (
+                  <p className="muted" style={{ color: '#ffcb05' }}>
+                    📡 {restExtraItems.map(item => itemLocalizedName(item)).join(' · ')}
+                  </p>
+                )}
                 <div className="capture-card" style={restEncounter.shiny ? { border: '2px solid #ffcb05', boxShadow: '0 0 12px rgba(250,204,21,0.4)' } : undefined}>
                   <img className="sprite" src={restEncounter.sprite} alt={restEncounter.name} onError={fallbackSprite} />
                 </div>
@@ -13008,6 +13304,169 @@ function MainApp() {
         </div>
       )}
 
+      {/* Modal de historial de partidas */}
+      {showMatchHistory && (
+        <div className="modal-backdrop" onClick={() => setShowMatchHistory(false)}>
+          <div
+            className="panel"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '720px',
+              width: 'min(94vw, 720px)',
+              maxHeight: '88vh',
+              overflowY: 'auto',
+              padding: 0,
+            }}
+          >
+            <div style={{ position: 'sticky', top: 0, zIndex: 5, padding: '1.1rem 1.5rem 1rem', background: 'linear-gradient(135deg, rgba(26,18,55,0.97), rgba(20,12,45,0.97))', borderBottom: '1px solid rgba(155,152,207,0.25)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <h2 style={{ color: '#4d9bff', margin: 0, fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  🕒 {language === 'en' ? 'Match History' : 'Historial de partidas'}
+                </h2>
+                <button
+                  className="tiny-btn"
+                  type="button"
+                  onClick={() => setShowMatchHistory(false)}
+                  title={t('common.close')}
+                  style={{ color: '#9b98cf', borderColor: 'rgba(155,152,207,0.35)', padding: '2px 8px' }}
+                >
+                  ✕
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.8rem', flexWrap: 'wrap' }}>
+                {[
+                  { key: 'all', label: language === 'en' ? 'All' : 'Todas', color: '#9b98cf' },
+                  { key: 'win', label: `🏆 ${language === 'en' ? 'Wins' : 'Victorias'}`, color: '#37d16b' },
+                  { key: 'loss', label: `💀 ${language === 'en' ? 'Losses' : 'Derrotas'}`, color: '#ff6b5e' },
+                ].map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => { playClick(); setMatchFilter(f.key as 'all' | 'win' | 'loss') }}
+                    style={{
+                      background: matchFilter === f.key ? `${f.color}2b` : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${matchFilter === f.key ? f.color : 'rgba(155,152,207,0.3)'}`,
+                      color: matchFilter === f.key ? f.color : '#9b98cf',
+                      borderRadius: '999px',
+                      padding: '3px 12px',
+                      fontSize: '0.72rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '1.1rem', marginTop: '0.8rem', flexWrap: 'wrap' }}>
+                {[
+                  { label: language === 'en' ? 'Matches' : 'Partidas', value: String(matchHistory.length), color: '#f3f1ff' },
+                  { label: 'W', value: String(matchHistory.filter((m) => m.result === 'win').length), color: '#37d16b' },
+                  { label: 'L', value: String(matchHistory.filter((m) => m.result === 'loss').length), color: '#ff6b5e' },
+                  { label: 'WR', value: `${matchHistory.length ? Math.round((matchHistory.filter((m) => m.result === 'win').length / matchHistory.length) * 100) : 0}%`, color: '#ffcb05' },
+                ].map((s, i) => (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
+                    <span style={{ color: s.color, fontSize: '1.05rem', fontWeight: 'bold', lineHeight: 1 }}>{s.value}</span>
+                    <span style={{ color: '#7d7ab5', fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ padding: '1rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {(() => {
+                const filtered = matchHistory.filter((m) => matchFilter === 'all' || m.result === matchFilter)
+                if (filtered.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', color: '#9b98cf', padding: '2.5rem 1rem' }}>
+                      <div style={{ fontSize: '2rem', marginBottom: '0.4rem' }}>{matchHistory.length === 0 ? '🎮' : '🔍'}</div>
+                      <div>
+                        {matchHistory.length === 0
+                          ? (language === 'en' ? 'No finished matches yet. Play a run to see it here.' : 'Aún no hay partidas terminadas. Juega una partida para verla aquí.')
+                          : (language === 'en' ? 'No matches in this filter.' : 'No hay partidas en este filtro.')}
+                      </div>
+                    </div>
+                  )
+                }
+                return filtered.map((m, idx) => {
+                  const win = m.result === 'win'
+                  const accent = win ? '#37d16b' : '#ff6b5e'
+                  return (
+                    <div
+                      key={`${m.date}-${idx}`}
+                      style={{
+                        position: 'relative',
+                        borderRadius: '12px',
+                        background: win
+                          ? 'linear-gradient(135deg, rgba(16,185,129,0.13), rgba(15,23,42,0.55))'
+                          : 'linear-gradient(135deg, rgba(238,59,47,0.13), rgba(15,23,42,0.55))',
+                        border: `1px solid ${win ? 'rgba(16,185,129,0.45)' : 'rgba(238,59,47,0.45)'}`,
+                        padding: '0.85rem 1rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>{win ? '🏆' : '💀'}</span>
+                          <div>
+                            <div style={{ color: accent, fontWeight: 'bold', fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              {win ? (language === 'en' ? 'Victory' : 'Victoria') : (language === 'en' ? 'Defeat' : 'Derrota')}
+                            </div>
+                            <div style={{ color: '#7d7ab5', fontSize: '0.7rem' }}>
+                              {new Date(m.date).toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                              {' · '}
+                              {new Date(m.date).toLocaleTimeString(language === 'en' ? 'en-US' : 'es-ES', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                          <span style={{ flexShrink: 0, background: 'rgba(255,203,5,0.1)', border: '1px solid rgba(255,203,5,0.35)', color: '#ffcb05', fontSize: '0.68rem', padding: '2px 9px', borderRadius: '999px', fontWeight: 'bold' }}>
+                            🎮 {difficultyLabel(language, m.mode).title}
+                          </span>
+                          <span style={{ flexShrink: 0, background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.35)', color: '#22d3ee', fontSize: '0.68rem', padding: '2px 9px', borderRadius: '999px', fontWeight: 'bold' }}>
+                            🌍 {m.generation === 0 ? 'Random All-Stars' : `Gen ${m.generation}`}
+                          </span>
+                          <span style={{ flexShrink: 0, background: 'rgba(240,171,252,0.1)', border: '1px solid rgba(240,171,252,0.35)', color: '#f0abfc', fontSize: '0.68rem', padding: '2px 9px', borderRadius: '999px', fontWeight: 'bold' }}>
+                            ⏱️ {formatDuration(m.duration)}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.7rem', flexWrap: 'wrap' }}>
+                        {m.team.map((p, i) => (
+                          <div
+                            key={i}
+                            className="match-team-slot"
+                            style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(155,152,207,0.25)', borderRadius: '8px', padding: '5px 8px', minWidth: '62px' }}
+                            onMouseEnter={() => setHoveredPoke({ idx, slot: i })}
+                            onMouseLeave={() => setHoveredPoke(null)}
+                          >
+                            {hoveredPoke && hoveredPoke.idx === idx && hoveredPoke.slot === i && (
+                              <span className="match-level-tooltip" style={{ opacity: 1, visibility: 'visible' }}>
+                                {language === 'en' ? 'Lv.' : 'Nv.'} {typeof p.level === 'number' ? p.level : '?'}
+                              </span>
+                            )}
+                            <img src={p.sprite} alt={p.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
+                            <span style={{ color: '#d4d0ff', fontSize: '0.62rem', maxWidth: '88px', textAlign: 'center', overflowWrap: 'anywhere', lineHeight: 1.25 }}>{p.name}{p.shiny ? ' ✨' : ''}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {m.challenges.length > 0 && (
+                        <div style={{ marginTop: '0.6rem', display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                          {m.challenges.map((k, i) => (
+                            <span key={i} style={{ flexShrink: 0, background: 'rgba(250,204,21,0.1)', border: '1px solid rgba(250,204,21,0.35)', color: '#fcd34d', fontSize: '0.68rem', padding: '2px 8px', borderRadius: '999px', overflowWrap: 'anywhere' }}>
+                              {t(`bch.${k}`)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de reset (tecla R) */}
       {showResetModal && (
         <div className="modal-backdrop" style={{ cursor: 'wait' }}>
@@ -13765,7 +14224,8 @@ function MainApp() {
                 const visibleThemes = THEMES.filter(t => themeName(t.id).toLowerCase().includes(term) || themeDesc(t.id).toLowerCase().includes(term))
                 const visibleItems = META_SHOP_ITEMS.filter(i => i.name.toLowerCase().includes(term) || i.desc.toLowerCase().includes(term))
                 const visibleBgs = BACKGROUNDS.filter(bg => bg.id === 'none' || bgName(bg.id).toLowerCase().includes(term) || bgDesc(bg.id).toLowerCase().includes(term))
-                if (visibleThemes.length === 0 && visibleItems.length === 0 && visibleBgs.length === 0) {
+                const visibleRedesigns = REDESIGNS.filter(r => r.name.toLowerCase().includes(term) || r.desc.toLowerCase().includes(term))
+                if (visibleThemes.length === 0 && visibleItems.length === 0 && visibleBgs.length === 0 && visibleRedesigns.length === 0) {
                   return <p style={{ color: '#7d7ab5', fontSize: '0.85rem', textAlign: 'center', margin: '0.75rem 0 0' }}>{t('shop.noResultsSearch', { q: metaShopSearch })}</p>
                 }
                 return null
@@ -13794,6 +14254,33 @@ function MainApp() {
                         disabled={metaProgression.pokeCoins < theme.price}
                         style={{ marginTop: '0.5rem', fontSize: '0.75rem', padding: '4px 12px', background: metaProgression.pokeCoins >= theme.price ? '#ffcb05' : '#475569', color: '#000' }}>
                         🪙 {theme.price}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <h3 style={{ color: '#ffcb05', marginBottom: '0.5rem' }}>🕹️ {language === 'en' ? 'Redesigns' : 'Rediseños'}</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              {REDESIGNS.filter(r => metaShopItemMatches(r, metaShopSearch.trim().toLowerCase())).map(redesign => {
+                const owned = metaProgression.permanentlyUnlockedItems.includes(redesign.id)
+                const active = owned && metaProgression.gameboyMode
+                return (
+                  <div key={redesign.id} style={{ background: redesign.colors.bg, border: `2px solid ${active ? '#ffcb05' : redesign.colors.border}`, borderRadius: '6px', padding: '0.75rem', cursor: owned ? 'pointer' : 'default', opacity: owned ? 1 : 0.7 }}
+                    onClick={() => owned ? (() => { playClick(); const updated = { ...metaProgression, gameboyMode: true }; setMetaProgression(updated); localStorage.setItem('pokerand_meta', JSON.stringify(updated)) })() : undefined}>
+                    <div style={{ height: '64px', borderRadius: '6px', marginBottom: '0.5rem', border: '1px solid rgba(255,255,255,0.15)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: redesign.colors.surface, fontSize: '2rem' }}>
+                      {redesign.icon}
+                    </div>
+                    <div style={{ color: redesign.colors.text, fontWeight: 'bold', fontSize: '0.85rem' }}>{redesign.name}</div>
+                    <div style={{ color: redesign.colors.border, fontSize: '0.75rem' }}>{redesign.desc}</div>
+                    {owned ? (
+                      active ? <div style={{ color: '#ffcb05', fontSize: '0.75rem', marginTop: '4px' }}>{t('shop.active')}</div> : <div style={{ color: redesign.colors.border, fontSize: '0.75rem', marginTop: '4px' }}>{t('shop.tapToActivateTheme')}</div>
+                    ) : (
+                      <button className="cta" onClick={(e) => { e.stopPropagation(); buyMetaItem({ ...redesign, spriteKey: redesign.icon, category: 'redesign' as const }) }}
+                        disabled={metaProgression.pokeCoins < redesign.price}
+                        style={{ marginTop: '0.5rem', fontSize: '0.75rem', padding: '4px 12px', background: metaProgression.pokeCoins >= redesign.price ? '#ffcb05' : '#475569', color: '#000' }}>
+                        🪙 {redesign.price}
                       </button>
                     )}
                   </div>

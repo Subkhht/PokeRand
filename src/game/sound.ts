@@ -10,6 +10,10 @@ let savedVolume = 0.5
 let activeMenuMusic = 'default'
 let activeBattleMusic = 'default'
 
+// Suavizado global: baja el volumen general de música y efectos (0.7 = 70%).
+const MUSIC_SOFTNESS = 0.7
+const SFX_SOFTNESS = 0.7
+
 function getCtx(): AudioContext {
   if (!ctx) ctx = new AudioContext()
   if (ctx.state === 'suspended') ctx.resume()
@@ -19,7 +23,7 @@ function getCtx(): AudioContext {
 function createMusicChain(): GainNode {
   const ac = getCtx()
   musicGain = ac.createGain()
-  musicGain.gain.setValueAtTime(masterVolume * 0.9, ac.currentTime)
+  musicGain.gain.setValueAtTime(masterVolume * 0.9 * MUSIC_SOFTNESS, ac.currentTime)
   musicGain.connect(ac.destination)
   return musicGain
 }
@@ -79,7 +83,7 @@ export function playHover(): void {
     osc.type = 'square'
     osc.frequency.setValueAtTime(600, ac.currentTime)
     osc.frequency.exponentialRampToValueAtTime(900, ac.currentTime + 0.06)
-    g.gain.setValueAtTime(0.16 * sfxVolume, ac.currentTime)
+    g.gain.setValueAtTime(0.16 * sfxVolume * SFX_SOFTNESS, ac.currentTime)
     g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.08)
     osc.connect(g).connect(ac.destination)
     osc.start(ac.currentTime)
@@ -95,7 +99,7 @@ export function playClick(): void {
     osc.type = 'square'
     osc.frequency.setValueAtTime(880, ac.currentTime)
     osc.frequency.exponentialRampToValueAtTime(440, ac.currentTime + 0.1)
-    g.gain.setValueAtTime(0.24 * sfxVolume, ac.currentTime)
+    g.gain.setValueAtTime(0.24 * sfxVolume * SFX_SOFTNESS, ac.currentTime)
     g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12)
     osc.connect(g).connect(ac.destination)
     osc.start(ac.currentTime)
@@ -111,7 +115,7 @@ export function playHit(): void {
     osc.type = 'sine'
     osc.frequency.setValueAtTime(200, ac.currentTime)
     osc.frequency.exponentialRampToValueAtTime(60, ac.currentTime + 0.12)
-    g.gain.setValueAtTime(0.5 * sfxVolume, ac.currentTime)
+    g.gain.setValueAtTime(0.5 * sfxVolume * SFX_SOFTNESS, ac.currentTime)
     g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.15)
     osc.connect(g).connect(ac.destination)
     osc.start(ac.currentTime)
@@ -129,8 +133,8 @@ export function playEvolution(): void {
       osc.type = 'square'
       const t = ac.currentTime + i * 0.12
       osc.frequency.setValueAtTime(freq, t)
-      g.gain.setValueAtTime(0.2 * sfxVolume, t)
-      g.gain.setValueAtTime(0.15 * sfxVolume, t + 0.08)
+      g.gain.setValueAtTime(0.2 * sfxVolume * SFX_SOFTNESS, t)
+      g.gain.setValueAtTime(0.15 * sfxVolume * SFX_SOFTNESS, t + 0.08)
       g.gain.exponentialRampToValueAtTime(0.001, t + 0.15)
       osc.connect(g).connect(ac.destination)
       osc.start(t)
@@ -456,7 +460,7 @@ export function unlockAudio(): void {
 export function setVolume(v: number): void {
   masterVolume = Math.max(0, Math.min(1, v))
   if (musicGain && ctx) {
-    musicGain.gain.setValueAtTime(masterVolume * 0.9, ctx.currentTime)
+    musicGain.gain.setValueAtTime(masterVolume * 0.9 * MUSIC_SOFTNESS, ctx.currentTime)
   }
 }
 
