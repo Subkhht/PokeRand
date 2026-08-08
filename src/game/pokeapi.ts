@@ -261,7 +261,7 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
 
 const EVOLUTION_ITEM_REVERSE: Record<string, string> = {
   'metal-coat': 'Metal Coat',
-  'king-s-rock': "King's Rock",
+  'kings-rock': "King's Rock",
   'dragon-scale': 'Dragon Scale',
   'up-grade': 'Up-Grade',
   'dubious-disc': 'Dubious Disc',
@@ -886,7 +886,8 @@ export async function getBalancedPokemonByGeneration(
   difficulty: string = 'medium',
   bossStage: number = -1,
   stageIndex: number = 0,
-  forcedLevel?: number
+  forcedLevel?: number,
+  isElite: boolean = false
 ): Promise<Pokemon> {
   const allIds = await getSpeciesIdsByGeneration(generation)
   const legendaryIds = await getLegendaryIdsByGeneration(generation)
@@ -899,6 +900,12 @@ export async function getBalancedPokemonByGeneration(
     : (stageIndex + routeProgress) / 3
 
   const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss, bossStage, legendaryIds)
+
+  // En Fácil, los jefes no sacan Pokémon legendarios: se excluyen de los
+  // candidatos y de cualquier pool de respaldo.
+  const bossNoLegendary = isBoss && difficulty === 'easy'
+  const effectiveCandidates = bossNoLegendary ? candidateIds.filter(id => !legendaryIds.has(id)) : candidateIds
+  const fallbackIds = bossNoLegendary ? allIds.filter(id => !legendaryIds.has(id)) : allIds
 
   const levelMult = difficulty === 'easy' ? 1.0 : difficulty === 'infinite' ? 1.0 : difficulty === 'hard' ? 2.0 : 1.5
   // forcedLevel: genera la especie directamente a un nivel concreto (el nivel
@@ -917,6 +924,18 @@ export async function getBalancedPokemonByGeneration(
       minBst = 450; maxBst = 600
     } else {
       minBst = 580; maxBst = 999
+    }
+  } else if (isElite) {
+    // Calle Victoria: los entrenadores élite llevan especies notablemente más
+    // fuertes que un entrenador normal, pero por debajo de los jefes de la Liga.
+    if (difficulty === 'easy') {
+      minBst = 380; maxBst = 600
+    } else if (difficulty === 'infinite') {
+      minBst = 520; maxBst = 800
+    } else if (difficulty === 'hard') {
+      minBst = 550; maxBst = 780
+    } else {
+      minBst = 500; maxBst = 700
     }
   } else if (difficulty === 'infinite') {
     if (isBoss) {
@@ -992,7 +1011,7 @@ export async function getBalancedPokemonByGeneration(
     }
   }
 
-  const shuffledCandidates = [...candidateIds].sort(() => 0.5 - Math.random())
+  const shuffledCandidates = [...effectiveCandidates].sort(() => 0.5 - Math.random())
   const attempts = Math.min(7, shuffledCandidates.length)
 
   let bestCandidate: Pokemon | null = null
@@ -1025,7 +1044,7 @@ export async function getBalancedPokemonByGeneration(
 
   // Fallback: evita que formas con nivel mínimo de aparición (piedras, intercambio,
   // evoluciones por nivel) se cuelen a niveles bajos.
-  const pool = candidateIds.length > 0 ? candidateIds : allIds
+  const pool = effectiveCandidates.length > 0 ? effectiveCandidates : fallbackIds
   for (let attempt = 0; attempt < 20; attempt++) {
     const randomId = randomFrom(pool)
     const pokemon = await buildPokemonFromApi(randomId, generation, scaledLevel, shiny, difficulty)

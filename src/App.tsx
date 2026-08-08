@@ -1517,6 +1517,19 @@ const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (p
   },
 ]
 
+// Legendarios de cada región (por generación) para el encuentro del Modo Original.
+const REGION_LEGENDARIES: Record<number, number[]> = {
+  1: [144, 145, 146, 150, 151],
+  2: [243, 244, 245, 249, 250, 251],
+  3: [377, 378, 379, 380, 381, 382, 383, 384, 385],
+  4: [480, 481, 482, 483, 484, 485, 486, 487, 488, 490, 491, 492, 493],
+  5: [494, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649],
+  6: [716, 717, 718, 719, 720, 721],
+  7: [785, 786, 787, 788, 791, 792, 800, 801, 802, 807, 808, 809],
+  8: [888, 889, 890, 891, 892, 893, 894, 895, 896, 897, 898],
+  9: [1001, 1002, 1003, 1004, 1007, 1008],
+}
+
 const RANDOM_EVENTS = [
   {
     id: 'legendary_appears',
@@ -1925,6 +1938,7 @@ function nodeTypeLabel(node: RouteNode): string {
     case 'double': return en ? 'Double Battle' : 'Combate Doble'
     case 'casino': return 'Casino'
     case 'elite': return en ? 'Elite' : 'Elite'
+    case 'legendary': return en ? 'Legendary' : 'Legendario'
     default: return node.type
   }
 }
@@ -1999,6 +2013,7 @@ const NODE_EMOJIS: Record<string, string> = {
   double: '🥊',
   casino: '🃏',
   elite: '🗻',
+  legendary: '🐉',
 }
 
 const NODE_TYPE_COLORS: Record<string, string> = {
@@ -2019,6 +2034,7 @@ const NODE_TYPE_COLORS: Record<string, string> = {
   double: '#facc15',
   casino: '#f0abfc',
   elite: '#cba3ff',
+  legendary: '#ffcb05',
 }
 
 function getNodeMapLayout(nodeCount: number): { positions: Array<{ x: number; y: number }>; width: number; height: number } {
@@ -2357,7 +2373,7 @@ function MainApp() {
   const [evoPopup, setEvoPopup] = useState<{ oldSprite: string; newSprite: string; oldName: string; newName: string } | null>(null)
   const [leagueOffer, setLeagueOffer] = useState(false)
   const [leagueTeamSelection, setLeagueTeamSelection] = useState(false)
-  const [tempLeagueTeam, setTempLeagueTeam] = useState<Pokemon[]>([])
+  const [tempLeagueTeam, setTempLeagueTeam] = useState<string[]>([])
   const [battleTurns, setBattleTurns] = useState(0)
   const [enemyHitFlash, setEnemyHitFlash] = useState(false)
 
@@ -3417,10 +3433,15 @@ function MainApp() {
 
   function triggerRandomEvent(routeProgress: number): void {
     if (Math.random() > 0.25) return
-    let eligible = RANDOM_EVENTS.filter(e => routeProgress >= e.minRouteProgress && !randomEventUsed.has(e.id))
+    // En Modo Original no salen eventos aleatorios salvo el Mercader Misterioso,
+    // que además puede aparecer varias veces durante la run.
+    const onlyMerchant = difficulty === 'original'
+    let eligible = onlyMerchant
+      ? RANDOM_EVENTS.filter(e => e.id === 'evolution_merchant' && routeProgress >= e.minRouteProgress)
+      : RANDOM_EVENTS.filter(e => routeProgress >= e.minRouteProgress && !randomEventUsed.has(e.id))
     // En modo Infinite la run es infinita: si ya se usaron todos los eventos,
     // se reinicia el conjunto para que sigan apareciendo más adelante.
-    if (eligible.length === 0 && difficulty === 'infinite' && randomEventUsed.size > 0) {
+    if (!onlyMerchant && eligible.length === 0 && difficulty === 'infinite' && randomEventUsed.size > 0) {
       setRandomEventUsed(new Set())
       eligible = RANDOM_EVENTS.filter(e => routeProgress >= e.minRouteProgress)
     }
@@ -3431,7 +3452,9 @@ function MainApp() {
       roll -= event.weight
       if (roll <= 0) {
         setActiveRandomEvent({ id: event.id, icon: event.icon, title: event.title, desc: event.desc })
-        setRandomEventUsed(prev => new Set(prev).add(event.id))
+        // En Modo Original el Mercader Misterioso no se marca como usado para
+        // poder repetirse; el resto de modos mantienen cada evento una sola vez.
+        if (!onlyMerchant) setRandomEventUsed(prev => new Set(prev).add(event.id))
         return
       }
     }
@@ -3508,7 +3531,7 @@ function MainApp() {
         const faintedIdx = team.findIndex(p => p.hp <= 0)
         if (faintedIdx >= 0) {
           const revivedHp = Math.max(1, Math.floor(team[faintedIdx].maxHp * 0.5))
-          setTeam(prev => prev.map((p, i) => i === faintedIdx ? { ...p, hp: revivedHp } : p))
+          setTeam(prev => prev.map((p, i) => i === faintedIdx ? { ...p, hp: revivedHp, status: undefined } : p))
           setBattleLog(prev => [t('b.mysteriousHelp', { name: team[faintedIdx].name, hp: revivedHp }), ...prev])
         } else {
           setBattleLog(prev => [t('b.mysteriousHelpNone'), ...prev])
@@ -3810,7 +3833,8 @@ function MainApp() {
         if (fixedMod) run.modifier = fixedMod
       }
 
-      if (run.modifier2) {
+      // En Modo Original no hay modificadores de run.
+      if (run.modifier2 && effectiveDifficulty !== 'original') {
         setModifier2(run.modifier2)
       } else {
         setModifier2(null)
@@ -3971,7 +3995,7 @@ function MainApp() {
         })
       }
 
-      const hpBonus = run.modifier?.playerMaxHpBonus ?? 0
+      const hpBonus = (effectiveDifficulty === 'original' ? null : run.modifier)?.playerMaxHpBonus ?? 0
       let starterWithBonus = {
         ...starter,
         maxHp: starter.maxHp + hpBonus,
@@ -4006,7 +4030,7 @@ function MainApp() {
         startingItems.push(apricornBalls.length > 0 ? apricornBalls[Math.floor(Math.random() * apricornBalls.length)] : 'Poké Ball')
       }
       setInventory(startingItems)
-      setModifier(run.modifier)
+      setModifier(effectiveDifficulty === 'original' ? null : run.modifier)
       setRoute(customRoute)
       setRouteIndex(0)
       setBadges([])
@@ -4301,7 +4325,9 @@ function MainApp() {
       if (currentNode && currentNode.id >= 4000 && difficulty === 'original') {
         const newMedals = originalMedals + 1
         setOriginalMedals(newMedals)
+        awardPokeCoins(5, '🎖️ Bonus por derrotar a un jefe del Modo Original')
         if (newMedals >= 8) {
+          setTempLeagueTeam([])
           setLeagueTeamSelection(true)
           return
         }
@@ -4311,9 +4337,19 @@ function MainApp() {
         setBattleLog((prev) => [t('b.originalMedal', { n: newMedals, total: 8 }), ...prev].slice(0, 15))
         return
       }
-      // Calle Victoria completada → Liga (4 jefes en un mapa nuevo).
+      // Calle Victoria completada → Encuentro legendario de la región antes de la Liga.
       if (currentNode && currentNode.id >= 2000) {
         const maxLvl = Math.max(...team.map(p => p.level)) + 2
+        // Si el nodo completado es la Calle Victoria (no el encuentro legendario),
+        // se abre el mapa del legendario: un solo nodo salvaje y capturable.
+        if (difficulty === 'original' && currentNode.type !== 'legendary') {
+          setRoute([{ id: 3000, type: 'legendary', label: 'Legendario de la región', done: false }])
+          setRouteIndex(0)
+          setScreen('route')
+          setBattleLog(prev => [t('b.legendaryEncounterWelcome', { lvl: maxLvl }), ...prev].slice(0, 15))
+          return
+        }
+        // Encuentro legendario completado → Liga (4 jefes en un mapa nuevo).
         const leagueRoute: RouteNode[] = []
         for (let i = 0; i < 4; i++) {
           leagueRoute.push({ id: 1000 + i, type: 'boss', label: `Liga #${i + 1}`, done: false })
@@ -4434,7 +4470,10 @@ function MainApp() {
     setRouteIndex((previous) => previous + 1)
     setRunStats(prev => ({ ...prev, nodesCleared: prev.nodesCleared + 1 }))
     const progress = route.length > 0 ? (routeIndex + 1) / route.length : 0
-    if (difficulty !== 'coliseum') triggerRandomEvent(progress)
+    // En la Liga (ids 1000-1999) no hay PC ni eventos aleatorios: es una
+    // sucesión de jefes sin ningún tipo de curación entre combates.
+    const isLeagueNode = currentNode ? currentNode.id >= 1000 && currentNode.id < 2000 : false
+    if (difficulty !== 'coliseum' && !isLeagueNode) triggerRandomEvent(progress)
     if (!activeRandomEvent) setScreen('route')
   }
 
@@ -5923,6 +5962,40 @@ function MainApp() {
     setIsTeamRocketBattle(currentNode.type === 'teamRocket')
     setIsRivalBattle(currentNode.type === 'rival')
 
+    if (currentNode.type === 'legendary') {
+      // Solo existe en el Modo Original (no se genera aleatoriamente en ningún
+      // otro modo): encuentro salvaje con un legendario de la región, capturable.
+      if (difficulty !== 'original') {
+        setBattleLog(prev => [t('b.legendaryOnlyOriginal'), ...prev].slice(0, 15))
+        completeCurrentNode()
+        return
+      }
+      setIsLoading(true)
+      setApiError('')
+      try {
+        const gen = currentRunGen
+        const ids = REGION_LEGENDARIES[gen] ?? REGION_LEGENDARIES[1]
+        const id = ids[Math.floor(Math.random() * ids.length)]
+        const maxLvl = Math.max(...team.map(p => p.level)) + 2
+        const legendaryData = await buildPokemonFromApi(id, 1, maxLvl, false, 'original', true)
+        const legendary: Pokemon = {
+          ...legendaryData,
+          level: maxLvl,
+          hp: legendaryData.maxHp,
+          maxHp: legendaryData.maxHp,
+        }
+        seenInPokedex(legendary)
+        setBattleLog(prev => [t('b.regionLegendary', { name: legendary.name, lvl: legendary.level }), ...prev].slice(0, 15))
+        setLegendaryEncounter(legendary)
+        setScreen('route')
+      } catch {
+        setApiError(t('b.legendError'))
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
     if (currentNode.type === 'blackmarket') {
       // Mercado Negro: vende objetos/Pokémon y compra objetos baratos y Pokémon.
       const blackItems = [...Object.keys(ALL_SHOP_ITEMS)].filter(i => isConsumableUnlocked(i) && !TREASURES.includes(i))
@@ -6366,7 +6439,8 @@ function MainApp() {
         // En Fácil, los jefes de las etapas 1 y 2 llevan la mitad de Pokémon (3);
         // el jefe de la última etapa (3ª insignia) conserva los 6.
         const maxSize = isBoss ? ((difficulty === 'easy' && !isLeague && badges.length < 2) ? 3 : 6) : trainerMaxSize(routeIndex, route.length, difficulty)
-        const teamSize = isBoss ? maxSize : Math.max(1, Math.min(maxSize, 1 + Math.floor(Math.random() * maxSize)))
+        // Élite: equipo mínimo de 4 y hasta 6 a lo largo de la Calle Victoria.
+        const teamSize = isBoss ? maxSize : isElite ? Math.max(4, maxSize) : Math.max(1, Math.min(maxSize, 1 + Math.floor(Math.random() * maxSize)))
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
 
         const fetches = Array.from({ length: teamSize }, (_, idx) =>
@@ -6389,7 +6463,7 @@ function MainApp() {
                 // respete etapas evolutivas y movimientos según el nivel. En Co-op,
                 // igual: la especie debe ser coherente con el nivel objetivo real.
                 const baseStepIndex = difficulty === 'infinite' ? Math.max(0, targetLevel - 10) : routeIndex
-                return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? badges.length : -1, badges.length, targetLevel)
+                return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? badges.length : -1, badges.length, targetLevel, isElite)
                   .then((base) => {
                     const levelDiff = targetLevel - base.level
                     let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
@@ -7146,7 +7220,11 @@ function MainApp() {
     let totalCrits = 0
 
     const isDamagingMove = (effectiveMove.power ?? 0) > 0
-    if (isDamagingMove) {
+    if (isDamagingMove && effectiveness === 0) {
+      // Movimiento sin efecto (p. ej. Eléctrico contra Tierra): no golpea ni
+      // aplica efectos secundarios.
+      lines.push(t('battle.noEffect'))
+    } else if (isDamagingMove) {
     for (let hit = 0; hit < totalHits; hit++) {
       const result = applyDamage(effectiveAttacker, currentDefender, effectiveMove, enemyBoost)
       let finalDamage = Math.floor(result.damage * effectiveness * stabBonus)
@@ -7196,11 +7274,13 @@ function MainApp() {
     }
     } else {
       // Movimiento de estado: no hace daño, solo puede aplicar su efecto.
-      lines.push(t('b.statusMove', { attacker: attacker.name, move: moveName(effectiveMove) }))
+      lines.push(effectiveness === 0 && (move.ailment || move.leechSeed || move.disable)
+        ? t('battle.noEffect')
+        : t('b.statusMove', { attacker: attacker.name, move: moveName(effectiveMove) }))
     }
 
     // --- Ailment application on first hit only ---
-    if (totalHits > 0 && currentDefender.hp > 0) {
+    if (effectiveness > 0 && totalHits > 0 && currentDefender.hp > 0) {
       // Sorpresa/Abatimiento (Fake Out): solo aturde en la PRIMERA acción del
       // Pokémon tras entrar a la lucha; si ya actuó antes, no aturde.
       const firstAction = attacker.justEntered ?? false
@@ -8379,7 +8459,7 @@ function MainApp() {
         setBattleLog((prev) => [t('b.noFaintedSacredAsh'), ...prev].slice(0, 15))
         return
       }
-      setTeam(prev => prev.map(p => p.hp <= 0 ? { ...p, hp: p.maxHp } : p))
+      setTeam(prev => prev.map(p => p.hp <= 0 ? { ...p, hp: p.maxHp, status: undefined } : p))
       setInventory((previous) => previous.filter((_, index) => index !== itemIndex))
       setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
       setBattleLog((prev) => [t('b.sacredAshUsed'), ...prev].slice(0, 15))
@@ -8519,7 +8599,7 @@ function MainApp() {
     if (!target || target.hp > 0) return
 
     const restoredHp = itemName === 'Max Revive' ? target.maxHp : Math.floor(target.maxHp * 0.5)
-    const revivedPkmn: Pokemon = { ...target, hp: restoredHp }
+    const revivedPkmn: Pokemon = { ...target, hp: restoredHp, status: undefined }
 
     setTeam((prev) => prev.map((p, idx) => (idx === targetIndex ? revivedPkmn : p)))
     setInventory((prev) => prev.filter((_, idx) => idx !== itemIndex))
@@ -8597,6 +8677,12 @@ function MainApp() {
       setBattleLog((prev) => [t('b.capturedLegend', { name: captured.name }), ...prev].slice(0, 15))
     }
     setLegendaryEncounter(null)
+    // En el nodo legendario del Modo Original, capturar completa el nodo y
+    // continúa hacia la Liga.
+    if (currentNode?.type === 'legendary') {
+      void completeCurrentNode()
+      return
+    }
   }
 
   function skipLegendaryCapture(): void {
@@ -8604,6 +8690,12 @@ function MainApp() {
 
     setBattleLog((prev) => [t('rest.letGoLegend', { name: legendaryEncounter.name }), ...prev].slice(0, 15))
     setLegendaryEncounter(null)
+    // En el nodo legendario del Modo Original, saltarlo completa el nodo y
+    // continúa hacia la Liga.
+    if (currentNode?.type === 'legendary') {
+      void completeCurrentNode()
+      return
+    }
   }
 
   function handleInfiniteRunDefeat(finalTeam: Pokemon[]): void {
@@ -8843,6 +8935,9 @@ function MainApp() {
     setCasinoPlayed(false)
     setEggInventory([])
     setPcStorage([])
+    setLeagueOffer(false)
+    setLeagueTeamSelection(false)
+    setTempLeagueTeam([])
     setSpeedrunSeconds(0)
     battleStartHPRef.current = 0
     battleMinHpRef.current = 0
@@ -10399,7 +10494,7 @@ function MainApp() {
                         <span className="badge-medium" title={language === 'en' ? 'Completed on the League' : 'Completado en Liga'}>🏅</span>
                       )}
                       {completedOriginal && (
-                        <span className="badge-medium" title={language === 'en' ? 'Completed on Original' : 'Completado en Modo Original'}>⭐</span>
+                        <span className="badge-medium" title={language === 'en' ? 'Completed on Original' : 'Completado en Modo Original'}>🕹️</span>
                       )}
                     </span>
                   </div>
@@ -10553,7 +10648,7 @@ function MainApp() {
                 padding: '10px',
               }}
             >
-              <span style={{ fontSize: '1rem', color: '#4d9bff', whiteSpace: 'nowrap' }}>⭐ {language === 'en' ? 'Original' : 'Original'}</span>
+              <span style={{ fontSize: '1rem', color: '#4d9bff', whiteSpace: 'nowrap' }}>🕹️ {language === 'en' ? 'Original' : 'Original'}</span>
               <strong style={{ fontSize: '1.1rem', color: '#9b98cf' }}>{language === 'en' ? 'Pick starter' : 'Elige inicial'}</strong>
             </button>
           </div>
@@ -11949,7 +12044,9 @@ function MainApp() {
                 <p>
                   🐉 ¡Un Pokémon Legendario apareció! <strong>{legendaryEncounter.name}</strong> está esperando ser capturado.
                 </p>
-                <p style={{ color: '#fbbf24', fontSize: '0.85rem' }}>✨ El equipo se ha curado por completo.</p>
+                {currentNode?.type !== 'legendary' && (
+                  <p style={{ color: '#fbbf24', fontSize: '0.85rem' }}>✨ El equipo se ha curado por completo.</p>
+                )}
                 <div className="capture-card" style={{ border: '2px solid #fbbf24', boxShadow: '0 0 12px rgba(251,191,36,0.4)' }}>
                   <img className="sprite" src={legendaryEncounter.sprite} alt={legendaryEncounter.name} onError={fallbackSprite} />
                 </div>
@@ -11994,7 +12091,7 @@ function MainApp() {
                 </div>
                 <div className="evolve-section" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
                   <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>{t('rest.healPrompt')}</p>
-                  <button className="cta" onClick={() => { if (runChallenges.noHealing) { setBattleLog(prev => [t('b.challengeNoHealRest'), ...prev].slice(0, 15)); completeCurrentNode(); return } setTeam(prev => prev.map(p => p.hp <= 0 ? { ...p, hp: Math.max(1, Math.floor(p.maxHp * 0.5)) } : { ...p, hp: p.maxHp })); setBattleLog(prev => [t('b.restHealed'), ...prev].slice(0, 15)); completeCurrentNode() }} type="button"                     style={{ background: '#ee3b2f', width: '100%' }}>
+                  <button className="cta" onClick={() => { if (runChallenges.noHealing) { setBattleLog(prev => [t('b.challengeNoHealRest'), ...prev].slice(0, 15)); completeCurrentNode(); return } setTeam(prev => prev.map(p => p.hp <= 0 ? { ...p, hp: Math.max(1, Math.floor(p.maxHp * 0.5)), status: undefined } : { ...p, hp: p.maxHp, status: undefined })); setBattleLog(prev => [t('b.restHealed'), ...prev].slice(0, 15)); completeCurrentNode() }} type="button"                     style={{ background: '#ee3b2f', width: '100%' }}>
                     {t('rest.healTeam')}
                   </button>
                 </div>
@@ -12722,13 +12819,13 @@ function MainApp() {
         <div className="modal-backdrop" onClick={() => { playClick(); setShowStarterSelect(false); setScreen('setup') }}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', padding: '1.5rem', animation: 'casinoSlideUp 0.35s ease' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <h2 style={{ margin: 0, color: '#4d9bff' }}>🔵 Modo Original — Elige tu inicial</h2>
+              <h2 style={{ margin: 0, color: '#4d9bff' }}>🕹️ Modo Original — Elige tu inicial</h2>
               <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowStarterSelect(false); setScreen('setup') }} style={{ color: '#ff8a80' }}>{t('common.close')}</button>
             </div>
             <p style={{ color: '#9b98cf', fontSize: '0.85rem', margin: '0 0 1rem' }}>
               {language === 'en'
-                ? 'Pick the Pokémon you will start with. This run has no badges: just 10 nodes, then Victory Road and the League are mandatory.'
-                : 'Elige el Pokémon con el que empezarás. Esta run no tiene insignias: solo 10 nodos, y después la Calle Victoria y la Liga son obligatorias.'}
+                ? 'Pick the Pokémon you will start with. Defeat 8 gym leaders to earn medals, then Victory Road and the League are mandatory.'
+                : 'Elige el Pokémon con el que empezarás. Derrota a 8 líderes de gimnasio para ganar medallas, y después la Calle Victoria y la Liga son obligatorias.'}
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.75rem' }}>
               {starterOptions.map(starter => (
@@ -12773,7 +12870,7 @@ function MainApp() {
               Deberás elegir entre 1 y 6 Pokémon de tu equipo y PC. Una vez dentro no podrás cambiarlos.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
-              <button className="cta" onClick={() => { setLeagueOffer(false); setLeagueTeamSelection(true) }} style={{ background: '#4d9bff', color: '#000' }}>
+              <button className="cta" onClick={() => { setLeagueOffer(false); setTempLeagueTeam([]); setLeagueTeamSelection(true) }} style={{ background: '#4d9bff', color: '#000' }}>
                 ¡Sí, a la Liga!
               </button>
               <button className="cta" onClick={() => { setLeagueOffer(false); finalizeRunVictory() }} style={{ background: '#7d7ab5' }}>
@@ -12785,17 +12882,35 @@ function MainApp() {
       )}
 
       {/* League Team Selection Modal */}
-      {leagueTeamSelection && (
+      {leagueTeamSelection && (() => {
+        // Identidad única por Pokémon (equipo y PC pueden tener duplicados de
+        // la misma especie, así que no se puede usar id+hp).
+        const leaguePool = [
+          ...team.map((p, i) => ({ key: `team-${i}`, pkmn: p, isTeam: true })),
+          ...pcStorage.map((p, i) => ({ key: `pc-${i}`, pkmn: p, isTeam: false })),
+        ]
+        const selectedKeys = new Set(tempLeagueTeam)
+        return (
         <div className="modal-backdrop" onClick={() => setLeagueTeamSelection(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
             <h3 style={{ color: '#4d9bff', margin: '0 0 0.5rem' }}>🏆 Equipo para la Liga</h3>
-            <p style={{ color: '#9b98cf', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+            <p style={{ color: '#9b98cf', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
               Selecciona entre 1 y 6 Pokémon de tu equipo y PC ({tempLeagueTeam.length}/6)
             </p>
+            <p style={{ color: '#fbbf24', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+              ⚠️ Los Pokémon que NO selecciones se eliminarán al comenzar la Calle Victoria.
+            </p>
             {tempLeagueTeam.length >= 1 && (
-              <button className="cta" onClick={async () => {
+              <button className="cta" onClick={() => {
                 setLeagueTeamSelection(false)
-                const healed = tempLeagueTeam.map(p => ({ ...p, hp: p.maxHp, status: undefined }))
+                // Los elegidos forman el equipo de la Liga. El resto de Pokémon
+                // que tenías antes de la Liga se ELIMINAN: el PC de la Liga queda
+                // vacío, así lo que captures después (p. ej. el legendario) nunca
+                // se pierde en un PC al que no se pueda acceder.
+                const healed = leaguePool
+                  .filter(({ key }) => selectedKeys.has(key))
+                  .map(({ pkmn }) => ({ ...pkmn, hp: pkmn.maxHp, status: undefined }))
+                const unselectedCount = leaguePool.filter(({ key }) => !selectedKeys.has(key)).length
                 const maxLvl = Math.max(...healed.map(p => p.level)) + 2
                 // Calle Victoria: 4 entrenadores → tienda → 4 entrenadores → tienda.
                 const victoryRoute: RouteNode[] = []
@@ -12808,22 +12923,24 @@ function MainApp() {
                 setRoute(victoryRoute)
                 setRouteIndex(0)
                 setScreen('route')
+                if (unselectedCount > 0) {
+                  setBattleLog(prev => [t('b.leagueUnselectedReleased', { n: unselectedCount }), ...prev].slice(0, 15))
+                }
                 setBattleLog(prev => [t('b.victoryRoadWelcome', { lvl: maxLvl }), ...prev].slice(0, 15))
               }} style={{ background: '#4d9bff', color: '#000', width: '100%', marginBottom: '1rem' }}>
                 🗻 ¡Comenzar la Calle Victoria!
               </button>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '6px' }}>
-              {[...team.map(p => ({ ...p, _source: 'team' as const })), ...pcStorage.map(p => ({ ...p, _source: 'pc' as const }))].map((pkmn, idx) => {
-                const key = `${pkmn._source}-${idx}`
-                const selected = tempLeagueTeam.some(p => p.id === pkmn.id && p.hp === pkmn.hp)
+              {leaguePool.map(({ key, pkmn, isTeam }) => {
+                const selected = selectedKeys.has(key)
                 return (
                   <div key={key}
                     onClick={() => {
                       if (selected) {
-                        setTempLeagueTeam(prev => prev.filter(p => !(p.id === pkmn.id && p.hp === pkmn.hp)))
+                        setTempLeagueTeam(prev => prev.filter(k => k !== key))
                       } else if (tempLeagueTeam.length < 6) {
-                        setTempLeagueTeam(prev => [...prev, pkmn])
+                        setTempLeagueTeam(prev => [...prev, key])
                       }
                     }}
                     style={{
@@ -12834,14 +12951,15 @@ function MainApp() {
                   >
                     <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
                     <div style={{ fontSize: '0.7rem', textTransform: 'capitalize', color: selected ? '#4d9bff' : '#f3f1ff' }}>{pkmn.name}</div>
-                    <div style={{ fontSize: '0.6rem', color: pkmn._source === 'team' ? '#7ceb95' : '#9b98cf' }}>Nv.{pkmn.level}</div>
+                    <div style={{ fontSize: '0.6rem', color: isTeam ? '#7ceb95' : '#9b98cf' }}>Nv.{pkmn.level}</div>
                   </div>
                 )
               })}
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
 
       {/* Achievements Modal */}
       {showAchievements && (
@@ -12949,6 +13067,7 @@ function MainApp() {
           <h3 style={{ color: '#4d9bff', textAlign: 'center', marginBottom: '0.75rem' }}>{t('runstats.title')}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '1.1rem' }}>
             <div style={{ color: '#9b98cf' }}>{t('runstats.battlesWon')}</div><div style={{ color: '#37d16b', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.time')}</div><div style={{ color: '#22d3ee', fontWeight: 'bold' }}>{formatDuration(Math.max(0, Math.round((Date.now() - runStartTimeRef.current) / 1000)))}</div>
             <div style={{ color: '#9b98cf' }}>{t('runstats.damageDealt')}</div><div style={{ color: '#ff8a80', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
             <div style={{ color: '#9b98cf' }}>{t('runstats.damageTaken')}</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>
             <div style={{ color: '#9b98cf' }}>{t('runstats.crits')}</div><div style={{ color: '#ffcb05', fontWeight: 'bold' }}>{runStats.critsLanded}</div>
@@ -12968,6 +13087,7 @@ function MainApp() {
           <h3 style={{ color: '#ee3b2f', textAlign: 'center', marginBottom: '0.75rem' }}>{t('runstats.title')}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '1.1rem' }}>
             <div style={{ color: '#9b98cf' }}>{t('runstats.battlesWon')}</div><div style={{ color: '#37d16b', fontWeight: 'bold' }}>{runStats.battlesWon}</div>
+            <div style={{ color: '#9b98cf' }}>{t('runstats.time')}</div><div style={{ color: '#22d3ee', fontWeight: 'bold' }}>{formatDuration(Math.max(0, Math.round((Date.now() - runStartTimeRef.current) / 1000)))}</div>
             <div style={{ color: '#9b98cf' }}>{t('runstats.damageDealt')}</div><div style={{ color: '#ff8a80', fontWeight: 'bold' }}>{runStats.totalDamageDealt}</div>
             <div style={{ color: '#9b98cf' }}>{t('runstats.damageTaken')}</div><div style={{ color: '#fb923c', fontWeight: 'bold' }}>{runStats.totalDamageTaken}</div>
             <div style={{ color: '#9b98cf' }}>{t('runstats.turns')}</div><div style={{ color: '#d9d6f2', fontWeight: 'bold' }}>{runStats.totalTurns}</div>
@@ -13516,6 +13636,7 @@ function MainApp() {
                   ['teamRocket', 'help.teamRocket'], ['spin', 'help.spin'], ['pokeRand', 'help.pokeRand'], ['move', 'help.move'],
                   ['mega', 'help.mega'], ['gmax', 'help.gmax'], ['primal', 'help.primal'], ['trade', 'help.trade'],
                   ['rival', 'help.rival'], ['blackmarket', 'help.blackmarket'], ['double', 'help.double'], ['casino', 'help.casino'],
+                  ['elite', 'help.elite'], ['legendary', 'help.legendary'],
                 ] as Array<[string, string]>).map(([type, key], i) => (
                   <div
                     key={type}

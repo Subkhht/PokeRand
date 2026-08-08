@@ -111,7 +111,7 @@ export function balanceWildPokemonToTeam(enemy: Pokemon, team: Pokemon[], diffic
   const attack = Math.max(10, Math.round(enemy.attack * blend + teamAvg.defense * strength * (1 - blend)))
   const defense = Math.max(10, Math.round(enemy.defense * blend + teamAvg.attack * strength * (1 - blend)))
   const spAttack = Math.max(10, Math.round(enemy.spAttack * blend + teamAvg.spDefense * strength * (1 - blend)))
-  const spDefense = Math.max(10, Math.round(enemy.spDefense * blend + teamAvg.spDefense * strength * (1 - blend)))
+  const spDefense = Math.max(10, Math.round(enemy.spDefense * blend + teamAvg.spAttack * strength * (1 - blend)))
   const speed = Math.max(10, Math.round(enemy.speed * blend + teamAvg.speed * strength * (1 - blend)))
   const maxHp = Math.max(20, Math.round(enemy.maxHp * blend + teamAvg.maxHp * strength * (1 - blend)))
 

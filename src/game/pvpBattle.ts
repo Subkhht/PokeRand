@@ -392,6 +392,11 @@ function performPvpHit(
   const lines: string[] = []
   let totalDamage = 0
 
+  // Movimiento sin efecto (p. ej. Eléctrico contra Tierra): no golpea ni
+  // aplica efectos secundarios.
+  if (effectiveness === 0) {
+    lines.push(t('battle.noEffect'))
+  } else {
   for (let hit = 0; hit < totalHits; hit++) {
     const result = applyDamage(effectiveAttacker, currentDefender, move)
     let finalDamage = Number.isFinite(result.damage) ? Math.floor(result.damage * effectiveness * stabBonus) : 3
@@ -419,8 +424,9 @@ function performPvpHit(
 
     if (currentDefender.hp <= 0) break
   }
+  }
 
-  if (totalHits > 0 && currentDefender.hp > 0 && move.ailment && !currentDefender.status) {
+  if (effectiveness > 0 && totalHits > 0 && currentDefender.hp > 0 && move.ailment && !currentDefender.status) {
     // La chance puede ser 1 (100%) o undefined si PokeAPI no la indica; en ese
     // caso se aplica garantizada, igual que en el combate normal.
     const chance = move.ailmentChance ?? 1
