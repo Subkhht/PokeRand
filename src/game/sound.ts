@@ -143,6 +143,26 @@ export function playEvolution(): void {
   } catch { /* silent */ }
 }
 
+// Sonido de moneda (dos notas agudas rápidas).
+export function playCoin(): void {
+  try {
+    const ac = getCtx()
+    const notes = [1318, 1760]
+    notes.forEach((freq, i) => {
+      const osc = ac.createOscillator()
+      const g = ac.createGain()
+      osc.type = 'square'
+      const t = ac.currentTime + i * 0.07
+      osc.frequency.setValueAtTime(freq, t)
+      g.gain.setValueAtTime(0.22 * sfxVolume * SFX_SOFTNESS, t)
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.14)
+      osc.connect(g).connect(ac.destination)
+      osc.start(t)
+      osc.stop(t + 0.14)
+    })
+  } catch { /* silent */ }
+}
+
 export function setMenuMusicTrack(id: string): void {
   activeMenuMusic = id
 }

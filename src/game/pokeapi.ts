@@ -88,6 +88,7 @@ export interface PokemonDetails {
   id: number
   name: string
   highResImage: string
+  highResImageShiny?: string
   description: string
   height: number
   weight: number
@@ -247,6 +248,7 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
     id: dataPokemon.id,
     name: dataPokemon.name,
     highResImage,
+    highResImageShiny: dataPokemon.sprites.other?.['official-artwork']?.front_shiny || undefined,
     description,
     height: dataPokemon.height / 10,
     weight: dataPokemon.weight / 10,

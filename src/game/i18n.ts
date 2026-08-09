@@ -517,6 +517,8 @@ const DICT: Record<string, Entry> = {
   'rest.searching': { es: 'Buscando encuentro...', en: 'Searching encounter...' },
   'rest.found': { es: '{label}: encuentras a {name} y obtienes {item}.', en: '{label}: you find {name} and get {item}.' },
   'rest.dowsingFound': { es: '📡 El Detector de Objetos encontró: {item}.', en: '📡 The Dowsing Machine found: {item}.' },
+  'rest.magmaEmblemFound': { es: '🏔️ ¡Encontraste un Emblema Magma!', en: '🏔️ You found a Magma Emblem!' },
+  'b.magmaEmblemRedeemed': { es: 'Canjeaste un Emblema Magma, obtienes 5 PokéCoins', en: 'You redeemed a Magma Emblem and got 5 PokéCoins' },
   'rest.eggFound': { es: '{label}: ¡Obtuviste un Huevo de {name}! (Eclosiona en {n} batallas)', en: '{label}: You got an Egg of {name}! (Hatches in {n} battles)' },
   'rest.eggItem': { es: 'También obtienes {item}.', en: 'You also get {item}.' },
   'rest.letGo': { es: 'Dejaste ir a {name}.', en: 'You let {name} go.' },
@@ -576,7 +578,7 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v1.15', en: 'v1.15' },
+  'help.version': { es: 'v1.16', en: 'v1.16' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
   'changelog.button': { es: 'Ver cambios', en: 'See changes' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
@@ -854,6 +856,7 @@ const DICT: Record<string, Entry> = {
   'b.equipped': { es: 'Equipaste {item} a {name}.', en: 'You equipped {item} to {name}.' },
   'b.unequipped': { es: 'Desequipaste {item} de {name}.', en: 'You unequipped {item} from {name}.' },
   'b.bought': { es: 'Compraste {qty}× {item} por ${total}.', en: 'You bought {qty}× {item} for ${total}.' },
+  'b.shopSoldOut': { es: '🚫 Ese objeto está agotado en esta tienda.', en: '🚫 That item is sold out in this shop.' },
   'b.sold': { es: '💰 Vendiste {qty}× {item} por ${total}.', en: '💰 You sold {qty}× {item} for ${total}.' },
   'b.released': { es: 'Liberaste a {name} del equipo.', en: 'You released {name} from the team.' },
   'b.depositedPC': { es: '📦 {name} fue depositado en el PC.', en: '📦 {name} was deposited in the PC.' },
@@ -1221,6 +1224,7 @@ const ITEM_DESC: Record<string, { es: string; en: string }> = {
   'Flauta Celeste': { es: 'Garantiza que el próximo Pokémon salvaje sea legendario.', en: 'Guarantees the next wild Pokémon is legendary.' },
   'Detector de Objetos': { es: 'Encuentra objetos ocultos: los descansos dan objetos extra.', en: 'Finds hidden items: rest encounters give extra items.' },
   'Telescopio': { es: 'Si el rival ya atacó este turno, tus movimientos aciertan un 20% más.', en: 'If the target already moved this turn, your moves hit 20% more often.' },
+  'Emblema Magma': { es: 'Cánjearlo por 5 PokéCoins.', en: 'Redeem it for 5 PokéCoins.' },
   'Moomoo Milk': { es: 'Restaura 100 HP de un Pokémon.', en: 'Restores 100 HP of a Pokémon.' },
   'Berry Juice': { es: 'Restaura 20 HP de un Pokémon.', en: 'Restores 20 HP of a Pokémon.' },
   'Fresh Water': { es: 'Restaura 30 HP de un Pokémon.', en: 'Restores 30 HP of a Pokémon.' },
@@ -1363,6 +1367,7 @@ const ITEM_NAMES: Record<string, { es: string; en: string }> = {
   'Flauta Celeste': { es: 'Flauta Celeste', en: 'Azure Flute' },
   'Detector de Objetos': { es: 'Detector de Objetos', en: 'Dowsing Machine' },
   'Telescopio': { es: 'Telescopio', en: 'Zoom Lens' },
+  'Emblema Magma': { es: 'Emblema Magma', en: 'Magma Emblem' },
   'Disco MT': { es: 'Disco MT', en: 'TM Disc' },
   'Perla Grande': { es: 'Perla Grande', en: 'Big Pearl' },
   'Polvo Estelar': { es: 'Polvo Estelar', en: 'Stardust' },
@@ -1599,6 +1604,10 @@ const META_ITEM_DESC: Record<string, { es: string; en: string }> = {
   'unlock_reroll_2': { es: 'Otorga 1 reroll extra de tienda por visita.', en: 'Grants 1 extra shop reroll per visit.' },
   'unlock_shop_slot': { es: 'Las tiendas ofrecen 1 objeto más.', en: 'Shops offer 1 extra item.' },
   'unlock_shop_slot_2': { es: 'Las tiendas ofrecen 1 objeto más (se suma a la anterior).', en: 'Shops offer 1 extra item (stacks with the previous).' },
+  'unlock_shop_stock_1': { es: 'Puedes comprar 1 unidad extra de cada objeto en la tienda.', en: 'You can buy 1 extra unit of each item in the shop.' },
+  'unlock_shop_stock_2': { es: '+1 unidad extra de cada objeto (2 en total).', en: '+1 extra unit of each item (2 total).' },
+  'unlock_shop_stock_3': { es: '+1 unidad extra de cada objeto (3 en total).', en: '+1 extra unit of each item (3 total).' },
+  'unlock_shop_stock_4': { es: '+1 unidad extra de cada objeto (4 en total).', en: '+1 extra unit of each item (4 total).' },
   'start_pokeballs_5': { es: 'Empiezas cada aventura con 5 Poké Balls extra.', en: 'Start every run with 5 extra Poké Balls.' },
   'unlock_caja_bonguri': { es: 'Empiezas cada aventura con 2 Poké Balls y 1 ball de bonguri aleatoria.', en: 'Start every run with 2 Poké Balls and 1 random Apricorn Ball.' },
   'start_potion_1': { es: 'Empiezas cada aventura con 1 Poción extra.', en: 'Start every run with 1 extra Potion.' },
@@ -1733,6 +1742,15 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v1.16',
+    items: [
+      { es: '🌋 Nuevo drop raro "Emblema Magma": aparece poco en descansos y eventos. Al usarlo, se canjea automáticamente por 5 PokéCoins con sonido de moneda.', en: '🌋 New rare drop "Magma Emblem": appears rarely in rest encounters and events. Using it auto-redeems it for 5 PokéCoins with a coin sound.' },
+      { es: '✨ Al ver los detalles de un shiny en la Pokédex de shinies, el arte en HD y los sprites de la cadena evolutiva se muestran en versión shiny.', en: '✨ When viewing a shiny\'s details in the shiny Pokédex, the HD art and evolution chain sprites are shown in their shiny versions.' },
+      { es: '🐛 Corregido: la Pokédex normal y la de shinies ahora son independientes: un shiny ya no desbloquea (ni borra) la entrada normal, y viceversa.', en: '🐛 Fixed: the normal and shiny Pokédex are now independent: a shiny no longer unlocks (or erases) the normal entry, and vice versa.' },
+      { es: '🛒 Las tiendas ahora limitan las compras: por defecto solo puedes comprar 1 unidad de cada objeto (botón "Agotado"). Las mejoras meta "Stock de Tienda I-IV" añaden 1 compra extra por objeto cada una.', en: '🛒 Shops now limit purchases: by default you can only buy 1 unit of each item ("Sold out" button). The "Shop Stock I-IV" meta upgrades each add 1 extra purchase per item.' },
+    ],
+  },
   {
     version: 'v1.15',
     items: [

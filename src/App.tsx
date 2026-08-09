@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useRef, useCallback, Component, type ReactNode, type CSSProperties } from 'react'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
-import { playHover, playClick, playHit, playEvolution, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
+import { playHover, playClick, playHit, playEvolution, playCoin, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -792,6 +792,10 @@ const BERRY_DROPS = [
 const TREASURES = ['Seta Pequeña', 'Polvo Estelar', 'Seta Grande', 'Perla', 'Corazón Marino', 'Correo Aéreo', 'Fragmento Estelar', 'Perla Grande', 'Pieza Dorada', 'Perla Rara', 'Cometa', 'Pieza Dorada II', 'Hueso Raro', 'Miel', 'Fragmento Rojo', 'Fragmento Azul', 'Fragmento Amarillo', 'Fragmento Verde']
 const TREASURE_DROPS = TREASURES
 
+// Emblema Magma: drop poco frecuente que se canjea por 5 PokéCoins.
+const MAGMA_EMBLEM_DROP_CHANCE = 0.08
+const rollMagmaEmblem = (): string[] => (Math.random() < MAGMA_EMBLEM_DROP_CHANCE ? ['Emblema Magma'] : [])
+
 // Ids de las evoluciones de Eevee (Vaporeon, Jolteon, Flareon, Espeon, Umbreon,
 // Leafeon, Glaceon, Sylveon). Se usan para el logro "Familia Eevee".
 const EEVEE_EVOLUTIONS = [134, 135, 136, 196, 197, 470, 471, 700]
@@ -1039,6 +1043,7 @@ const ITEM_SPRITES: Record<string, string> = {
   'rule-book': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rule-book.png',
   'Detector de Objetos': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dowsing-machine.png',
   'Telescopio': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/zoom-lens.png',
+  'Emblema Magma': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/magma-emblem.png',
   'Moomoo Milk': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/moomoo-milk.png',
   'Berry Juice': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/berry-juice.png',
   'Fresh Water': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fresh-water.png',
@@ -1776,8 +1781,12 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_reroll', name: 'Reroll', desc: 'Permite rerollear la tienda 1 vez por visita.', price: 120, spriteKey: 'dice', category: 'upgrade' },
   { id: 'unlock_reroll_2', name: 'Reroll II', desc: 'Otorga 1 reroll extra de tienda por visita.', price: 200, spriteKey: 'dice', category: 'upgrade', requires: 'unlock_reroll' },
   { id: 'unlock_shop_slot', name: 'Espacio de Tienda', desc: 'Las tiendas ofrecen 1 objeto más.', price: 100, spriteKey: 'money', category: 'upgrade' },
-  { id: 'unlock_history', name: 'Historial', desc: 'Desbloquea el historial de partidas en la barra superior.', price: 10, spriteKey: 'rule-book', category: 'upgrade' },
   { id: 'unlock_shop_slot_2', name: 'Espacio de Tienda II', desc: 'Las tiendas ofrecen 1 objeto más (se suma a la anterior).', price: 180, spriteKey: 'money', category: 'upgrade', requires: 'unlock_shop_slot' },
+  { id: 'unlock_shop_stock_1', name: 'Stock de Tienda I', desc: 'Puedes comprar 1 unidad extra de cada objeto en la tienda.', price: 80, spriteKey: 'money', category: 'upgrade' },
+  { id: 'unlock_shop_stock_2', name: 'Stock de Tienda II', desc: '+1 unidad extra de cada objeto (2 en total).', price: 120, spriteKey: 'money', category: 'upgrade', requires: 'unlock_shop_stock_1' },
+  { id: 'unlock_shop_stock_3', name: 'Stock de Tienda III', desc: '+1 unidad extra de cada objeto (3 en total).', price: 160, spriteKey: 'money', category: 'upgrade', requires: 'unlock_shop_stock_2' },
+  { id: 'unlock_shop_stock_4', name: 'Stock de Tienda IV', desc: '+1 unidad extra de cada objeto (4 en total).', price: 200, spriteKey: 'money', category: 'upgrade', requires: 'unlock_shop_stock_3' },
+  { id: 'unlock_history', name: 'Historial', desc: 'Desbloquea el historial de partidas en la barra superior.', price: 10, spriteKey: 'rule-book', category: 'upgrade' },
   { id: 'start_pokeballs_5', name: 'Inicio: +5 Poké Balls', desc: 'Empiezas cada aventura con 5 Poké Balls extra.', price: 180, spriteKey: 'Poké Ball', category: 'upgrade' },
   { id: 'unlock_caja_bonguri', name: 'Caja Bonguri', desc: 'Empiezas cada aventura con 2 Poké Balls y 1 ball de bonguri aleatoria.', price: 150, spriteKey: 'Caja Bonguri', category: 'upgrade' },
   { id: 'unlock_dowsing', name: 'Detector de Objetos', desc: 'Los descansos dan 1 objeto extra.', price: 140, spriteKey: 'Detector de Objetos', category: 'upgrade' },
@@ -2377,6 +2386,7 @@ function MainApp() {
   const [shopStock, setShopStock] = useState<string[]>([])
   const [shopRerollsUsed, setShopRerollsUsed] = useState(0)
   const [shopQty, setShopQty] = useState<Record<string, number>>({})
+  const [shopBoughtCount, setShopBoughtCount] = useState<Record<string, number>>({})
   const [sellQty, setSellQty] = useState<Record<string, number>>({})
 
   const [inventory, setInventory] = useState<string[]>([])
@@ -2416,6 +2426,7 @@ function MainApp() {
   const [restEncounter, setRestEncounter] = useState<Pokemon | null>(null)
   const [restRewardItem, setRestRewardItem] = useState<string>('')
   const [restExtraItems, setRestExtraItems] = useState<string[]>([])
+  const [coinExchangeMsg, setCoinExchangeMsg] = useState<string | null>(null)
   const [legendaryEncounter, setLegendaryEncounter] = useState<Pokemon | null>(null)
 
   // Resumen de derrota
@@ -2565,6 +2576,7 @@ function MainApp() {
   const [pokedexMode, setPokedexMode] = useState<'normal' | 'shiny'>('normal')
   const [pokedexSearch, setPokedexSearch] = useState<string>('')
   const [selectedPokemonDetail, setSelectedPokemonDetail] = useState<PokemonDetails | null>(null)
+  const [selectedPokemonShiny, setSelectedPokemonShiny] = useState<boolean>(false)
   const [isLoadingDetail, setIsLoadingDetail] = useState<boolean>(false)
 
   // Opciones / Volumen
@@ -3287,8 +3299,9 @@ function MainApp() {
     return Math.round((maxLvl + avgLvl) / 2)
   }
 
-  async function handleSelectPokedexPokemon(id: number) {
+  async function handleSelectPokedexPokemon(id: number, isShiny = false) {
     setIsLoadingDetail(true)
+    setSelectedPokemonShiny(isShiny)
     try {
       const details = await fetchPokemonDetails(id)
       setSelectedPokemonDetail(details)
@@ -3318,10 +3331,29 @@ function MainApp() {
       }
 
       if (isNaN(pokemonId) || !pokemonId) return prev
-      if (prev[pokemonId]?.caught && !pokemon.shiny) return prev
-      if (pokemon.shiny && prev[pokemonId]?.shinyCaught) return prev
 
-      const current = prev[pokemonId] ?? { id: pokemonId, name: pokemon.name, sprite: pokemon.sprite, types: (pokemon as any).types ?? [], seen: true, caught: false }
+      const current = prev[pokemonId] ?? { id: pokemonId, name: pokemon.name, sprite: pokemon.sprite, types: (pokemon as any).types ?? [], seen: false, caught: false }
+
+      // La Pokédex normal y la de shinies son independientes: un shiny no
+      // desbloquea la entrada normal y un Pokémon normal no toca la shiny.
+      if (pokemon.shiny) {
+        if (current.shinyCaught) return prev
+        const updated: Record<number, PokedexEntry> = {
+          ...prev,
+          [pokemonId]: {
+            ...current,
+            name: pokemon.name,
+            sprite: pokemon.sprite,
+            types: (pokemon as any).types ?? [],
+            shinySeen: true,
+            shinyCaught: true,
+          }
+        }
+        localStorage.setItem('pokerand_pokedex', JSON.stringify(updated))
+        return updated
+      }
+
+      if (current.caught) return prev
       const updated: Record<number, PokedexEntry> = {
         ...prev,
         [pokemonId]: {
@@ -3331,7 +3363,6 @@ function MainApp() {
           types: (pokemon as any).types ?? [],
           seen: true,
           caught: true,
-          ...(pokemon.shiny ? { shinySeen: true, shinyCaught: true } : {})
         }
       }
       localStorage.setItem('pokerand_pokedex', JSON.stringify(updated))
@@ -3351,10 +3382,28 @@ function MainApp() {
       }
 
       if (isNaN(pokemonId) || !pokemonId) return prev
-      if (prev[pokemonId] && !pokemon.shiny) return prev
-      if (pokemon.shiny && prev[pokemonId]?.shinySeen) return prev
 
-      const current = prev[pokemonId] ?? { id: pokemonId, name: pokemon.name, sprite: pokemon.sprite, types: (pokemon as any).types ?? [], seen: true, caught: false }
+      const current = prev[pokemonId] ?? { id: pokemonId, name: pokemon.name, sprite: pokemon.sprite, types: (pokemon as any).types ?? [], seen: false, caught: false }
+
+      // Independencia total entre la Pokédex normal y la shiny.
+      if (pokemon.shiny) {
+        if (current.shinySeen) return prev
+        const updated: Record<number, PokedexEntry> = {
+          ...prev,
+          [pokemonId]: {
+            ...current,
+            name: pokemon.name,
+            sprite: pokemon.sprite,
+            types: (pokemon as any).types ?? [],
+            shinySeen: true,
+            shinyCaught: current.shinyCaught ?? false,
+          }
+        }
+        localStorage.setItem('pokerand_pokedex', JSON.stringify(updated))
+        return updated
+      }
+
+      if (current.seen) return prev
       const updated: Record<number, PokedexEntry> = {
         ...prev,
         [pokemonId]: {
@@ -3364,7 +3413,6 @@ function MainApp() {
           types: (pokemon as any).types ?? [],
           seen: true,
           caught: false,
-          ...(pokemon.shiny ? { shinySeen: true, shinyCaught: current.shinyCaught ?? false } : {})
         }
       }
       localStorage.setItem('pokerand_pokedex', JSON.stringify(updated))
@@ -3644,8 +3692,9 @@ function MainApp() {
         setMoney(prev => prev + gold)
         const items = ['Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]
         const item = items[Math.floor(Math.random() * items.length)]
-        setInventory(prev => [...prev, item])
-        setBattleLog(prev => [t('b.coinChest', { gold, item }), ...prev])
+        const magmaEmblem = rollMagmaEmblem()
+        setInventory(prev => [...prev, item, ...magmaEmblem])
+        setBattleLog(prev => [t('b.coinChest', { gold, item }), ...(magmaEmblem.length > 0 ? [t('rest.magmaEmblemFound')] : []), ...prev])
         break
       }
       case 'shiny_spot': {
@@ -6071,10 +6120,19 @@ function MainApp() {
     return n
   }
 
+  // Compras permitidas por objeto en cada tienda: 1 por defecto + 1 por cada
+  // mejora de Stock de Tienda (I a IV).
+  const shopBuyAllowance = 1 +
+    (metaProgression.permanentlyUnlockedItems.includes('unlock_shop_stock_1') ? 1 : 0) +
+    (metaProgression.permanentlyUnlockedItems.includes('unlock_shop_stock_2') ? 1 : 0) +
+    (metaProgression.permanentlyUnlockedItems.includes('unlock_shop_stock_3') ? 1 : 0) +
+    (metaProgression.permanentlyUnlockedItems.includes('unlock_shop_stock_4') ? 1 : 0)
+
   function rerollShop(): void {
     if (shopRerollsUsed >= maxShopRerolls()) return
     const currentStone = shopStock.find(n => EVOLUTION_STONE_UNLOCK_IDS[n])
     setShopStock(generateShopStock(currentStone))
+    setShopBoughtCount({})
     setShopRerollsUsed(prev => prev + 1)
     playClick()
     setBattleLog((prev) => [t('b.rerolled', { used: shopRerollsUsed + 1, max: maxShopRerolls() }), ...prev].slice(0, 15))
@@ -6209,6 +6267,7 @@ function MainApp() {
 
     if (currentNode.type === 'shop') {
       setShopRerollsUsed(0)
+      setShopBoughtCount({})
       setShopStock(generateShopStock())
       if (runChallenges.noPurchasing) {
         setBattleLog((prev) => [
@@ -6419,13 +6478,15 @@ function MainApp() {
           : ['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked), ...unlockedBalls]
         const extraItemsEgg: string[] = []
         for (let i = 0; i < dowsingExtraEgg; i++) extraItemsEgg.push(randomFrom(restExtraPoolEgg))
+        const magmaEmblemEgg = rollMagmaEmblem()
         setRestRewardItem(rewardItem)
-        setRestExtraItems(extraItemsEgg)
-        setInventory((previous) => [...previous, rewardItem, ...extraItemsEgg])
+        setRestExtraItems([...extraItemsEgg, ...magmaEmblemEgg])
+        setInventory((previous) => [...previous, rewardItem, ...extraItemsEgg, ...magmaEmblemEgg])
         setBattleLog((prev) => [
           t('rest.eggFound', { name: eggEntry.name, n: eggEntry.hatchIn, label: currentNode.label }),
           t('rest.eggItem', { item: itemLocalizedName(rewardItem) }),
           ...extraItemsEgg.map(item => t('rest.dowsingFound', { item: itemLocalizedName(item) })),
+          ...(magmaEmblemEgg.length > 0 ? [t('rest.magmaEmblemFound')] : []),
           ...prev
         ].slice(0, 15))
         completeCurrentNode()
@@ -6461,15 +6522,17 @@ function MainApp() {
         : ['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked), ...unlockedBalls]
       const extraItems: string[] = []
       for (let i = 0; i < dowsingExtra; i++) extraItems.push(randomFrom(restExtraPool))
+      const magmaEmblem = rollMagmaEmblem()
 
       setRestEncounter(generatedEncounter)
       seenInPokedex(generatedEncounter)
       setRestRewardItem(rewardItem)
-      setRestExtraItems(extraItems)
-      setInventory((previous) => [...previous, rewardItem, ...extraItems])
+      setRestExtraItems([...extraItems, ...magmaEmblem])
+      setInventory((previous) => [...previous, rewardItem, ...extraItems, ...magmaEmblem])
       setBattleLog((prev) => [
         t('rest.found', { label: currentNode.label, name: generatedEncounter.name, item: itemLocalizedName(rewardItem) }),
         ...extraItems.map(item => t('rest.dowsingFound', { item: itemLocalizedName(item) })),
+        ...(magmaEmblem.length > 0 ? [t('rest.magmaEmblemFound')] : []),
         ...prev
       ])
     } catch {
@@ -7058,6 +7121,11 @@ function MainApp() {
     }
     const item = ALL_SHOP_ITEMS[itemName]
     if (!item) return
+    const alreadyBought = shopBoughtCount[itemName] ?? 0
+    if (alreadyBought + qty > shopBuyAllowance) {
+      setBattleLog((prev) => [t('b.shopSoldOut'), ...prev].slice(0, 15))
+      return
+    }
     const discount = modifier?.shopDiscount ?? 0
     const hardMarkup = (difficulty === 'hard' || difficulty === 'infinite') ? 1.4 : 1
     const stageMarkup = 1 + badges.length * 0.15
@@ -7067,6 +7135,7 @@ function MainApp() {
 
     setMoney((prev) => prev - total)
     setInventory((prev) => [...prev, ...Array(qty).fill(itemName)])
+    setShopBoughtCount((prev) => ({ ...prev, [itemName]: (prev[itemName] ?? 0) + qty }))
     setRunStats(prev => ({ ...prev, moneySpent: prev.moneySpent + total }))
     setBattleLog((prev) => [t('b.bought', { qty, item: itemLocalizedName(itemName), total }), ...prev].slice(0, 15))
     setShopQty(prev => ({ ...prev, [itemName]: 1 }))
@@ -8652,6 +8721,16 @@ function MainApp() {
       return
     }
 
+    if (itemName === 'Emblema Magma') {
+      setInventory(prev => prev.filter((_, i) => i !== itemIndex))
+      setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
+      awardPokeCoins(5, t('b.magmaEmblemRedeemed'))
+      playCoin()
+      setCoinExchangeMsg(t('b.magmaEmblemRedeemed'))
+      setTimeout(() => setCoinExchangeMsg(null), 3000)
+      return
+    }
+
     if (runChallenges.noItems) {
       setBattleLog((prev) => [t('b.challengeNoItemsBattle'), ...prev].slice(0, 15))
       return
@@ -9222,12 +9301,13 @@ function MainApp() {
   }
 
   const pokedexList = Object.values(pokedex)
-  const pokedexSeen = pokedexList.filter(p => p.seen).length
-    const pokedexCaught = pokedexList.filter(p => p.caught).length
+  const normalDexList = pokedexList.filter(p => p.seen)
+  const pokedexSeen = normalDexList.length
+  const pokedexCaught = normalDexList.filter(p => p.caught).length
   const shinyDexList = pokedexList.filter(p => p.shinySeen)
   const shinyDexSeen = shinyDexList.length
   const shinyDexCaught = shinyDexList.filter(p => p.shinyCaught).length
-  const activeDexList = pokedexMode === 'shiny' ? shinyDexList : pokedexList
+  const activeDexList = pokedexMode === 'shiny' ? shinyDexList : normalDexList
 
   const leaderboardActiveEntries: LeaderboardEntry[] = leaderboardGen === 0
     ? Object.values(leaderboardByGen).flat().sort((a, b) => (b.node - a.node) || (a.duration_seconds - b.duration_seconds))
@@ -9763,7 +9843,7 @@ function MainApp() {
 
       {/* Modal Pokédex */}
       {showPokedex && (
-        <div className="modal-backdrop" onClick={() => { setShowPokedex(false); setSelectedPokemonDetail(null); setPokedexSearch(''); }}>
+        <div className="modal-backdrop" onClick={() => { setShowPokedex(false); setSelectedPokemonDetail(null); setSelectedPokemonShiny(false); setPokedexSearch(''); }}>
           <div className="pokedex-frame" onClick={(e) => e.stopPropagation()}>
             <div className="pokedex-top-bar">
               <div className="big-blue-sensor"></div>
@@ -9784,7 +9864,7 @@ function MainApp() {
                   <div className="detail-header" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                     <img
                       className="high-res-img"
-                      src={selectedPokemonDetail.highResImage}
+                      src={selectedPokemonShiny && selectedPokemonDetail.highResImageShiny ? selectedPokemonDetail.highResImageShiny : selectedPokemonDetail.highResImage}
                       alt={selectedPokemonDetail.name}
                     />
                     <div className="detail-title">
@@ -9819,7 +9899,7 @@ function MainApp() {
                       <div className="evolution-chain" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', padding: '8px 0' }}>
                         {selectedPokemonDetail.evolutions.map((evo, idx) => {
                           const entry = pokedex[evo.id]
-                          const known = !!entry?.caught
+                          const known = selectedPokemonShiny ? (entry?.shinyCaught ?? false) : !!entry?.caught
                           return (
                             <div key={evo.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               {idx > 0 && <span style={{ color: '#7d7ab5', fontSize: '1.2rem' }}>→</span>}
@@ -9831,10 +9911,12 @@ function MainApp() {
                                   border: evo.id === selectedPokemonDetail.id ? '2px solid #4d9bff' : '1px solid #3f3f6e',
                                   minWidth: '80px', opacity: known ? 1 : 0.5, cursor: known ? 'pointer' : 'default'
                                 }}
-                                onClick={() => known && handleSelectPokedexPokemon(evo.id)}
+                                onClick={() => known && handleSelectPokedexPokemon(evo.id, selectedPokemonShiny)}
                               >
                                 <img
-                                  src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${evo.id}.gif`}
+                                  src={selectedPokemonShiny
+                                    ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/shiny/${evo.id}.gif`
+                                    : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${evo.id}.gif`}
                                   alt={evo.name}
                                   onError={(e) => { (e.target as HTMLImageElement).src = evo.sprite }}
                                   style={{ width: '56px', height: '56px', imageRendering: 'pixelated', filter: known ? undefined : 'brightness(0) invert(0)' }}
@@ -9948,7 +10030,7 @@ function MainApp() {
 
                   {isLoadingDetail ? (
                     <p className="muted" style={{ textAlign: 'center', padding: '2rem 0' }}>Cargando datos oficiales...</p>
-                  ) : (pokedexMode === 'shiny' ? shinyDexList.length : pokedexList.length) === 0 ? (
+                  ) : (pokedexMode === 'shiny' ? shinyDexList.length : normalDexList.length) === 0 ? (
                     <p className="muted" style={{ padding: '1rem 0', textAlign: 'center' }}>
                       {pokedexMode === 'shiny'
                         ? (language === 'en' ? 'No shiny Pokémon found yet. Use a Poké Radar or keep exploring!' : 'Aún no hay Pokémon shiny vistos. ¡Usa un Poké Radar o sigue explorando!')
@@ -9967,7 +10049,7 @@ function MainApp() {
                           <div
                             key={pkmn.id}
                             className="pokedex-card clickable"
-                            onClick={() => known ? handleSelectPokedexPokemon(pkmn.id) : undefined}
+                            onClick={() => known ? handleSelectPokedexPokemon(pkmn.id, isShiny) : undefined}
                             style={!known ? { opacity: 0.6 } : undefined}
                           >
                             <span className="pokedex-id">#{String(pkmn.id).padStart(3, '0')}</span>
@@ -9995,7 +10077,7 @@ function MainApp() {
               <div className="d-pad" title="D-Pad Pokédex"></div>
               <button
                 className="pokedex-close-btn"
-                onClick={() => { setShowPokedex(false); setSelectedPokemonDetail(null); setPokedexSearch(''); }}
+                onClick={() => { setShowPokedex(false); setSelectedPokemonDetail(null); setSelectedPokemonShiny(false); setPokedexSearch(''); }}
               >
                 {t('options.close')}
               </button>
@@ -11699,9 +11781,13 @@ function MainApp() {
                     const stageMarkup = 1 + badges.length * 0.15
                     const finalPrice = Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0)) * hardMarkup * stageMarkup)
                     const qty = shopQty[itemName] ?? 1
-                    const maxQty = isHoldable ? 1 : Math.max(1, Math.min(99, Math.floor(money / finalPrice)))
+                    const bought = shopBoughtCount[itemName] ?? 0
+                    const allowance = isHoldable ? 1 : shopBuyAllowance
+                    const remaining = Math.max(0, allowance - bought)
+                    const soldOut = !isHoldable && remaining <= 0
+                    const maxQty = isHoldable ? 1 : Math.max(0, Math.min(remaining, Math.floor(money / finalPrice)))
                     const totalPrice = finalPrice * qty
-                    const canBuy = money >= totalPrice
+                    const canBuy = money >= totalPrice && remaining >= qty
 
                         const stepperBtnStyle: CSSProperties = {
                       background: '#2a2a55',
@@ -11743,7 +11829,7 @@ function MainApp() {
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          {!isHoldable && (
+                          {!isHoldable && !soldOut && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <button
                                 type="button"
@@ -11762,21 +11848,32 @@ function MainApp() {
                               >+</button>
                             </div>
                           )}
-                          <button
-                            className="tiny-btn"
-                            type="button"
-                            onClick={() => isHoldable ? buyHoldableItem(itemName) : buyShopItem(itemName, qty)}
-                            disabled={!canBuy}
-                            style={{
-                              background: canBuy ? '#10b981' : '#475569',
-                              minWidth: '70px',
-                              color: canBuy ? '#12122b' : '#d9d6f2',
-                              fontWeight: 'bold',
-                              cursor: canBuy ? 'pointer' : 'not-allowed'
-                            }}
-                          >
-                            {isHoldable ? `$${finalPrice}` : `${qty > 1 ? `${qty}× ` : ''}$${totalPrice}`}
-                          </button>
+                          {soldOut ? (
+                            <button
+                              className="tiny-btn"
+                              type="button"
+                              disabled
+                              style={{ background: '#475569', minWidth: '70px', color: '#d9d6f2', fontWeight: 'bold', cursor: 'not-allowed' }}
+                            >
+                              Agotado
+                            </button>
+                          ) : (
+                            <button
+                              className="tiny-btn"
+                              type="button"
+                              onClick={() => isHoldable ? buyHoldableItem(itemName) : buyShopItem(itemName, qty)}
+                              disabled={!canBuy}
+                              style={{
+                                background: canBuy ? '#10b981' : '#475569',
+                                minWidth: '70px',
+                                color: canBuy ? '#12122b' : '#d9d6f2',
+                                fontWeight: 'bold',
+                                cursor: canBuy ? 'pointer' : 'not-allowed'
+                              }}
+                            >
+                              {isHoldable ? `$${finalPrice}` : `${qty > 1 ? `${qty}× ` : ''}$${totalPrice}`}
+                            </button>
+                          )}
                         </div>
                       </div>
                     )
@@ -14730,6 +14827,16 @@ function MainApp() {
           <div style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '1.1rem', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.25rem' }}>¡Item Desbloqueado!</div>
           <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '1.4rem', marginBottom: '0.5rem' }}>{unlockPopup.name}</div>
           <div style={{ color: '#9b98cf', fontSize: '0.9rem' }}>Ahora puede aparecer en las aventuras</div>
+        </div>
+      )}
+
+      {/* Mensaje central de canje de Emblema Magma */}
+      {coinExchangeMsg && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10000, background: '#1c1c3a', border: '3px solid #ffcb05', borderRadius: '8px', padding: '1.75rem 2.5rem', textAlign: 'center', boxShadow: '5px 5px 0 0 rgba(0,0,0,0.6)', animation: 'slideInRight 0.3s ease' }}>
+          <div style={{ marginBottom: '0.5rem' }}>
+            <img src={ITEM_SPRITES['Emblema Magma']} alt="Emblema Magma" style={{ width: '70px', height: '70px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
+          </div>
+          <div style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '1rem' }}>{coinExchangeMsg}</div>
         </div>
       )}
 
