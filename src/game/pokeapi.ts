@@ -7,6 +7,14 @@ const API_BASE = 'https://pokeapi.co/api/v2'
 // amistad, etc. Sin un nivel de evolución definido, no deben aparecer al principio.
 const SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL = 20
 
+// Pokémon de evolución por amistad (sin nivel mínimo en la API) que en este
+// juego evolucionan a nivel 10.
+const FRIENDSHIP_EVOLVE_LEVEL_10 = ['pichu', 'cleffa', 'igglybuff', 'togepi', 'azurill', 'budew', 'chingling']
+// Pokémon que en este juego evolucionan a nivel 25.
+const FRIENDSHIP_EVOLVE_LEVEL_25 = ['buneary', 'woobat', 'swadloon', 'snom']
+// Nivel al que Kubfu evoluciona con los manuscritos.
+const KUBFU_EVOLVE_LEVEL = 30
+
 const generationSpeciesCache = new Map<number, number[]>()
 const pokemonCache = new Map<string | number, Pokemon>()
 const moveDetailsCache = new Map<string, Move>()
@@ -94,25 +102,57 @@ export interface PokemonDetails {
   weight: number
   types: string[]
   stats: Array<{ name: string; value: number }>
-  evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string }>
+  evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null }>
 }
 
-function extractEvolutionLine(chainNode: EvolutionChainNode, targetId: number): Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string }> {
-  const allNodes: Array<{ id: number; name: string; level: number | null; trigger: string; speciesUrl: string }> = []
+// Calcula cómo evoluciona una etapa en ESTE juego (nivel de evolución por
+// amistad, intercambio, etc. o el objeto que se debe usar), en lugar de
+// mostrar los datos crudos de PokeAPI.
+function gameEvolutionInfo(sourceName: string, details?: NonNullable<EvolutionChainNode['evolution_details']>[number]): { level: number | null; trigger: string; item: string | null } {
+  const trigger = details?.trigger?.name ?? 'level-up'
+  const minLevel = details?.min_level ?? null
+  const itemSlug = details?.item?.name ?? details?.held_item?.name ?? null
+  const item = itemSlug ? getEvolutionItemDisplayName(itemSlug) : null
 
-  function walk(node: EvolutionChainNode, parentLevel: number | null, parentTrigger: string) {
+  // Las evoluciones con objeto de uso (piedras, manuscritos, armaduras...) no
+  // tienen nivel: el objeto se consume desde el inventario.
+  if (trigger === 'use-item') {
+    return { level: null, trigger, item }
+  }
+
+  const name = sourceName.toLowerCase()
+  let level: number | null
+  if (FRIENDSHIP_EVOLVE_LEVEL_25.includes(name)) {
+    level = 25
+  } else if (name === 'kubfu') {
+    level = KUBFU_EVOLVE_LEVEL
+  } else if (minLevel) {
+    level = minLevel
+  } else if (trigger === 'trade') {
+    level = 35
+  } else if (FRIENDSHIP_EVOLVE_LEVEL_10.includes(name)) {
+    level = 10
+  } else {
+    level = 45
+  }
+
+  return { level, trigger, item }
+}
+
+function extractEvolutionLine(chainNode: EvolutionChainNode, targetId: number): Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null }> {
+  const allNodes: Array<{ id: number; name: string; level: number | null; trigger: string; item: string | null; speciesUrl: string }> = []
+
+  function walk(node: EvolutionChainNode, parentLevel: number | null, parentTrigger: string, parentItem: string | null) {
     const match = node.species.url.match(/\/pokemon-species\/(\d+)\//)
     const id = match ? parseInt(match[1], 10) : 0
-    allNodes.push({ id, name: node.species.name, level: parentLevel, trigger: parentTrigger, speciesUrl: node.species.url })
+    allNodes.push({ id, name: node.species.name, level: parentLevel, trigger: parentTrigger, item: parentItem, speciesUrl: node.species.url })
     for (const evo of node.evolves_to) {
-      const details = evo.evolution_details?.[0]
-      const evoLevel = details?.min_level ?? null
-      const evoTrigger = details?.trigger?.name ?? 'level-up'
-      walk(evo, evoLevel, evoTrigger)
+      const info = gameEvolutionInfo(node.species.name, evo.evolution_details?.[0])
+      walk(evo, info.level, info.trigger, info.item)
     }
   }
 
-  walk(chainNode, null, 'level-up')
+  walk(chainNode, null, 'level-up', null)
 
   const targetIdx = allNodes.findIndex(n => n.id === targetId)
   if (targetIdx === -1) return []
@@ -123,6 +163,7 @@ function extractEvolutionLine(chainNode: EvolutionChainNode, targetId: number): 
     sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${n.id}.png`,
     level: n.level,
     trigger: n.trigger,
+    item: n.item,
   }))
 
   return result
@@ -147,10 +188,10 @@ async function resolveRegionalSpeciesId(speciesName: string, suffix: string): Pr
 // geodude → geodude-alola). Si una etapa no tiene variante regional, se deja la
 // forma base.
 async function mapRegionalEvolutionLine(
-  line: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string }>,
+  line: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null }>,
   suffix: string
-): Promise<Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string }>> {
-  const out: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string }> = []
+): Promise<Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null }>> {
+  const out: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null }> = []
   for (const node of line) {
     const regionalId = await resolveRegionalSpeciesId(node.name, suffix)
     if (regionalId !== null) {
@@ -211,7 +252,7 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
       'speed': 'Velocidad'
     }
 
-  let evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string }> = []
+  let evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null }> = []
   try {
     // Las formas regionales (p. ej. geodude-alola) comparten la cadena evolutiva
     // con la forma base: se resuelve la cadena base y luego se mapea a la variante.
@@ -239,8 +280,8 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
   // caramelos en Pokémon GO), así que se muestran como una línea evolutiva manual.
   if (dataPokemon.id === 808 || dataPokemon.id === 809) {
     evolutions = [
-      { id: 808, name: 'meltan', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/808.png', level: null, trigger: 'level-up' },
-      { id: 809, name: 'melmetal', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/809.png', level: null, trigger: 'level-up' },
+      { id: 808, name: 'meltan', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/808.png', level: null, trigger: 'level-up', item: null },
+      { id: 809, name: 'melmetal', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/809.png', level: 35, trigger: 'level-up', item: null },
     ]
   }
 
@@ -262,6 +303,18 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
 }
 
 const EVOLUTION_ITEM_REVERSE: Record<string, string> = {
+  // Piedras evolutivas
+  'fire-stone': 'Fire Stone',
+  'water-stone': 'Water Stone',
+  'thunder-stone': 'Thunder Stone',
+  'leaf-stone': 'Leaf Stone',
+  'moon-stone': 'Moon Stone',
+  'sun-stone': 'Sun Stone',
+  'shiny-stone': 'Shiny Stone',
+  'dusk-stone': 'Dusk Stone',
+  'dawn-stone': 'Dawn Stone',
+  'ice-stone': 'Ice Stone',
+  'gorra-de-ash': 'Gorra de Ash',
   'metal-coat': 'Metal Coat',
   'kings-rock': "King's Rock",
   'dragon-scale': 'Dragon Scale',
@@ -897,9 +950,11 @@ export async function getBalancedPokemonByGeneration(
 
   // Progreso efectivo: combina la etapa actual con la posición dentro de la ruta.
   // Infinite no tiene etapas, así que usa el progreso de la ruta directamente.
+  // El Modo Original tiene 8 etapas (medallas), el resto 3 (insignias).
+  const stageDivisor = difficulty === 'original' ? 8 : 3
   const progressRatio = difficulty === 'infinite'
     ? routeProgress
-    : (stageIndex + routeProgress) / 3
+    : (stageIndex + routeProgress) / stageDivisor
 
   const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss, bossStage, legendaryIds)
 
@@ -1099,12 +1154,6 @@ function getRegionalSuffix(name: string): string {
   return ''
 }
 
-// Pokémon de evolución por amistad (sin nivel mínimo en la API) que en este
-// juego evolucionan a nivel 10.
-const FRIENDSHIP_EVOLVE_LEVEL_10 = ['pichu', 'cleffa', 'igglybuff', 'togepi', 'azurill', 'budew', 'chingling']
-// Pokémon que en este juego evolucionan a nivel 25.
-const FRIENDSHIP_EVOLVE_LEVEL_25 = ['buneary', 'woobat', 'swadloon', 'snom']
-
 function findEvolutionForSpecies(chainNode: EvolutionChainNode, speciesName: string): { speciesName: string; level: number; trigger: string; heldItem: string | null } | null {
   const baseName = getBaseName(speciesName)
   const matchName = (name: string) => name.toLowerCase() === speciesName.toLowerCase() || name.toLowerCase() === baseName.toLowerCase()
@@ -1122,7 +1171,7 @@ function findEvolutionForSpecies(chainNode: EvolutionChainNode, speciesName: str
       const evoLevel = FRIENDSHIP_EVOLVE_LEVEL_25.includes(chainNode.species.name.toLowerCase())
         ? 25
         : (chainNode.species.name.toLowerCase() === 'kubfu'
-          ? 30
+          ? KUBFU_EVOLVE_LEVEL
           : (minLevel ?? (trigger === 'trade' ? 35 : (FRIENDSHIP_EVOLVE_LEVEL_10.includes(chainNode.species.name.toLowerCase()) ? 10 : 45))))
       const heldItem = details?.held_item?.name ?? null
       // La API ya devuelve el nombre con sufijo regional para las formas
@@ -1147,8 +1196,8 @@ interface HeldItemEvo {
 // Kubfu evoluciona con un objeto a sus dos formas (la cadena de la API solo
 // apunta a una especie, así que se mapean manualmente los dos manuscritos).
 const KUBFU_ITEM_EVOLUTIONS: Record<string, { target: string; level: number }> = {
-  'scroll-of-darkness': { target: 'urshifu-single-strike', level: 30 },
-  'scroll-of-waters': { target: 'urshifu-rapid-strike', level: 30 },
+  'scroll-of-darkness': { target: 'urshifu-single-strike', level: KUBFU_EVOLVE_LEVEL },
+  'scroll-of-waters': { target: 'urshifu-rapid-strike', level: KUBFU_EVOLVE_LEVEL },
 }
 
 function findHeldItemEvolutions(chainNode: EvolutionChainNode, speciesName: string): HeldItemEvo[] {
@@ -1208,14 +1257,13 @@ function findPreEvolutionLevel(chainNode: EvolutionChainNode, speciesName: strin
     // nombre base del objetivo (maneja formas regionales), no el del propio evo.
     if (matchName(evo.species.name)) {
       const details = evo.evolution_details?.[0]
-      const minLevel = details?.min_level ?? null
       const trigger = details?.trigger?.name ?? 'level-up'
-      // Evoluciones por nivel usan su nivel como umbral. Las que evolucionan por
-      // piedra o intercambio no tienen nivel, pero tampoco deberían aparecer al
-      // inicio del juego. Las de amistad (Pichu→Pikachu, etc.) sí pueden.
-      if (trigger === 'level-up' && minLevel) return minLevel
+      // Las que evolucionan por piedra o intercambio no tienen nivel, pero
+      // tampoco deberían aparecer al inicio del juego.
       if (trigger === 'use-item' || trigger === 'trade') return SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL
-      return null
+      // El resto (nivel, amistad...) usa el nivel real de evolución de ESTE
+      // juego como umbral mínimo de aparición (p. ej. Munchlax→Snorlax a 45).
+      return gameEvolutionInfo(chainNode.species.name, details).level
     }
     const found = findPreEvolutionLevel(evo, speciesName)
     if (found) return found
@@ -1225,6 +1273,20 @@ function findPreEvolutionLevel(chainNode: EvolutionChainNode, speciesName: strin
 
 export async function getEvolutionInfo(pokemonId: number): Promise<{ nextName: string | null; evolutionLevel: number | null; heldItem: string | null; heldItemEvolutions: HeldItemEvo[]; minAppearLevel: number | null }> {
   try {
+    // Meltan y Melmetal no están enlazados en la cadena de PokeAPI (evolución
+    // por caramelos en Pokémon GO). En este juego Meltan evoluciona a Melmetal
+    // al nivel 35, y Melmetal no aparece por debajo de ese nivel.
+    if (pokemonId === 808) {
+      return { nextName: 'melmetal', evolutionLevel: 35, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    if (pokemonId === 809) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 35 }
+    }
+    // Aerodactyl no tiene pre-evolución en la cadena de PokeAPI (fósil): no
+    // debe aparecer por debajo del nivel 40.
+    if (pokemonId === 142) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 40 }
+    }
     const speciesRes = await fetch(`${API_BASE}/pokemon-species/${pokemonId}`)
     if (!speciesRes.ok) return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
     const speciesData = await speciesRes.json()

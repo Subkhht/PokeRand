@@ -674,6 +674,11 @@ button {
   filter: grayscale(1);
 }
 
+.team-slot.is-dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
 .team-slot.empty {
   min-height: 86px;
   align-items: center;

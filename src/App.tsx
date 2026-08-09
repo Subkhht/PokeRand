@@ -784,8 +784,8 @@ const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
 const BERRY_DROPS = [
   'Oran Berry', 'Lum Berry', 'Baya Zreza', 'Baya Atania', 'Baya Algama', 'Baya Safre', 'Baya Siendrepis', 'Baya Caquic',
   'Baya Cuaja', 'Baya Wiki', 'Baya Mago', 'Baya Aguav', 'Baya Ango',
-  'Sitrus Berry', 'Babiri Berry', 'Baya Oca', 'Baya Kasib', 'Baya Meloc', 'Baya Zidra', 'Baya Aou',
-  'Baya Perismon', 'Baya Colbur', 'Baya Waca', 'Baya Rindo', 'Baya Chilan',
+  'Sitrus Berry', 'Babiri Berry', 'Baya Oca', 'Baya Kasib', 'Baya Shuca', 'Baya Coba', 'Baya Charti',
+  'Baya Payapa', 'Baya Colbur', 'Baya Waca', 'Baya Rindo', 'Baya Chilan',
 ]
 
 // Tesoros que pueden caer como drop (se filtran por desbloqueo en la tienda meta).
@@ -896,16 +896,16 @@ const itemDescriptions: Record<string, string> = {
   'Fragmento Azul': 'Se vende por $100.',
   'Fragmento Amarillo': 'Se vende por $100.',
   'Fragmento Verde': 'Se vende por $100.',
-  'Baya Oca': '15% Reducción de Daño.',
-  'Baya Kasib': '15% Reducción de Daño.',
-  'Baya Meloc': '+15 HP máximos.',
-  'Baya Zidra': '+10% Ataque.',
-  'Baya Aou': '+10% Defensa.',
-  'Baya Perismon': '+10% Ataque Especial.',
-  'Baya Colbur': '+10% Defensa Especial.',
-  'Baya Waca': '+10% Velocidad.',
-  'Baya Rindo': '10% Golpe Crítico.',
-  'Baya Chilan': '10% Robo de Vida.',
+  'Baya Oca': 'Reduce a la mitad un movimiento Fuego superefectivo.',
+  'Baya Kasib': 'Reduce a la mitad un movimiento Fantasma superefectivo.',
+  'Baya Shuca': 'Reduce a la mitad un movimiento Tierra superefectivo.',
+  'Baya Coba': 'Reduce a la mitad un movimiento Volador superefectivo.',
+  'Baya Charti': 'Reduce a la mitad un movimiento Roca superefectivo.',
+  'Baya Payapa': 'Reduce a la mitad un movimiento Psíquico superefectivo.',
+  'Baya Colbur': 'Reduce a la mitad un movimiento Siniestro superefectivo.',
+  'Baya Waca': 'Reduce a la mitad un movimiento Eléctrico superefectivo.',
+  'Baya Rindo': 'Reduce a la mitad un movimiento Planta superefectivo.',
+  'Baya Chilan': 'Reduce a la mitad un movimiento Normal superefectivo.',
   'Manuscrito sombras': 'Evoluciona a Kubfu en Urshifu Brusco.',
   'Manuscrito aguas': 'Evoluciona a Kubfu en Urshifu Fluido.',
   'Diamansfera': '+20% daño en movimientos Acero y Dragón para Dialga. Transforma a Dialga en su Forma Origen.',
@@ -961,8 +961,8 @@ const ITEM_SPRITES: Record<string, string> = {
   'Big Root': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/big-root.png',
   'Wide Lens': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/wide-lens.png',
   'Sitrus Berry': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sitrus-berry.png',
-  'Guts Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/muscle-band.png',
-  'Vest Protector': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/assault-vest.png',
+  'Choice Specs': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/choice-specs.png',
+  'Charcoal': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/charcoal.png',
   'Focus Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/focus-band.png',
   'Rare Candy': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rare-candy.png',
   'Elixir': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/elixir.png',
@@ -978,13 +978,13 @@ const ITEM_SPRITES: Record<string, string> = {
   'X Sp. Attack 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-sp-atk.png',
   'X Sp. Defense 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-sp-def.png',
   'Dragon Fang': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dragon-fang.png',
-  'Guardian Charm': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/guard-spec.png',
-  'Berserker Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/macho-brace.png',
-  'Phantom Cloak': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/black-sludge.png',
-  'Swift Feather': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png',
+  'Mystic Water': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mystic-water.png',
+  'Expert Belt': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/expert-belt.png',
+  'Miracle Seed': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/miracle-seed.png',
+  'Sharp Beak': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sharp-beak.png',
   'Iron Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/iron-ball.png',
-  'Vampire Fang': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/float-stone.png',
-  'Cursed Blade': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/razor-claw.png',
+  'Black Glasses': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/black-glasses.png',
+  'Twisted Spoon': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/twisted-spoon.png',
   'Mega Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/key-stone.png',
   'Dynamax Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png',
   'Prisma Rojo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/red-orb.png',
@@ -994,10 +994,10 @@ const ITEM_SPRITES: Record<string, string> = {
   'Griseosfera': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/griseous-orb.png',
   'Baya Oca': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/occa-berry.png',
   'Baya Kasib': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/kasib-berry.png',
-  'Baya Meloc': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/charti-berry.png',
-  'Baya Zidra': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/coba-berry.png',
-  'Baya Aou': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tanga-berry.png',
-  'Baya Perismon': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/payapa-berry.png',
+  'Baya Shuca': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shuca-berry.png',
+  'Baya Coba': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/coba-berry.png',
+  'Baya Charti': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/charti-berry.png',
+  'Baya Payapa': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/payapa-berry.png',
   'Baya Colbur': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/colbur-berry.png',
   'Baya Waca': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/wacan-berry.png',
   'Baya Rindo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rindo-berry.png',
@@ -1043,6 +1043,7 @@ const ITEM_SPRITES: Record<string, string> = {
   'rule-book': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rule-book.png',
   'Detector de Objetos': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dowsing-machine.png',
   'Telescopio': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/zoom-lens.png',
+  'Tarjeta Roja': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/red-card.png',
   'Emblema Magma': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/magma-emblem.png',
   'Moomoo Milk': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/moomoo-milk.png',
   'Berry Juice': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/berry-juice.png',
@@ -1075,6 +1076,8 @@ const ITEM_SPRITES: Record<string, string> = {
   'Fragmento Amarillo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/yellow-shard.png',
   'Fragmento Verde': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/green-shard.png',
   'Caja Bonguri': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/apricorn-box.png',
+  'Estuche de MT': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tm-case.png',
+  'Saco bayas': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/berry-pouch.png',
   'Luxury Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/luxury-ball.png',
   'Premier Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/premier-ball.png',
   'Fast Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fast-ball.png',
@@ -1118,43 +1121,64 @@ interface HoldableItem {
   lowHpBonus?: number
   firstStrikeBonus?: number
   accuracyMod?: number
+  physicalBoost?: number
+  specialBoost?: number
+  superEffectiveBoost?: number
+  choiceLock?: boolean
+  focusSash?: boolean
+  endureChance?: number
+  quickClawChance?: number
+  assaultVest?: boolean
+  eviolite?: boolean
+  lifeOrb?: boolean
+  rockyHelmet?: boolean
+  bigRoot?: boolean
+  healFraction?: number
+  berryHeal?: number
+  resistType?: string
   isMegaStone?: boolean
   isGmaxBand?: boolean
   isPrimalOrb?: boolean
   isExpShare?: boolean
+  isRedCard?: boolean
   typeBoost?: { types: string[]; boost: number; onlyIds?: number[] }
 }
 
+// ¿Un Pokémon puede seguir evolucionando? (para la Joya Evolutiva/Eviolite).
+function canStillEvolve(pokemon: Pokemon): boolean {
+  return pokemon.evolutionLevel != null || (pokemon.heldItemEvolutions?.length ?? 0) > 0 || pokemon.heldItemRequired != null
+}
+
 const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
-  'Muscle Band': { name: 'Muscle Band', desc: '+15% Ataque', price: 200, attackMod: 0.15 },
-  'Wise Glasses': { name: 'Wise Glasses', desc: '+15% At. Esp.', price: 200, spAttackMod: 0.15 },
-  'Choice Band': { name: 'Choice Band', desc: '+25% Ataque', price: 350, attackMod: 0.25 },
-  'Leftovers': { name: 'Leftovers', desc: 'Recupera 6 HP por turno', price: 300, healPerTurn: 6 },
-  'Focus Sash': { name: 'Focus Sash', desc: '+20 HP máximos', price: 250, maxHpMod: 20 },
-  'Assault Vest': { name: 'Assault Vest', desc: '+20% Def. Esp.', price: 300, spDefenseMod: 0.20 },
-  'Quick Claw': { name: 'Quick Claw', desc: '+20% Velocidad', price: 250, speedMod: 0.20 },
-  'Eviolite': { name: 'Eviolite', desc: '+10% Defensa y Def. Esp.', price: 200, defenseMod: 0.10, spDefenseMod: 0.10 },
-  'Life Orb': { name: 'Life Orb', desc: '+30% Daño, -5 HP por turno', price: 400, damageBoost: 0.30, healPerTurn: -5 },
-  'Rocky Helmet': { name: 'Rocky Helmet', desc: '+15% Defensa', price: 200, defenseMod: 0.15 },
-  'Scope Lens': { name: 'Scope Lens', desc: '20% Golpe Crítico', price: 250, critChance: 0.20 },
-  'Telescopio': { name: 'Telescopio', desc: '+20% precisión si el rival ya atacó este turno', price: 300, accuracyMod: 0.20 },
-  'Shell Bell': { name: 'Shell Bell', desc: '20% Robo de Vida', price: 300, lifesteal: 0.20 },
-  'Choice Scarf': { name: 'Choice Scarf', desc: '+30% Velocidad', price: 350, speedMod: 0.30 },
-  'Babiri Berry': { name: 'Babiri Berry', desc: '20% Reducción de Daño', price: 250, damageReduction: 0.20 },
-  'Big Root': { name: 'Big Root', desc: '25% Robo de Vida', price: 350, lifesteal: 0.25 },
-  'Wide Lens': { name: 'Wide Lens', desc: '15% Crítico, +10% Velocidad', price: 200, critChance: 0.15, speedMod: 0.10 },
-  'Sitrus Berry': { name: 'Sitrus Berry', desc: '+15 HP máximos, +8 HP/turno', price: 200, maxHpMod: 15, healPerTurn: 8 },
-  'Guts Band': { name: 'Guts Band', desc: '+20% Ataque, +15% daño bajo 30% HP', price: 300, attackMod: 0.20, lowHpBonus: 0.15 },
-  'Vest Protector': { name: 'Vest Protector', desc: '+25% Defensa, 15% Reducción daño', price: 400, defenseMod: 0.25, damageReduction: 0.15 },
-  'Focus Band': { name: 'Focus Band', desc: '25% Crítico, +10% Ataque', price: 300, critChance: 0.25, attackMod: 0.10 },
-  'Dragon Fang': { name: 'Dragon Fang', desc: '+20% Ataque, +10% Velocidad', price: 350, attackMod: 0.20, speedMod: 0.10 },
-  'Guardian Charm': { name: 'Guardian Charm', desc: '+15% Def. Esp., +10 HP máximos', price: 300, spDefenseMod: 0.15, maxHpMod: 10 },
-  'Berserker Band': { name: 'Berserker Band', desc: '+30% Ataque bajo 25% HP', price: 400, attackMod: 0.10, lowHpBonus: 0.30 },
-  'Phantom Cloak': { name: 'Phantom Cloak', desc: '10% Reducción daño, +10% Velocidad', price: 350, damageReduction: 0.10, speedMod: 0.10 },
-  'Swift Feather': { name: 'Swift Feather', desc: '+15% Velocidad, 10% Crítico', price: 300, speedMod: 0.15, critChance: 0.10 },
-  'Iron Ball': { name: 'Iron Ball', desc: '+25% Defensa, -10% Velocidad', price: 250, defenseMod: 0.25, speedMod: -0.10 },
-  'Vampire Fang': { name: 'Vampire Fang', desc: '15% Robo de Vida', price: 350, lifesteal: 0.15 },
-  'Cursed Blade': { name: 'Cursed Blade', desc: '+35% Ataque, -5 HP por turno', price: 450, attackMod: 0.35, healPerTurn: -5 },
+  'Muscle Band': { name: 'Muscle Band', desc: '+10% daño en movimientos físicos', price: 100, physicalBoost: 0.10 },
+  'Wise Glasses': { name: 'Wise Glasses', desc: '+10% daño en movimientos especiales', price: 100, specialBoost: 0.10 },
+  'Choice Band': { name: 'Choice Band', desc: '+50% Ataque, pero solo puedes usar un movimiento', price: 200, attackMod: 0.50, choiceLock: true },
+  'Choice Specs': { name: 'Choice Specs', desc: '+50% At. Esp., pero solo puedes usar un movimiento', price: 200, spAttackMod: 0.50, choiceLock: true },
+  'Choice Scarf': { name: 'Choice Scarf', desc: '+50% Velocidad, pero solo puedes usar un movimiento', price: 200, speedMod: 0.50, choiceLock: true },
+  'Leftovers': { name: 'Leftovers', desc: 'Recupera 1/16 de tu HP máximo cada turno', price: 150, healFraction: 1 / 16 },
+  'Focus Sash': { name: 'Focus Sash', desc: 'A plena vida, aguanta un golpe letal y se consume', price: 150, focusSash: true },
+  'Assault Vest': { name: 'Assault Vest', desc: '+50% Def. Esp., pero no puedes usar movimientos de estado', price: 200, spDefenseMod: 0.50, assaultVest: true },
+  'Quick Claw': { name: 'Quick Claw', desc: '20% de probabilidad de atacar primero', price: 150, quickClawChance: 0.20 },
+  'Eviolite': { name: 'Eviolite', desc: '+50% Defensa y Def. Esp. si aún puede evolucionar', price: 120, eviolite: true },
+  'Life Orb': { name: 'Life Orb', desc: '+30% daño, pero pierdes 1/10 del daño infligido', price: 250, damageBoost: 0.30, lifeOrb: true },
+  'Rocky Helmet': { name: 'Rocky Helmet', desc: 'El rival que te golpee pierde 1/6 de su HP máximo', price: 150, rockyHelmet: true },
+  'Scope Lens': { name: 'Scope Lens', desc: 'Aumenta la probabilidad de golpe crítico', price: 120, critChance: 0.20 },
+  'Telescopio': { name: 'Telescopio', desc: '+20% precisión si el rival ya atacó este turno', price: 120, accuracyMod: 0.20 },
+  'Shell Bell': { name: 'Shell Bell', desc: 'Recupera 1/8 del daño infligido', price: 150, lifesteal: 1 / 8 },
+  'Big Root': { name: 'Big Root', desc: '+30% de recuperación con movimientos drenantes', price: 150, bigRoot: true },
+  'Wide Lens': { name: 'Wide Lens', desc: '+10% de precisión', price: 100, accuracyMod: 0.10 },
+  'Sitrus Berry': { name: 'Sitrus Berry', desc: 'Restaura el 25% del HP al caer al 50%. Se consume', price: 120, berryHeal: 0.25 },
+  'Focus Band': { name: 'Focus Band', desc: '10% de probabilidad de aguantar un golpe letal', price: 150, endureChance: 0.10 },
+  'Iron Ball': { name: 'Iron Ball', desc: 'Reduce la Velocidad a la mitad', price: 100, speedMod: -0.50 },
+  'Dragon Fang': { name: 'Dragon Fang', desc: '+20% daño en movimientos de tipo Dragón', price: 150, typeBoost: { types: ['dragon'], boost: 0.20 } },
+  'Expert Belt': { name: 'Expert Belt', desc: '+20% daño en movimientos superefectivos', price: 150, superEffectiveBoost: 0.20 },
+  'Charcoal': { name: 'Charcoal', desc: '+20% daño en movimientos de tipo Fuego', price: 150, typeBoost: { types: ['fire'], boost: 0.20 } },
+  'Mystic Water': { name: 'Mystic Water', desc: '+20% daño en movimientos de tipo Agua', price: 150, typeBoost: { types: ['water'], boost: 0.20 } },
+  'Miracle Seed': { name: 'Miracle Seed', desc: '+20% daño en movimientos de tipo Planta', price: 150, typeBoost: { types: ['grass'], boost: 0.20 } },
+  'Sharp Beak': { name: 'Sharp Beak', desc: '+20% daño en movimientos de tipo Volador', price: 150, typeBoost: { types: ['flying'], boost: 0.20 } },
+  'Black Glasses': { name: 'Black Glasses', desc: '+20% daño en movimientos de tipo Siniestro', price: 150, typeBoost: { types: ['dark'], boost: 0.20 } },
+  'Twisted Spoon': { name: 'Twisted Spoon', desc: '+20% daño en movimientos de tipo Psíquico', price: 150, typeBoost: { types: ['psychic'], boost: 0.20 } },
+  'Tarjeta Roja': { name: 'Tarjeta Roja', desc: 'Si te golpean con daño y sobrevives, el rival cambia', price: 120, isRedCard: true },
   'Mega Stone': { name: 'Mega Stone', desc: 'Permite mega-evolucionar 1 vez por combate', price: 700, isMegaStone: true },
   'Dynamax Band': { name: 'Dynamax Band', desc: 'Permite gigamaximar 1 vez por combate (3 turnos)', price: 0, isGmaxBand: true },
   'Prisma Rojo': { name: 'Prisma Rojo', desc: 'Despierta la Primal Reversion de Groudon (1 vez por combate)', price: 0, isPrimalOrb: true },
@@ -1162,16 +1186,17 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Diamansfera': { name: 'Diamansfera', desc: '+20% daño en movimientos Acero y Dragón si lo lleva Dialga. Transforma a Dialga en su Forma Origen.', price: 700, typeBoost: { types: ['steel', 'dragon'], boost: 0.20, onlyIds: [483] } },
   'Lustresfera': { name: 'Lustresfera', desc: '+20% daño en movimientos Agua y Dragón si lo lleva Palkia. Transforma a Palkia en su Forma Origen.', price: 700, typeBoost: { types: ['water', 'dragon'], boost: 0.20, onlyIds: [484] } },
   'Griseosfera': { name: 'Griseosfera', desc: '+20% daño en movimientos Dragón y Fantasma si la lleva Giratina. Transforma a Giratina en su Forma Origen.', price: 700, typeBoost: { types: ['dragon', 'ghost'], boost: 0.20, onlyIds: [487] } },
-  'Baya Oca': { name: 'Baya Oca', desc: '15% Reducción de Daño', price: 200, damageReduction: 0.15 },
-  'Baya Kasib': { name: 'Baya Kasib', desc: '15% Reducción de Daño', price: 200, damageReduction: 0.15 },
-  'Baya Meloc': { name: 'Baya Meloc', desc: '+15 HP máximos', price: 200, maxHpMod: 15 },
-  'Baya Zidra': { name: 'Baya Zidra', desc: '+10% Ataque', price: 200, attackMod: 0.10 },
-  'Baya Aou': { name: 'Baya Aou', desc: '+10% Defensa', price: 200, defenseMod: 0.10 },
-  'Baya Perismon': { name: 'Baya Perismon', desc: '+10% Ataque Especial', price: 200, spAttackMod: 0.10 },
-  'Baya Colbur': { name: 'Baya Colbur', desc: '+10% Defensa Especial', price: 200, spDefenseMod: 0.10 },
-  'Baya Waca': { name: 'Baya Waca', desc: '+10% Velocidad', price: 200, speedMod: 0.10 },
-  'Baya Rindo': { name: 'Baya Rindo', desc: '10% Golpe Crítico', price: 200, critChance: 0.10 },
-  'Baya Chilan': { name: 'Baya Chilan', desc: '10% Robo de Vida', price: 200, lifesteal: 0.10 },
+  'Baya Oca': { name: 'Baya Oca', desc: 'Reduce a la mitad un movimiento Fuego superefectivo. Se consume', price: 120, resistType: 'fire' },
+  'Baya Kasib': { name: 'Baya Kasib', desc: 'Reduce a la mitad un movimiento Fantasma superefectivo. Se consume', price: 120, resistType: 'ghost' },
+  'Babiri Berry': { name: 'Babiri Berry', desc: 'Reduce a la mitad un movimiento Acero superefectivo. Se consume', price: 120, resistType: 'steel' },
+  'Baya Waca': { name: 'Baya Waca', desc: 'Reduce a la mitad un movimiento Eléctrico superefectivo. Se consume', price: 120, resistType: 'electric' },
+  'Baya Rindo': { name: 'Baya Rindo', desc: 'Reduce a la mitad un movimiento Planta superefectivo. Se consume', price: 120, resistType: 'grass' },
+  'Baya Colbur': { name: 'Baya Colbur', desc: 'Reduce a la mitad un movimiento Siniestro superefectivo. Se consume', price: 120, resistType: 'dark' },
+  'Baya Chilan': { name: 'Baya Chilan', desc: 'Reduce a la mitad un movimiento Normal superefectivo. Se consume', price: 120, resistType: 'normal' },
+  'Baya Shuca': { name: 'Baya Shuca', desc: 'Reduce a la mitad un movimiento Tierra superefectivo. Se consume', price: 120, resistType: 'ground' },
+  'Baya Coba': { name: 'Baya Coba', desc: 'Reduce a la mitad un movimiento Volador superefectivo. Se consume', price: 120, resistType: 'flying' },
+  'Baya Charti': { name: 'Baya Charti', desc: 'Reduce a la mitad un movimiento Roca superefectivo. Se consume', price: 120, resistType: 'rock' },
+  'Baya Payapa': { name: 'Baya Payapa', desc: 'Reduce a la mitad un movimiento Psíquico superefectivo. Se consume', price: 120, resistType: 'psychic' },
   'Metal Coat': { name: 'Metal Coat', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   "King's Rock": { name: "King's Rock", desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Dragon Scale': { name: 'Dragon Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
@@ -1184,12 +1209,12 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Prism Scale': { name: 'Prism Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Sachet': { name: 'Sachet', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Whipped Dream': { name: 'Whipped Dream', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Focus Sash II': { name: 'Focus Sash II', desc: '+40 HP máximos', price: 350, maxHpMod: 40 },
-  'Scope Lens II': { name: 'Scope Lens II', desc: '30% Golpe Crítico', price: 350, critChance: 0.30 },
-  'Shell Bell II': { name: 'Shell Bell II', desc: '30% Robo de Vida', price: 400, lifesteal: 0.30 },
-  'Assault Vest II': { name: 'Assault Vest II', desc: '+30% Def. Esp.', price: 400, spDefenseMod: 0.30 },
-  'Leftovers II': { name: 'Leftovers II', desc: 'Recupera 12 HP por turno', price: 400, healPerTurn: 12 },
-  'Quick Claw II': { name: 'Quick Claw II', desc: '+30% Velocidad', price: 350, speedMod: 0.30 },
+  'Focus Sash II': { name: 'Focus Sash II', desc: 'A plena vida, aguanta un golpe letal. +30 HP máximos', price: 200, focusSash: true, maxHpMod: 30 },
+  'Scope Lens II': { name: 'Scope Lens II', desc: 'Mayor probabilidad de golpe crítico', price: 200, critChance: 0.30 },
+  'Shell Bell II': { name: 'Shell Bell II', desc: 'Recupera 1/6 del daño infligido', price: 250, lifesteal: 1 / 6 },
+  'Assault Vest II': { name: 'Assault Vest II', desc: '+65% Def. Esp., no puedes usar movimientos de estado', price: 250, spDefenseMod: 0.65, assaultVest: true },
+  'Leftovers II': { name: 'Leftovers II', desc: 'Recupera 1/8 de tu HP máximo cada turno', price: 250, healFraction: 1 / 8 },
+  'Quick Claw II': { name: 'Quick Claw II', desc: '35% de probabilidad de atacar primero', price: 200, quickClawChance: 0.35 },
   'Razor Claw': { name: 'Razor Claw', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Razor Fang': { name: 'Razor Fang', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Oval Stone': { name: 'Oval Stone', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
@@ -1505,9 +1530,9 @@ const ACHIEVEMENTS: Achievement[] = [
 
 const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (pokemon: Pokemon) => Partial<Pokemon> }> = [
   {
-    items: ['Life Orb', 'Guts Band'],
+    items: ['Life Orb', 'Expert Belt'],
     name: 'Furia Desatada',
-    desc: '+20% daño adicional y +20% a bajo HP',
+    desc: '+10% Ataque (Vida Esfera + Cinturón Experto)',
     effect: (p) => ({ attack: Math.round(p.attack * 1.1) })
   },
   {
@@ -1535,7 +1560,7 @@ const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (p
     effect: (p) => ({ attack: Math.round(p.attack * 1.05) })
   },
   {
-    items: ['Assault Vest', 'Vest Protector'],
+    items: ['Assault Vest', 'Eviolite'],
     name: 'Fortaleza Total',
     desc: '+10% defensa y +10 maxHP',
     effect: (p) => ({ defense: Math.round(p.defense * 1.1), spDefense: Math.round(p.spDefense * 1.1), maxHp: p.maxHp + 10, hp: Math.min(p.hp + 10, p.maxHp + 10) })
@@ -1736,45 +1761,45 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_fresh_water', name: 'Fresh Water', desc: 'Restaura 30 HP. Aparece en tiendas.', price: 20, spriteKey: 'Fresh Water', category: 'consumable' },
   { id: 'unlock_soda_pop', name: 'Soda Pop', desc: 'Restaura 40 HP. Aparece en tiendas.', price: 25, spriteKey: 'Soda Pop', category: 'consumable' },
   { id: 'unlock_lemonade', name: 'Lemonade', desc: 'Restaura 60 HP. Aparece en tiendas.', price: 30, spriteKey: 'Lemonade', category: 'consumable' },
-  { id: 'unlock_muscle_band', name: 'Muscle Band', desc: '+15% Ataque.', price: 40, spriteKey: 'Muscle Band', category: 'holdable' },
-  { id: 'unlock_wise_glasses', name: 'Wise Glasses', desc: '+15% At. Esp.', price: 40, spriteKey: 'Wise Glasses', category: 'holdable' },
-  { id: 'unlock_choice_band', name: 'Choice Band', desc: '+25% Ataque.', price: 70, spriteKey: 'Choice Band', category: 'holdable' },
-  { id: 'unlock_leftovers', name: 'Leftovers', desc: 'Recupera 6 HP por turno.', price: 60, spriteKey: 'Leftovers', category: 'holdable' },
-  { id: 'unlock_focus_sash', name: 'Focus Sash', desc: '+20 HP máximos.', price: 50, spriteKey: 'Focus Sash', category: 'holdable' },
-  { id: 'unlock_assault_vest', name: 'Assault Vest', desc: '+20% Def. Esp.', price: 60, spriteKey: 'Assault Vest', category: 'holdable' },
-  { id: 'unlock_quick_claw', name: 'Quick Claw', desc: '+20% Velocidad.', price: 50, spriteKey: 'Quick Claw', category: 'holdable' },
-  { id: 'unlock_eviolite', name: 'Eviolite', desc: '+10% Defensa y Def. Esp.', price: 40, spriteKey: 'Eviolite', category: 'holdable' },
-  { id: 'unlock_life_orb', name: 'Life Orb', desc: '+30% Daño, -5 HP/turno.', price: 100, spriteKey: 'Life Orb', category: 'holdable' },
-  { id: 'unlock_rocky_helmet', name: 'Rocky Helmet', desc: '+15% Defensa.', price: 40, spriteKey: 'Rocky Helmet', category: 'holdable' },
-  { id: 'unlock_scope_lens', name: 'Scope Lens', desc: '20% Golpe Crítico.', price: 70, spriteKey: 'Scope Lens', category: 'holdable' },
-  { id: 'unlock_telescopio', name: 'Telescopio', desc: '+20% precisión si el rival ya atacó este turno.', price: 80, spriteKey: 'Telescopio', category: 'holdable' },
-  { id: 'unlock_shell_bell', name: 'Shell Bell', desc: '20% Lifesteal.', price: 90, spriteKey: 'Shell Bell', category: 'holdable' },
-  { id: 'unlock_choice_scarf', name: 'Choice Scarf', desc: '+30% Velocidad.', price: 70, spriteKey: 'Choice Scarf', category: 'holdable' },
-  { id: 'unlock_babiri_berry', name: 'Babiri Berry', desc: '20% Reducción de Daño.', price: 50, spriteKey: 'Babiri Berry', category: 'berry' },
-  { id: 'unlock_big_root', name: 'Big Root', desc: '25% Lifesteal.', price: 90, spriteKey: 'Big Root', category: 'holdable' },
-  { id: 'unlock_wide_lens', name: 'Wide Lens', desc: '15% Crítico, +10% Velocidad.', price: 40, spriteKey: 'Wide Lens', category: 'holdable' },
-  { id: 'unlock_sitrus_berry', name: 'Sitrus Berry', desc: '+15 HP máx, +8 HP/turno.', price: 40, spriteKey: 'Sitrus Berry', category: 'berry' },
-  { id: 'unlock_baya_oca', name: 'Baya Oca', desc: '15% Reducción de Daño.', price: 40, spriteKey: 'Baya Oca', category: 'berry' },
-  { id: 'unlock_baya_kasib', name: 'Baya Kasib', desc: '15% Reducción de Daño.', price: 40, spriteKey: 'Baya Kasib', category: 'berry' },
-  { id: 'unlock_baya_meloc', name: 'Baya Meloc', desc: '+15 HP máximos.', price: 40, spriteKey: 'Baya Meloc', category: 'berry' },
-  { id: 'unlock_baya_zidra', name: 'Baya Zidra', desc: '+10% Ataque.', price: 40, spriteKey: 'Baya Zidra', category: 'berry' },
-  { id: 'unlock_baya_aou', name: 'Baya Aou', desc: '+10% Defensa.', price: 40, spriteKey: 'Baya Aou', category: 'berry' },
-  { id: 'unlock_baya_perismon', name: 'Baya Perismon', desc: '+10% At. Esp.', price: 40, spriteKey: 'Baya Perismon', category: 'berry' },
-  { id: 'unlock_baya_colbur', name: 'Baya Colbur', desc: '+10% Def. Esp.', price: 40, spriteKey: 'Baya Colbur', category: 'berry' },
-  { id: 'unlock_baya_waca', name: 'Baya Waca', desc: '+10% Velocidad.', price: 40, spriteKey: 'Baya Waca', category: 'berry' },
-  { id: 'unlock_baya_rindo', name: 'Baya Rindo', desc: '10% Golpe Crítico.', price: 40, spriteKey: 'Baya Rindo', category: 'berry' },
-  { id: 'unlock_baya_chilan', name: 'Baya Chilan', desc: '10% Robo de Vida.', price: 40, spriteKey: 'Baya Chilan', category: 'berry' },
-  { id: 'unlock_guts_band', name: 'Guts Band', desc: '+20% ATK, +15% bajo 30% HP.', price: 60, spriteKey: 'Guts Band', category: 'holdable' },
-  { id: 'unlock_vest_protector', name: 'Vest Protector', desc: '+25% DEF, -15% daño.', price: 80, spriteKey: 'Vest Protector', category: 'holdable' },
-  { id: 'unlock_focus_band', name: 'Focus Band', desc: '25% Crítico, +10% ATK.', price: 60, spriteKey: 'Focus Band', category: 'holdable' },
-  { id: 'unlock_dragon_fang', name: 'Dragon Fang', desc: '+20% ATK, +10% Velocidad.', price: 70, spriteKey: 'Dragon Fang', category: 'holdable' },
-  { id: 'unlock_guardian_charm', name: 'Guardian Charm', desc: '+15% Def. Esp., +10 HP máx.', price: 60, spriteKey: 'Guardian Charm', category: 'holdable' },
-  { id: 'unlock_berserker_band', name: 'Berserker Band', desc: '+30% ATK bajo 25% HP.', price: 80, spriteKey: 'Berserker Band', category: 'holdable' },
-  { id: 'unlock_phantom_cloak', name: 'Phantom Cloak', desc: '10% Reducción, +10% Vel.', price: 70, spriteKey: 'Phantom Cloak', category: 'holdable' },
-  { id: 'unlock_swift_feather', name: 'Swift Feather', desc: '+15% Vel, 10% Crítico.', price: 60, spriteKey: 'Swift Feather', category: 'holdable' },
-  { id: 'unlock_iron_ball', name: 'Iron Ball', desc: '+25% DEF, -10% Vel.', price: 50, spriteKey: 'Iron Ball', category: 'holdable' },
-  { id: 'unlock_vampire_fang', name: 'Vampire Fang', desc: '15% Lifesteal.', price: 70, spriteKey: 'Vampire Fang', category: 'holdable' },
-  { id: 'unlock_cursed_blade', name: 'Cursed Blade', desc: '+35% ATK, -5 HP/turno.', price: 90, spriteKey: 'Cursed Blade', category: 'holdable' },
+  { id: 'unlock_muscle_band', name: 'Muscle Band', desc: '+10% daño en movimientos físicos.', price: 30, spriteKey: 'Muscle Band', category: 'holdable' },
+  { id: 'unlock_wise_glasses', name: 'Wise Glasses', desc: '+10% daño en movimientos especiales.', price: 30, spriteKey: 'Wise Glasses', category: 'holdable' },
+  { id: 'unlock_choice_band', name: 'Choice Band', desc: '+50% Ataque, pero solo un movimiento.', price: 70, spriteKey: 'Choice Band', category: 'holdable' },
+  { id: 'unlock_leftovers', name: 'Leftovers', desc: 'Recupera 1/16 del HP máximo por turno.', price: 50, spriteKey: 'Leftovers', category: 'holdable' },
+  { id: 'unlock_focus_sash', name: 'Focus Sash', desc: 'A plena vida, aguanta un golpe letal.', price: 50, spriteKey: 'Focus Sash', category: 'holdable' },
+  { id: 'unlock_assault_vest', name: 'Assault Vest', desc: '+50% Def. Esp., sin movimientos de estado.', price: 70, spriteKey: 'Assault Vest', category: 'holdable' },
+  { id: 'unlock_quick_claw', name: 'Quick Claw', desc: '20% de probabilidad de atacar primero.', price: 50, spriteKey: 'Quick Claw', category: 'holdable' },
+  { id: 'unlock_eviolite', name: 'Eviolite', desc: '+50% Def. y Def. Esp. si puede evolucionar.', price: 40, spriteKey: 'Eviolite', category: 'holdable' },
+  { id: 'unlock_life_orb', name: 'Life Orb', desc: '+30% daño, pierdes 1/10 del daño infligido.', price: 100, spriteKey: 'Life Orb', category: 'holdable' },
+  { id: 'unlock_rocky_helmet', name: 'Rocky Helmet', desc: 'El rival que te golpee pierde 1/6 de su HP.', price: 50, spriteKey: 'Rocky Helmet', category: 'holdable' },
+  { id: 'unlock_scope_lens', name: 'Scope Lens', desc: 'Aumenta la probabilidad de crítico.', price: 60, spriteKey: 'Scope Lens', category: 'holdable' },
+  { id: 'unlock_telescopio', name: 'Telescopio', desc: '+20% precisión si el rival ya atacó este turno.', price: 60, spriteKey: 'Telescopio', category: 'holdable' },
+  { id: 'unlock_shell_bell', name: 'Shell Bell', desc: 'Recupera 1/8 del daño infligido.', price: 70, spriteKey: 'Shell Bell', category: 'holdable' },
+  { id: 'unlock_choice_scarf', name: 'Choice Scarf', desc: '+50% Velocidad, pero solo un movimiento.', price: 70, spriteKey: 'Choice Scarf', category: 'holdable' },
+  { id: 'unlock_babiri_berry', name: 'Babiri Berry', desc: 'Reduce a la mitad un movimiento Acero superefectivo.', price: 40, spriteKey: 'Babiri Berry', category: 'berry' },
+  { id: 'unlock_big_root', name: 'Big Root', desc: '+30% de curación con movimientos drenantes.', price: 70, spriteKey: 'Big Root', category: 'holdable' },
+  { id: 'unlock_wide_lens', name: 'Wide Lens', desc: '+10% de precisión.', price: 30, spriteKey: 'Wide Lens', category: 'holdable' },
+  { id: 'unlock_sitrus_berry', name: 'Sitrus Berry', desc: 'Restaura el 25% del HP al caer al 50%.', price: 40, spriteKey: 'Sitrus Berry', category: 'berry' },
+  { id: 'unlock_baya_oca', name: 'Baya Oca', desc: 'Reduce a la mitad un movimiento Fuego superefectivo.', price: 40, spriteKey: 'Baya Oca', category: 'berry' },
+  { id: 'unlock_baya_kasib', name: 'Baya Kasib', desc: 'Reduce a la mitad un movimiento Fantasma superefectivo.', price: 40, spriteKey: 'Baya Kasib', category: 'berry' },
+  { id: 'unlock_baya_meloc', name: 'Baya Shuca', desc: 'Reduce a la mitad un movimiento Tierra superefectivo.', price: 40, spriteKey: 'Baya Shuca', category: 'berry' },
+  { id: 'unlock_baya_zidra', name: 'Baya Coba', desc: 'Reduce a la mitad un movimiento Volador superefectivo.', price: 40, spriteKey: 'Baya Coba', category: 'berry' },
+  { id: 'unlock_baya_aou', name: 'Baya Charti', desc: 'Reduce a la mitad un movimiento Roca superefectivo.', price: 40, spriteKey: 'Baya Charti', category: 'berry' },
+  { id: 'unlock_baya_perismon', name: 'Baya Payapa', desc: 'Reduce a la mitad un movimiento Psíquico superefectivo.', price: 40, spriteKey: 'Baya Payapa', category: 'berry' },
+  { id: 'unlock_baya_colbur', name: 'Baya Colbur', desc: 'Reduce a la mitad un movimiento Siniestro superefectivo.', price: 40, spriteKey: 'Baya Colbur', category: 'berry' },
+  { id: 'unlock_baya_waca', name: 'Baya Waca', desc: 'Reduce a la mitad un movimiento Eléctrico superefectivo.', price: 40, spriteKey: 'Baya Waca', category: 'berry' },
+  { id: 'unlock_baya_rindo', name: 'Baya Rindo', desc: 'Reduce a la mitad un movimiento Planta superefectivo.', price: 40, spriteKey: 'Baya Rindo', category: 'berry' },
+  { id: 'unlock_baya_chilan', name: 'Baya Chilan', desc: 'Reduce a la mitad un movimiento Normal superefectivo.', price: 40, spriteKey: 'Baya Chilan', category: 'berry' },
+  { id: 'unlock_guts_band', name: 'Choice Specs', desc: '+50% At. Esp., pero solo un movimiento.', price: 70, spriteKey: 'Choice Specs', category: 'holdable' },
+  { id: 'unlock_vest_protector', name: 'Charcoal', desc: '+20% daño en movimientos de tipo Fuego.', price: 60, spriteKey: 'Charcoal', category: 'holdable' },
+  { id: 'unlock_focus_band', name: 'Focus Band', desc: '10% de probabilidad de aguantar un golpe letal.', price: 60, spriteKey: 'Focus Band', category: 'holdable' },
+  { id: 'unlock_dragon_fang', name: 'Dragon Fang', desc: '+20% daño en movimientos de tipo Dragón.', price: 60, spriteKey: 'Dragon Fang', category: 'holdable' },
+  { id: 'unlock_guardian_charm', name: 'Mystic Water', desc: '+20% daño en movimientos de tipo Agua.', price: 60, spriteKey: 'Mystic Water', category: 'holdable' },
+  { id: 'unlock_berserker_band', name: 'Expert Belt', desc: '+20% daño en movimientos superefectivos.', price: 70, spriteKey: 'Expert Belt', category: 'holdable' },
+  { id: 'unlock_phantom_cloak', name: 'Miracle Seed', desc: '+20% daño en movimientos de tipo Planta.', price: 60, spriteKey: 'Miracle Seed', category: 'holdable' },
+  { id: 'unlock_swift_feather', name: 'Sharp Beak', desc: '+20% daño en movimientos de tipo Volador.', price: 60, spriteKey: 'Sharp Beak', category: 'holdable' },
+  { id: 'unlock_iron_ball', name: 'Iron Ball', desc: 'Reduce la Velocidad a la mitad.', price: 40, spriteKey: 'Iron Ball', category: 'holdable' },
+  { id: 'unlock_vampire_fang', name: 'Black Glasses', desc: '+20% daño en movimientos de tipo Siniestro.', price: 60, spriteKey: 'Black Glasses', category: 'holdable' },
+  { id: 'unlock_cursed_blade', name: 'Twisted Spoon', desc: '+20% daño en movimientos de tipo Psíquico.', price: 60, spriteKey: 'Twisted Spoon', category: 'holdable' },
   { id: 'unlock_mega_node', name: 'Nodo Mega', desc: 'Desbloquea nodos de Mega Piedra en Hard/Infinite.', price: 150, spriteKey: 'Mega Stone', category: 'upgrade' },
   { id: 'unlock_gmax_node', name: 'Nodo G-MAX', desc: 'Desbloquea nodos G-MAX en Hard/Infinite.', price: 200, spriteKey: 'Dynamax Band', category: 'upgrade' },
   { id: 'unlock_primal_node', name: 'Nodo Primal', desc: 'Desbloquea nodos Primal en Hard/Infinite. Otorgan Prisma Rojo o Azul.', price: 250, spriteKey: 'Prisma Rojo', category: 'upgrade' },  { id: 'unlock_casino_node', name: 'Nodo Casino', desc: 'Desbloquea nodos Casino en Hard/Infinite. Juega al Pachinko para ganar premios según tu puntuación.', price: 220, spriteKey: 'money', category: 'upgrade' },
@@ -1789,6 +1814,8 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_history', name: 'Historial', desc: 'Desbloquea el historial de partidas en la barra superior.', price: 10, spriteKey: 'rule-book', category: 'upgrade' },
   { id: 'start_pokeballs_5', name: 'Inicio: +5 Poké Balls', desc: 'Empiezas cada aventura con 5 Poké Balls extra.', price: 180, spriteKey: 'Poké Ball', category: 'upgrade' },
   { id: 'unlock_caja_bonguri', name: 'Caja Bonguri', desc: 'Empiezas cada aventura con 2 Poké Balls y 1 ball de bonguri aleatoria.', price: 150, spriteKey: 'Caja Bonguri', category: 'upgrade' },
+  { id: 'unlock_estuche_mt', name: 'Estuche de MT', desc: 'Empiezas cada aventura con un Disco MT en el inventario.', price: 200, spriteKey: 'Estuche de MT', category: 'upgrade' },
+  { id: 'unlock_saco_bayas', name: 'Saco bayas', desc: 'Empiezas cada aventura con 1 baya extra aleatoria de las desbloqueadas.', price: 120, spriteKey: 'Saco bayas', category: 'upgrade' },
   { id: 'unlock_dowsing', name: 'Detector de Objetos', desc: 'Los descansos dan 1 objeto extra.', price: 140, spriteKey: 'Detector de Objetos', category: 'upgrade' },
   { id: 'unlock_dowsing_2', name: 'Detector de Objetos II', desc: 'Los descansos dan 1 objeto extra más (2 en total).', price: 200, spriteKey: 'Detector de Objetos', category: 'upgrade', requires: 'unlock_dowsing' },
   { id: 'start_potion_1', name: 'Inicio: +1 Poción', desc: 'Empiezas cada aventura con 1 Poción extra.', price: 140, spriteKey: 'Potion', category: 'upgrade' },
@@ -1890,12 +1917,12 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_sueno_ball', name: 'Sueñobola', desc: 'x4 contra Pokémon dormidos. Aparece en tiendas y descansos.', price: 40, spriteKey: 'Sueñobola', category: 'pokeball' },
   { id: 'unlock_luna_ball', name: 'Ball Luna', desc: 'x4 contra Pokémon que evolucionan con Piedra Lunar. Aparece en tiendas y descansos.', price: 40, spriteKey: 'Ball Luna', category: 'pokeball' },
   { id: 'unlock_ente_ball', name: 'Entebola', desc: 'x5 contra Pokémon legendarios. Aparece en tiendas y descansos.', price: 60, spriteKey: 'Entebola', category: 'pokeball' },
-  { id: 'unlock_focus_sash_2', name: 'Focus Sash II', desc: '+40 HP máximos.', price: 70, spriteKey: 'Focus Sash II', category: 'holdable', requires: 'unlock_focus_sash' },
-  { id: 'unlock_scope_lens_2', name: 'Scope Lens II', desc: '30% Golpe Crítico.', price: 70, spriteKey: 'Scope Lens II', category: 'holdable', requires: 'unlock_scope_lens' },
-  { id: 'unlock_shell_bell_2', name: 'Shell Bell II', desc: '30% Robo de Vida.', price: 90, spriteKey: 'Shell Bell II', category: 'holdable', requires: 'unlock_shell_bell' },
-  { id: 'unlock_assault_vest_2', name: 'Assault Vest II', desc: '+30% Def. Esp.', price: 90, spriteKey: 'Assault Vest II', category: 'holdable', requires: 'unlock_assault_vest' },
-  { id: 'unlock_leftovers_2', name: 'Leftovers II', desc: 'Recupera 12 HP por turno.', price: 90, spriteKey: 'Leftovers II', category: 'holdable', requires: 'unlock_leftovers' },
-  { id: 'unlock_quick_claw_2', name: 'Quick Claw II', desc: '+30% Velocidad.', price: 70, spriteKey: 'Quick Claw II', category: 'holdable', requires: 'unlock_quick_claw' },
+  { id: 'unlock_focus_sash_2', name: 'Focus Sash II', desc: 'Aguanta un golpe a plena vida. +30 HP máximos.', price: 70, spriteKey: 'Focus Sash II', category: 'holdable', requires: 'unlock_focus_sash' },
+  { id: 'unlock_scope_lens_2', name: 'Scope Lens II', desc: 'Mayor probabilidad de crítico.', price: 70, spriteKey: 'Scope Lens II', category: 'holdable', requires: 'unlock_scope_lens' },
+  { id: 'unlock_shell_bell_2', name: 'Shell Bell II', desc: 'Recupera 1/6 del daño infligido.', price: 90, spriteKey: 'Shell Bell II', category: 'holdable', requires: 'unlock_shell_bell' },
+  { id: 'unlock_assault_vest_2', name: 'Assault Vest II', desc: '+65% Def. Esp., sin movimientos de estado.', price: 90, spriteKey: 'Assault Vest II', category: 'holdable', requires: 'unlock_assault_vest' },
+  { id: 'unlock_leftovers_2', name: 'Leftovers II', desc: 'Recupera 1/8 del HP máximo por turno.', price: 90, spriteKey: 'Leftovers II', category: 'holdable', requires: 'unlock_leftovers' },
+  { id: 'unlock_quick_claw_2', name: 'Quick Claw II', desc: '35% de probabilidad de atacar primero.', price: 70, spriteKey: 'Quick Claw II', category: 'holdable', requires: 'unlock_quick_claw' },
   { id: 'unlock_diamansfera', name: 'Diamansfera', desc: '+20% daño en movimientos Acero y Dragón para Dialga.', price: 80, spriteKey: 'Diamansfera', category: 'holdable' },
   { id: 'unlock_lustresfera', name: 'Lustresfera', desc: '+20% daño en movimientos Agua y Dragón para Palkia.', price: 80, spriteKey: 'Lustresfera', category: 'holdable' },
   { id: 'unlock_griseosfera', name: 'Griseosfera', desc: '+20% daño en movimientos Dragón y Fantasma para Giratina.', price: 80, spriteKey: 'Griseosfera', category: 'holdable' },
@@ -1907,6 +1934,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_manuscrito_sombras', name: 'Manuscrito sombras', desc: 'Evoluciona a Kubfu en Urshifu Brusco. Aparece con el Comerciante Misterioso.', price: 60, spriteKey: 'Manuscrito sombras', category: 'evolution_item' },
   { id: 'unlock_manuscrito_aguas', name: 'Manuscrito aguas', desc: 'Evoluciona a Kubfu en Urshifu Fluido. Aparece con el Comerciante Misterioso.', price: 60, spriteKey: 'Manuscrito aguas', category: 'evolution_item' },
   { id: 'unlock_repartir_exp', name: 'Repartir Exp', desc: 'Todos los Pokémon del PC ganan 1 nivel tras cada combate.', price: 130, spriteKey: 'Repartir Exp', category: 'holdable' },
+  { id: 'unlock_tarjeta_roja', name: 'Tarjeta Roja', desc: 'Si te golpean con daño y sobrevives, el rival cambia. Se consume.', price: 100, spriteKey: 'Tarjeta Roja', category: 'holdable' },
 ]
 
 function fallbackSprite(e: React.SyntheticEvent<HTMLImageElement>) {
@@ -2338,7 +2366,8 @@ function MainApp() {
   const [starterOptions, setStarterOptions] = useState<Pokemon[]>([])
   const [showStarterSelect, setShowStarterSelect] = useState(false)
   const chosenStarterIdRef = useRef<number | null>(null)
-  const [originalMedals, setOriginalMedals] = useState<number>(0)
+  // Medallas del Modo Original: cada una es una insignia distinta (no se repiten).
+  const [originalMedals, setOriginalMedals] = useState<Array<{ id: string; name: string; sprite: string }>>([])
 
   const [progression, setProgression] = useState<ProgressionData>(() => {
     try {
@@ -2536,6 +2565,13 @@ function MainApp() {
   const [eggInventory, setEggInventory] = useState<Array<{ name: string; sprite: string; types: string[]; hatchIn: number; id: number }>>([])
 
   const [pcStorage, setPcStorage] = useState<Pokemon[]>([])
+  const [dragItem, setDragItem] = useState<{ type: 'team' | 'pc'; index: number } | null>(null)
+  // Fuente real del arrastre (ref síncrona para los onDrop; el estado solo
+  // sirve para la clase visual is-dragging).
+  const dragSourceRef = useRef<{ type: 'team' | 'pc'; index: number } | null>(null)
+  // Tras un arrastre el navegador dispara un "click" en la casilla de origen;
+  // se suprime para que el reordenado no cambie además el Pokémon activo.
+  const suppressClickRef = useRef(false)
   const [modifier2, setModifier2] = useState<RunModifier | null>(null)
   const [gauntletKeys, setGauntletKeys] = useState<Array<keyof RunChallenges>>([])
 
@@ -3168,17 +3204,17 @@ function MainApp() {
     unlock_big_root: 'Big Root',
     unlock_wide_lens: 'Wide Lens',
     unlock_sitrus_berry: 'Sitrus Berry',
-    unlock_guts_band: 'Guts Band',
-    unlock_vest_protector: 'Vest Protector',
+    unlock_guts_band: 'Choice Specs',
+    unlock_vest_protector: 'Charcoal',
     unlock_focus_band: 'Focus Band',
     unlock_dragon_fang: 'Dragon Fang',
-    unlock_guardian_charm: 'Guardian Charm',
-    unlock_berserker_band: 'Berserker Band',
-    unlock_phantom_cloak: 'Phantom Cloak',
-    unlock_swift_feather: 'Swift Feather',
+    unlock_guardian_charm: 'Mystic Water',
+    unlock_berserker_band: 'Expert Belt',
+    unlock_phantom_cloak: 'Miracle Seed',
+    unlock_swift_feather: 'Sharp Beak',
     unlock_iron_ball: 'Iron Ball',
-    unlock_vampire_fang: 'Vampire Fang',
-    unlock_cursed_blade: 'Cursed Blade',
+    unlock_vampire_fang: 'Black Glasses',
+    unlock_cursed_blade: 'Twisted Spoon',
     unlock_focus_sash_2: 'Focus Sash II',
     unlock_scope_lens_2: 'Scope Lens II',
     unlock_shell_bell_2: 'Shell Bell II',
@@ -3186,15 +3222,16 @@ function MainApp() {
     unlock_leftovers_2: 'Leftovers II',
     unlock_quick_claw_2: 'Quick Claw II',
     unlock_repartir_exp: 'Repartir Exp',
+    unlock_tarjeta_roja: 'Tarjeta Roja',
     unlock_diamansfera: 'Diamansfera',
     unlock_lustresfera: 'Lustresfera',
     unlock_griseosfera: 'Griseosfera',
     unlock_baya_oca: 'Baya Oca',
     unlock_baya_kasib: 'Baya Kasib',
-    unlock_baya_meloc: 'Baya Meloc',
-    unlock_baya_zidra: 'Baya Zidra',
-    unlock_baya_aou: 'Baya Aou',
-    unlock_baya_perismon: 'Baya Perismon',
+    unlock_baya_meloc: 'Baya Shuca',
+    unlock_baya_zidra: 'Baya Coba',
+    unlock_baya_aou: 'Baya Charti',
+    unlock_baya_perismon: 'Baya Payapa',
     unlock_baya_colbur: 'Baya Colbur',
     unlock_baya_waca: 'Baya Waca',
     unlock_baya_rindo: 'Baya Rindo',
@@ -3284,6 +3321,13 @@ function MainApp() {
       return unlockedGens[Math.floor(Math.random() * unlockedGens.length)]
     }
     return generation
+  }
+
+  // Índice de etapa para la progresión de dificultad (pokémon evolucionados
+  // según el avance). El Modo Original no da insignias sino medallas, así que
+  // usa las medallas ganadas como progreso entre etapas.
+  function getStageProgression(): number {
+    return difficulty === 'original' ? originalMedals.length : badges.length
   }
 
   function getMaxTeamLevel(): number {
@@ -4033,7 +4077,7 @@ function MainApp() {
         customRoute = generateBossRushRoute(totalNodes)
       } else if (effectiveDifficulty === 'original') {
         // Modo Original: 8 etapas; cada una termina en un jefe que da una medalla.
-        setOriginalMedals(0)
+        setOriginalMedals([])
         customRoute = buildOriginalStageRoute(1)
       } else if (effectiveDifficulty === 'infinite') {
         for (let i = 1; i <= infiniteNodeSize; i++) {
@@ -4203,6 +4247,13 @@ function MainApp() {
         startingItems.push('Poké Ball', 'Poké Ball')
         const apricornBalls = ['Level Ball', 'Friend Ball', 'Love Ball', 'Heavy Ball', 'Fast Ball'].filter(isPokeballUnlocked)
         startingItems.push(apricornBalls.length > 0 ? apricornBalls[Math.floor(Math.random() * apricornBalls.length)] : 'Poké Ball')
+      }
+      // Estuche de MT: empiezas con un Disco MT en el inventario.
+      if (startItems.includes('unlock_estuche_mt')) startingItems.push('Disco MT')
+      // Saco bayas: 1 baya extra aleatoria de las desbloqueadas.
+      if (startItems.includes('unlock_saco_bayas')) {
+        const unlockedBerries = BERRY_DROPS.filter(isBerryUnlocked)
+        if (unlockedBerries.length > 0) startingItems.push(unlockedBerries[Math.floor(Math.random() * unlockedBerries.length)])
       }
       setInventory(startingItems)
       setModifier(effectiveDifficulty === 'original' ? null : run.modifier)
@@ -4501,18 +4552,22 @@ function MainApp() {
       // Modo Original: al derrotar el jefe de una etapa se gana una medalla.
       // Con 8 medallas, la Calle Victoria y la Liga son obligatorias.
       if (currentNode && currentNode.id >= 4000 && difficulty === 'original') {
-        const newMedals = originalMedals + 1
+        // Medalla única: se elige una insignia que aún no se haya ganado.
+        const available = GYM_BADGES.filter(b => !originalMedals.some(m => m.id === b.id))
+        const medal = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : null
+        if (!medal) return
+        const newMedals = [...originalMedals, medal]
         setOriginalMedals(newMedals)
         awardPokeCoins(5, '🎖️ Bonus por derrotar a un jefe del Modo Original')
-        if (newMedals >= 8) {
+        if (newMedals.length >= 8) {
           setTempLeagueTeam([])
           setLeagueTeamSelection(true)
           return
         }
-        setRoute(buildOriginalStageRoute(newMedals + 1))
+        setRoute(buildOriginalStageRoute(newMedals.length + 1))
         setRouteIndex(0)
         setScreen('route')
-        setBattleLog((prev) => [t('b.originalMedal', { n: newMedals, total: 8 }), ...prev].slice(0, 15))
+        setBattleLog((prev) => [t('b.originalMedal', { n: newMedals.length, total: 8 }), ...prev].slice(0, 15))
         return
       }
       // Calle Victoria completada → Encuentro legendario de la región antes de la Liga.
@@ -6085,6 +6140,66 @@ function MainApp() {
     setBattleLog((prev) => [t('b.depositedPC', { name: pokemon.name }), ...prev].slice(0, 15))
   }
 
+  // --- Arrastrar y soltar: reordenar equipo y PC, o mover entre ambos ---
+  function canDragTeam(): boolean {
+    return !runChallenges.soloStarter && !runChallenges.fixedTeam
+  }
+
+  function reorderTeam(fromIdx: number, toIdx: number): void {
+    if (fromIdx === toIdx) return
+    setTeam(prev => {
+      const next = [...prev]
+      const [moved] = next.splice(fromIdx, 1)
+      next.splice(toIdx, 0, moved)
+      return next
+    })
+    setActiveIndex(prev => {
+      let next: number
+      if (prev === fromIdx) next = toIdx
+      else if (fromIdx < toIdx && prev > fromIdx && prev <= toIdx) next = prev - 1
+      else if (fromIdx > toIdx && prev >= toIdx && prev < fromIdx) next = prev + 1
+      else next = prev
+      return Math.max(0, Math.min(team.length - 1, next))
+    })
+  }
+
+  function reorderPC(fromIdx: number, toIdx: number): void {
+    if (fromIdx === toIdx) return
+    setPcStorage(prev => {
+      const next = [...prev]
+      const [moved] = next.splice(fromIdx, 1)
+      next.splice(toIdx, 0, moved)
+      return next
+    })
+  }
+
+  // Saca un Pokémon del PC al equipo: si hay hueco lo inserta en `toSlot`, y si
+  // el equipo está lleno intercambia con el Pokémon de esa casilla.
+  function movePCToTeam(pcIndex: number, toSlot?: number): void {
+    const pokemon = pcStorage[pcIndex]
+    if (!pokemon) return
+    if (!canDragTeam()) {
+      setBattleLog((prev) => [t('b.noModifyTeam'), ...prev].slice(0, 15))
+      return
+    }
+    if (team.length < maxTeamSize) {
+      const newTeam = [...team]
+      const insertAt = toSlot !== undefined ? Math.min(toSlot, newTeam.length) : newTeam.length
+      newTeam.splice(insertAt, 0, pokemon)
+      setTeam(newTeam)
+      setPcStorage(prev => prev.filter((_, i) => i !== pcIndex))
+      if (insertAt <= activeIndex) setActiveIndex(prev => prev + 1)
+      setBattleLog((prev) => [t('b.withdrawnPC', { name: pokemon.name }), ...prev].slice(0, 15))
+    } else {
+      const target = toSlot !== undefined ? Math.min(toSlot, team.length - 1) : activeIndex
+      const swapOut = team[target]
+      const newTeam = team.map((p, i) => i === target ? pokemon : p)
+      setTeam(newTeam)
+      setPcStorage(prev => prev.map((p, i) => i === pcIndex ? swapOut : p))
+      setBattleLog((prev) => [t('b.swappedPC', { a: swapOut.name, b: pokemon.name }), ...prev].slice(0, 15))
+    }
+  }
+
   function generateShopStock(excludeStone?: string): string[] {
     const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i] && !TREASURES.includes(i))
     const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
@@ -6155,7 +6270,8 @@ function MainApp() {
 
     if (currentNode.type === 'legendary') {
       // Solo existe en el Modo Original (no se genera aleatoriamente en ningún
-      // otro modo): encuentro salvaje con un legendario de la región, capturable.
+      // otro modo): combate salvaje contra un legendario de la región, que se
+      // puede debilitar y capturar como cualquier Pokémon salvaje.
       if (difficulty !== 'original') {
         setBattleLog(prev => [t('b.legendaryOnlyOriginal'), ...prev].slice(0, 15))
         completeCurrentNode()
@@ -6176,9 +6292,20 @@ function MainApp() {
           maxHp: legendaryData.maxHp,
         }
         seenInPokedex(legendary)
-        setBattleLog(prev => [t('b.regionLegendary', { name: legendary.name, lvl: legendary.level }), ...prev].slice(0, 15))
-        setLegendaryEncounter(legendary)
-        setScreen('route')
+        setIsTrainerBattle(false)
+        setTrainerTeam([])
+        setTrainerPokemonIndex(0)
+        setTrainerName('')
+        setTrainerSprite('')
+        setTrainerBadge('')
+        setReviveModal(null)
+        setEquipModal(null)
+        setEnemy({ ...legendary, justEntered: true })
+        setBattleLog((prev) => [
+          t('b.wildAppeared', { name: legendary.name, lvl: legendary.level }),
+          ...prev
+        ])
+        setScreen('battle')
       } catch {
         setApiError(t('b.legendError'))
       } finally {
@@ -6200,7 +6327,7 @@ function MainApp() {
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const targetLevel = difficulty === 'infinite' ? getInfiniteTargetLevel() : avgPlayerLevel
         const fetches = Array.from({ length: 4 }, () =>
-          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
+          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression(), targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
               let scaled = scalePokemonForNode(base, currentNode, routeIndex, levelDiff, difficulty)
@@ -6227,7 +6354,7 @@ function MainApp() {
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const targetLevel = difficulty === 'infinite' ? getInfiniteTargetLevel() : avgPlayerLevel + 1
         const fetches = Array.from({ length: 2 }, (_, idx) =>
-          getBalancedPokemonByGeneration(targetGen, routeIndex + idx, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
+          getBalancedPokemonByGeneration(targetGen, routeIndex + idx, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression(), targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
               let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff, difficulty)
@@ -6328,7 +6455,7 @@ function MainApp() {
           const targetLevel = difficulty === 'infinite'
             ? getInfiniteTargetLevel() + 1 + Math.floor(Math.random() * 2)
             : avgPlayerLevel + Math.floor(Math.random() * 3) - 1
-          return getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
+          return getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression(), targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
               const scaled = scalePokemonForNode(base, currentNode, routeIndex, levelDiff, difficulty)
@@ -6457,7 +6584,7 @@ function MainApp() {
     try {
       if (runChallenges.egglocke) {
         const targetGen = getEffectiveGen()
-        const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length)
+        const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression())
         const eggId = Math.floor(Math.random() * 900) + 1
         const eggEntry = {
           name: restPokemonBase.name,
@@ -6499,7 +6626,7 @@ function MainApp() {
       const restTargetLevel = difficulty === 'infinite'
             ? getInfiniteTargetLevel() + (Math.floor(Math.random() * 3) - 1)
         : avgPlayerLevel - 2 + Math.floor(Math.random() * 3) - 1
-      const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, restTargetLevel)
+      const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression(), restTargetLevel)
       const levelDiff = restTargetLevel - restPokemonBase.level
       const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, levelDiff, difficulty)
       generatedEncounter.holdItem = null
@@ -6562,7 +6689,7 @@ function MainApp() {
             ? getInfiniteTargetLevel() + trainerMemberLevelOffset(idx, teamSize, true, difficulty)
             : avgPlayerLevel + trainerMemberLevelOffset(idx, teamSize, true, difficulty)
           const baseStepIndex = difficulty === 'infinite' ? Math.max(0, targetLevel - 10) : routeIndex
-          return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
+          return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression(), targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
               let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels, difficulty)
@@ -6606,7 +6733,7 @@ function MainApp() {
           // En Infinite, genera al rival directamente a su nivel objetivo para que
           // respete etapas evolutivas y movimientos según el nivel. En Co-op, igual.
           const baseStepIndex = difficulty === 'infinite' ? Math.max(0, targetLevel - 10) : routeIndex
-          return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
+          return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression(), targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
               let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
@@ -6675,7 +6802,7 @@ function MainApp() {
                 // respete etapas evolutivas y movimientos según el nivel. En Co-op,
                 // igual: la especie debe ser coherente con el nivel objetivo real.
                 const baseStepIndex = difficulty === 'infinite' ? Math.max(0, targetLevel - 10) : routeIndex
-                return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? badges.length : -1, badges.length, targetLevel, isElite)
+                return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? getStageProgression() : -1, getStageProgression(), targetLevel, isElite)
                   .then((base) => {
                     const levelDiff = targetLevel - base.level
                     let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
@@ -6763,7 +6890,7 @@ function MainApp() {
         const targetLevel = difficulty === 'infinite'
             ? getInfiniteTargetLevel() + (Math.floor(Math.random() * 3) - 1)
           : avgPlayerLevel + wildLevelOffset
-        const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, badges.length, targetLevel)
+        const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression(), targetLevel)
         const levelDiff = targetLevel - enemyBase.level
         let generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
         generatedEnemy = balanceWildPokemonToTeam(generatedEnemy, team, difficulty)
@@ -7146,6 +7273,11 @@ function MainApp() {
       setBattleLog((prev) => [t('b.challengeNoBuying'), ...prev].slice(0, 15))
       return
     }
+    const alreadyBought = shopBoughtCount[itemName] ?? 0
+    if (alreadyBought >= shopBuyAllowance) {
+      setBattleLog((prev) => [t('b.shopSoldOut'), ...prev].slice(0, 15))
+      return
+    }
     if (HOLDABLE_ITEM_NAMES.includes(itemName)) {
       const holdableIdx = inventory.indexOf(itemName)
       if (holdableIdx !== -1) {
@@ -7163,6 +7295,7 @@ function MainApp() {
 
     setMoney((prev) => prev - finalPrice)
     setInventory((prev) => [...prev, itemName])
+    setShopBoughtCount((prev) => ({ ...prev, [itemName]: (prev[itemName] ?? 0) + 1 }))
     setRunStats(prev => ({ ...prev, moneySpent: prev.moneySpent + finalPrice }))
     setBattleLog((prev) => [t('b.bought', { qty: 1, item: itemLocalizedName(itemName), total: finalPrice }), ...prev].slice(0, 15))
   }
@@ -7413,8 +7546,8 @@ function MainApp() {
     }
     const effectiveDefender: Pokemon = {
       ...defender,
-      defense: Math.round(defender.defense * (1 + (defenderItem?.defenseMod ?? 0) + playerDefMod) * defStageMult + enemyDefDelta),
-      spDefense: Math.round(defender.spDefense * (1 + (defenderItem?.spDefenseMod ?? 0) + playerDefMod) * spDefStageMult + enemyDefDelta)
+      defense: Math.round(defender.defense * (1 + (defenderItem?.defenseMod ?? 0) + (defenderItem?.eviolite && canStillEvolve(defender) ? 0.50 : 0) + playerDefMod) * defStageMult + enemyDefDelta),
+      spDefense: Math.round(defender.spDefense * (1 + (defenderItem?.spDefenseMod ?? 0) + (defenderItem?.eviolite && canStillEvolve(defender) ? 0.50 : 0) + playerDefMod) * spDefStageMult + enemyDefDelta)
     }
 
     const effectiveMove = runChallenges.typeRandomizer
@@ -7461,6 +7594,8 @@ function MainApp() {
     const lines: string[] = []
     let totalDamage = 0
     let totalCrits = 0
+    const defenderAtFullHp = currentDefender.hp >= currentDefender.maxHp
+    let resistBerryUsed = false
 
     const isDamagingMove = (effectiveMove.power ?? 0) > 0
     if (isDamagingMove && effectiveness === 0) {
@@ -7480,6 +7615,15 @@ function MainApp() {
       if (typeBoost && (!typeBoost.onlyIds || typeBoost.onlyIds.includes(attacker.id)) && typeBoost.types.includes(effectiveMove.type)) {
         finalDamage = Math.floor(finalDamage * (1 + typeBoost.boost))
       }
+      // Potenciadores de categoría (Muscle Band / Wise Glasses).
+      const categoryBoost = effectiveMove.damageClass === 'special' ? (attackerItem?.specialBoost ?? 0) : (attackerItem?.physicalBoost ?? 0)
+      if (categoryBoost) {
+        finalDamage = Math.floor(finalDamage * (1 + categoryBoost))
+      }
+      // Cinturón Experto (Expert Belt): +daño si el movimiento es superefectivo.
+      if (attackerItem?.superEffectiveBoost && effectiveness > 1) {
+        finalDamage = Math.floor(finalDamage * (1 + attackerItem.superEffectiveBoost))
+      }
       if (attackerItem?.lowHpBonus && attacker.hp < attacker.maxHp * 0.3) {
         finalDamage = Math.floor(finalDamage * (1 + attackerItem.lowHpBonus))
       }
@@ -7488,6 +7632,12 @@ function MainApp() {
       }
       if (defenderItem?.damageReduction) {
         finalDamage = Math.floor(finalDamage * (1 - defenderItem.damageReduction))
+      }
+      // Baya resistente (Baya Oca, Kasib, Babiri...): reduce a la mitad un
+      // movimiento superefectivo de su tipo. Se consume al activarse.
+      if (defenderItem?.resistType && !resistBerryUsed && effectiveMove.type === defenderItem.resistType && effectiveness > 1) {
+        finalDamage = Math.floor(finalDamage / 2)
+        resistBerryUsed = true
       }
 
       // --- Crit: base from items/modifiers + move crit stage ---
@@ -7514,6 +7664,27 @@ function MainApp() {
       lines.push(hitLine)
 
       if (currentDefender.hp <= 0) break
+    }
+    // --- Objetos de supervivencia y bayas (se resuelven tras los golpes) ---
+    // Baya resistente consumida: se elimina del Pokémon.
+    if (resistBerryUsed) {
+      currentDefender = { ...currentDefender, holdItem: undefined }
+      lines.push(t('b.resistBerry', { name: currentDefender.name, berry: itemLocalizedName(defender.holdItem ?? '') }))
+    }
+    // Cinta Focus (Focus Sash): a plena vida aguanta un golpe letal y se consume.
+    if (currentDefender.hp <= 0 && defenderItem?.focusSash && defenderAtFullHp) {
+      currentDefender = { ...currentDefender, hp: 1, holdItem: undefined }
+      lines.push(t('b.focusSash', { name: currentDefender.name }))
+    } else if (currentDefender.hp <= 0 && defenderItem?.endureChance && Math.random() < defenderItem.endureChance) {
+      // Cinta Focus (Focus Band): probabilidad de aguantar un golpe letal.
+      currentDefender = { ...currentDefender, hp: 1 }
+      lines.push(t('b.focusBand', { name: currentDefender.name }))
+    }
+    // Baya Sitrus: restaura HP al estar por debajo del 50%. Se consume.
+    if (defenderItem?.berryHeal && totalDamage > 0 && currentDefender.hp > 0 && currentDefender.hp < currentDefender.maxHp / 2) {
+      const sitrusHeal = Math.floor(currentDefender.maxHp * defenderItem.berryHeal)
+      currentDefender = { ...currentDefender, hp: Math.min(currentDefender.maxHp, currentDefender.hp + sitrusHeal), holdItem: undefined }
+      lines.push(t('b.sitrusHeal', { name: currentDefender.name, hp: sitrusHeal }))
     }
     } else {
       // Movimiento de estado: no hace daño, solo puede aplicar su efecto.
@@ -7631,10 +7802,23 @@ function MainApp() {
       updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - recoilDamage) }
       lines.push(t('b.recoil', { name: attacker.name, dmg: recoilDamage }))
     }
+    // --- Vida Esfera (Life Orb): pierdes 1/10 del daño infligido ---
+    if (attackerItem?.lifeOrb && totalDamage > 0) {
+      const orbRecoil = Math.max(1, Math.floor(totalDamage / 10))
+      updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - orbRecoil) }
+      lines.push(t('b.lifeOrb', { name: attacker.name, hp: orbRecoil }))
+    }
+    // --- Casco Dentado (Rocky Helmet): el atacante (físico) pierde 1/6 de su HP ---
+    if (defenderItem?.rockyHelmet && totalDamage > 0 && effectiveMove.damageClass !== 'special') {
+      const helmetRecoil = Math.max(1, Math.floor(attacker.maxHp / 6))
+      updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - helmetRecoil) }
+      lines.push(t('b.rockyHelmet', { name: attacker.name, hp: helmetRecoil }))
+    }
 
     // --- Drain (Absorb, Megaagotar, etc.) ---
     if (move.drainPercent && move.drainPercent > 0 && totalDamage > 0 && updatedAttacker.hp > 0) {
-      const drainHeal = Math.floor(totalDamage * move.drainPercent)
+      const drainMult = attackerItem?.bigRoot ? 1.30 : 1
+      const drainHeal = Math.floor(totalDamage * move.drainPercent * drainMult)
       updatedAttacker = { ...updatedAttacker, hp: Math.min(updatedAttacker.maxHp, updatedAttacker.hp + drainHeal) }
       lines.push(t('b.drained', { name: attacker.name, hp: drainHeal }))
     }
@@ -7745,6 +7929,22 @@ function MainApp() {
       setTeam(prev => prev.map((p, i) => i === nextAliveIndex ? { ...p, justEntered: true } : p))
       setActiveIndex(nextAliveIndex)
       return
+    }
+
+    // --- Objetos Choice y Chaleco Asalto: restricciones del movimiento ---
+    const activeHoldable = activePokemon.holdItem ? HOLDABLE_ITEMS[activePokemon.holdItem] : null
+    if (activeHoldable?.assaultVest && (!move.power || move.power <= 0)) {
+      setBattleLog((prev) => [t('b.assaultVestBlock', { name: activePokemon.name }), ...prev].slice(0, 15))
+      return
+    }
+    if (activeHoldable?.choiceLock) {
+      if (activePokemon.choiceLockedMove && activePokemon.choiceLockedMove !== move.name) {
+        setBattleLog((prev) => [t('b.choiceLock', { name: activePokemon.name, move: moveName({ name: activePokemon.choiceLockedMove ?? '' }) }), ...prev].slice(0, 15))
+        return
+      }
+      if (!activePokemon.choiceLockedMove) {
+        setTeam(prev => prev.map((p, i) => i === activeIndex ? { ...p, choiceLockedMove: move.name } : p))
+      }
     }
 
     setBattleTurns(t => t + 1)
@@ -7882,6 +8082,12 @@ function MainApp() {
       playerStarts = playerEffectiveSpeed >= enemyEffectiveSpeed
     }
 
+    // Garra Rápida (Quick Claw): probabilidad de atacar primero.
+    const playerQuickClaw = (playerItem?.quickClawChance ?? 0) > 0 && Math.random() < (playerItem?.quickClawChance ?? 0)
+    const enemyQuickClaw = (enemyItem?.quickClawChance ?? 0) > 0 && Math.random() < (enemyItem?.quickClawChance ?? 0)
+    if (playerQuickClaw && !enemyQuickClaw) playerStarts = true
+    else if (enemyQuickClaw && !playerQuickClaw) playerStarts = false
+
     let playerCrits = 0
     const doPlayerAttack = async () => {
       if (nextPlayer.hp <= 0 || nextEnemy.hp <= 0 || playerSkipped || playerConfusedSelfHit) return
@@ -7920,6 +8126,21 @@ function MainApp() {
     const doEnemyAttack = async () => {
       if (nextEnemy.hp <= 0 || nextPlayer.hp <= 0 || enemySkipped || enemyConfusedSelfHit) return
       let enemyMove = enemyMoveForPriority
+      // Objetos Choice del rival: se queda con el primer movimiento elegido.
+      const enemyHoldable = nextEnemy.holdItem ? HOLDABLE_ITEMS[nextEnemy.holdItem] : null
+      if (enemyHoldable?.choiceLock) {
+        if (nextEnemy.choiceLockedMove) {
+          const locked = nextEnemy.moves.find(m => m.name === nextEnemy.choiceLockedMove)
+          if (locked) enemyMove = locked
+        } else {
+          nextEnemy = { ...nextEnemy, choiceLockedMove: enemyMove.name }
+        }
+      }
+      // Chaleco Asalto del rival: no puede usar movimientos de estado.
+      if (enemyHoldable?.assaultVest && (!enemyMove.power || enemyMove.power <= 0)) {
+        const damagingMoves = nextEnemy.moves.filter(m => (m.power ?? 0) > 0)
+        if (damagingMoves.length > 0) enemyMove = damagingMoves[Math.floor(Math.random() * damagingMoves.length)]
+      }
       // Anulación: el rival evita su movimiento anulado si puede.
       if (nextEnemy.disabled && nextEnemy.disabled.move === enemyMove.name) {
         const usable = nextEnemy.moves.filter(m => m.name !== nextEnemy.disabled?.move)
@@ -7932,6 +8153,7 @@ function MainApp() {
         }
       }
       if (enemyMove.name !== 'Furia') nextEnemy = { ...nextEnemy, furiaActive: false }
+      const playerHpBeforeEnemyHit = nextPlayer.hp
       const enemyHit = performHit(nextEnemy, nextPlayer, enemyMove, true, playerStarts)
       nextPlayer = enemyHit.updatedDefender
       nextEnemy = enemyHit.updatedAttacker
@@ -7941,6 +8163,30 @@ function MainApp() {
         logs.push(t('b.vampirism', { name: nextEnemy.name, hp: enemyHit.attackerHeal }))
       }
       logs.push(...enemyHit.lines)
+
+      // --- Tarjeta Roja: si el Pokémon la lleva equipada y es golpeado por un
+      // movimiento de daño (sobreviviendo), el rival es obligado a cambiar a
+      // otro Pokémon de su equipo. El objeto se consume. ---
+      if (nextPlayer.holdItem === 'Tarjeta Roja' && isTrainerBattle) {
+        const playerTookDamage = nextPlayer.hp < playerHpBeforeEnemyHit
+        const isDamaging = (enemyMove.power ?? 0) > 0
+        if (playerTookDamage && isDamaging && nextPlayer.hp > 0) {
+          const currentEnemyIndex = trainerPokemonIndex
+          const teamWithCurrent = trainerTeam.map((p, idx) => idx === currentEnemyIndex ? nextEnemy : p)
+          const aliveOthers = teamWithCurrent
+            .map((p, idx) => ({ p, idx }))
+            .filter(x => x.p.hp > 0 && x.idx !== currentEnemyIndex)
+          if (aliveOthers.length > 0) {
+            const picked = aliveOthers[Math.floor(Math.random() * aliveOthers.length)]
+            nextPlayer = { ...nextPlayer, holdItem: undefined }
+            nextEnemy = { ...picked.p, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, justEntered: true }
+            setTrainerTeam(teamWithCurrent)
+            setTrainerPokemonIndex(picked.idx)
+            logs.push(t('b.redCard', { name: nextPlayer.name }))
+            logs.push(t('b.enemySendsOut', { trainer: trainerName, name: picked.p.name, lvl: picked.p.level }))
+          }
+        }
+      }
     }
 
     if (playerStarts) {
@@ -7958,6 +8204,15 @@ function MainApp() {
       const item = p.holdItem ? HOLDABLE_ITEMS[p.holdItem] : null
       if (!item) return p
       let updated = { ...p }
+      // Restos (Leftovers): recupera una fracción del HP máximo cada turno.
+      if (item.healFraction && updated.hp > 0) {
+        let healAmount = Math.max(1, Math.floor(updated.maxHp * item.healFraction))
+        if (healAmount > 0) {
+          healAmount = Math.floor(healAmount * (1 - modHealReduction)) + modHealBonus
+        }
+        updated = { ...updated, hp: Math.min(updated.maxHp, updated.hp + healAmount) }
+        if (healAmount > 0) logs.push(t('b.itemHealTurn', { name: updated.name, hp: healAmount, item: item.name }))
+      }
       if (item.healPerTurn && updated.hp > 0) {
         let healAmount = item.healPerTurn
         if (healAmount > 0) {
@@ -8065,7 +8320,7 @@ function MainApp() {
       // victoria final de todo el equipo rival.
       const isFullWin = !isTrainerBattle || (() => {
         const updatedTrainerTeam = trainerTeam.map((p, idx) => idx === trainerPokemonIndex ? nextEnemy : p)
-        return updatedTrainerTeam.findIndex((p, idx) => idx > trainerPokemonIndex && p.hp > 0) === -1
+        return updatedTrainerTeam.findIndex((p) => p.hp > 0) === -1
       })()
       if (isFullWin) {
         if (nextPlayer.hp === 1) unlockAchievement('back_from_brink')
@@ -8166,7 +8421,11 @@ function MainApp() {
       // --- Batalla de entrenador: enviar siguiente Pokémon ---
       if (isTrainerBattle) {
         const updatedTrainerTeam = trainerTeam.map((p, idx) => idx === trainerPokemonIndex ? nextEnemy : p)
-        const nextTrainerIndex = updatedTrainerTeam.findIndex((p, idx) => idx > trainerPokemonIndex && p.hp > 0)
+        // Búsqueda circular: primero los que quedan después del índice actual y,
+        // si no hay, los anteriores (la Tarjeta Roja puede haber mezclado el orden).
+        const aliveAfter = updatedTrainerTeam.findIndex((p, idx) => idx > trainerPokemonIndex && p.hp > 0)
+        const aliveBefore = updatedTrainerTeam.findIndex((p, idx) => idx < trainerPokemonIndex && p.hp > 0)
+        const nextTrainerIndex = aliveAfter !== -1 ? aliveAfter : aliveBefore
 
         if (nextTrainerIndex === -1) {
           const baseTotalReward = 40 + nextEnemy.level * 5 * trainerTeam.length
@@ -8535,8 +8794,8 @@ function MainApp() {
     setTeam(prev => prev.map((p, i) => {
       // Al cambiar de Pokémon se pierden Drenadoras y Anulación (como en los juegos reales),
       // y el que entra cuenta como "recién llegado" para Sorpresa/Abatimiento.
-      if (i === activeIndex && orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false, ...orig }
-      if (i === activeIndex) return { ...p, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false }
+      if (i === activeIndex && orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false, choiceLockedMove: undefined, ...orig }
+      if (i === activeIndex) return { ...p, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false, choiceLockedMove: undefined }
       if (i === index) return { ...p, justEntered: true }
       return p
     }))
@@ -8965,12 +9224,6 @@ function MainApp() {
       setBattleLog((prev) => [t('b.capturedLegend', { name: captured.name }), ...prev].slice(0, 15))
     }
     setLegendaryEncounter(null)
-    // En el nodo legendario del Modo Original, capturar completa el nodo y
-    // continúa hacia la Liga.
-    if (currentNode?.type === 'legendary') {
-      void completeCurrentNode()
-      return
-    }
   }
 
   function skipLegendaryCapture(): void {
@@ -8978,12 +9231,6 @@ function MainApp() {
 
     setBattleLog((prev) => [t('rest.letGoLegend', { name: legendaryEncounter.name }), ...prev].slice(0, 15))
     setLegendaryEncounter(null)
-    // En el nodo legendario del Modo Original, saltarlo completa el nodo y
-    // continúa hacia la Liga.
-    if (currentNode?.type === 'legendary') {
-      void completeCurrentNode()
-      return
-    }
   }
 
   function handleInfiniteRunDefeat(finalTeam: Pokemon[]): void {
@@ -9924,10 +10171,13 @@ function MainApp() {
                                 <strong style={{ textTransform: 'capitalize', fontSize: '0.75rem', color: evo.id === selectedPokemonDetail.id ? '#4d9bff' : '#f3f1ff', textAlign: 'center' }}>
                                   {known ? evo.name : '???'}
                                 </strong>
+                                {evo.item && (
+                                  <span style={{ fontSize: '0.72rem', color: '#ffcb05', fontWeight: 'bold', textAlign: 'center' }}>{itemLocalizedName(evo.item)}</span>
+                                )}
                                 {evo.level && (
                                   <span style={{ fontSize: '0.85rem', color: '#a855f7', fontWeight: 'bold' }}>{t('pokedex.lv')} {evo.level}</span>
                                 )}
-                                {!evo.level && evo.trigger && evo.trigger !== 'level-up' && (
+                                {!evo.level && !evo.item && evo.trigger && evo.trigger !== 'level-up' && (
                                   <span style={{ fontSize: '0.85rem', color: '#ffcb05', fontWeight: 'bold' }}>{t(`evo.trigger.${evo.trigger}`)}</span>
                                 )}
                               </div>
@@ -11458,14 +11708,30 @@ function MainApp() {
             </div>
 
             <p className="label">{t('route.team')} {team.length}/{maxTeamSize}</p>
-            <div className="team-grid">
+            <div className="team-grid" onDragOver={(e) => { e.preventDefault() }}>
               {team.map((pokemon, index) => (
                 <div key={`${pokemon.id}-${index}`} className="sprite-tooltip-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <button
-                    className={`team-slot ${index === activeIndex ? 'is-active' : ''} ${pokemon.hp <= 0 ? 'is-fainted' : ''}`}
+                    className={`team-slot ${index === activeIndex ? 'is-active' : ''} ${pokemon.hp <= 0 ? 'is-fainted' : ''} ${dragItem?.type === 'team' && dragItem.index === index ? 'is-dragging' : ''}`}
                     type="button"
-                    onClick={() => switchActive(index)}
+                    onClick={() => {
+                      if (suppressClickRef.current) { suppressClickRef.current = false; return }
+                      switchActive(index)
+                    }}
                     disabled={pokemon.hp <= 0 || isLoading}
+                    draggable={!isLoading && canDragTeam()}
+                    onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'team'); suppressClickRef.current = true; dragSourceRef.current = { type: 'team', index }; setDragItem({ type: 'team', index }) }}
+                    onDragEnd={() => { dragSourceRef.current = null; setDragItem(null); setTimeout(() => { suppressClickRef.current = false }, 400) }}
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+                    onDrop={(e) => {
+                      e.preventDefault(); e.stopPropagation()
+                      const src = dragSourceRef.current
+                      if (!src) return
+                      if (src.type === 'team') reorderTeam(src.index, index)
+                      else if (src.type === 'pc') movePCToTeam(src.index, index)
+                      dragSourceRef.current = null
+                      setDragItem(null)
+                    }}
                   >
                     <img src={pokemon.sprite} alt={pokemon.name} onError={fallbackSprite} />
                     {pokemon.holdItem && ITEM_SPRITES[pokemon.holdItem] && (
@@ -11580,7 +11846,21 @@ function MainApp() {
                 </div>
               ))}
               {Array.from({ length: Math.max(0, maxTeamSize - team.length) }).map((_, index) => (
-                <div key={`empty-${index}`} className="team-slot empty">
+                <div
+                  key={`empty-${index}`}
+                  className="team-slot empty"
+                  onDragOver={(e) => { e.preventDefault() }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    const src = dragSourceRef.current
+                    if (!src) return
+                    const toIdx = team.length + index
+                    if (src.type === 'team') reorderTeam(src.index, toIdx)
+                    else if (src.type === 'pc') movePCToTeam(src.index, toIdx)
+                    dragSourceRef.current = null
+                    setDragItem(null)
+                  }}
+                >
                   Empty
                 </div>
               ))}
@@ -11589,14 +11869,42 @@ function MainApp() {
             {pcStorage.length > 0 && (
               <>
                 <p className="label" style={{ marginTop: '0.75rem' }}>PC ({pcStorage.length})</p>
-                <div className="team-grid">
+                <div
+                  className="team-grid"
+                  onDragOver={(e) => { e.preventDefault() }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    const src = dragSourceRef.current
+                    if (!src) return
+                    // Soltar un miembro del equipo en el hueco del PC lo manda al PC.
+                    if (src.type === 'team') depositToPC(src.index)
+                    dragSourceRef.current = null
+                    setDragItem(null)
+                  }}
+                >
                   {pcStorage.map((pokemon, index) => (
                     <div key={`pc-${index}`} className="sprite-tooltip-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <button
-                        className="team-slot"
+                        className={`team-slot ${dragItem?.type === 'pc' && dragItem.index === index ? 'is-dragging' : ''}`}
                         type="button"
-                        onClick={() => withdrawFromPC(index)}
+                        onClick={() => {
+                          if (suppressClickRef.current) { suppressClickRef.current = false; return }
+                          withdrawFromPC(index)
+                        }}
                         disabled={isLoading}
+                        draggable={!isLoading && canDragTeam()}
+                        onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'pc'); suppressClickRef.current = true; dragSourceRef.current = { type: 'pc', index }; setDragItem({ type: 'pc', index }) }}
+                        onDragEnd={() => { dragSourceRef.current = null; setDragItem(null); setTimeout(() => { suppressClickRef.current = false }, 400) }}
+                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+                        onDrop={(e) => {
+                          e.preventDefault(); e.stopPropagation()
+                          const src = dragSourceRef.current
+                          if (!src) return
+                          if (src.type === 'pc') reorderPC(src.index, index)
+                          else if (src.type === 'team') depositToPC(src.index)
+                          dragSourceRef.current = null
+                          setDragItem(null)
+                        }}
                       >
                         <img src={pokemon.sprite} alt={pokemon.name} onError={fallbackSprite} />
                         {pokemon.holdItem && ITEM_SPRITES[pokemon.holdItem] && (
@@ -11629,7 +11937,7 @@ function MainApp() {
 
             {team.length > 1 && pcStorage.length > 0 && (
               <p style={{ fontSize: '0.7rem', color: '#7d7ab5', marginTop: '0.5rem', textAlign: 'center' }}>
-                Haz clic en "→ Equipo" para sacar del PC. Si el equipo está lleno, se intercambia con el activo.
+                Arrastra los Pokémon para reordenar el equipo y el PC, o arrastra entre ambos. Si el equipo está lleno, se intercambia con el de la casilla.
               </p>
             )}
           </article>
@@ -11652,18 +11960,21 @@ function MainApp() {
             )}
             {difficulty === 'original' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', padding: '6px 10px', background: 'rgba(77,155,255,0.1)', borderRadius: '8px', border: '1px solid rgba(77,155,255,0.35)' }}>
-                <span style={{ fontSize: '0.85rem', color: '#4d9bff', fontWeight: 'bold' }}>🏅 {language === 'en' ? 'Medals' : 'Medallas'}: {originalMedals}/8</span>
+                <span style={{ fontSize: '0.85rem', color: '#4d9bff', fontWeight: 'bold' }}>🏅 {language === 'en' ? 'Medals' : 'Medallas'}: {originalMedals.length}/8</span>
                 <div style={{ display: 'flex', gap: '3px' }}>
-                  {Array.from({ length: 8 }, (_, i) => (
-                    <div key={i} style={{
-                      width: '18px', height: '18px', borderRadius: '50%',
-                      background: i < originalMedals ? 'rgba(77,155,255,0.3)' : 'rgba(255,255,255,0.05)',
-                      border: i < originalMedals ? '2px solid #4d9bff' : '2px dashed #475569',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      {i < originalMedals ? <span style={{ fontSize: '0.6rem' }}>🏅</span> : <span style={{ fontSize: '0.55rem', color: '#475569' }}>?</span>}
-                    </div>
-                  ))}
+                  {Array.from({ length: 8 }, (_, i) => {
+                    const medal = originalMedals[i]
+                    return (
+                      <div key={i} style={{
+                        width: '18px', height: '18px', borderRadius: '50%',
+                        background: medal ? 'rgba(77,155,255,0.3)' : 'rgba(255,255,255,0.05)',
+                        border: medal ? '2px solid #4d9bff' : '2px dashed #475569',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                      }}>
+                        {medal ? <img src={medal.sprite} alt={medal.name} style={{ width: '13px', height: '13px', imageRendering: 'pixelated' }} /> : <span style={{ fontSize: '0.55rem', color: '#475569' }}>?</span>}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -11782,9 +12093,9 @@ function MainApp() {
                     const finalPrice = Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0)) * hardMarkup * stageMarkup)
                     const qty = shopQty[itemName] ?? 1
                     const bought = shopBoughtCount[itemName] ?? 0
-                    const allowance = isHoldable ? 1 : shopBuyAllowance
+                    const allowance = shopBuyAllowance
                     const remaining = Math.max(0, allowance - bought)
-                    const soldOut = !isHoldable && remaining <= 0
+                    const soldOut = remaining <= 0
                     const maxQty = isHoldable ? 1 : Math.max(0, Math.min(remaining, Math.floor(money / finalPrice)))
                     const totalPrice = finalPrice * qty
                     const canBuy = money >= totalPrice && remaining >= qty
@@ -12432,9 +12743,6 @@ function MainApp() {
                 <p>
                   🐉 ¡Un Pokémon Legendario apareció! <strong>{legendaryEncounter.name}</strong> está esperando ser capturado.
                 </p>
-                {currentNode?.type !== 'legendary' && (
-                  <p style={{ color: '#fbbf24', fontSize: '0.85rem' }}>✨ El equipo se ha curado por completo.</p>
-                )}
                 <div className="capture-card" style={{ border: '2px solid #fbbf24', boxShadow: '0 0 12px rgba(251,191,36,0.4)' }}>
                   <img className="sprite" src={legendaryEncounter.sprite} alt={legendaryEncounter.name} onError={fallbackSprite} />
                 </div>
@@ -12455,7 +12763,7 @@ function MainApp() {
                   {t('route.nextNode', { name: `${nodeTypeLabel(currentNode)} #${currentNode.id}` })}
                 </p>
                 <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={enterNode} type="button" disabled={isLoading}>
-                  {isLoading ? t('node.searching') : currentNode.type === 'teamRocket' ? t('node.teamRocket') : currentNode.type === 'spin' ? t('node.spin') : currentNode.type === 'pokeRand' ? t('node.pokeRand') : currentNode.type === 'mega' ? t('node.mega') : currentNode.type === 'gmax' ? t('node.gmax') : currentNode.type === 'primal' ? t('node.primal') : currentNode.type === 'trade' ? t('node.trade') : currentNode.type === 'rival' ? t('node.rival') : currentNode.type === 'blackmarket' ? t('node.blackmarket') : currentNode.type === 'double' ? t('node.double') : currentNode.type === 'casino' ? t('node.casino') : t('node.enter')}
+                  {isLoading ? t('node.searching') : currentNode.type === 'teamRocket' ? t('node.teamRocket') : currentNode.type === 'spin' ? t('node.spin') : currentNode.type === 'pokeRand' ? t('node.pokeRand') : currentNode.type === 'mega' ? t('node.mega') : currentNode.type === 'gmax' ? t('node.gmax') : currentNode.type === 'primal' ? t('node.primal') : currentNode.type === 'trade' ? t('node.trade') : currentNode.type === 'rival' ? t('node.rival') : currentNode.type === 'blackmarket' ? t('node.blackmarket') : currentNode.type === 'double' ? t('node.double') : currentNode.type === 'casino' ? t('node.casino') : currentNode.type === 'legendary' ? t('node.legendary') : t('node.enter')}
                 </button>
               </div>
             )}
@@ -12787,17 +13095,29 @@ function MainApp() {
                   <>
                   {(runChallenges.restrictedMoves ? activePokemon.moves.slice(0, 2) : activePokemon.moves).map((move) => {
                     const isDisabled = activePokemon.disabled?.move === move.name
+                    const moveHoldable = activePokemon.holdItem ? HOLDABLE_ITEMS[activePokemon.holdItem] : null
+                    const isStatusMove = !move.power || move.power <= 0
+                    const assaultVestBlocked = !!moveHoldable?.assaultVest && isStatusMove
+                    const choiceBlocked = !!moveHoldable?.choiceLock && !!activePokemon.choiceLockedMove && activePokemon.choiceLockedMove !== move.name
+                    const moveDisabled = isLoading || isDisabled || (runChallenges.speedrun && speedrunSeconds <= 0) || assaultVestBlocked || choiceBlocked
+                    const blockTitle = choiceBlocked
+                      ? `🔒 Solo puedes usar ${moveName({ name: activePokemon.choiceLockedMove ?? '' })}`
+                      : assaultVestBlocked
+                        ? '🦺 Chaleco Asalto: no puedes usar movimientos de estado'
+                        : isDisabled
+                          ? '🚫 Anulado por Anulación'
+                          : moveTooltip(move)
                     return (
                     <button
                       key={move.name}
                       className="move-btn"
                       onClick={() => onPlayerMove(move)}
                       type="button"
-                      disabled={isLoading || isDisabled || (runChallenges.speedrun && speedrunSeconds <= 0)}
-                      title={isDisabled ? `🚫 Anulado por Anulación` : moveTooltip(move)}
-                      style={isDisabled ? { borderColor: '#ff8a80', opacity: 0.5, textDecoration: 'line-through' } : undefined}
+                      disabled={moveDisabled}
+                      title={blockTitle}
+                      style={isDisabled || choiceBlocked || assaultVestBlocked ? { borderColor: '#ff8a80', opacity: 0.5, textDecoration: 'line-through' } : undefined}
                     >
-                      <span className="move-btn-line">{isDisabled ? '🚫 ' : ''}{moveName(move)} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''}){move.minHits ? ` x${move.minHits}-${move.maxHits}` : ''}</span>
+                      <span className="move-btn-line">{isDisabled || choiceBlocked || assaultVestBlocked ? '🚫 ' : ''}{moveName(move)} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''}){move.minHits ? ` x${move.minHits}-${move.maxHits}` : ''}</span>
                       {moveEffectSummary(move) && <span className="move-btn-effect">{moveEffectSummary(move)}</span>}
                     </button>
                     )

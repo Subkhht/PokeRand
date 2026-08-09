@@ -83,6 +83,7 @@ export interface Pokemon {
   lastMove?: string
   disabled?: { move: string; turns: number }
   justEntered?: boolean
+  choiceLockedMove?: string
 }
 
 export interface RouteNode {
