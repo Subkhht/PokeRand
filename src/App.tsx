@@ -667,7 +667,7 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'X Sp. Defense 2': { price: 150, desc: 'Aumenta permanentemente en +10 la Defensa Especial.' },
   'Cuerda Huida': { price: 200, desc: 'Permite escapar de cualquier combate de la aventura.' },
   'Poké Radar': { price: 250, desc: 'Garantiza que el próximo Pokémon salvaje o de descanso sea shiny.' },
-  'Flauta Celeste': { price: 400, desc: 'Garantiza que el próximo Pokémon salvaje sea legendario.' },
+  'Flauta Celeste': { price: 5000, desc: 'Garantiza que el próximo Pokémon salvaje sea legendario.' },
   'Moomoo Milk': { price: 120, desc: 'Restaura 100 HP de un Pokémon.' },
   'Berry Juice': { price: 40, desc: 'Restaura 20 HP de un Pokémon.' },
   'Fresh Water': { price: 60, desc: 'Restaura 30 HP de un Pokémon.' },
@@ -1136,6 +1136,7 @@ interface HoldableItem {
   healFraction?: number
   berryHeal?: number
   resistType?: string
+  ironBall?: boolean
   isMegaStone?: boolean
   isGmaxBand?: boolean
   isPrimalOrb?: boolean
@@ -1169,7 +1170,7 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Wide Lens': { name: 'Wide Lens', desc: '+10% de precisión', price: 100, accuracyMod: 0.10 },
   'Sitrus Berry': { name: 'Sitrus Berry', desc: 'Restaura el 25% del HP al caer al 50%. Se consume', price: 120, berryHeal: 0.25 },
   'Focus Band': { name: 'Focus Band', desc: '10% de probabilidad de aguantar un golpe letal', price: 150, endureChance: 0.10 },
-  'Iron Ball': { name: 'Iron Ball', desc: 'Reduce la Velocidad a la mitad', price: 100, speedMod: -0.50 },
+  'Iron Ball': { name: 'Iron Ball', desc: 'Reduce la Velocidad a la mitad. Los Pokémon Volador reciben daño neutral de Tierra', price: 100, speedMod: -0.50, ironBall: true },
   'Dragon Fang': { name: 'Dragon Fang', desc: '+20% daño en movimientos de tipo Dragón', price: 150, typeBoost: { types: ['dragon'], boost: 0.20 } },
   'Expert Belt': { name: 'Expert Belt', desc: '+20% daño en movimientos superefectivos', price: 150, superEffectiveBoost: 0.20 },
   'Charcoal': { name: 'Charcoal', desc: '+20% daño en movimientos de tipo Fuego', price: 150, typeBoost: { types: ['fire'], boost: 0.20 } },
@@ -1178,7 +1179,7 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Sharp Beak': { name: 'Sharp Beak', desc: '+20% daño en movimientos de tipo Volador', price: 150, typeBoost: { types: ['flying'], boost: 0.20 } },
   'Black Glasses': { name: 'Black Glasses', desc: '+20% daño en movimientos de tipo Siniestro', price: 150, typeBoost: { types: ['dark'], boost: 0.20 } },
   'Twisted Spoon': { name: 'Twisted Spoon', desc: '+20% daño en movimientos de tipo Psíquico', price: 150, typeBoost: { types: ['psychic'], boost: 0.20 } },
-  'Tarjeta Roja': { name: 'Tarjeta Roja', desc: 'Si te golpean con daño y sobrevives, el rival cambia', price: 120, isRedCard: true },
+  'Tarjeta Roja': { name: 'Tarjeta Roja', desc: 'Si te golpean con daño y sobrevives, el rival cambia', price: 1000, isRedCard: true },
   'Mega Stone': { name: 'Mega Stone', desc: 'Permite mega-evolucionar 1 vez por combate', price: 700, isMegaStone: true },
   'Dynamax Band': { name: 'Dynamax Band', desc: 'Permite gigamaximar 1 vez por combate (3 turnos)', price: 0, isGmaxBand: true },
   'Prisma Rojo': { name: 'Prisma Rojo', desc: 'Despierta la Primal Reversion de Groudon (1 vez por combate)', price: 0, isPrimalOrb: true },
@@ -1797,7 +1798,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_berserker_band', name: 'Expert Belt', desc: '+20% daño en movimientos superefectivos.', price: 70, spriteKey: 'Expert Belt', category: 'holdable' },
   { id: 'unlock_phantom_cloak', name: 'Miracle Seed', desc: '+20% daño en movimientos de tipo Planta.', price: 60, spriteKey: 'Miracle Seed', category: 'holdable' },
   { id: 'unlock_swift_feather', name: 'Sharp Beak', desc: '+20% daño en movimientos de tipo Volador.', price: 60, spriteKey: 'Sharp Beak', category: 'holdable' },
-  { id: 'unlock_iron_ball', name: 'Iron Ball', desc: 'Reduce la Velocidad a la mitad.', price: 40, spriteKey: 'Iron Ball', category: 'holdable' },
+  { id: 'unlock_iron_ball', name: 'Iron Ball', desc: 'Reduce la Velocidad a la mitad. Los Pokémon Volador reciben daño neutral de Tierra.', price: 40, spriteKey: 'Iron Ball', category: 'holdable' },
   { id: 'unlock_vampire_fang', name: 'Black Glasses', desc: '+20% daño en movimientos de tipo Siniestro.', price: 60, spriteKey: 'Black Glasses', category: 'holdable' },
   { id: 'unlock_cursed_blade', name: 'Twisted Spoon', desc: '+20% daño en movimientos de tipo Psíquico.', price: 60, spriteKey: 'Twisted Spoon', category: 'holdable' },
   { id: 'unlock_mega_node', name: 'Nodo Mega', desc: 'Desbloquea nodos de Mega Piedra en Hard/Infinite.', price: 150, spriteKey: 'Mega Stone', category: 'upgrade' },
@@ -3203,6 +3204,7 @@ function MainApp() {
     unlock_babiri_berry: 'Babiri Berry',
     unlock_big_root: 'Big Root',
     unlock_wide_lens: 'Wide Lens',
+    unlock_telescopio: 'Telescopio',
     unlock_sitrus_berry: 'Sitrus Berry',
     unlock_guts_band: 'Choice Specs',
     unlock_vest_protector: 'Charcoal',
@@ -7558,7 +7560,15 @@ function MainApp() {
     const primaryType = defTypes[0] || 'normal'
     const secondaryType = defTypes[1] || undefined
 
-    const { effectiveness, message } = getTypeEffectiveness(effectiveMove.type, primaryType, secondaryType)
+    let { effectiveness, message } = getTypeEffectiveness(effectiveMove.type, primaryType, secondaryType)
+
+    // --- Bola Férrea (desde Gen 5): un Pokémon de tipo Volador que la lleva
+    // recibe SIEMPRE efectividad neutral de los movimientos de tipo Tierra,
+    // sin importar las debilidades o resistencias de su tipo secundario. ---
+    if (defenderItem?.ironBall && effectiveMove.type === 'ground' && defTypes.includes('flying')) {
+      effectiveness = 1
+      message = null
+    }
 
     // --- STAB (Same-Type Attack Bonus) ---
     const attackerTypes: string[] = (attacker as any).types ?? []
@@ -7937,13 +7947,14 @@ function MainApp() {
       setBattleLog((prev) => [t('b.assaultVestBlock', { name: activePokemon.name }), ...prev].slice(0, 15))
       return
     }
+    let choiceLockedMove = activePokemon.choiceLockedMove
     if (activeHoldable?.choiceLock) {
-      if (activePokemon.choiceLockedMove && activePokemon.choiceLockedMove !== move.name) {
-        setBattleLog((prev) => [t('b.choiceLock', { name: activePokemon.name, move: moveName({ name: activePokemon.choiceLockedMove ?? '' }) }), ...prev].slice(0, 15))
+      if (choiceLockedMove && choiceLockedMove !== move.name) {
+        setBattleLog((prev) => [t('b.choiceLock', { name: activePokemon.name, move: moveName({ name: choiceLockedMove ?? '' }) }), ...prev].slice(0, 15))
         return
       }
-      if (!activePokemon.choiceLockedMove) {
-        setTeam(prev => prev.map((p, i) => i === activeIndex ? { ...p, choiceLockedMove: move.name } : p))
+      if (!choiceLockedMove) {
+        choiceLockedMove = move.name
       }
     }
 
@@ -7956,6 +7967,12 @@ function MainApp() {
 
     const nextTeam = team.map((pokemon, index) => (index === activeIndex ? { ...pokemon } : pokemon))
     let nextPlayer = { ...nextTeam[activeIndex] }
+    // Se persiste el movimiento bloqueado por el objeto Choice en el propio
+    // nextPlayer para que el setTeam final de la función lo conserve.
+    if (choiceLockedMove) {
+      nextPlayer = { ...nextPlayer, choiceLockedMove }
+      nextTeam[activeIndex] = nextPlayer
+    }
     let nextEnemy = { ...enemy }
     const logs: string[] = []
 

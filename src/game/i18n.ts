@@ -588,7 +588,7 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v1.17', en: 'v1.17' },
+  'help.version': { es: 'v1.18', en: 'v1.18' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
   'changelog.button': { es: 'Ver cambios', en: 'See changes' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
@@ -1316,7 +1316,7 @@ const ITEM_DESC: Record<string, { es: string; en: string }> = {
   'Expert Belt': { es: '+20% daño en movimientos superefectivos', en: '+20% damage on super-effective moves' },
   'Miracle Seed': { es: '+20% daño en movimientos de tipo Planta', en: '+20% damage on Grass-type moves' },
   'Sharp Beak': { es: '+20% daño en movimientos de tipo Volador', en: '+20% damage on Flying-type moves' },
-  'Iron Ball': { es: 'Reduce la Velocidad a la mitad', en: 'Halves the holder\'s Speed' },
+  'Iron Ball': { es: 'Reduce la Velocidad a la mitad. Los Pokémon Volador reciben daño neutral de Tierra', en: 'Halves the holder\'s Speed. Flying Pokémon take neutral damage from Ground' },
   'Black Glasses': { es: '+20% daño en movimientos de tipo Siniestro', en: '+20% damage on Dark-type moves' },
   'Twisted Spoon': { es: '+20% daño en movimientos de tipo Psíquico', en: '+20% damage on Psychic-type moves' },
   'Focus Sash II': { es: 'A plena vida, aguanta un golpe letal. +30 HP máximos', en: 'At full HP, survives a lethal hit. +30 max HP' },
@@ -1607,7 +1607,7 @@ const META_ITEM_DESC: Record<string, { es: string; en: string }> = {
   'unlock_berserker_band': { es: '+20% daño en movimientos superefectivos.', en: '+20% damage on super-effective moves.' },
   'unlock_phantom_cloak': { es: '+20% daño en movimientos de tipo Planta.', en: '+20% damage on Grass-type moves.' },
   'unlock_swift_feather': { es: '+20% daño en movimientos de tipo Volador.', en: '+20% damage on Flying-type moves.' },
-  'unlock_iron_ball': { es: 'Reduce la Velocidad a la mitad.', en: 'Halves the holder\'s Speed.' },
+  'unlock_iron_ball': { es: 'Reduce la Velocidad a la mitad. Los Pokémon Volador reciben daño neutral de Tierra.', en: 'Halves the holder\'s Speed. Flying Pokémon take neutral damage from Ground.' },
   'unlock_vampire_fang': { es: '+20% daño en movimientos de tipo Siniestro.', en: '+20% damage on Dark-type moves.' },
   'unlock_cursed_blade': { es: '+20% daño en movimientos de tipo Psíquico.', en: '+20% damage on Psychic-type moves.' },
   'unlock_baya_oca': { es: 'Reduce a la mitad un movimiento Fuego superefectivo.', en: 'Halves a super-effective Fire move.' },
@@ -1759,13 +1759,24 @@ export function metaItemDesc(id: string): string {
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
   {
+    version: 'v1.18',
+    items: [
+      { es: '💵 Rebalanceo de precios en la Poké Mart: la Flauta Celeste sube a $5000 y la Tarjeta Roja a $1000.', en: '💵 Poké Mart price rebalance: the Azure Flute now costs $5000 and the Red Card $1000.' },
+      { es: '🐛 Corregido el bloqueo de los objetos Choice (Cinta/Gafas/Pañuelo Choice): ahora sí se guarda el primer movimiento elegido y no puedes cambiar hasta sacar al Pokémon del combate (antes podías usar cualquiera).', en: '🐛 Fixed the Choice item lock (Choice Band/Specs/Scarf): the first move you choose is now properly locked and cannot be changed until the Pokémon leaves battle (previously you could use any move).' },
+      { es: '⚙️ Bola Férrea fiel a los juegos recientes: un Pokémon de tipo Volador que la lleva recibe siempre efectividad neutral de los movimientos de tipo Tierra, sin importar su tipo secundario.', en: '⚙️ Iron Ball now faithful to recent games: a Flying-type Pokémon holding it always takes neutral effectiveness from Ground-type moves, regardless of its secondary type.' },
+      { es: '🍗 Restos II ahora recupera el doble de HP por turno que Restos (1/8 del HP máximo).', en: '🍗 Leftovers II now recovers twice as much HP per turn as Leftovers (1/8 of max HP).' },
+      { es: '💤 Snorlax ya no aparece por debajo de nivel 45 y Aerodactyl por debajo de nivel 40, igual que en los juegos originales.', en: '💤 Snorlax no longer appears below level 45 and Aerodactyl below level 40, just like the original games.' },
+      { es: '🎰 El Spin solo reparte objetos que tengas desbloqueados en la tienda meta (corregido el caso del Telescopio, que salía aunque no estuviera desbloqueado).', en: '🎰 The Spin now only awards items you have unlocked in the meta shop (fixed the Telescopio case, which appeared even when not unlocked).' },
+    ],
+  },
+  {
     version: 'v1.17',
     items: [
       { es: '🎒 Rework de objetos equipables: ahora son fieles a los juegos originales. Cinta Muscular/Gafas de Sabio (+10% daño físico/especial), objetos Choice (+50% de una stat pero bloquean a un solo movimiento), Cinta Focus (aguanta un golpe a plena vida), Chaleco Asalto (+50% Def. Esp. sin movimientos de estado), Garra Rápida (20% atacar primero), Joya Evolutiva (+50% Def. si puede evolucionar), Vida Esfera (recoil 1/10), Casco Dentado, Campana Concha (1/8 del daño), Restos (1/16 por turno), Baya Sitrus y bayas resistentes por tipo. Los objetos personalizados se sustituyeron por objetos reales (Gafas Choice, Cinturón Experto, tipo-boosts y más).', en: '🎒 Holdable items rework: they are now faithful to the original games. Muscle Band/Wise Glasses (+10% physical/special damage), Choice items (+50% to one stat but lock to one move), Focus Sash (endure a hit at full HP), Assault Vest (+50% Sp. Def, no status moves), Quick Claw (20% move first), Eviolite (+50% Def if it can evolve), Life Orb (1/10 recoil), Rocky Helmet, Shell Bell (1/8 of damage dealt), Leftovers (1/16 per turn), Sitrus Berry and per-type resist berries. Custom items were replaced with real items (Choice Specs, Expert Belt, type-boosts and more).' },
-      { es: '🍒 Nueva mejora "Saco bayas" en la tienda meta: empiezas cada aventura con 1 baya extra aleatoria de las que tengas desbloqueadas.', en: '🍒 New "Berry Pouch" upgrade in the meta shop: start every run with 1 extra random berry from the ones you have unlocked.' },
-      { es: '🧳 Nueva mejora "Estuche de MT" en la tienda meta: empiezas cada aventura con un Disco MT en el inventario.', en: '🧳 New "TM Case" upgrade in the meta shop: start every run with a TM Disc in your inventory.' },
       { es: '🖱️ En la aventura ahora puedes arrastrar y soltar con el ratón: reordena tu equipo y los Pokémon del PC, y muévelos entre ambos.', en: '🖱️ In the adventure you can now drag and drop with the mouse: reorder your team and PC Pokémon, and move them between the two.' },
       { es: '🟥 Nuevo objeto equipable "Tarjeta Roja" en la tienda meta: si tu Pokémon es golpeado por un movimiento de daño y sobrevive, el rival es obligado a cambiar a otro de su equipo (se consume).', en: '🟥 New "Red Card" holdable in the meta shop: if your Pokémon is hit by a damaging move and survives, the foe is forced to switch to another member of their team (consumed).' },
+      { es: '🧳 Nueva mejora "Estuche de MT" en la tienda meta: empiezas cada aventura con un Disco MT en el inventario.', en: '🧳 New "TM Case" upgrade in the meta shop: start every run with a TM Disc in your inventory.' },
+      { es: '🍒 Nueva mejora "Saco bayas" en la tienda meta: empiezas cada aventura con 1 baya extra aleatoria de las que tengas desbloqueadas.', en: '🍒 New "Berry Pouch" upgrade in the meta shop: start every run with 1 extra random berry from the ones you have unlocked.' },
       { es: '🗺️ Pokédex: la cadena evolutiva ahora muestra cómo evoluciona cada etapa en el juego (el nivel real de evolución o el objeto que hay que usar, p. ej. piedras), en lugar de los datos crudos de PokeAPI.', en: '🗺️ Pokédex: the evolution chain now shows how each stage evolves in the game (the actual evolution level or the item to use, e.g. stones) instead of raw PokeAPI data.' },
       { es: '🧲 Meltan ya evoluciona a Melmetal a nivel 35 en el juego (antes no podía), y Melmetal ya no aparece por debajo de ese nivel. Actualizada su línea evolutiva en la Pokédex.', en: '🧲 Meltan now evolves into Melmetal at level 35 in the game (it previously couldn\'t), and Melmetal no longer appears below that level. Its Pokédex evolution line was updated.' },
       { es: '🐛 Corregido: el Stock de Tienda (I-IV) ahora también se aplica a los objetos pasivos/equipables, no solo a los consumibles.', en: '🐛 Fixed: the Shop Stock (I-IV) upgrades now also apply to holdable/passive items, not just consumables.' },
