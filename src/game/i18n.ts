@@ -405,6 +405,7 @@ const DICT: Record<string, Entry> = {
   'pokedex.caught2b': { es: 'capturados', en: 'caught' },
   'pokedex.unknown': { es: 'Desconocido', en: 'Unknown' },
   'pokedex.lv': { es: 'Nv.', en: 'Lv.' },
+  'pokedex.chance': { es: 'Prob.', en: 'Chance' },
   'evo.trigger.level-up': { es: 'Subir de nivel', en: 'Level up' },
   'evo.trigger.use-item': { es: 'Usar objeto', en: 'Use item' },
   'evo.trigger.trade': { es: 'Intercambio', en: 'Trade' },
@@ -589,7 +590,7 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v1.19', en: 'v1.19' },
+  'help.version': { es: 'v1.20', en: 'v1.20' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
   'changelog.button': { es: 'Ver cambios', en: 'See changes' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
@@ -1760,6 +1761,19 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v1.20',
+    items: [
+      { es: '⚡ Pikachu con la Piedra Trueno evoluciona un 70% a Raichu y un 30% a Raichu de Alola. La línea evolutiva de la Pokédex muestra ambas formas como ramas alternativas con su probabilidad.', en: '⚡ Pikachu with the Thunder Stone now evolves 70% into Raichu and 30% into Alolan Raichu. The Pokédex evolution line shows both forms as alternative branches with their chance.' },
+      { es: '🔀 La Pokédex ahora separa con "/" las ramas alternativas de cualquier línea evolutiva, no solo Eevee y Pikachu (p. ej. Ralts → Kirlia → Gardevoir / Gallade o Meowth → Persian / Perrserker).', en: '🔀 The Pokédex now separates alternative branches with "/" in every evolution line, not just Eevee and Pikachu (e.g. Ralts → Kirlia → Gardevoir / Gallade or Meowth → Persian / Perrserker).' },
+      { es: '🦊 La línea evolutiva de Eevee en la Pokédex ahora refleja el juego: Vaporeon (Piedra Agua), Jolteon (Piedra Trueno), Flareon (Piedra Fuego), Espeon (Piedra Solar), Umbreon (Piedra Lunar), Leafeon (Piedra Hoja), Glaceon (Piedra Hielo) y Sylveon (Piedra Alba).', en: '🦊 The Eevee evolution line in the Pokédex now reflects the game: Vaporeon (Water Stone), Jolteon (Thunder Stone), Flareon (Fire Stone), Espeon (Sun Stone), Umbreon (Moon Stone), Leafeon (Leaf Stone), Glaceon (Ice Stone) and Sylveon (Dawn Stone).' },
+      { es: '🌅 Sylveon ahora evoluciona con la Piedra Alba (antes no era evolucionable en el juego).', en: '🌅 Sylveon now evolves with the Dawn Stone (it previously could not evolve in the game).' },
+      { es: '🖥️ Porygon-Z ahora evoluciona con el Disco Raro al nivel 45 (antes intercambio a nivel 35), reflejado en la línea evolutiva de la Pokédex.', en: '🖥️ Porygon-Z now evolves with the Dubious Disc at level 45 (previously trade at level 35), reflected in the Pokédex evolution line.' },
+      { es: '🐒 Aipom ahora evoluciona a Ambipom al nivel 25 (antes 45), reflejado en la línea evolutiva de la Pokédex.', en: '🐒 Aipom now evolves into Ambipom at level 25 (previously 45), reflected in the Pokédex evolution line.' },
+      { es: '📱 Adaptación móvil: el arrastre de equipo y PC ahora funciona táctil (reordenar, mover entre equipo↔PC), la topbar se reorganiza en móvil y se evitan el zoom por doble toque, el retardo de 300 ms y los hovers "pegados".', en: '📱 Mobile adaptation: team and PC drag-and-drop now works with touch (reorder, move between team↔PC), the topbar is reorganized on mobile, and double-tap zoom, the 300 ms delay and sticky hovers are avoided.' },
+      { es: '📱 En móvil, el PvP 1vs1 aparece debajo del modo Cooperativo en el menú principal (Gen → Dificultad → Cooperativo → PvP → Desafíos).', en: '📱 On mobile, PvP 1vs1 appears below Co-op mode on the main menu (Gen → Difficulty → Co-op → PvP → Challenges).' },
+    ],
+  },
   {
     version: 'v1.19',
     items: [

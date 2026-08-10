@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, useCallback, Component, type ReactNode, type CSSProperties } from 'react'
+import { useMemo, useState, useEffect, useRef, useCallback, Component, type ReactNode, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
 import { playHover, playClick, playHit, playEvolution, playCoin, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
@@ -2589,6 +2589,9 @@ function MainApp() {
   // Fuente real del arrastre (ref síncrona para los onDrop; el estado solo
   // sirve para la clase visual is-dragging).
   const dragSourceRef = useRef<{ type: 'team' | 'pc'; index: number } | null>(null)
+  // Arrastre táctil: el HTML5 DnD no funciona con el dedo, así que se
+  // implementa con Pointer Events (solo touch) como alternativa.
+  const touchDragRef = useRef<{ type: 'team' | 'pc'; index: number; startX: number; startY: number; active: boolean } | null>(null)
   // Tras un arrastre el navegador dispara un "click" en la casilla de origen;
   // se suprime para que el reordenado no cambie además el Pokémon activo.
   const suppressClickRef = useRef(false)
@@ -6212,6 +6215,67 @@ function MainApp() {
   // --- Arrastrar y soltar: reordenar equipo y PC, o mover entre ambos ---
   function canDragTeam(): boolean {
     return !runChallenges.soloStarter && !runChallenges.fixedTeam
+  }
+
+  // --- Arrastre táctil (fallback al HTML5 DnD, que no funciona con el dedo) ---
+  function pointerDragStart(e: ReactPointerEvent, src: { type: 'team' | 'pc'; index: number }): void {
+    if (e.pointerType === 'mouse' || !canDragTeam()) return
+    touchDragRef.current = { ...src, startX: e.clientX, startY: e.clientY, active: false }
+  }
+
+  function pointerDragMove(e: ReactPointerEvent): void {
+    const t = touchDragRef.current
+    if (!t || e.pointerType === 'mouse') return
+    if (!t.active) {
+      // Solo se convierte en arrastre si el dedo se mueve lo suficiente:
+      // un toque sin arrastre sigue siendo un tap (cambiar Pokémon / retirar).
+      if (Math.hypot(e.clientX - t.startX, e.clientY - t.startY) > 12) {
+        t.active = true
+        dragSourceRef.current = { type: t.type, index: t.index }
+        setDragItem({ type: t.type, index: t.index })
+        suppressClickRef.current = true
+        document.body.style.touchAction = 'none'
+      }
+    }
+    if (t.active) e.preventDefault()
+  }
+
+  function pointerDragEnd(e: ReactPointerEvent): void {
+    const t = touchDragRef.current
+    if (!t) return
+    touchDragRef.current = null
+    document.body.style.touchAction = ''
+    if (!t.active) return
+    // Se busca la casilla de destino bajo el dedo (data-drop-type/index).
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    const target = el?.closest?.('[data-drop-type]') as HTMLElement | null
+    if (target) {
+      const dtype = target.dataset.dropType
+      const didx = Number(target.dataset.dropIndex ?? -1)
+      if (dtype === 'team' && didx >= 0) {
+        if (t.type === 'team') reorderTeam(t.index, didx)
+        else movePCToTeam(t.index, didx)
+      } else if (dtype === 'pc') {
+        if (t.type === 'pc') {
+          if (didx >= 0) reorderPC(t.index, didx)
+        } else {
+          depositToPC(t.index)
+        }
+      }
+    }
+    dragSourceRef.current = null
+    setDragItem(null)
+    suppressClickRef.current = true
+    setTimeout(() => { suppressClickRef.current = false }, 400)
+  }
+
+  function pointerDragCancel(): void {
+    const t = touchDragRef.current
+    touchDragRef.current = null
+    document.body.style.touchAction = ''
+    if (!t?.active) return
+    dragSourceRef.current = null
+    setDragItem(null)
   }
 
   function reorderTeam(fromIdx: number, toIdx: number): void {
@@ -10231,9 +10295,10 @@ function MainApp() {
                         {selectedPokemonDetail.evolutions.map((evo, idx) => {
                           const entry = pokedex[evo.id]
                           const known = selectedPokemonShiny ? (entry?.shinyCaught ?? false) : !!entry?.caught
+                          const sep = evo.branch === true ? '/' : '→'
                           return (
-                            <div key={evo.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              {idx > 0 && <span style={{ color: '#7d7ab5', fontSize: '1.2rem' }}>→</span>}
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {idx > 0 && <span style={{ color: '#7d7ab5', fontSize: '1.2rem' }}>{sep}</span>}
                               <div
                                 className="pokedex-card"
                                 style={{
@@ -10263,6 +10328,9 @@ function MainApp() {
                                 )}
                                 {!evo.level && !evo.item && evo.trigger && evo.trigger !== 'level-up' && (
                                   <span style={{ fontSize: '0.85rem', color: '#ffcb05', fontWeight: 'bold' }}>{t(`evo.trigger.${evo.trigger}`)}</span>
+                                )}
+                                {evo.chance != null && (
+                                  <span style={{ fontSize: '0.72rem', color: '#4d9bff', fontWeight: 'bold', textAlign: 'center' }}>{t('pokedex.chance')} {evo.chance}%</span>
                                 )}
                               </div>
                             </div>
@@ -11177,7 +11245,7 @@ function MainApp() {
 
           <div className="setup-grid">
             <div className="setup-col">
-              <div className="setup-card">
+              <div className="setup-card setup-card-gen">
                 <h2 className="setup-card-title"><span className="setup-step">1</span> {t('setup.selectGeneration')}</h2>
                 <div className="generation-grid">
             {generations.map((gen) => {
@@ -11305,7 +11373,7 @@ function MainApp() {
           </div>
               </div>
 
-              <div className="setup-card" style={{ marginTop: '0.75rem' }}>
+              <div className="setup-card setup-card-pvp" style={{ marginTop: '0.75rem' }}>
                 <h2 className="setup-card-title">{t('pvp.setupTitle')}</h2>
                 <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0' }}>
                   <button
@@ -11324,7 +11392,7 @@ function MainApp() {
             </div>
 
             <div className="setup-col">
-              <div className="setup-card">
+              <div className="setup-card setup-card-diff">
                 <h2 className="setup-card-title"><span className="setup-step">2</span> {t('setup.selectDifficulty')}</h2>
           <div className="generation-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
             {(['easy', 'medium', 'hard'] as Difficulty[]).map((diff) => {
@@ -11528,7 +11596,7 @@ function MainApp() {
           </div>
               </div>
 
-              <div className="setup-card">
+              <div className="setup-card setup-card-coop">
                 <h2 className="setup-card-title">{t('coop.title2')}</h2>
           <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0' }}>
             {!coopMode ? (
@@ -11630,7 +11698,7 @@ function MainApp() {
 
           <div className="setup-grid">
             <div className="setup-col">
-              <div className="setup-card">
+              <div className="setup-card setup-card-challenges">
                 <h2 className="setup-card-title"><span className="setup-step">3</span> {t('setup.challenges')} <span className="muted" style={{ fontSize: '0.6rem', fontWeight: 'normal' }}>{t('setup.challengesOptional')}</span></h2>
           {(() => {
             // En Cooperativo y COLISEUM los desafíos están siempre disponibles.
@@ -11814,12 +11882,18 @@ function MainApp() {
                   <button
                     className={`team-slot ${index === activeIndex ? 'is-active' : ''} ${pokemon.hp <= 0 ? 'is-fainted' : ''} ${dragItem?.type === 'team' && dragItem.index === index ? 'is-dragging' : ''}`}
                     type="button"
+                    data-drop-type="team"
+                    data-drop-index={index}
                     onClick={() => {
                       if (suppressClickRef.current) { suppressClickRef.current = false; return }
                       switchActive(index)
                     }}
                     disabled={pokemon.hp <= 0 || isLoading}
                     draggable={!isLoading && canDragTeam()}
+                    onPointerDown={(e) => pointerDragStart(e, { type: 'team', index })}
+                    onPointerMove={pointerDragMove}
+                    onPointerUp={pointerDragEnd}
+                    onPointerCancel={pointerDragCancel}
                     onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'team'); suppressClickRef.current = true; dragSourceRef.current = { type: 'team', index }; setDragItem({ type: 'team', index }) }}
                     onDragEnd={() => { dragSourceRef.current = null; setDragItem(null); setTimeout(() => { suppressClickRef.current = false }, 400) }}
                     onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
@@ -11949,6 +12023,8 @@ function MainApp() {
                 <div
                   key={`empty-${index}`}
                   className="team-slot empty"
+                  data-drop-type="team"
+                  data-drop-index={team.length + index}
                   onDragOver={(e) => { e.preventDefault() }}
                   onDrop={(e) => {
                     e.preventDefault()
@@ -11971,6 +12047,8 @@ function MainApp() {
                 <p className="label" style={{ marginTop: '0.75rem' }}>PC ({pcStorage.length})</p>
                 <div
                   className="team-grid"
+                  data-drop-type="pc"
+                  data-drop-index="-1"
                   onDragOver={(e) => { e.preventDefault() }}
                   onDrop={(e) => {
                     e.preventDefault()
@@ -11987,12 +12065,18 @@ function MainApp() {
                       <button
                         className={`team-slot ${dragItem?.type === 'pc' && dragItem.index === index ? 'is-dragging' : ''}`}
                         type="button"
+                        data-drop-type="pc"
+                        data-drop-index={index}
                         onClick={() => {
                           if (suppressClickRef.current) { suppressClickRef.current = false; return }
                           withdrawFromPC(index)
                         }}
                         disabled={isLoading}
                         draggable={!isLoading && canDragTeam()}
+                        onPointerDown={(e) => pointerDragStart(e, { type: 'pc', index })}
+                        onPointerMove={pointerDragMove}
+                        onPointerUp={pointerDragEnd}
+                        onPointerCancel={pointerDragCancel}
                         onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'pc'); suppressClickRef.current = true; dragSourceRef.current = { type: 'pc', index }; setDragItem({ type: 'pc', index }) }}
                         onDragEnd={() => { dragSourceRef.current = null; setDragItem(null); setTimeout(() => { suppressClickRef.current = false }, 400) }}
                         onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}

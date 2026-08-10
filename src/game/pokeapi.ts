@@ -102,7 +102,7 @@ export interface PokemonDetails {
   weight: number
   types: string[]
   stats: Array<{ name: string; value: number }>
-  evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null }>
+  evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; chance?: number; branch?: boolean }>
 }
 
 // Calcula cómo evoluciona una etapa en ESTE juego (nivel de evolución por
@@ -126,6 +126,12 @@ function gameEvolutionInfo(sourceName: string, details?: NonNullable<EvolutionCh
     level = 25
   } else if (name === 'kubfu') {
     level = KUBFU_EVOLVE_LEVEL
+  } else if (name === 'porygon2') {
+    // Porygon-Z evoluciona con el Disco Raro al nivel 45 en este juego.
+    level = 45
+  } else if (name === 'aipom') {
+    // Aipom → Ambipom evoluciona al nivel 25 en este juego.
+    level = 25
   } else if (minLevel) {
     level = minLevel
   } else if (trigger === 'trade') {
@@ -139,17 +145,19 @@ function gameEvolutionInfo(sourceName: string, details?: NonNullable<EvolutionCh
   return { level, trigger, item }
 }
 
-function extractEvolutionLine(chainNode: EvolutionChainNode, targetId: number): Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null }> {
-  const allNodes: Array<{ id: number; name: string; level: number | null; trigger: string; item: string | null; speciesUrl: string }> = []
+function extractEvolutionLine(chainNode: EvolutionChainNode, targetId: number): Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; branch?: boolean }> {
+  const allNodes: Array<{ id: number; name: string; level: number | null; trigger: string; item: string | null; speciesUrl: string; branch: boolean }> = []
 
-  function walk(node: EvolutionChainNode, parentLevel: number | null, parentTrigger: string, parentItem: string | null) {
+  // `isBranch` marca los hermanos alternativos (2º, 3º... hijo del mismo padre):
+  // la Pokédex los separa con "/" en vez de "→" (como Eevee o Pikachu).
+  function walk(node: EvolutionChainNode, parentLevel: number | null, parentTrigger: string, parentItem: string | null, isBranch = false) {
     const match = node.species.url.match(/\/pokemon-species\/(\d+)\//)
     const id = match ? parseInt(match[1], 10) : 0
-    allNodes.push({ id, name: node.species.name, level: parentLevel, trigger: parentTrigger, item: parentItem, speciesUrl: node.species.url })
-    for (const evo of node.evolves_to) {
+    allNodes.push({ id, name: node.species.name, level: parentLevel, trigger: parentTrigger, item: parentItem, speciesUrl: node.species.url, branch: isBranch })
+    node.evolves_to.forEach((evo, i) => {
       const info = gameEvolutionInfo(node.species.name, evo.evolution_details?.[0])
-      walk(evo, info.level, info.trigger, info.item)
-    }
+      walk(evo, info.level, info.trigger, info.item, i > 0)
+    })
   }
 
   walk(chainNode, null, 'level-up', null)
@@ -164,6 +172,7 @@ function extractEvolutionLine(chainNode: EvolutionChainNode, targetId: number): 
     level: n.level,
     trigger: n.trigger,
     item: n.item,
+    ...(n.branch ? { branch: true } : {}),
   }))
 
   return result
@@ -188,10 +197,10 @@ async function resolveRegionalSpeciesId(speciesName: string, suffix: string): Pr
 // geodude → geodude-alola). Si una etapa no tiene variante regional, se deja la
 // forma base.
 async function mapRegionalEvolutionLine(
-  line: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null }>,
+  line: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; branch?: boolean }>,
   suffix: string
-): Promise<Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null }>> {
-  const out: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null }> = []
+): Promise<Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; branch?: boolean }>> {
+  const out: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; branch?: boolean }> = []
   for (const node of line) {
     const regionalId = await resolveRegionalSpeciesId(node.name, suffix)
     if (regionalId !== null) {
@@ -252,7 +261,7 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
       'speed': 'Velocidad'
     }
 
-  let evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null }> = []
+  let evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; chance?: number; branch?: boolean }> = []
   try {
     // Las formas regionales (p. ej. geodude-alola) comparten la cadena evolutiva
     // con la forma base: se resuelve la cadena base y luego se mapea a la variante.
@@ -312,6 +321,35 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
       { id: 10174, name: 'zigzagoon-galar', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/10174.png', level: null, trigger: 'level-up', item: null },
       { id: 10175, name: 'linoone-galar', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/10175.png', level: 20, trigger: 'level-up', item: null },
       { id: 862, name: 'obstagoon', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/862.png', level: 35, trigger: 'level-up', item: null },
+    ]
+  }
+
+  // Pikachu con Piedra Trueno: 70% Raichu, 30% Raichu de Alola. La línea
+  // evolutiva de la Pokédex muestra ambas formas como ramas alternativas.
+  if (dataPokemon.id === 25) {
+    evolutions = [
+      ...evolutions.map(evo => (evo.id === 26 ? { ...evo, chance: 70 } : evo)),
+      { id: 10100, name: 'raichu-alola', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/10100.png', level: null, trigger: 'use-item', item: 'Thunder Stone', chance: 30, branch: true },
+    ]
+  }
+
+  // Familia Eevee: en este juego Eevee evoluciona solo con piedras (Vaporeon:
+  // Piedra Agua, Jolteon: Piedra Trueno, Flareon: Piedra Fuego, Espeon: Piedra
+  // Solar, Umbreon: Piedra Lunar, Leafeon: Piedra Hoja, Glaceon: Piedra Hielo,
+  // Sylveon: Piedra Alba).
+  const EEVEE_FAMILY = new Set([133, 134, 135, 136, 196, 197, 470, 471, 700])
+  if (EEVEE_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 133, name: 'eevee', sprite: spriteFor(133), level: null, trigger: 'level-up', item: null },
+      { id: 134, name: 'vaporeon', sprite: spriteFor(134), level: null, trigger: 'use-item', item: 'Water Stone' },
+      { id: 135, name: 'jolteon', sprite: spriteFor(135), level: null, trigger: 'use-item', item: 'Thunder Stone', branch: true },
+      { id: 136, name: 'flareon', sprite: spriteFor(136), level: null, trigger: 'use-item', item: 'Fire Stone', branch: true },
+      { id: 196, name: 'espeon', sprite: spriteFor(196), level: null, trigger: 'use-item', item: 'Sun Stone', branch: true },
+      { id: 197, name: 'umbreon', sprite: spriteFor(197), level: null, trigger: 'use-item', item: 'Moon Stone', branch: true },
+      { id: 470, name: 'leafeon', sprite: spriteFor(470), level: null, trigger: 'use-item', item: 'Leaf Stone', branch: true },
+      { id: 471, name: 'glaceon', sprite: spriteFor(471), level: null, trigger: 'use-item', item: 'Ice Stone', branch: true },
+      { id: 700, name: 'sylveon', sprite: spriteFor(700), level: null, trigger: 'use-item', item: 'Dawn Stone', branch: true },
     ]
   }
 
@@ -1354,6 +1392,15 @@ export async function getEvolutionInfo(pokemonId: number): Promise<{ nextName: s
     if (pokemonId === 862) {
       return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 35 }
     }
+    // Porygon2 → Porygon-Z: en este juego evoluciona con el Disco Raro al
+    // nivel 45 (la cadena de PokeAPI lo marca como intercambio a nivel 35).
+    if (pokemonId === 233) {
+      return { nextName: 'porygon-z', evolutionLevel: 45, heldItem: 'Dubious Disc', heldItemEvolutions: [{ item: 'Dubious Disc', target: 'porygon-z', level: 45 }], minAppearLevel: SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL }
+    }
+    // Aipom → Ambipom evoluciona al nivel 25 en este juego.
+    if (pokemonId === 190) {
+      return { nextName: 'ambipom', evolutionLevel: 25, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
     const speciesRes = await fetch(`${API_BASE}/pokemon-species/${pokemonId}`)
     if (!speciesRes.ok) return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
     const speciesData = await speciesRes.json()
@@ -1434,7 +1481,7 @@ function findStoneEvolution(chainNode: EvolutionChainNode, speciesName: string, 
 }
 
 export async function canEvolveWithStone(pokemonId: number, stoneItemName: string): Promise<{ canEvolve: boolean; evolvedName: string | null }> {
-  // Hardcoded Eevee evolutions (all 7 eeveelutions with stones)
+  // Hardcoded Eevee evolutions (all 8 eeveelutions with stones)
   if (pokemonId === 133) {
     const eeveeMap: Record<string, string> = {
       'fire-stone': 'flareon',
@@ -1444,6 +1491,7 @@ export async function canEvolveWithStone(pokemonId: number, stoneItemName: strin
       'ice-stone': 'glaceon',
       'sun-stone': 'espeon',
       'moon-stone': 'umbreon',
+      'dawn-stone': 'sylveon',
     }
     const evolved = eeveeMap[stoneItemName]
     if (evolved) return { canEvolve: true, evolvedName: evolved }
@@ -1452,6 +1500,11 @@ export async function canEvolveWithStone(pokemonId: number, stoneItemName: strin
   // Gorra de Ash: Greninja → Greninja-Ash (Battle Bond, ID 10117)
   if (pokemonId === 658 && stoneItemName === 'gorra-de-ash') {
     return { canEvolve: true, evolvedName: 'greninja-ash' }
+  }
+
+  // Pikachu con Piedra Trueno: 70% Raichu, 30% Raichu de Alola.
+  if (pokemonId === 25 && stoneItemName === 'thunder-stone') {
+    return { canEvolve: true, evolvedName: Math.random() < 0.7 ? 'raichu' : 'raichu-alola' }
   }
 
   try {
