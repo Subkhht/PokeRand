@@ -11,6 +11,7 @@ import {
   checkAndLearnNewMove,
   getMoveDetails,
   getSpeciesIdsByGeneration,
+  getAllSpeciesList,
   buildPokemonFromApi,
   startersByGen,
   makeShinySprite,
@@ -2556,6 +2557,24 @@ function MainApp() {
     }
   }, [doubleActives, doubleActiveSlot, screen, team])
 
+  // Si el objetivo seleccionado para un movimiento se debilitó, reasigna
+  // automáticamente al primer enemigo vivo para no atacar a un rival caído.
+  useEffect(() => {
+    if (screen !== 'double') return
+    const firstAlive = doubleEnemies.findIndex(e => e.hp > 0)
+    setDoubleMoves(prev => {
+      let changed = false
+      const next = prev.map(sel => {
+        if (!sel) return sel
+        if (sel.target >= 0 && doubleEnemies[sel.target] && doubleEnemies[sel.target].hp > 0) return sel
+        if (firstAlive === -1) return sel
+        changed = true
+        return { ...sel, target: firstAlive }
+      })
+      return changed ? next : prev
+    })
+  }, [doubleEnemies, screen])
+
   // Move node (intercambio de movimientos)
   const [moveOptions, setMoveOptions] = useState<Move[]>([])
   const [selectedNewMove, setSelectedNewMove] = useState<Move | null>(null)
@@ -3038,6 +3057,36 @@ function MainApp() {
       localStorage.setItem('pokerand_meta', JSON.stringify(updated))
       return updated
     })
+  }
+
+  // Modo secreto: activa TODA la Pokédex (todas las especies como vistas y capturadas).
+  async function unlockAllPokedex(): Promise<void> {
+    setSecretAddLoading(true)
+    setSecretAddError('')
+    try {
+      const species = await getAllSpeciesList()
+      const entries: Record<number, PokedexEntry> = {}
+      for (const s of species) {
+        entries[s.id] = {
+          id: s.id,
+          name: s.name,
+          sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${s.id}.png`,
+          types: [],
+          seen: true,
+          caught: true,
+        }
+      }
+      setPokedex(prev => {
+        const updated = { ...prev, ...entries }
+        localStorage.setItem('pokerand_pokedex', JSON.stringify(updated))
+        return updated
+      })
+      setBattleLog((prev) => [t('b.secretDexUnlocked', { n: species.length }), ...prev].slice(0, 15))
+    } catch {
+      setSecretAddError('No se pudo cargar la lista de especies.')
+    } finally {
+      setSecretAddLoading(false)
+    }
   }
 
   async function secretAddPokemon(): Promise<void> {
@@ -5915,9 +5964,17 @@ function MainApp() {
 
   // --- Combate Doble (2 vs 2) ---
   function doubleSelectMove(slot: number, moveIdx: number): void {
+    const firstAlive = doubleEnemies.findIndex(e => e.hp > 0)
     setDoubleMoves(prev => {
       const next = [...prev]
-      next[slot] = next[slot] ? { ...next[slot]!, moveIdx } : { moveIdx, target: 0 }
+      const existing = next[slot]
+      if (existing) {
+        const curTarget = existing.target
+        const curAlive = curTarget >= 0 && doubleEnemies[curTarget] && doubleEnemies[curTarget].hp > 0
+        next[slot] = { ...existing, moveIdx, target: curAlive ? curTarget : (firstAlive >= 0 ? firstAlive : 0) }
+      } else {
+        next[slot] = { moveIdx, target: firstAlive >= 0 ? firstAlive : 0 }
+      }
       return next
     })
   }
@@ -6054,16 +6111,20 @@ function MainApp() {
       const attacker = teamCopy[teamIdx]
       if (!attacker || attacker.hp <= 0) continue
       const move = attacker.moves[sel.moveIdx]
-      const target = enemies[sel.target]
-      if (!move || !target || target.hp <= 0) continue
+      let targetIndex = sel.target
+      if (targetIndex < 0 || !enemies[targetIndex] || enemies[targetIndex].hp <= 0) {
+        targetIndex = enemies.findIndex(e => e.hp > 0)
+      }
+      const target = targetIndex >= 0 ? enemies[targetIndex] : undefined
+      if (!move || !target) continue
       const before = target.hp
       const hit = performDoubleHit(attacker, target, move)
       teamCopy[teamIdx] = hit.attacker
-      enemies[sel.target] = hit.defender
+      enemies[targetIndex] = hit.defender
       log.push(...hit.log)
       if (hit.defender.hp < before) {
         doubleHitKeyRef.current += 1
-        hits.push({ kind: 'enemy', index: sel.target, key: doubleHitKeyRef.current })
+        hits.push({ kind: 'enemy', index: targetIndex, key: doubleHitKeyRef.current })
         playHit()
       }
       if (hit.defender.hp <= 0) log.push(t('b.fainted', { name: hit.defender.name }))
@@ -6122,6 +6183,12 @@ function MainApp() {
   function depositToPC(teamIndex: number): void {
     const pokemon = team[teamIndex]
     if (!pokemon) return
+    // Los Pokémon debilitados no pueden ir al PC: se quedan en el equipo
+    // hasta que se liberen.
+    if (pokemon.hp <= 0) {
+      setBattleLog((prev) => [t('b.noDepositFainted', { name: pokemon.name }), ...prev].slice(0, 15))
+      return
+    }
     if (runChallenges.soloStarter || runChallenges.fixedTeam) {
       setBattleLog((prev) => [t('b.noModifyTeam'), ...prev].slice(0, 15))
       return
@@ -10252,6 +10319,22 @@ function MainApp() {
                         >
                           ✨ Shiny
                         </button>
+                        {secretUnlocked && (
+                          <button
+                            type="button"
+                            onClick={() => { playClick(); unlockAllPokedex() }}
+                            disabled={secretAddLoading}
+                            title={language === 'en' ? 'Secret mode: unlock the whole Pokédex' : 'Modo secreto: activa toda la Pokédex'}
+                            style={{
+                              background: 'rgba(255,203,5,0.15)',
+                              border: '1px solid #ffcb05',
+                              color: '#ffcb05',
+                              borderRadius: '999px', padding: '2px 10px', fontSize: '0.62rem', fontWeight: 'bold', cursor: 'pointer'
+                            }}
+                          >
+                            🗝️ {language === 'en' ? 'Full Pokédex' : 'Toda la Pokédex'}
+                          </button>
+                        )}
                       </div>
                     </div>
 

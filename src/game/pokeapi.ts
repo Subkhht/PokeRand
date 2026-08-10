@@ -285,6 +285,36 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
     ]
   }
 
+  // Familia Sneasel: la cadena de PokeAPI enlaza Weavile → Sneasler (por la
+  // forma Hisui), pero lo real es Sneasel → Weavile y Sneasel-Hisui → Sneasler.
+  if (dataPokemon.id === 215 || dataPokemon.id === 461) {
+    evolutions = [
+      { id: 215, name: 'sneasel', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/215.png', level: null, trigger: 'level-up', item: null },
+      { id: 461, name: 'weavile', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/461.png', level: 45, trigger: 'level-up', item: 'Razor Claw' },
+    ]
+  } else if (dataPokemon.id === 10235 || dataPokemon.id === 903) {
+    evolutions = [
+      { id: 10235, name: 'sneasel-hisui', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/10235.png', level: null, trigger: 'level-up', item: null },
+      { id: 903, name: 'sneasler', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/903.png', level: 45, trigger: 'level-up', item: 'Razor Claw' },
+    ]
+  }
+
+  // Familia Zigzagoon/Linoone/Obstagoon: la cadena de PokeAPI pone Linoone →
+  // Obstagoon, pero solo la línea de Galar (Zigzagoon-Galar → Linoone-Galar →
+  // Obstagoon) evoluciona a Obstagoon. La forma normal de Linoone NO evoluciona.
+  if (dataPokemon.id === 263 || dataPokemon.id === 264) {
+    evolutions = [
+      { id: 263, name: 'zigzagoon', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/263.png', level: null, trigger: 'level-up', item: null },
+      { id: 264, name: 'linoone', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/264.png', level: 20, trigger: 'level-up', item: null },
+    ]
+  } else if (dataPokemon.id === 10174 || dataPokemon.id === 10175 || dataPokemon.id === 862) {
+    evolutions = [
+      { id: 10174, name: 'zigzagoon-galar', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/10174.png', level: null, trigger: 'level-up', item: null },
+      { id: 10175, name: 'linoone-galar', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/10175.png', level: 20, trigger: 'level-up', item: null },
+      { id: 862, name: 'obstagoon', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/862.png', level: 35, trigger: 'level-up', item: null },
+    ]
+  }
+
   return {
     id: dataPokemon.id,
     name: dataPokemon.name,
@@ -403,6 +433,20 @@ async function getAllFormIds(): Promise<number[]> {
   })()
 
   return allFormIdsPromise
+}
+
+let allSpeciesListPromise: Promise<Array<{ id: number; name: string }>> | null = null
+
+// Lista de TODAS las especies (1-1025) con su nombre, para el modo secreto.
+export function getAllSpeciesList(): Promise<Array<{ id: number; name: string }>> {
+  if (allSpeciesListPromise) return allSpeciesListPromise
+  allSpeciesListPromise = (async () => {
+    const data = await fetchJson<{ results: PokeApiNamedResource[] }>(
+      `${API_BASE}/pokemon-species?limit=1300&offset=0`
+    )
+    return data.results.map(r => ({ id: extractIdFromResourceUrl(r.url), name: r.name }))
+  })()
+  return allSpeciesListPromise
 }
 
 export async function getSpeciesIdsByGeneration(generation: number): Promise<number[]> {
@@ -1286,6 +1330,29 @@ export async function getEvolutionInfo(pokemonId: number): Promise<{ nextName: s
     // debe aparecer por debajo del nivel 40.
     if (pokemonId === 142) {
       return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 40 }
+    }
+    // Sneasel-Hisui → Sneasler (la especie Hisui no tiene cadena propia en
+    // PokeAPI: la cadena de Sneasel enlaza Weavile → Sneasler por error).
+    if (pokemonId === 10235) {
+      return { nextName: 'sneasler', evolutionLevel: 45, heldItem: 'Razor Claw', heldItemEvolutions: [{ item: 'Razor Claw', target: 'sneasler', level: 45 }], minAppearLevel: null }
+    }
+    // Sneasler es la forma final de Sneasel-Hisui: no aparece por debajo de 45.
+    if (pokemonId === 903) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 45 }
+    }
+    // La forma normal de Linoone NO evoluciona a Obstagoon (solo lo hace la
+    // línea de Galar). Zigzagoon-Galar → Linoone-Galar → Obstagoon.
+    if (pokemonId === 264) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    if (pokemonId === 10174) {
+      return { nextName: 'linoone-galar', evolutionLevel: 20, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    if (pokemonId === 10175) {
+      return { nextName: 'obstagoon', evolutionLevel: 35, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    if (pokemonId === 862) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 35 }
     }
     const speciesRes = await fetch(`${API_BASE}/pokemon-species/${pokemonId}`)
     if (!speciesRes.ok) return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }

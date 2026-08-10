@@ -352,6 +352,7 @@ const DICT: Record<string, Entry> = {
   'b.evolved': { es: '✨ ¡{name} evolucionó en {evolved}!', en: '✨ {name} evolved into {evolved}!' },
   'b.escapedBall': { es: '💨 ¡{name} escapó de la {ball}! ({pct}%)', en: '💨 {name} broke free from the {ball}! ({pct}%)' },
   'b.secretAdded': { es: '🔓 Modo secreto: añadiste a {name} Nv.{lvl}{toPc}.', en: '🔓 Secret mode: you added {name} Lv.{lvl}{toPc}.' },
+  'b.secretDexUnlocked': { es: '🗝️ Modo secreto: Pokédex completada ({n} especies).', en: '🗝️ Secret mode: Pokédex completed ({n} species).' },
   'b.alreadyKnewFakeOut': { es: '{attacker} usa {move}: el rival ya conocía el ataque y no se aturdió.', en: '{attacker} used {move}: the foe already knew the move and was not flinched.' },
   'b.toPc': { es: ' (al PC)', en: ' (to PC)' },
   'pvp.switchPokemon': { es: 'Cambiar de Pokémon:', en: 'Switch Pokémon:' },
@@ -588,7 +589,7 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v1.18', en: 'v1.18' },
+  'help.version': { es: 'v1.19', en: 'v1.19' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
   'changelog.button': { es: 'Ver cambios', en: 'See changes' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
@@ -838,6 +839,7 @@ const DICT: Record<string, Entry> = {
   // ---------- Battle log messages ----------
   'b.escapeRopeBattleOnly': { es: 'La Cuerda Huida solo se puede usar durante un combate.', en: 'The Escape Rope can only be used during a battle.' },
   'b.noDepositOnly': { es: 'No puedes depositar a tu único Pokémon.', en: 'You cannot deposit your only Pokémon.' },
+  'b.noDepositFainted': { es: '{name} está debilitado y no puede ir al PC. Libera antes de poder usar esa casilla.', en: '{name} is fainted and cannot go to the PC. Release it first to free that slot.' },
   'b.noMovesCompat': { es: 'No se encontraron movimientos compatibles.', en: 'No compatible moves were found.' },
   'b.noBalls': { es: 'No tienes Poké Balls para capturar.', en: 'You have no Poké Balls to catch.' },
   'b.noPokemonForStone': { es: 'No tienes Pokémon en pie para usar la piedra.', en: 'You have no healthy Pokémon to use the stone on.' },
@@ -1758,6 +1760,15 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v1.19',
+    items: [
+      { es: '🎯 Combates Dobles: al elegir un movimiento, el objetivo se fija por defecto en el primer enemigo vivo. Si el enemigo que habías elegido se debilita, el ataque se redirige automáticamente al rival restante (antes podías quedarte sin objetivo y no atacar a nadie).', en: '🎯 Double Battles: when choosing a move, the target now defaults to the first alive enemy. If your chosen enemy faints, the attack automatically redirects to the remaining foe (previously you could end up with no target and not attack anyone).' },
+      { es: '🐾 Corregida la familia de Zigzagoon: la forma normal de Linoone ya no evoluciona a Obstagoon. La línea de Galar va Zigzagoon-Galar → Linoone-Galar → Obstagoon (Nv 20 y 35), reflejado en la Pokédex y en la evolución en juego.', en: '🐾 Fixed the Zigzagoon family: regular Linoone no longer evolves into Obstagoon. The Galar line is now Zigzagoon-Galar → Linoone-Galar → Obstagoon (levels 20 and 35), reflected in the Pokédex and in-game evolution.' },
+      { es: '🛡️ Los Pokémon debilitados ya no pueden ir al PC: se quedan en el equipo hasta que los liberes.', en: '🛡️ Fainted Pokémon can no longer be sent to the PC: they stay on your team until you release them.' },
+      { es: '🧊 Corregida la familia de Sneasel: Sneasel evoluciona solo a Weavile y Sneasel-Hisui a Sneasler (PokeAPI enlazaba Weavile → Sneasler por error). La línea evolutiva de la Pokédex y la evolución en juego ya lo reflejan.', en: '🧊 Fixed the Sneasel family: Sneasel now only evolves into Weavile and Sneasel-Hisui into Sneasler (PokeAPI incorrectly linked Weavile → Sneasler). The Pokédex evolution line and in-game evolution now reflect this.' }
+    ],
+  },
   {
     version: 'v1.18',
     items: [
