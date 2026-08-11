@@ -688,16 +688,16 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
     ]
   }
 
-  // Familia Finizen/Palafin: en este juego Finizen evoluciona a Palafin al nivel
-  // 38 (la especie "palafin" no existe en PokeAPI, así que se muestra la forma
-  // base "palafin-zero", id 964). La línea se muestra sea cual sea el miembro
-  // visto.
+  // Familia Finizen/Palafin: en este juego Finizen evoluciona a Palafin (forma
+  // zero, id 964) al nivel 38 y este a Palafin Hero al nivel 48. La línea se
+  // muestra sea cual sea el miembro visto.
   const FINIZEN_FAMILY = new Set([963, 964, 10256])
   if (FINIZEN_FAMILY.has(dataPokemon.id)) {
     const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
     evolutions = [
       { id: 963, name: 'finizen', sprite: spriteFor(963), level: null, trigger: 'level-up', item: null },
       { id: 964, name: 'palafin-zero', sprite: spriteFor(964), level: 38, trigger: 'level-up', item: null },
+      { id: 10256, name: 'palafin-hero', sprite: spriteFor(10256), level: 48, trigger: 'level-up', item: null },
     ]
   }
 
@@ -823,6 +823,32 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
     evolutions = [
       { id: 746, name: 'wishiwashi-solo', sprite: spriteFor(746), level: null, trigger: 'level-up', item: null },
       { id: 10127, name: 'wishiwashi-school', sprite: spriteFor(10127), level: 45, trigger: 'level-up', item: null },
+    ]
+  }
+
+  // Familia Terapagos: en este juego Terapagos evoluciona a su forma Terastal
+  // al nivel 25 y esta a la forma Stellar al nivel 50. La línea se muestra sea
+  // cual sea el miembro visto.
+  const TERAPAGOS_FAMILY = new Set([1024, 10276, 10277])
+  if (TERAPAGOS_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 1024, name: 'terapagos', sprite: spriteFor(1024), level: null, trigger: 'level-up', item: null },
+      { id: 10276, name: 'terapagos-terastal', sprite: spriteFor(10276), level: 25, trigger: 'level-up', item: null },
+      { id: 10277, name: 'terapagos-stellar', sprite: spriteFor(10277), level: 50, trigger: 'level-up', item: null },
+    ]
+  }
+
+  // Familia Toxel/Toxtricity: en este juego Toxel evoluciona al nivel 30 un 50%
+  // a Toxtricity Amped y un 50% a Toxtricity Low-Key. La línea muestra ambas
+  // formas como ramas alternativas con su probabilidad.
+  const TOXEL_FAMILY = new Set([848, 849, 10184])
+  if (TOXEL_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 848, name: 'toxel', sprite: spriteFor(848), level: null, trigger: 'level-up', item: null },
+      { id: 849, name: 'toxtricity-amped', sprite: spriteFor(849), level: 30, trigger: 'level-up', item: null, chance: 50 },
+      { id: 10184, name: 'toxtricity-low-key', sprite: spriteFor(10184), level: 30, trigger: 'level-up', item: null, chance: 50, branch: true },
     ]
   }
 
@@ -1005,6 +1031,13 @@ export function getAllSpeciesList(): Promise<Array<{ id: number; name: string }>
     return data.results.map(r => ({ id: extractIdFromResourceUrl(r.url), name: r.name }))
   })()
   return allSpeciesListPromise
+}
+
+// Tipos de un Pokémon por su id (solo el listado de tipos, sin el resto de
+// datos). Se usa para rellenar los tipos de la Pokédex en el modo secreto.
+export async function fetchPokemonTypes(id: number): Promise<string[]> {
+  const data = await fetchJson<PokeApiPokemon>(`${API_BASE}/pokemon/${id}`)
+  return data.types.map(t => t.type.name)
 }
 
 export async function getSpeciesIdsByGeneration(generation: number): Promise<number[]> {
@@ -2084,6 +2117,31 @@ export async function getEvolutionInfo(pokemonId: number): Promise<{ nextName: s
     if (pokemonId === 10127) {
       return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 45 }
     }
+    // Terapagos → Terapagos Terastal (nivel 25) → Terapagos Stellar (nivel 50):
+    // PokeAPI no tiene cadena (Terapagos es de una sola etapa y sus formas no
+    // tienen especie propia).
+    if (pokemonId === 1024) {
+      return { nextName: 'terapagos-terastal', evolutionLevel: 25, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    if (pokemonId === 10276) {
+      return { nextName: 'terapagos-stellar', evolutionLevel: 50, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Terapagos Stellar es la evolución de la forma Terastal: no aparece por
+    // debajo del nivel 50.
+    if (pokemonId === 10277) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 50 }
+    }
+    // Toxel → Toxtricity: en este juego evoluciona al nivel 30 un 50% a
+    // Toxtricity Amped y un 50% a Toxtricity Low-Key (la especie "toxtricity"
+    // no existe como Pokémon en PokeAPI: hay que usar las formas).
+    if (pokemonId === 848) {
+      return { nextName: Math.random() < 0.5 ? 'toxtricity-amped' : 'toxtricity-low-key', evolutionLevel: 30, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Toxtricity (Amped y Low-Key) es la evolución de Toxel: no aparece por
+    // debajo del nivel 30.
+    if (pokemonId === 849 || pokemonId === 10184) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 30 }
+    }
     // Koffing → Weezing: 70% Weezing, 30% Weezing de Galar (nivel 35).
     if (pokemonId === 109) {
       return { nextName: Math.random() < 0.7 ? 'weezing' : 'weezing-galar', evolutionLevel: 35, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
@@ -2261,10 +2319,16 @@ export async function getEvolutionInfo(pokemonId: number): Promise<{ nextName: s
     if (pokemonId === 963) {
       return { nextName: 'palafin-zero', evolutionLevel: 38, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
     }
-    // Palafin (incluida su forma Hero) es la evolución de Finizen: no aparece
-    // por debajo del nivel 38.
-    if (pokemonId === 964 || pokemonId === 10256) {
-      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 38 }
+    // Palafin-zero es la evolución de Finizen (no aparece por debajo del 38) y
+    // evoluciona a Palafin Hero al nivel 48 (la forma Hero no tiene especie
+    // propia en PokeAPI, así que no evolucionaba).
+    if (pokemonId === 964) {
+      return { nextName: 'palafin-hero', evolutionLevel: 48, heldItem: null, heldItemEvolutions: [], minAppearLevel: 38 }
+    }
+    // Palafin-hero es la evolución de Palafin-zero: no aparece por debajo del
+    // nivel 48.
+    if (pokemonId === 10256) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 48 }
     }
     // Wooper de Paldea → Clodsire: en este juego evoluciona al nivel 20 (la
     // forma de Paldea no tiene especie propia en PokeAPI, así que no

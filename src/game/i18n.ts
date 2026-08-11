@@ -174,6 +174,7 @@ const DICT: Record<string, Entry> = {
   'shop.title': { es: 'PokéShop', en: 'PokéShop' },
   'shop.yourCoins': { es: 'Tus PokéCoins', en: 'Your PokéCoins' },
   'shop.themes': { es: 'Temas Visuales', en: 'Visual Themes' },
+  'shop.sections': { es: 'Secciones', en: 'Sections' },
   'shop.backgrounds': { es: 'Fondos Animados', en: 'Animated Backgrounds' },
   'shop.consumables': { es: 'Items Curativos', en: 'Healing Items' },
   'shop.pokeballs': { es: 'Poké Balls', en: 'Poké Balls' },
@@ -324,6 +325,7 @@ const DICT: Record<string, Entry> = {
   'lb.copyCode': { es: 'Copiar código', en: 'Copy code' },
   'lb.copied': { es: '¡Copiado!', en: 'Copied!' },
   'coop.needSession': { es: 'Primero crea o únete a una sesión cooperativa.', en: 'First create or join a co-op session.' },
+  'coop.waitPartnerFinish': { es: '🤝 Espera a que tu compañero termine su run para poder reiniciar.', en: '🤝 Wait for your partner to finish their run before restarting.' },
   'auth.needEmailPass': { es: 'Introduce tu email y contraseña.', en: 'Enter your email and password.' },
   'auth.usernameTaken': { es: 'Ese nombre de usuario ya está en uso.', en: 'That username is already in use.' },
   'topbar.musicToggle': { es: 'Activar música', en: 'Unmute music' },
@@ -590,7 +592,7 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v2.0', en: 'v2.0' },
+  'help.version': { es: 'v2.1', en: 'v2.1' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
   'changelog.button': { es: 'Ver cambios', en: 'See changes' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
@@ -1077,6 +1079,11 @@ const ACHIEVEMENT_TEXT: Record<string, { name: { es: string; en: string }; desc:
   'coop_hard_win': { name: { es: 'Dúo Imparable', en: 'Unstoppable Duo' }, desc: { es: 'Gana una partida cooperativa en dificultad Difícil', en: 'Win a co-op run on Hard difficulty' } },
   'meta_complete': { name: { es: 'Magnate del PokéShop', en: 'PokéShop Tycoon' }, desc: { es: 'Compra todos los objetos de la Tienda Meta', en: 'Buy every item from the Meta Shop' } },
   'eevee_master': { name: { es: 'Familia Eevee', en: 'Eevee Family' }, desc: { es: 'Obtén todas las evoluciones de Eevee en una partida', en: 'Obtain all Eevee evolutions in one run' } },
+  'cazador_50': { name: { es: 'Cazador', en: 'Hunter' }, desc: { es: 'Captura 50 especies distintas', en: 'Catch 50 different species' } },
+  'cazador_100': { name: { es: 'Profesor Oak', en: 'Professor Oak' }, desc: { es: 'Captura 100 especies distintas', en: 'Catch 100 different species' } },
+  'shiny_dex_10': { name: { es: 'Pokédex de Shinies', en: 'Shiny Pokédex' }, desc: { es: 'Captura 10 especies shiny distintas', en: 'Catch 10 different shiny species' } },
+  'legendary_catcher_5': { name: { es: 'Guardián de Leyendas', en: 'Legend Keeper' }, desc: { es: 'Captura 5 legendarios distintos', en: 'Catch 5 different legendaries' } },
+  'type_master': { name: { es: 'Maestro de Tipos', en: 'Type Master' }, desc: { es: 'Captura al menos un Pokémon de cada tipo', en: 'Catch at least one Pokémon of each type' } },
 }
 
 export function achName(id: string): string {
@@ -1791,6 +1798,22 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v2.1',
+    items: [
+      { es: '🏅 Nuevos logros de Pokédex: Cazador (50 especies), Profesor Oak (100 especies), Pokédex de Shinies (10 shinies), Guardián de Leyendas (5 legendarios) y Maestro de Tipos (uno de cada tipo).', en: '🏅 New Pokédex achievements: Hunter (50 species), Professor Oak (100 species), Shiny Pokédex (10 shinies), Legend Keeper (5 legendaries) and Type Master (one of each type).' },
+      { es: '🐢 Terapagos evoluciona a su forma Terastal al nivel 25 y esta a la forma Stellar al nivel 50, reflejado en la línea evolutiva de la Pokédex.', en: '🐢 Terapagos now evolves into its Terastal form at level 25 and it into the Stellar form at level 50, reflected in the Pokédex evolution line.' },
+      { es: '🎸 Toxel evoluciona al nivel 30 un 50% a Toxtricity Amped y un 50% a Toxtricity Low-Key (antes la evolución fallaba porque la especie "toxtricity" no existe en PokeAPI).', en: '🎸 Toxel now evolves at level 30 with a 50% chance into Toxtricity Amped and a 50% chance into Toxtricity Low-Key (it previously failed because the "toxtricity" species does not exist in PokeAPI).' },
+      { es: '🧹 Los cambios de stats (bufos y debufos) ahora se eliminan SIEMPRE al terminar el combate, igual que al empezar el siguiente.', en: '🧹 Stat changes (boosts and debuffs) are now ALWAYS cleared at the end of battle, just like at the start of the next one.' },
+      { es: '🎨 Las barras de scroll de toda la interfaz ahora usan el color del tema activo (borde del tema) en lugar del gris fijo.', en: '🎨 The scrollbars across the whole UI now use the active theme color (theme border) instead of a fixed gray.' },
+      { es: '🖥️ El menú de Opciones ahora es más grande (más ancho y con más espacio entre secciones).', en: '🖥️ The Options menu is now bigger (wider with more spacing between sections).' },
+      { es: '🦸 Palafin (forma zero) evoluciona a Palafin Hero al nivel 48, reflejado en la línea evolutiva de la Pokédex.', en: '🦸 Palafin (Zero form) now evolves into Palafin Hero at level 48, reflected in the Pokédex evolution line.' },
+      { es: '🛍️ La Tienda Meta tiene un botón "Secciones" en la parte superior que despliega/oculta al instante los accesos directos a cada sección (igual en ordenador y móvil). El desplegable usa solo CSS, así que no provoca lag ni re-renderiza la tienda.', en: '🛍️ The Meta Shop has a "Sections" button at the top that instantly opens/closes the shortcuts to each section (same on desktop and mobile). The dropdown is CSS-only, so it causes no lag and does not re-render the shop.' },
+      { es: '⚡ Optimización: el desplegable de secciones de la Tienda Meta ya no re-renderiza toda la tienda al abrirse/cerrarse (se alterna con una clase CSS).', en: '⚡ Performance: the Meta Shop sections dropdown no longer re-renders the whole shop when opening/closing (it toggles a CSS class).' },
+      { es: '🤝 En el modo cooperativo, un jugador ya no puede reiniciar la partida hasta que su compañero haya terminado su run (se muestra un aviso y se bloquea el reinicio). Al reiniciar, ambos jugadores entran automáticamente a la nueva partida.', en: '🤝 In co-op mode, a player can no longer restart the run until their partner has finished theirs (a notice is shown and restart is blocked). When restarting, both players automatically enter the new run.' },
+      { es: '💬 Los tooltips de descripciones de objetos y movimientos ahora usan los colores del tema activo en lugar del tooltip gris del navegador.', en: '💬 Item and move description tooltips now use the active theme colors instead of the browser\'s gray tooltip.' },
+    ],
+  },
   {
     version: 'v2.0',
     items: [

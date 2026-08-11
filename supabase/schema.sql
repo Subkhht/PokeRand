@@ -233,6 +233,7 @@ create table if not exists public.coop_sessions (
 
 alter table public.coop_sessions add column if not exists finished_a boolean not null default false;
 alter table public.coop_sessions add column if not exists finished_b boolean not null default false;
+alter table public.coop_sessions add column if not exists restart_requested boolean not null default false;
 
 create table if not exists public.coop_progress (
   id uuid primary key default gen_random_uuid(),
@@ -365,6 +366,9 @@ end;
 $$;
 
 -- Estado del nodo + estado de la sesión (para saber si el compañero terminó).
+-- 'finished' es true si ALGUNO de los dos jugadores ha terminado su run, para
+-- liberar al compañero que espera en un nodo (el estado 'finished' global solo
+-- se pone cuando ambos han terminado).
 create or replace function public.get_coop_progress(p_code text, p_node integer)
 returns jsonb
 language plpgsql security definer set search_path = public
@@ -379,7 +383,7 @@ begin
   return jsonb_build_object(
     'a_ready', coalesce(v_prog.a_ready, false),
     'b_ready', coalesce(v_prog.b_ready, false),
-    'finished', v_sess.status = 'finished',
+    'finished', v_sess.status = 'finished' or v_sess.finished_a or v_sess.finished_b,
     'result', v_sess.result
   );
 end;
@@ -439,6 +443,9 @@ $$;
 
 -- Cierra la sesión (partida terminada para uno de los jugadores).
 -- p_result: 'won' si quien termina ganó la run, 'lost' si perdió/abandonó.
+-- Marca como terminada la run SOLO del jugador que llama (finished_a/finished_b)
+-- y pone la sesión en 'finished' cuando AMBOS han terminado. Así el compañero
+-- que aún juega puede seguir, y nadie puede reiniciar antes de tiempo.
 -- La sesión NO se borra: así el botón de "Reiniciar" puede volver a usarla con
 -- la misma semilla sin ir al menú. La limpieza la hace la TTL de 24h de
 -- create_coop_session y el borrado inmediato al cancelar.
@@ -454,8 +461,20 @@ begin
   select * into v_sess from public.coop_sessions where code = upper(p_code);
   if not found then return false; end if;
   if v_uid <> v_sess.player_a_id and v_uid <> v_sess.player_b_id then return false; end if;
-  update public.coop_sessions set status = 'finished', result = p_result
-  where code = v_sess.code;
+
+  if v_uid = v_sess.player_a_id then
+    update public.coop_sessions
+    set finished_a = true,
+        result = p_result,
+        status = case when v_sess.finished_b then 'finished' else status end
+    where code = v_sess.code;
+  else
+    update public.coop_sessions
+    set finished_b = true,
+        result = p_result,
+        status = case when v_sess.finished_a then 'finished' else status end
+    where code = v_sess.code;
+  end if;
   return true;
 end;
 $$;
@@ -480,19 +499,58 @@ end;
 $$;
 
 -- Reinicia la sesión (misma semilla, mismo código): borra progreso e intercambios.
--- Devuelve false si la sesión ya no existe (ambos terminaron y fue eliminada).
+-- Devuelve 'blocked' si el compañero aún no ha terminado su run (no se puede
+-- empezar de nuevo hasta que ambos terminen), 'missing' si la sesión ya no
+-- existe, y 'ok' si el reinicio se completó.
+-- Nota: cambió el tipo de retorno (boolean → text), así que se elimina la
+-- versión anterior antes de recrearla.
+drop function if exists public.reset_coop_session(text);
 create or replace function public.reset_coop_session(p_code text)
-returns boolean
+returns text
 language plpgsql security definer set search_path = public
 as $$
+declare
+  v_uid uuid := auth.uid();
+  v_sess public.coop_sessions%rowtype;
+  v_other_finished boolean;
 begin
+  if v_uid is null then raise exception 'Necesitas iniciar sesión'; end if;
+  select * into v_sess from public.coop_sessions where code = upper(p_code);
+  if not found then return 'missing'; end if;
+  if v_uid <> v_sess.player_a_id and v_uid <> v_sess.player_b_id then return 'forbidden'; end if;
+
+  -- Sin compañero (player_b null) siempre se puede reiniciar.
+  if v_sess.player_b_id is null then
+    v_other_finished := true;
+  elsif v_uid = v_sess.player_a_id then
+    v_other_finished := v_sess.finished_b;
+  else
+    v_other_finished := v_sess.finished_a;
+  end if;
+
+  if not v_other_finished then return 'blocked'; end if;
+
   delete from public.coop_trades where code = upper(p_code);
   delete from public.coop_exchanges where code = upper(p_code);
   delete from public.coop_progress where code = upper(p_code);
   update public.coop_sessions set status = 'active', result = null,
-         finished_a = false, finished_b = false
+         finished_a = false, finished_b = false,
+         restart_requested = true
   where code = upper(p_code);
-  return FOUND;
+  return 'ok';
+end;
+$$;
+
+-- Marca como "leído" el reinicio del compañero: el jugador que detecta la señal
+-- la limpia para que no se vuelva a disparar.
+create or replace function public.clear_coop_restart(p_code text)
+returns boolean
+language plpgsql security definer set search_path = public
+as $$
+begin
+  update public.coop_sessions set restart_requested = false
+  where code = upper(p_code);
+  return true;
 end;
 $$;
 

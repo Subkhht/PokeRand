@@ -9,6 +9,9 @@ export interface CoopSession {
   player_b_id: string | null
   status: 'waiting' | 'active' | 'finished'
   result: 'won' | 'lost' | null
+  finished_a?: boolean
+  finished_b?: boolean
+  restart_requested?: boolean
   created_at: string
 }
 
@@ -144,15 +147,18 @@ export async function finishCoopSession(code: string, result: 'won' | 'lost'): P
   return true
 }
 
-export async function resetCoopSession(code: string): Promise<boolean> {
+export type CoopResetResult = 'ok' | 'blocked' | 'missing' | 'error' | 'forbidden'
+
+export async function resetCoopSession(code: string): Promise<CoopResetResult> {
   const client = await getClient()
-  if (!client) return false
+  if (!client) return 'error'
   const { data, error } = await client.rpc('reset_coop_session', { p_code: code })
   if (error) {
     console.error('reset_coop_session:', error)
-    return false
+    return 'error'
   }
-  return data === true
+  if (data === 'ok' || data === 'blocked' || data === 'missing' || data === 'forbidden') return data
+  return 'error'
 }
 
 export async function cancelCoopSession(code: string): Promise<boolean> {
@@ -164,6 +170,18 @@ export async function cancelCoopSession(code: string): Promise<boolean> {
     return false
   }
   return data === true
+}
+
+// Marca como leído el reinicio del compañero para que no se vuelva a disparar.
+export async function clearCoopRestart(code: string): Promise<boolean> {
+  const client = await getClient()
+  if (!client) return false
+  const { error } = await client.rpc('clear_coop_restart', { p_code: code })
+  if (error) {
+    console.error('clear_coop_restart:', error)
+    return false
+  }
+  return true
 }
 
 export async function submitExchangeOffer(code: string, node: number, offer: CoopTrade['offer']): Promise<boolean> {

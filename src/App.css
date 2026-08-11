@@ -28,6 +28,94 @@
   --shadow-hard-sm: 3px 3px 0 0 rgba(0, 0, 0, 0.5);
 }
 
+/* ------------------------------------------------------------
+   BARRAS DE SCROLL INTEGRADAS CON EL TEMA ACTIVO
+   (el color del borde del tema se usa para el pulgar; la pista
+   se mantiene oscura). El rediseño Game Boy las sobreescribe.
+   ------------------------------------------------------------ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border, #5a5a96) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border, #5a5a96);
+  border-radius: 6px;
+  border: 2px solid var(--panel-bg);
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+}
+
+/* ------------------------------------------------------------
+   BARRA DE SECCIONES DE LA TIENDA META
+   Botón desplegable: se abre/cierra al pulsar "Secciones".
+   ------------------------------------------------------------ */
+.meta-nav-zone {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin-bottom: 1rem;
+}
+
+.meta-nav-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0.45rem 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(13, 20, 38, 0.97), rgba(15, 23, 42, 0.92));
+  color: #7d9bd6;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.meta-nav-handle:hover {
+  color: #4d9bff;
+  background: linear-gradient(180deg, rgba(22, 34, 62, 0.97), rgba(15, 23, 42, 0.92));
+}
+
+.meta-nav-chevron {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.meta-nav-zone.open .meta-nav-chevron {
+  transform: rotate(180deg);
+}
+
+.meta-nav-bar {
+  display: none;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.55rem 0.75rem;
+  margin-top: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(13, 20, 38, 0.97), rgba(15, 23, 42, 0.92));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.meta-nav-zone.open .meta-nav-bar {
+  display: flex;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -550,6 +638,25 @@ button {
   font-weight: 500;
 }
 
+/* Tooltip con el tema integrado (descripciones de objetos y movimientos). */
+.theme-tooltip {
+  position: fixed;
+  transform: translate(-50%, calc(-100% - 8px));
+  background: var(--panel-bg);
+  border: 1px solid var(--border, #5a5a96);
+  color: var(--text-main);
+  border-radius: 6px;
+  padding: 8px 12px;
+  white-space: pre-line;
+  font-size: 0.95rem;
+  max-width: 300px;
+  z-index: 2000;
+  pointer-events: none;
+  box-shadow: var(--shadow-hard-sm);
+  text-align: left;
+  line-height: 1.4;
+}
+
 /* ------------------------------------------------------------
    GRID DE NODOS DE RUTA
    ------------------------------------------------------------ */
@@ -558,7 +665,7 @@ button {
   justify-content: center;
   overflow: hidden;
   scrollbar-width: thin;
-  scrollbar-color: var(--border-light) transparent;
+  scrollbar-color: var(--border, #5a5a96) transparent;
 }
 
 .route-map.is-infinite {
@@ -572,7 +679,7 @@ button {
 }
 
 .route-map::-webkit-scrollbar-thumb {
-  background: var(--border-light);
+  background: var(--border, #5a5a96);
   border-radius: 6px;
   border: 2px solid var(--panel-bg);
 }

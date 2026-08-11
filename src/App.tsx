@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useCallback, Component, Fragment, type ReactNode, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { createPortal } from 'react-dom'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
 import { playHover, playClick, playHit, playEvolution, playCoin, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
@@ -12,6 +13,7 @@ import {
   getMoveDetails,
   getSpeciesIdsByGeneration,
   getAllSpeciesList,
+  fetchPokemonTypes,
   buildPokemonFromApi,
   startersByGen,
   makeShinySprite,
@@ -23,7 +25,7 @@ import {
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
 import { isLeaderboardEnabled, submitInfiniteScore, fetchInfiniteLeaderboard, formatDuration, getCurrentUser, onAuthChange, signUpWithUsername, signIn, signOut, getUsername, isUsernameTaken, type LeaderboardEntry, type InfiniteScoreInsert } from './game/leaderboard'
-import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, cancelExchangeOffer, sendCoopChat, getCoopChat, finishCoopSession, resetCoopSession, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange, type CoopChatMessage } from './game/coop'
+import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, cancelExchangeOffer, sendCoopChat, getCoopChat, finishCoopSession, resetCoopSession, clearCoopRestart, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange, type CoopChatMessage } from './game/coop'
 import { isPvpEnabled, createPvpRoom, findPvpOpponent, joinPvpRoom, getPvpMatch, getPvpState, submitPvpAction, resolvePvpTurn as resolvePvpTurnRpc, forfeitPvpMatch, cancelPvpMatch, finishPvpMatch, clearPvpAction, startPvpTimer, expirePvpTimer, getPvpElo, getPvpEloLeaderboard, awardPvpElo, rematchPvpRoom, serializePvpPokemon, type PvpTurnSnapshot, type PvpRoomResult, type PvpState, type PvpEloEntry } from './game/pvp'
 import { resolvePvpTurn, type PvpAction } from './game/pvpBattle'
 import CasinoMinigame from './minigames/CasinoMinigame'
@@ -1566,6 +1568,11 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: 'coop_hard_win', name: 'Dúo Imparable', desc: 'Gana una partida cooperativa en dificultad Difícil', icon: '⚡', hidden: false, reward: 60 },
   { id: 'meta_complete', name: 'Magnate del PokéShop', desc: 'Compra todos los objetos de la Tienda Meta', icon: '🛍️', hidden: false, reward: 250 },
   { id: 'eevee_master', name: 'Familia Eevee', desc: 'Obtén todas las evoluciones de Eevee en una partida', icon: '🦊', hidden: false, reward: 250 },
+  { id: 'cazador_50', name: 'Cazador', desc: 'Captura 50 especies distintas', icon: '📋', hidden: false, reward: 60 },
+  { id: 'cazador_100', name: 'Profesor Oak', desc: 'Captura 100 especies distintas', icon: '🧑‍🏫', hidden: false, reward: 100 },
+  { id: 'shiny_dex_10', name: 'Pokédex de Shinies', desc: 'Captura 10 especies shiny distintas', icon: '🌈', hidden: false, reward: 60 },
+  { id: 'legendary_catcher_5', name: 'Guardián de Leyendas', desc: 'Captura 5 legendarios distintos', icon: '🐉', hidden: false, reward: 60 },
+  { id: 'type_master', name: 'Maestro de Tipos', desc: 'Captura al menos un Pokémon de cada tipo', icon: '🎨', hidden: false, reward: 60 },
 ]
 
 const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (pokemon: Pokemon) => Partial<Pokemon> }> = [
@@ -1655,6 +1662,9 @@ const REGION_LEGENDARIES: Record<number, number[]> = {
   8: [888, 889, 890, 891, 892, 893, 894, 895, 896, 897, 898],
   9: [1001, 1002, 1003, 1004, 1007, 1008],
 }
+
+// Todos los legendarios de todas las generaciones (para logros y la Entebola).
+const ALL_LEGENDARIES = Object.values(REGION_LEGENDARIES).flat()
 
 const RANDOM_EVENTS = [
   {
@@ -2309,6 +2319,40 @@ function getStageMultiplier(stage: number): number {
   return 1
 }
 
+// Tooltip con el tema integrado para descripciones de objetos y movimientos.
+// Usa display:contents para no alterar el layout y un portal fijo que sigue al
+// cursor (posicionado por ref, sin re-renderizar en cada movimiento).
+function ThemedTooltip({ content, children }: { content: string; children: ReactNode }): ReactNode {
+  const tooltipRef = useRef<HTMLDivElement | null>(null)
+  const [visible, setVisible] = useState(false)
+  if (!content) return <>{children}</>
+  return (
+    <span
+      style={{ display: 'contents' }}
+      onMouseEnter={(e) => {
+        setVisible(true)
+        if (tooltipRef.current) {
+          tooltipRef.current.style.left = `${e.clientX}px`
+          tooltipRef.current.style.top = `${e.clientY}px`
+        }
+      }}
+      onMouseLeave={() => setVisible(false)}
+      onMouseMove={(e) => {
+        if (tooltipRef.current) {
+          tooltipRef.current.style.left = `${e.clientX}px`
+          tooltipRef.current.style.top = `${e.clientY}px`
+        }
+      }}
+    >
+      {children}
+      {createPortal(
+        <div ref={tooltipRef} className="theme-tooltip" style={{ display: visible ? 'block' : 'none' }}>{content}</div>,
+        document.body
+      )}
+    </span>
+  )
+}
+
 function getEffectiveStats(pokemon: Pokemon): { attack: number; defense: number; spAttack: number; spDefense: number; speed: number; maxHp: number } {
   const item = pokemon.holdItem ? HOLDABLE_ITEMS[pokemon.holdItem] : null
   const stages = pokemon.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
@@ -2771,6 +2815,7 @@ function MainApp() {
   })
   const achievementsRef = useRef<AchievementState>(achievements)
   achievementsRef.current = achievements
+  const typesMigrationRef = useRef(false)
   const [metaProgression, setMetaProgression] = useState<MetaProgression>(() => {
     try {
       const saved = localStorage.getItem('pokerand_meta')
@@ -2834,6 +2879,7 @@ function MainApp() {
   const [coopWaiting, setCoopWaiting] = useState<boolean>(false)
   const [coopStarting, setCoopStarting] = useState<boolean>(false)
   const coopAutoStartedRef = useRef(false)
+  const coopRestartInitiatedRef = useRef(false)
   const [coopWaitingNode, setCoopWaitingNode] = useState<number>(0)
   const [coopSessionEndedMsg, setCoopSessionEndedMsg] = useState<string>('')
   const [coopMyOffer, setCoopMyOffer] = useState<CoopTrade['offer'] | null>(null)
@@ -3149,6 +3195,26 @@ function MainApp() {
         return updated
       })
       setBattleLog((prev) => [t('b.secretDexUnlocked', { n: species.length }), ...prev].slice(0, 15))
+      // Rellena los tipos de cada especie en lotes en segundo plano para que los
+      // logros de Pokédex (p. ej. Maestro de Tipos) funcionen con la Pokédex
+      // completa.
+      void (async () => {
+        const BATCH = 60
+        for (let i = 0; i < species.length; i += BATCH) {
+          const batch = species.slice(i, i + BATCH)
+          const typesResults = await Promise.all(batch.map(s => fetchPokemonTypes(s.id).catch(() => [] as string[])))
+          setPokedex(prev => {
+            const updated = { ...prev }
+            batch.forEach((s, idx) => {
+              if (updated[s.id] && typesResults[idx].length > 0) {
+                updated[s.id] = { ...updated[s.id], types: typesResults[idx] }
+              }
+            })
+            localStorage.setItem('pokerand_pokedex', JSON.stringify(updated))
+            return updated
+          })
+        }
+      })()
     } catch {
       setSecretAddError('No se pudo cargar la lista de especies.')
     } finally {
@@ -3742,6 +3808,45 @@ function MainApp() {
     if (winStreak >= 20) unlockAchievement('streak_20')
     if (winStreak >= 25) unlockAchievement('streak_25')
   }, [winStreak])
+
+  // Logros acumulativos de la Pokédex (se guardan entre partidas).
+  useEffect(() => {
+    // Migración: si hay entradas capturadas sin tipos (p. ej. una Pokédex
+    // desbloqueada con el modo secreto antes de que se guardaran los tipos), se
+    // rellenan en segundo plano para que los logros funcionen.
+    const entriesWithoutTypes = Object.entries(pokedex).filter(([, e]) => e.caught && !(e.types?.length))
+    if (entriesWithoutTypes.length > 0 && !typesMigrationRef.current) {
+      typesMigrationRef.current = true
+      void (async () => {
+        const ids = entriesWithoutTypes.map(([id]) => Number(id))
+        const BATCH = 60
+        for (let i = 0; i < ids.length; i += BATCH) {
+          const batchIds = ids.slice(i, i + BATCH)
+          const results = await Promise.all(batchIds.map(id => fetchPokemonTypes(id).catch(() => [] as string[])))
+          setPokedex(prev => {
+            const updated = { ...prev }
+            batchIds.forEach((id, idx) => {
+              if (updated[id] && results[idx].length > 0) {
+                updated[id] = { ...updated[id], types: results[idx] }
+              }
+            })
+            localStorage.setItem('pokerand_pokedex', JSON.stringify(updated))
+            return updated
+          })
+        }
+      })()
+    }
+
+    const allEntries = Object.values(pokedex)
+    const caughtEntries = allEntries.filter(p => p.caught)
+    if (caughtEntries.length >= 50) unlockAchievement('cazador_50')
+    if (caughtEntries.length >= 100) unlockAchievement('cazador_100')
+    if (allEntries.filter(p => p.shinyCaught).length >= 10) unlockAchievement('shiny_dex_10')
+    const legendaryCaught = caughtEntries.filter(p => ALL_LEGENDARIES.includes(p.id)).length
+    if (legendaryCaught >= 5) unlockAchievement('legendary_catcher_5')
+    const typesCaught = new Set(caughtEntries.flatMap(p => p.types ?? []))
+    if (Object.keys(TYPE_COLORS).every(t => typesCaught.has(t))) unlockAchievement('type_master')
+  }, [pokedex])
 
   useEffect(() => {
     const legendaryIds = Object.entries(pokedex).filter(([,e]) => e.name.startsWith('legendary-')).map(([id]) => Number(id))
@@ -4619,12 +4724,9 @@ function MainApp() {
 
   async function completeCurrentNode(): Promise<void> {
     // Las etapas de stats (subidas/bajadas de Ataque, Def. Esp., etc.) solo
-    // debían durar un combate. Como las pantallas de victoria/derrota solo se
-    // usan al terminar la run, aquí se resetean al completar CUALQUIER nodo:
-    // evita que una Def. Esp. subida se "pegue" a niveles altos durante toda la run.
-    setTeam(prev => prev.map(p => p.statStages && (p.statStages.attack !== 0 || p.statStages.defense !== 0 || p.statStages.spAttack !== 0 || p.statStages.spDefense !== 0 || p.statStages.speed !== 0)
-      ? { ...p, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
-      : p))
+    // duran un combate: se eliminan SIEMPRE al completar el nodo, tanto bufos
+    // como debufos, para que nada se "pegue" de un combate a otro.
+    setTeam(prev => prev.map(p => ({ ...p, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false })))
 
     if (difficulty === 'coliseum') {
       setTeam(prev => prev.map(p => ({ ...p, hp: p.maxHp, status: undefined })))
@@ -5004,7 +5106,14 @@ function MainApp() {
 
   async function restartRun(): Promise<void> {
     if (coopModeRef.current && coopSessionCodeRef.current) {
-      let exists = await resetCoopSession(coopSessionCodeRef.current)
+      coopRestartInitiatedRef.current = true
+      const reset = await resetCoopSession(coopSessionCodeRef.current)
+      if (reset === 'blocked') {
+        coopRestartInitiatedRef.current = false
+        setCoopError(t('coop.waitPartnerFinish'))
+        return
+      }
+      let exists = reset === 'ok'
       setCoopSessionEndedMsg('')
       setCoopWaiting(false)
       if (!exists) {
@@ -5075,6 +5184,40 @@ function MainApp() {
         setTimeout(() => { void finishCoopSession(code, result) }, 3000)
       }
     })
+  }, [screen])
+
+  // En cooperativo, si estás en victoria/derrota y el compañero reinicia la
+  // sesión (señal restart_requested), arranca la partida de nuevo automáticamente
+  // para que los dos entren a la vez en la misma ruta.
+  useEffect(() => {
+    if (!coopModeRef.current || !coopSessionCodeRef.current) return
+    if (screen !== 'victory' && screen !== 'defeat') return
+    const code = coopSessionCodeRef.current
+    let cancelled = false
+    const timer = setInterval(async () => {
+      if (cancelled) return
+      const sess = await getCoopSession(code)
+      if (!sess) return
+      if (sess.restart_requested && !coopRestartInitiatedRef.current) {
+        cancelled = true
+        clearInterval(timer)
+        await clearCoopRestart(code)
+        setCoopSessionEndedMsg('')
+        setVoluntaryRunEnd(false)
+        setDefeatSummary(null)
+        await startNewRun(true)
+      }
+    }, 3000)
+    return () => { cancelled = true; clearInterval(timer) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, coopMode, coopSessionCode])
+
+  // Reinicia el ref de reinicio local al salir de la pantalla de victoria/derrota,
+  // para que en la siguiente run la detección automática vuelva a funcionar.
+  useEffect(() => {
+    if (screen !== 'victory' && screen !== 'defeat') {
+      coopRestartInitiatedRef.current = false
+    }
   }, [screen])
 
   function buildOfferFromPokemon(p: Pokemon): CoopTrade['offer'] {
@@ -6453,12 +6596,10 @@ function MainApp() {
   async function enterNode(): Promise<void> {
     if (!activePokemon || !currentNode) return
 
-    // Red de seguridad: las etapas de stats SIEMPRE se reinician al entrar a un
-    // nodo nuevo, cubriendo cualquier ruta de fin de combate que no pasara por
-    // completeCurrentNode. Evita que At. Esp. / Def. Esp. se acumulen.
-    setTeam(prev => prev.map(p => p.statStages && (p.statStages.attack !== 0 || p.statStages.defense !== 0 || p.statStages.spAttack !== 0 || p.statStages.spDefense !== 0 || p.statStages.speed !== 0)
-      ? { ...p, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
-      : p))
+    // Red de seguridad: las etapas de stats SIEMPRE se eliminan al entrar a un
+    // nodo nuevo (bufos y debufos), cubriendo cualquier ruta de fin de combate
+    // que no pasara por completeCurrentNode.
+    setTeam(prev => prev.map(p => ({ ...p, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false })))
 
     // El flag de batalla TeamR debe reflejar SIEMPRE el nodo actual, para que un
     // TeamR escapado (Cuerda Huida) o un combate normal no hereden el robo/elección.
@@ -10688,7 +10829,7 @@ function MainApp() {
       {/* Modal Opciones */}
       {showOptions && (
         <div className="modal-backdrop" onClick={closeOptions}>
-          <div className="pokedex-frame" style={{ maxWidth: '380px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="pokedex-frame" style={{ maxWidth: '540px' }} onClick={(e) => e.stopPropagation()}>
             <div className="pokedex-top-bar">
               <div className="big-blue-sensor"></div>
               <div className="mini-leds">
@@ -10698,8 +10839,8 @@ function MainApp() {
               </div>
             </div>
 
-            <div className="pokedex-screen" style={{ padding: '1.25rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div className="pokedex-screen" style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 <div>
                   <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
                     🎵 {t('options.musicVolume')}
@@ -12090,12 +12231,13 @@ function MainApp() {
                   >
                     <img src={pokemon.sprite} alt={pokemon.name} onError={fallbackSprite} />
                     {pokemon.holdItem && ITEM_SPRITES[pokemon.holdItem] && (
-                      <img
-                        src={ITEM_SPRITES[pokemon.holdItem]}
-                        alt={pokemon.holdItem}
-                        title={`${itemLocalizedName(pokemon.holdItem ?? '')}: ${itemDesc(pokemon.holdItem ?? '')}`}
-                        style={{ width: '18px', height: '18px', imageRendering: 'pixelated', position: 'absolute', bottom: '4px', right: '4px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
-                      />
+                      <ThemedTooltip content={`${itemLocalizedName(pokemon.holdItem ?? '')}: ${itemDesc(pokemon.holdItem ?? '')}`}>
+                        <img
+                          src={ITEM_SPRITES[pokemon.holdItem]}
+                          alt={pokemon.holdItem}
+                          style={{ width: '18px', height: '18px', imageRendering: 'pixelated', position: 'absolute', bottom: '4px', right: '4px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
+                        />
+                      </ThemedTooltip>
                     )}
                     <strong>{pokemon.name}{pokemon.shiny ? ' ✨' : ''}{pokemon.leechSeed && <LeechSeedBadge compact />}</strong>
                     <span>
@@ -12990,20 +13132,20 @@ function MainApp() {
                     </p>
                     <div className="moves-grid" style={{ marginBottom: '1rem' }}>
                       {moveOptions.map((move) => (
-                        <button
-                          key={`move-opt-${move.name}`}
-                          className="move-btn move-opt-btn"
-                          type="button"
-                          onClick={() => setSelectedNewMove(move)}
-                          title={moveTooltip(move)}
-                          style={{ borderColor: TYPE_COLORS[move.type] ?? '#475569' }}
-                        >
-                          <strong>{moveName(move)}</strong>
-                          <span className="muted" style={{ fontSize: '0.5rem' }}>
-                            {move.type.toUpperCase()} · Pwr {move.power} · Acc {move.accuracy ?? '—'}
-                          </span>
-                          {moveEffectSummary(move) && <span className="move-btn-effect" style={{ fontSize: '0.55rem' }}>{moveEffectSummary(move)}</span>}
-                        </button>
+                        <ThemedTooltip key={`move-opt-${move.name}`} content={moveTooltip(move)}>
+                          <button
+                            className="move-btn move-opt-btn"
+                            type="button"
+                            onClick={() => setSelectedNewMove(move)}
+                            style={{ borderColor: TYPE_COLORS[move.type] ?? '#475569' }}
+                          >
+                            <strong>{moveName(move)}</strong>
+                            <span className="muted" style={{ fontSize: '0.5rem' }}>
+                              {move.type.toUpperCase()} · Pwr {move.power} · Acc {move.accuracy ?? '—'}
+                            </span>
+                            {moveEffectSummary(move) && <span className="move-btn-effect" style={{ fontSize: '0.55rem' }}>{moveEffectSummary(move)}</span>}
+                          </button>
+                        </ThemedTooltip>
                       ))}
                     </div>
                     <div style={{ textAlign: 'center' }}>
@@ -13020,20 +13162,20 @@ function MainApp() {
                     </p>
                     <div className="moves-grid" style={{ marginBottom: '1rem' }}>
                       {activePokemon?.moves.map((move, idx) => (
-                        <button
-                          key={`move-replace-${idx}`}
-                          className="move-btn move-opt-btn"
-                          type="button"
-                          onClick={() => replaceTeamMove(idx)}
-                          title={moveTooltip(move)}
-                          style={{ borderColor: TYPE_COLORS[move.type] ?? '#475569' }}
-                        >
-                          <strong>{moveName(move)}</strong>
-                          <span className="muted" style={{ fontSize: '0.5rem' }}>
-                            {move.type.toUpperCase()} · Pwr {move.power}
-                          </span>
-                          {moveEffectSummary(move) && <span className="move-btn-effect" style={{ fontSize: '0.55rem' }}>{moveEffectSummary(move)}</span>}
-                        </button>
+                        <ThemedTooltip key={`move-replace-${idx}`} content={moveTooltip(move)}>
+                          <button
+                            className="move-btn move-opt-btn"
+                            type="button"
+                            onClick={() => replaceTeamMove(idx)}
+                            style={{ borderColor: TYPE_COLORS[move.type] ?? '#475569' }}
+                          >
+                            <strong>{moveName(move)}</strong>
+                            <span className="muted" style={{ fontSize: '0.5rem' }}>
+                              {move.type.toUpperCase()} · Pwr {move.power}
+                            </span>
+                            {moveEffectSummary(move) && <span className="move-btn-effect" style={{ fontSize: '0.55rem' }}>{moveEffectSummary(move)}</span>}
+                          </button>
+                        </ThemedTooltip>
                       ))}
                     </div>
                     <div style={{ textAlign: 'center' }}>
@@ -13276,17 +13418,17 @@ function MainApp() {
                           <p style={{ margin: '0 0 0.3rem', color: '#9b98cf', fontSize: '0.8rem' }}>1️⃣ Elige un movimiento:</p>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.6rem' }}>
                             {pokemon.moves.map((m, mi) => (
-                              <button
-                                key={mi}
-                                className="tiny-btn"
-                                type="button"
-                                onClick={() => doubleSelectMove(slot, mi)}
-                                title={moveTooltip(m)}
-                                style={{ background: sel?.moveIdx === mi ? '#a855f7' : '#2a2a55', color: '#fff', border: sel?.moveIdx === mi ? '2px solid #cba3ff' : '2px solid transparent' }}
-                              >
-                                {moveName(m)} ({m.type})
-                                {moveEffectSummary(m) && <div style={{ fontSize: '0.6rem', color: '#7dd3fc', marginTop: '2px' }}>{moveEffectSummary(m)}</div>}
-                              </button>
+                              <ThemedTooltip key={mi} content={moveTooltip(m)}>
+                                <button
+                                  className="tiny-btn"
+                                  type="button"
+                                  onClick={() => doubleSelectMove(slot, mi)}
+                                  style={{ width: '100%', background: sel?.moveIdx === mi ? '#a855f7' : '#2a2a55', color: '#fff', border: sel?.moveIdx === mi ? '2px solid #cba3ff' : '2px solid transparent' }}
+                                >
+                                  {moveName(m)} ({m.type})
+                                  {moveEffectSummary(m) && <div style={{ fontSize: '0.6rem', color: '#7dd3fc', marginTop: '2px' }}>{moveEffectSummary(m)}</div>}
+                                </button>
+                              </ThemedTooltip>
                             ))}
                           </div>
                           <p style={{ margin: '0 0 0.3rem', color: '#9b98cf', fontSize: '0.8rem' }}>2️⃣ Elige el objetivo:</p>
@@ -13473,18 +13615,18 @@ function MainApp() {
                           ? '🚫 Anulado por Anulación'
                           : moveTooltip(move)
                     return (
-                    <button
-                      key={move.name}
-                      className="move-btn"
-                      onClick={() => onPlayerMove(move)}
-                      type="button"
-                      disabled={moveDisabled}
-                      title={blockTitle}
-                      style={isDisabled || choiceBlocked || assaultVestBlocked ? { borderColor: '#ff8a80', opacity: 0.5, textDecoration: 'line-through' } : undefined}
-                    >
-                      <span className="move-btn-line">{isDisabled || choiceBlocked || assaultVestBlocked ? '🚫 ' : ''}{moveName(move)} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''}){move.minHits ? ` x${move.minHits}-${move.maxHits}` : ''}</span>
-                      {moveEffectSummary(move) && <span className="move-btn-effect">{moveEffectSummary(move)}</span>}
-                    </button>
+                    <ThemedTooltip key={move.name} content={blockTitle}>
+                      <button
+                        className="move-btn"
+                        onClick={() => onPlayerMove(move)}
+                        type="button"
+                        disabled={moveDisabled}
+                        style={isDisabled || choiceBlocked || assaultVestBlocked ? { borderColor: '#ff8a80', opacity: 0.5, textDecoration: 'line-through' } : undefined}
+                      >
+                        <span className="move-btn-line">{isDisabled || choiceBlocked || assaultVestBlocked ? '🚫 ' : ''}{moveName(move)} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''}){move.minHits ? ` x${move.minHits}-${move.maxHits}` : ''}</span>
+                        {moveEffectSummary(move) && <span className="move-btn-effect">{moveEffectSummary(move)}</span>}
+                      </button>
+                    </ThemedTooltip>
                     )
                   })}
                   </>
@@ -13579,26 +13721,26 @@ function MainApp() {
                     )
                   }
                   return (
-                    <button
-                      key={entry.name}
-                      className="item-slot filled item-button"
-                      type="button"
-                      onClick={() => consumeInventoryItem(entry.name)}
-                      title={entry.description}
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px' }}
-                    >
-                      {itemIcon && (
-                        <img
-                          src={itemIcon}
-                          alt={entry.name}
-                          style={{ width: '24px', height: '24px', imageRendering: 'pixelated' }}
-                        />
-                      )}
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                        <strong>{itemLocalizedName(entry.name)}</strong>
-                        <span style={{ fontSize: '0.75rem', color: '#9b98cf' }}>x{entry.count}</span>
-                      </div>
-                    </button>
+                    <ThemedTooltip key={entry.name} content={entry.description}>
+                      <button
+                        className="item-slot filled item-button"
+                        type="button"
+                        onClick={() => consumeInventoryItem(entry.name)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', width: '100%' }}
+                      >
+                        {itemIcon && (
+                          <img
+                            src={itemIcon}
+                            alt={entry.name}
+                            style={{ width: '24px', height: '24px', imageRendering: 'pixelated' }}
+                          />
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                          <strong>{itemLocalizedName(entry.name)}</strong>
+                          <span style={{ fontSize: '0.75rem', color: '#9b98cf' }}>x{entry.count}</span>
+                        </div>
+                      </button>
+                    </ThemedTooltip>
                   )
                 })
               ) : (
@@ -14983,6 +15125,59 @@ function MainApp() {
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
             <h2 style={{ color: '#ffcb05', textAlign: 'center', marginBottom: '0.5rem' }}>🪙 {t('shop.title')}</h2>
             <p style={{ textAlign: 'center', color: '#9b98cf', marginBottom: '1rem' }}>{t('shop.yourCoins')}: <strong style={{ color: '#ffcb05' }}>{metaProgression.pokeCoins}</strong></p>
+            {(() => {
+              const metaSections = [
+                { id: 'meta-themes', icon: '🎨', label: t('shop.themes') },
+                { id: 'meta-redesigns', icon: '🕹️', label: language === 'en' ? 'Redesigns' : 'Rediseños' },
+                { id: 'meta-backgrounds', icon: '🖼️', label: t('shop.backgrounds') },
+                { id: 'meta-consumables', icon: '🧪', label: t('shop.consumables') },
+                { id: 'meta-treasures', icon: '💰', label: t('shop.treasures') },
+                { id: 'meta-berries', icon: '🫐', label: t('shop.berries') },
+                { id: 'meta-disco', icon: '💿', label: t('shop.disco') },
+                { id: 'meta-pokeballs', icon: '🏐', label: t('shop.pokeballs') },
+                { id: 'meta-stones', icon: '💎', label: t('shop.stones') },
+                { id: 'meta-evo-items', icon: '🔧', label: t('shop.evoItems') },
+                { id: 'meta-upgrades', icon: '⚙️', label: t('shop.upgrades') },
+                { id: 'meta-music', icon: '🎵', label: t('shop.music') },
+                { id: 'meta-holdables', icon: '🎒', label: t('shop.holdables') },
+              ]
+              return (
+                <div className="meta-nav-zone">
+                  <button
+                    className="meta-nav-handle"
+                    type="button"
+                    onClick={(e) => { playClick(); e.currentTarget.closest('.meta-nav-zone')?.classList.toggle('open') }}
+                  >
+                    🧭 {t('shop.sections')} <span className="meta-nav-chevron" style={{ fontSize: '0.6rem' }}>▾</span>
+                  </button>
+                  <div className="meta-nav-bar">
+                    {metaSections.map(s => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => { playClick(); document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
+                        title={s.label}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '6px',
+                          padding: '0.45rem 0.85rem', borderRadius: '999px',
+                          border: '1px solid rgba(255,255,255,0.12)',
+                          background: 'rgba(45,58,84,0.55)',
+                          color: '#e2e8f0',
+                          cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600', letterSpacing: '0.02em',
+                          whiteSpace: 'nowrap',
+                          transition: 'transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(77,155,255,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(77,155,255,0.3)' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(45,58,84,0.55)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
+                      >
+                        <span style={{ fontSize: '0.85rem', lineHeight: 1 }}>{s.icon}</span>
+                        <span>{s.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
             <div style={{ marginBottom: '1rem' }}>
               <input
                 type="text"
@@ -15014,7 +15209,7 @@ function MainApp() {
               })()}
             </div>
 
-            <h3 style={{ color: '#4d9bff', marginBottom: '0.5rem' }}>🎨 {t('shop.themes')}</h3>
+            <h3 id="meta-themes" style={{ color: '#4d9bff', marginBottom: '0.5rem', scrollMarginTop: '60px' }}>🎨 {t('shop.themes')}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {THEMES.filter(t => metaShopItemMatches(t, metaShopSearch.trim().toLowerCase())).map(theme => {
                 const owned = metaProgression.ownedThemes.includes(theme.id)
@@ -15043,7 +15238,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#ffcb05', marginBottom: '0.5rem' }}>🕹️ {language === 'en' ? 'Redesigns' : 'Rediseños'}</h3>
+            <h3 id="meta-redesigns" style={{ color: '#ffcb05', marginBottom: '0.5rem', scrollMarginTop: '60px' }}>🕹️ {language === 'en' ? 'Redesigns' : 'Rediseños'}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {REDESIGNS.filter(r => metaShopItemMatches(r, metaShopSearch.trim().toLowerCase())).map(redesign => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(redesign.id)
@@ -15070,7 +15265,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#22d3ee', marginBottom: '0.5rem' }}>🖼️ {t('shop.backgrounds')}</h3>
+            <h3 id="meta-backgrounds" style={{ color: '#22d3ee', marginBottom: '0.5rem', scrollMarginTop: '60px' }}>🖼️ {t('shop.backgrounds')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.backgroundsDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {BACKGROUNDS.filter(bg => bg.id === 'none' || metaShopItemMatches(bg, metaShopSearch.trim().toLowerCase())).map(bg => {
@@ -15104,7 +15299,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#ff8a33', marginBottom: '0.5rem' }}>🧪 {t('shop.consumables')}</h3>
+            <h3 id="meta-consumables" style={{ color: '#ff8a33', marginBottom: '0.5rem', scrollMarginTop: '60px' }}>🧪 {t('shop.consumables')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.consumablesDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'consumable' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -15139,7 +15334,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#fbbf24', marginBottom: '0.5rem' }}>💰 {t('shop.treasures')}</h3>
+            <h3 id="meta-treasures" style={{ color: '#fbbf24', marginBottom: '0.5rem', scrollMarginTop: '60px' }}>💰 {t('shop.treasures')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.treasuresDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'treasure' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -15171,7 +15366,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#78c850', marginBottom: '0.5rem' }}>🫐 {t('shop.berries')}</h3>
+            <h3 id="meta-berries" style={{ color: '#78c850', marginBottom: '0.5rem', scrollMarginTop: '60px' }}>🫐 {t('shop.berries')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.berriesDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'berry' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -15203,7 +15398,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#38bdf8', marginBottom: '0.5rem' }}>💿 {t('shop.disco')}</h3>
+            <h3 id="meta-disco" style={{ color: '#38bdf8', marginBottom: '0.5rem', scrollMarginTop: '60px' }}>💿 {t('shop.disco')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.discoDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'disco_mt' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -15235,7 +15430,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#ee3b2f', marginBottom: '0.5rem' }}>🏐 {t('shop.pokeballs')}</h3>
+            <h3 id="meta-pokeballs" style={{ color: '#ee3b2f', marginBottom: '0.5rem', scrollMarginTop: '60px' }}>🏐 {t('shop.pokeballs')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.pokeballsDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'pokeball' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -15267,7 +15462,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#a855f7', marginBottom: '0.5rem' }}>💎 {t('shop.stones')}</h3>
+            <h3 id="meta-stones" style={{ color: '#a855f7', marginBottom: '0.5rem', scrollMarginTop: '60px' }}>💎 {t('shop.stones')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.stonesDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'evolution_stone' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -15299,7 +15494,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#ff8a33', marginBottom: '0.5rem' }}>🔧 {t('shop.evoItems')}</h3>
+            <h3 id="meta-evo-items" style={{ color: '#ff8a33', marginBottom: '0.5rem', scrollMarginTop: '60px' }}>🔧 {t('shop.evoItems')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.evoItemsDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'evolution_item' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -15331,7 +15526,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#22d3ee', marginBottom: '0.5rem' }}>⚙️ {t('shop.upgrades')}</h3>
+            <h3 id="meta-upgrades" style={{ color: '#22d3ee', marginBottom: '0.5rem', scrollMarginTop: '60px' }}>⚙️ {t('shop.upgrades')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.upgradesDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'upgrade' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -15367,7 +15562,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#ff9ad6', marginBottom: '0.5rem' }}>{t('shop.music')}</h3>
+            <h3 id="meta-music" style={{ color: '#ff9ad6', marginBottom: '0.5rem', scrollMarginTop: '60px' }}>{t('shop.music')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.musicDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'music' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
@@ -15396,7 +15591,7 @@ function MainApp() {
               })}
             </div>
 
-            <h3 style={{ color: '#a855f7', marginBottom: '0.5rem' }}>{t('shop.holdables')}</h3>
+            <h3 id="meta-holdables" style={{ color: '#a855f7', marginBottom: '0.5rem', scrollMarginTop: '60px' }}>{t('shop.holdables')}</h3>
             <p style={{ color: '#7d7ab5', fontSize: '0.8rem', marginBottom: '0.75rem' }}>{t('shop.holdablesDesc')}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'holdable' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
