@@ -102,7 +102,7 @@ export interface PokemonDetails {
   weight: number
   types: string[]
   stats: Array<{ name: string; value: number }>
-  evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; chance?: number; branch?: boolean }>
+  evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; chance?: number; branch?: boolean; parent?: number; isGroup?: boolean }>
 }
 
 // Calcula cómo evoluciona una etapa en ESTE juego (nivel de evolución por
@@ -132,6 +132,21 @@ function gameEvolutionInfo(sourceName: string, details?: NonNullable<EvolutionCh
   } else if (name === 'aipom') {
     // Aipom → Ambipom evoluciona al nivel 25 en este juego.
     level = 25
+  } else if (name === 'dusclops') {
+    // Dusclops → Dusknoir evoluciona con el Paño Siniestro al nivel 45.
+    level = 45
+  } else if (name === 'seadra') {
+    // Seadra → Kingdra evoluciona con la Escama Dragón al nivel 45.
+    level = 45
+  } else if (name === 'slowpoke' && details?.held_item?.name === 'kings-rock') {
+    // Slowpoke → Slowking evoluciona con la Roca del Rey al nivel 30.
+    level = 30
+  } else if (name === 'happiny') {
+    // Happiny → Chansey evoluciona con la Piedra Oval al nivel 35.
+    level = 35
+  } else if (name === 'bisharp') {
+    // Bisharp → Kingambit evoluciona al nivel 70.
+    level = 70
   } else if (minLevel) {
     level = minLevel
   } else if (trigger === 'trade') {
@@ -145,22 +160,23 @@ function gameEvolutionInfo(sourceName: string, details?: NonNullable<EvolutionCh
   return { level, trigger, item }
 }
 
-function extractEvolutionLine(chainNode: EvolutionChainNode, targetId: number): Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; branch?: boolean }> {
-  const allNodes: Array<{ id: number; name: string; level: number | null; trigger: string; item: string | null; speciesUrl: string; branch: boolean }> = []
+function extractEvolutionLine(chainNode: EvolutionChainNode, targetId: number): Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; branch?: boolean; parent?: number; isGroup?: boolean }> {
+  const allNodes: Array<{ id: number; name: string; level: number | null; trigger: string; item: string | null; speciesUrl: string; branch: boolean; parent: number | null }> = []
 
   // `isBranch` marca los hermanos alternativos (2º, 3º... hijo del mismo padre):
   // la Pokédex los separa con "/" en vez de "→" (como Eevee o Pikachu).
-  function walk(node: EvolutionChainNode, parentLevel: number | null, parentTrigger: string, parentItem: string | null, isBranch = false) {
+  // `parent` guarda el id del padre para reconstruir el árbol (p. ej. Wurmple).
+  function walk(node: EvolutionChainNode, parentId: number | null, parentLevel: number | null, parentTrigger: string, parentItem: string | null, isBranch = false) {
     const match = node.species.url.match(/\/pokemon-species\/(\d+)\//)
     const id = match ? parseInt(match[1], 10) : 0
-    allNodes.push({ id, name: node.species.name, level: parentLevel, trigger: parentTrigger, item: parentItem, speciesUrl: node.species.url, branch: isBranch })
+    allNodes.push({ id, name: node.species.name, level: parentLevel, trigger: parentTrigger, item: parentItem, speciesUrl: node.species.url, branch: isBranch, parent: parentId })
     node.evolves_to.forEach((evo, i) => {
       const info = gameEvolutionInfo(node.species.name, evo.evolution_details?.[0])
-      walk(evo, info.level, info.trigger, info.item, i > 0)
+      walk(evo, id, info.level, info.trigger, info.item, i > 0)
     })
   }
 
-  walk(chainNode, null, 'level-up', null)
+  walk(chainNode, null, null, 'level-up', null)
 
   const targetIdx = allNodes.findIndex(n => n.id === targetId)
   if (targetIdx === -1) return []
@@ -173,6 +189,7 @@ function extractEvolutionLine(chainNode: EvolutionChainNode, targetId: number): 
     trigger: n.trigger,
     item: n.item,
     ...(n.branch ? { branch: true } : {}),
+    ...(n.parent !== null ? { parent: n.parent } : {}),
   }))
 
   return result
@@ -197,24 +214,25 @@ async function resolveRegionalSpeciesId(speciesName: string, suffix: string): Pr
 // geodude → geodude-alola). Si una etapa no tiene variante regional, se deja la
 // forma base.
 async function mapRegionalEvolutionLine(
-  line: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; branch?: boolean }>,
+  line: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; branch?: boolean; parent?: number; isGroup?: boolean }>,
   suffix: string
-): Promise<Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; branch?: boolean }>> {
-  const out: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; branch?: boolean }> = []
-  for (const node of line) {
+): Promise<Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; branch?: boolean; parent?: number; isGroup?: boolean }>> {
+  // Primero se resuelve el id regional de cada etapa y se construye el mapa
+  // id original → id regional para remapear también el campo `parent`.
+  const idMap = new Map<number, number>()
+  const resolved = await Promise.all(line.map(async (node) => {
     const regionalId = await resolveRegionalSpeciesId(node.name, suffix)
-    if (regionalId !== null) {
-      out.push({
-        ...node,
-        id: regionalId,
-        name: `${node.name}${suffix}`,
-        sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${regionalId}.png`,
-      })
-    } else {
-      out.push(node)
-    }
-  }
-  return out
+    const mappedId = regionalId !== null ? regionalId : node.id
+    idMap.set(node.id, mappedId)
+    return { node, regionalId, mappedId }
+  }))
+  return resolved.map(({ node, regionalId, mappedId }) => ({
+    ...node,
+    id: mappedId,
+    name: regionalId !== null ? `${node.name}${suffix}` : node.name,
+    sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${mappedId}.png`,
+    ...(node.parent != null ? { parent: idMap.get(node.parent) ?? node.parent } : {}),
+  }))
 }
 
 export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
@@ -261,7 +279,7 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
       'speed': 'Velocidad'
     }
 
-  let evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; chance?: number; branch?: boolean }> = []
+  let evolutions: Array<{ id: number; name: string; sprite: string; level: number | null; trigger: string; item: string | null; chance?: number; branch?: boolean; parent?: number; isGroup?: boolean }> = []
   try {
     // Las formas regionales (p. ej. geodude-alola) comparten la cadena evolutiva
     // con la forma base: se resuelve la cadena base y luego se mapea a la variante.
@@ -324,12 +342,157 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
     ]
   }
 
-  // Pikachu con Piedra Trueno: 70% Raichu, 30% Raichu de Alola. La línea
-  // evolutiva de la Pokédex muestra ambas formas como ramas alternativas.
-  if (dataPokemon.id === 25) {
+  // Familia Pikachu: en este juego Pikachu con la Piedra Trueno evoluciona un
+  // 70% a Raichu y un 30% a Raichu de Alola. La línea evolutiva de la Pokédex
+  // muestra ambas formas como ramas alternativas, sea cual sea el miembro visto.
+  const PIKACHU_FAMILY = new Set([172, 25, 26, 10100])
+  if (PIKACHU_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
     evolutions = [
-      ...evolutions.map(evo => (evo.id === 26 ? { ...evo, chance: 70 } : evo)),
-      { id: 10100, name: 'raichu-alola', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/10100.png', level: null, trigger: 'use-item', item: 'Thunder Stone', chance: 30, branch: true },
+      { id: 172, name: 'pichu', sprite: spriteFor(172), level: null, trigger: 'level-up', item: null },
+      { id: 25, name: 'pikachu', sprite: spriteFor(25), level: 10, trigger: 'level-up', item: null },
+      { id: 26, name: 'raichu', sprite: spriteFor(26), level: null, trigger: 'use-item', item: 'Thunder Stone', chance: 70 },
+      { id: 10100, name: 'raichu-alola', sprite: spriteFor(10100), level: null, trigger: 'use-item', item: 'Thunder Stone', chance: 30, branch: true },
+    ]
+  }
+
+  // Familia Cubone: en este juego Cubone evoluciona por nivel (28) un 70% a
+  // Marowak y un 30% a Marowak de Alola. La línea muestra ambas formas como
+  // ramas alternativas, sea cual sea el miembro visto.
+  const CUBONE_FAMILY = new Set([104, 105, 10115])
+  if (CUBONE_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 104, name: 'cubone', sprite: spriteFor(104), level: null, trigger: 'level-up', item: null },
+      { id: 105, name: 'marowak', sprite: spriteFor(105), level: 28, trigger: 'level-up', item: null, chance: 70 },
+      { id: 10115, name: 'marowak-alola', sprite: spriteFor(10115), level: 28, trigger: 'level-up', item: null, chance: 30, branch: true },
+    ]
+  }
+
+  // Familia Exeggcute: en este juego Exeggcute con la Piedra Hoja evoluciona
+  // un 70% a Exeggutor y un 30% a Exeggutor de Alola. La línea muestra ambas
+  // formas como ramas alternativas, sea cual sea el miembro visto.
+  const EXEGGCUTE_FAMILY = new Set([102, 103, 10114])
+  if (EXEGGCUTE_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 102, name: 'exeggcute', sprite: spriteFor(102), level: null, trigger: 'level-up', item: null },
+      { id: 103, name: 'exeggutor', sprite: spriteFor(103), level: null, trigger: 'use-item', item: 'Leaf Stone', chance: 70 },
+      { id: 10114, name: 'exeggutor-alola', sprite: spriteFor(10114), level: null, trigger: 'use-item', item: 'Leaf Stone', chance: 30, branch: true },
+    ]
+  }
+
+  // Familia Koffing: en este juego Koffing evoluciona por nivel (35) un 70% a
+  // Weezing y un 30% a Weezing de Galar. La línea muestra ambas formas como
+  // ramas alternativas, sea cual sea el miembro visto.
+  const KOFFING_FAMILY = new Set([109, 110, 10167])
+  if (KOFFING_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 109, name: 'koffing', sprite: spriteFor(109), level: null, trigger: 'level-up', item: null },
+      { id: 110, name: 'weezing', sprite: spriteFor(110), level: 35, trigger: 'level-up', item: null, chance: 70 },
+      { id: 10167, name: 'weezing-galar', sprite: spriteFor(10167), level: 35, trigger: 'level-up', item: null, chance: 30, branch: true },
+    ]
+  }
+
+  // Familia Oshawott: en este juego Dewott evoluciona por nivel (36) un 70% a
+  // Samurott y un 30% a Samurott de Hisui. La línea muestra ambas formas como
+  // ramas alternativas, sea cual sea el miembro visto.
+  const OSHAWOTT_FAMILY = new Set([501, 502, 503, 10236])
+  if (OSHAWOTT_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 501, name: 'oshawott', sprite: spriteFor(501), level: null, trigger: 'level-up', item: null },
+      { id: 502, name: 'dewott', sprite: spriteFor(502), level: 17, trigger: 'level-up', item: null },
+      { id: 503, name: 'samurott', sprite: spriteFor(503), level: 36, trigger: 'level-up', item: null, chance: 70 },
+      { id: 10236, name: 'samurott-hisui', sprite: spriteFor(10236), level: 36, trigger: 'level-up', item: null, chance: 30, branch: true },
+    ]
+  }
+
+  // Nosepass → Probopass: en este juego evoluciona con la Piedra Trueno.
+  if (dataPokemon.id === 299 || dataPokemon.id === 476) {
+    evolutions = evolutions.map(evo =>
+      evo.id === 476 ? { ...evo, level: null, trigger: 'use-item', item: 'Thunder Stone' } : evo
+    )
+  }
+
+  // Phione y Manaphy no evolucionan: se muestran solos en la cadena.
+  if (dataPokemon.id === 489 || dataPokemon.id === 490) {
+    evolutions = []
+  }
+
+  // Familia Yamask: en este juego Yamask evoluciona a Cofagrigus (nivel 34) y
+  // Yamask de Galar a Runerigus (nivel 34). Runerigus ya no aparece en la línea
+  // de Yamask normal (la cadena de PokeAPI lo enlaza con la base).
+  const YAMASK_FAMILY = new Set([562, 563, 10179, 867])
+  if (YAMASK_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    if (dataPokemon.id === 562 || dataPokemon.id === 563) {
+      evolutions = [
+        { id: 562, name: 'yamask', sprite: spriteFor(562), level: null, trigger: 'level-up', item: null },
+        { id: 563, name: 'cofagrigus', sprite: spriteFor(563), level: 34, trigger: 'level-up', item: null },
+      ]
+    } else {
+      evolutions = [
+        { id: 10179, name: 'yamask-galar', sprite: spriteFor(10179), level: null, trigger: 'level-up', item: null },
+        { id: 867, name: 'runerigus', sprite: spriteFor(867), level: 34, trigger: 'level-up', item: null },
+      ]
+    }
+  }
+
+  // Familia Dunsparce: en este juego evoluciona un 50% a Dudunsparce (2
+  // segmentos) y un 50% a Dudunsparce (3 segmentos) al nivel 45. La línea
+  // muestra ambas formas como ramas alternativas, sea cual sea el miembro visto.
+  const DUNSPARCE_FAMILY = new Set([206, 982, 10255])
+  if (DUNSPARCE_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 206, name: 'dunsparce', sprite: spriteFor(206), level: null, trigger: 'level-up', item: null },
+      { id: 982, name: 'dudunsparce', sprite: spriteFor(982), level: 45, trigger: 'level-up', item: null, chance: 50 },
+      { id: 10255, name: 'dudunsparce-three-segment', sprite: spriteFor(10255), level: 45, trigger: 'level-up', item: null, chance: 50, branch: true },
+    ]
+  }
+
+  // Familia Tyrogue: en este juego evoluciona por igual (1/3) a Hitmonlee,
+  // Hitmonchan o Hitmontop al nivel 20. La línea muestra las tres formas como
+  // ramas alternativas, sea cual sea el miembro visto.
+  const TYROGUE_FAMILY = new Set([236, 106, 107, 237])
+  if (TYROGUE_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 236, name: 'tyrogue', sprite: spriteFor(236), level: null, trigger: 'level-up', item: null },
+      { id: 106, name: 'hitmonlee', sprite: spriteFor(106), level: 20, trigger: 'level-up', item: null, chance: 33 },
+      { id: 107, name: 'hitmonchan', sprite: spriteFor(107), level: 20, trigger: 'level-up', item: null, chance: 33, branch: true },
+      { id: 237, name: 'hitmontop', sprite: spriteFor(237), level: 20, trigger: 'level-up', item: null, chance: 33, branch: true },
+    ]
+  }
+
+  // Familia Nincada: en este juego Nincada evoluciona un 50% a Ninjask y un
+  // 50% a Shedinja (nivel 20). La línea muestra ambas formas como ramas.
+  const NINCADA_FAMILY = new Set([290, 291, 292])
+  if (NINCADA_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 290, name: 'nincada', sprite: spriteFor(290), level: null, trigger: 'level-up', item: null },
+      { id: 291, name: 'ninjask', sprite: spriteFor(291), level: 20, trigger: 'level-up', item: null, chance: 50 },
+      { id: 292, name: 'shedinja', sprite: spriteFor(292), level: 20, trigger: 'level-up', item: null, chance: 50, branch: true },
+    ]
+  }
+
+  // Familia Burmy: en este juego Burmy evoluciona un 50% a Wormadam y un 50% a
+  // Mothim (nivel 20). Wormadam se divide en 3 formas (Planta, Arena, Basura)
+  // con la misma probabilidad. El nodo "grupo" agrupa las formas sin repetir
+  // una tarjeta de Wormadam.
+  const BURMY_FAMILY = new Set([412, 413, 414, 10004, 10005])
+  if (BURMY_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 412, name: 'burmy', sprite: spriteFor(412), level: null, trigger: 'level-up', item: null },
+      { id: 5000, name: 'wormadam', sprite: '', level: null, trigger: 'level-up', item: null, isGroup: true, parent: 412 },
+      { id: 413, name: 'wormadam-plant', sprite: spriteFor(413), level: 20, trigger: 'level-up', item: null, chance: 17, parent: 5000 },
+      { id: 10004, name: 'wormadam-sandy', sprite: spriteFor(10004), level: 20, trigger: 'level-up', item: null, chance: 17, parent: 5000, branch: true },
+      { id: 10005, name: 'wormadam-trash', sprite: spriteFor(10005), level: 20, trigger: 'level-up', item: null, chance: 17, parent: 5000, branch: true },
+      { id: 414, name: 'mothim', sprite: spriteFor(414), level: 20, trigger: 'level-up', item: null, chance: 50, parent: 412, branch: true },
     ]
   }
 
@@ -351,6 +514,328 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
       { id: 471, name: 'glaceon', sprite: spriteFor(471), level: null, trigger: 'use-item', item: 'Ice Stone', branch: true },
       { id: 700, name: 'sylveon', sprite: spriteFor(700), level: null, trigger: 'use-item', item: 'Dawn Stone', branch: true },
     ]
+  }
+
+  // Familia Scyther: en este juego Scyther evoluciona a Scizor con el
+  // Revestimiento Metálico y a Kleavor con el Mineral Negro (nivel 35).
+  const SCYTHER_FAMILY = new Set([123, 212, 900])
+  if (SCYTHER_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 123, name: 'scyther', sprite: spriteFor(123), level: null, trigger: 'level-up', item: null },
+      { id: 212, name: 'scizor', sprite: spriteFor(212), level: 35, trigger: 'level-up', item: 'Metal Coat' },
+      { id: 900, name: 'kleavor', sprite: spriteFor(900), level: 35, trigger: 'level-up', item: 'Mineral Negro', branch: true },
+    ]
+  }
+
+  // Familia Wurmple: en este juego Wurmple evoluciona un 50% a Silcoon y un
+  // 50% a Cascoon (nivel 7); luego Silcoon → Beautifly y Cascoon → Dustox.
+  const WURMPLE_FAMILY = new Set([265, 266, 267, 268, 269])
+  if (WURMPLE_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 265, name: 'wurmple', sprite: spriteFor(265), level: null, trigger: 'level-up', item: null },
+      { id: 266, name: 'silcoon', sprite: spriteFor(266), level: 7, trigger: 'level-up', item: null, parent: 265, chance: 50 },
+      { id: 267, name: 'beautifly', sprite: spriteFor(267), level: 10, trigger: 'level-up', item: null, parent: 266 },
+      { id: 268, name: 'cascoon', sprite: spriteFor(268), level: 7, trigger: 'level-up', item: null, parent: 265, chance: 50 },
+      { id: 269, name: 'dustox', sprite: spriteFor(269), level: 10, trigger: 'level-up', item: null, parent: 268 },
+    ]
+  }
+
+  // Familia Espurr: en este juego Espurr evoluciona un 50% a Meowstic (macho)
+  // y un 50% a Meowstic (hembra) al nivel 25. La línea muestra ambas formas
+  // como ramas alternativas, sea cual sea el miembro visto.
+  const ESPURR_FAMILY = new Set([677, 678, 10025])
+  if (ESPURR_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 677, name: 'espurr', sprite: spriteFor(677), level: null, trigger: 'level-up', item: null },
+      { id: 678, name: 'meowstic-male', sprite: spriteFor(678), level: 25, trigger: 'level-up', item: null, parent: 677, chance: 50 },
+      { id: 10025, name: 'meowstic-female', sprite: spriteFor(10025), level: 25, trigger: 'level-up', item: null, parent: 677, chance: 50 },
+    ]
+  }
+
+  // Familia Meowth: en este juego Meowth evoluciona a Persian (nivel 28) y
+  // Meowth de Galar a Perrserker (nivel 28). Perrserker ya no aparece en la
+  // línea de Meowth normal (la cadena de PokeAPI lo enlaza con la base).
+  const MEOWTH_FAMILY = new Set([52, 53, 10107, 10108, 10161, 863])
+  if (MEOWTH_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    if (dataPokemon.id === 52 || dataPokemon.id === 53) {
+      evolutions = [
+        { id: 52, name: 'meowth', sprite: spriteFor(52), level: null, trigger: 'level-up', item: null },
+        { id: 53, name: 'persian', sprite: spriteFor(53), level: 28, trigger: 'level-up', item: null },
+      ]
+    } else if (dataPokemon.id === 10161 || dataPokemon.id === 863) {
+      evolutions = [
+        { id: 10161, name: 'meowth-galar', sprite: spriteFor(10161), level: null, trigger: 'level-up', item: null },
+        { id: 863, name: 'perrserker', sprite: spriteFor(863), level: 28, trigger: 'level-up', item: null },
+      ]
+    } else {
+      evolutions = [
+        { id: 10107, name: 'meowth-alola', sprite: spriteFor(10107), level: null, trigger: 'level-up', item: null },
+        { id: 10108, name: 'persian-alola', sprite: spriteFor(10108), level: 28, trigger: 'level-up', item: null },
+      ]
+    }
+  }
+
+  // Familia Qwilfish: en este juego Qwilfish normal ya no evoluciona, y
+  // Qwilfish de Hisui evoluciona a Overqwil (nivel 45). Overqwil ya no aparece
+  // en la línea de Qwilfish normal (la cadena de PokeAPI lo enlaza con la base).
+  const QWILFISH_FAMILY = new Set([211, 10234, 904])
+  if (QWILFISH_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    if (dataPokemon.id === 211) {
+      evolutions = []
+    } else {
+      evolutions = [
+        { id: 10234, name: 'qwilfish-hisui', sprite: spriteFor(10234), level: null, trigger: 'level-up', item: null },
+        { id: 904, name: 'overqwil', sprite: spriteFor(904), level: 45, trigger: 'level-up', item: null },
+      ]
+    }
+  }
+
+  // Familia Corsola: en este juego Corsola normal ya no evoluciona, y Corsola
+  // de Galar evoluciona a Cursola (nivel 38). Cursola ya no aparece en la
+  // línea de Corsola normal.
+  const CORSOLA_FAMILY = new Set([222, 10173, 864])
+  if (CORSOLA_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    if (dataPokemon.id === 222) {
+      evolutions = []
+    } else {
+      evolutions = [
+        { id: 10173, name: 'corsola-galar', sprite: spriteFor(10173), level: null, trigger: 'level-up', item: null },
+        { id: 864, name: 'cursola', sprite: spriteFor(864), level: 38, trigger: 'level-up', item: null },
+      ]
+    }
+  }
+
+  // Familia Honedge: en este juego Doublade con la Piedra Noche evoluciona un
+  // 50% a Aegislash Escudo y un 50% a Aegislash Filo. La línea muestra ambas
+  // formas como ramas alternativas, sea cual sea el miembro visto.
+  const HONEDGE_FAMILY = new Set([679, 680, 681, 10026])
+  if (HONEDGE_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 679, name: 'honedge', sprite: spriteFor(679), level: null, trigger: 'level-up', item: null },
+      { id: 680, name: 'doublade', sprite: spriteFor(680), level: 35, trigger: 'level-up', item: null },
+      { id: 681, name: 'aegislash-shield', sprite: spriteFor(681), level: null, trigger: 'use-item', item: 'Dusk Stone', chance: 50 },
+      { id: 10026, name: 'aegislash-blade', sprite: spriteFor(10026), level: null, trigger: 'use-item', item: 'Dusk Stone', chance: 50, branch: true },
+    ]
+  }
+
+  // Familia Pumpkaboo/Gourgeist: en este juego Pumpkaboo evoluciona a Gourgeist
+  // al nivel 35 (la cadena de PokeAPI lo marca como intercambio). Las formas de
+  // tamaño (Pumpkaboo pequeño, grande, super y sus Gourgeist) no tienen especie
+  // propia en PokeAPI, así que no mostraban cadena: aquí se unen todos los
+  // tamaños, cada Pumpkaboo con su Gourgeist del mismo tamaño.
+  const PUMPKABOO_FAMILY = new Set([710, 711, 10027, 10028, 10029, 10030, 10031, 10032])
+  if (PUMPKABOO_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 710, name: 'pumpkaboo-average', sprite: spriteFor(710), level: null, trigger: 'level-up', item: null },
+      { id: 711, name: 'gourgeist-average', sprite: spriteFor(711), level: 35, trigger: 'level-up', item: null },
+      { id: 10027, name: 'pumpkaboo-small', sprite: spriteFor(10027), level: null, trigger: 'level-up', item: null, parent: 710, branch: true },
+      { id: 10030, name: 'gourgeist-small', sprite: spriteFor(10030), level: 35, trigger: 'level-up', item: null, parent: 10027 },
+      { id: 10028, name: 'pumpkaboo-large', sprite: spriteFor(10028), level: null, trigger: 'level-up', item: null, parent: 710, branch: true },
+      { id: 10031, name: 'gourgeist-large', sprite: spriteFor(10031), level: 35, trigger: 'level-up', item: null, parent: 10028 },
+      { id: 10029, name: 'pumpkaboo-super', sprite: spriteFor(10029), level: null, trigger: 'level-up', item: null, parent: 710, branch: true },
+      { id: 10032, name: 'gourgeist-super', sprite: spriteFor(10032), level: 35, trigger: 'level-up', item: null, parent: 10029 },
+    ]
+  }
+
+  // Familia Rockruff/Lycanroc: en este juego Rockruff evoluciona al nivel 25 un
+  // 33% a Lycanroc Día, un 33% a Lycanroc Noche y un 33% a Lycanroc Crepúsculo.
+  // La línea muestra las tres formas como ramas alternativas con su probabilidad,
+  // sea cual sea el miembro visto (incluido Rockruff Tacto Afín).
+  const ROCKRUFF_FAMILY = new Set([744, 745, 10126, 10152, 10151])
+  if (ROCKRUFF_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 744, name: 'rockruff', sprite: spriteFor(744), level: null, trigger: 'level-up', item: null },
+      { id: 745, name: 'lycanroc-midday', sprite: spriteFor(745), level: 25, trigger: 'level-up', item: null, chance: 33 },
+      { id: 10126, name: 'lycanroc-midnight', sprite: spriteFor(10126), level: 25, trigger: 'level-up', item: null, chance: 33, branch: true },
+      { id: 10152, name: 'lycanroc-dusk', sprite: spriteFor(10152), level: 25, trigger: 'level-up', item: null, chance: 33, branch: true },
+    ]
+  }
+
+  // Familia Basculin/Basculegion: en este juego Basculin de Raya Blanca evoluciona
+  // al nivel 35 un 50% a Basculegion macho y un 50% a Basculegion hembra. La línea
+  // muestra ambas formas como ramas alternativas con su probabilidad, sea cual
+  // sea el miembro visto.
+  const BASCULIN_FAMILY = new Set([10247, 902, 10248])
+  if (BASCULIN_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 10247, name: 'basculin-white-striped', sprite: spriteFor(10247), level: null, trigger: 'level-up', item: null },
+      { id: 902, name: 'basculegion-male', sprite: spriteFor(902), level: 35, trigger: 'level-up', item: null, chance: 50 },
+      { id: 10248, name: 'basculegion-female', sprite: spriteFor(10248), level: 35, trigger: 'level-up', item: null, chance: 50, branch: true },
+    ]
+  }
+
+  // Familia Tandemaus/Maushold: en este juego Tandemaus evoluciona al nivel 25
+  // un 90% a Maushold de Cuatro y un 10% a Maushold de Tres. La línea muestra
+  // ambas formas como ramas alternativas con su probabilidad, sea cual sea el
+  // miembro visto.
+  const TANDEMAUS_FAMILY = new Set([924, 925, 10257])
+  if (TANDEMAUS_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 924, name: 'tandemaus', sprite: spriteFor(924), level: null, trigger: 'level-up', item: null },
+      { id: 925, name: 'maushold-family-of-four', sprite: spriteFor(925), level: 25, trigger: 'level-up', item: null, chance: 90 },
+      { id: 10257, name: 'maushold-family-of-three', sprite: spriteFor(10257), level: 25, trigger: 'level-up', item: null, chance: 10, branch: true },
+    ]
+  }
+
+  // Familia Finizen/Palafin: en este juego Finizen evoluciona a Palafin al nivel
+  // 38 (la especie "palafin" no existe en PokeAPI, así que se muestra la forma
+  // base "palafin-zero", id 964). La línea se muestra sea cual sea el miembro
+  // visto.
+  const FINIZEN_FAMILY = new Set([963, 964, 10256])
+  if (FINIZEN_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 963, name: 'finizen', sprite: spriteFor(963), level: null, trigger: 'level-up', item: null },
+      { id: 964, name: 'palafin-zero', sprite: spriteFor(964), level: 38, trigger: 'level-up', item: null },
+    ]
+  }
+
+  // Familia Wooper de Paldea/Clodsire: en este juego Wooper de Paldea evoluciona
+  // solo a Clodsire al nivel 20 (la cadena de PokeAPI también enlaza Quagsire,
+  // pero eso solo aplica al Wooper normal). La línea se muestra sea cual sea el
+  // miembro visto.
+  const WOOPER_PALDEA_FAMILY = new Set([10253, 980])
+  if (WOOPER_PALDEA_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 10253, name: 'wooper-paldea', sprite: spriteFor(10253), level: null, trigger: 'level-up', item: null },
+      { id: 980, name: 'clodsire', sprite: spriteFor(980), level: 20, trigger: 'level-up', item: null },
+    ]
+  }
+
+  // Familia Sandshrew de Alola/Sandslash de Alola: en este juego Sandshrew de
+  // Alola evoluciona con la Piedra Hielo (la cadena de PokeAPI usa la evolución
+  // por nivel del Sandshrew normal, así que se muestra el objeto real). La
+  // línea se muestra sea cual sea el miembro visto.
+  const SANDSHREW_ALOLA_FAMILY = new Set([10101, 10102])
+  if (SANDSHREW_ALOLA_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 10101, name: 'sandshrew-alola', sprite: spriteFor(10101), level: null, trigger: 'level-up', item: null },
+      { id: 10102, name: 'sandslash-alola', sprite: spriteFor(10102), level: null, trigger: 'use-item', item: 'Ice Stone' },
+    ]
+  }
+
+  // Familia Vulpix de Alola/Ninetales de Alola: en este juego Vulpix de Alola
+  // evoluciona con la Piedra Hielo (la cadena de PokeAPI usa la Piedra Fuego
+  // del Vulpix normal, así que se muestra el objeto real). La línea se muestra
+  // sea cual sea el miembro visto.
+  const VULPIX_ALOLA_FAMILY = new Set([10103, 10104])
+  if (VULPIX_ALOLA_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 10103, name: 'vulpix-alola', sprite: spriteFor(10103), level: null, trigger: 'level-up', item: null },
+      { id: 10104, name: 'ninetales-alola', sprite: spriteFor(10104), level: null, trigger: 'use-item', item: 'Ice Stone' },
+    ]
+  }
+
+  // Familia Slowpoke de Galar: en este juego evoluciona con el Brazal Galanuez
+  // a Slowbro de Galar o con la Corona Galanuez a Slowking de Galar (la cadena
+  // de PokeAPI usa las evoluciones del Slowpoke normal, así que se muestran los
+  // objetos reales). La línea se muestra sea cual sea el miembro visto.
+  const SLOWPOKE_GALAR_FAMILY = new Set([10164, 10165, 10172])
+  if (SLOWPOKE_GALAR_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 10164, name: 'slowpoke-galar', sprite: spriteFor(10164), level: null, trigger: 'level-up', item: null },
+      { id: 10165, name: 'slowbro-galar', sprite: spriteFor(10165), level: null, trigger: 'use-item', item: 'Galarica Cuff' },
+      { id: 10172, name: 'slowking-galar', sprite: spriteFor(10172), level: null, trigger: 'use-item', item: 'Galarica Wreath', branch: true },
+    ]
+  }
+
+  // Farfetch'd normal NO evoluciona: se muestra solo en su cadena (la cadena de
+  // PokeAPI enlaza Sirfetch'd, que solo aplica a la forma de Galar).
+  if (dataPokemon.id === 83) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 83, name: 'farfetchd', sprite: spriteFor(83), level: null, trigger: 'level-up', item: null },
+    ]
+  }
+
+  // Familia Farfetch'd de Galar/Sirfetch'd: en este juego Farfetch'd de Galar
+  // evoluciona a Sirfetch'd al nivel 35. La línea se muestra sea cual sea el
+  // miembro visto.
+  const FARFETCHD_GALAR_FAMILY = new Set([10166, 865])
+  if (FARFETCHD_GALAR_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 10166, name: 'farfetchd-galar', sprite: spriteFor(10166), level: null, trigger: 'level-up', item: null },
+      { id: 865, name: 'sirfetchd', sprite: spriteFor(865), level: 35, trigger: 'level-up', item: null },
+    ]
+  }
+
+  // Familia Darumaka/Darmanitan: en este juego Darumaka evoluciona al nivel 35
+  // un 80% a Darmanitan y un 20% a Darmanitan Modo Daruma. La línea muestra
+  // ambas formas como ramas alternativas con su probabilidad.
+  const DARUMANITA_FAMILY = new Set([554, 555, 10017])
+  if (DARUMANITA_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 554, name: 'darumaka', sprite: spriteFor(554), level: null, trigger: 'level-up', item: null },
+      { id: 555, name: 'darmanitan-standard', sprite: spriteFor(555), level: 35, trigger: 'level-up', item: null, chance: 80 },
+      { id: 10017, name: 'darmanitan-zen', sprite: spriteFor(10017), level: 35, trigger: 'level-up', item: null, chance: 20, branch: true },
+    ]
+  }
+
+  // Familia Darumaka de Galar: en este juego evoluciona con la Piedra Hielo a
+  // Darmanitan de Galar, y este con la Piedra Fuego a su Modo Daruma. Se usa la
+  // estructura de árbol anidado (como Wurmple) con `parent`.
+  const DARUMANITA_GALAR_FAMILY = new Set([10176, 10177, 10178])
+  if (DARUMANITA_GALAR_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 10176, name: 'darumaka-galar', sprite: spriteFor(10176), level: null, trigger: 'level-up', item: null },
+      { id: 10177, name: 'darmanitan-galar-standard', sprite: spriteFor(10177), level: null, trigger: 'use-item', item: 'Ice Stone', parent: 10176 },
+      { id: 10178, name: 'darmanitan-galar-zen', sprite: spriteFor(10178), level: null, trigger: 'use-item', item: 'Fire Stone', parent: 10177 },
+    ]
+  }
+
+  // Familia Mime Jr.: en este juego Mime Jr. evoluciona al nivel 20 a Mr. Mime
+  // o con la Piedra Hielo a Mr. Mime de Galar, y este a Mr. Rime al nivel 42.
+  // Se usa la estructura de árbol anidado (como Wurmple) con `parent`.
+  const MIME_JR_FAMILY = new Set([439, 122, 10168, 866])
+  if (MIME_JR_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 439, name: 'mime-jr', sprite: spriteFor(439), level: null, trigger: 'level-up', item: null },
+      { id: 122, name: 'mr-mime', sprite: spriteFor(122), level: 20, trigger: 'level-up', item: null, parent: 439 },
+      { id: 10168, name: 'mr-mime-galar', sprite: spriteFor(10168), level: null, trigger: 'use-item', item: 'Ice Stone', parent: 439, branch: true },
+      { id: 866, name: 'mr-rime', sprite: spriteFor(866), level: 42, trigger: 'level-up', item: null, parent: 10168 },
+    ]
+  }
+
+  // Familia Wishiwashi: en este juego la Forma Solitaria evoluciona a la Forma
+  // Banco al nivel 45. La línea se muestra sea cual sea el miembro visto.
+  const WISHIWASHI_FAMILY = new Set([746, 10127])
+  if (WISHIWASHI_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 746, name: 'wishiwashi-solo', sprite: spriteFor(746), level: null, trigger: 'level-up', item: null },
+      { id: 10127, name: 'wishiwashi-school', sprite: spriteFor(10127), level: 45, trigger: 'level-up', item: null },
+    ]
+  }
+
+  // Los Pokémon sin evolución se muestran solos en la cadena evolutiva.
+  if (evolutions.length === 0) {
+    evolutions = [{
+      id: dataPokemon.id,
+      name: dataPokemon.name,
+      sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${dataPokemon.id}.png`,
+      level: null,
+      trigger: 'level-up',
+      item: null,
+    }]
   }
 
   return {
@@ -404,6 +889,16 @@ const EVOLUTION_ITEM_REVERSE: Record<string, string> = {
   'deep-sea-scale': 'Deep Sea Scale',
   'scroll-of-darkness': 'Manuscrito sombras',
   'scroll-of-waters': 'Manuscrito aguas',
+  'black-augurite': 'Mineral Negro',
+  'tart-apple': 'Tart Apple',
+  'sweet-apple': 'Sweet Apple',
+  'syrupy-apple': 'Syrupy Apple',
+  'cracked-pot': 'Cracked Pot',
+  'peat-block': 'Peat Block',
+  'unremarkable-teacup': 'Unremarkable Teacup',
+  'metal-alloy': 'Metal Alloy',
+  'galarica-cuff': 'Galarica Cuff',
+  'galarica-wreath': 'Galarica Wreath',
 }
 
 export function getEvolutionItemDisplayName(pokeApiName: string): string {
@@ -435,6 +930,31 @@ export function makeShinySprite(sprite: string, id: number): string {
     return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/shiny/${id}.gif`
   }
   return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
+}
+
+// Sprites animados de Gen V que PokeAPI tiene mezclados por la generación
+// automática de la Gen 8:
+// - Silicobra (843): su "animated/843.gif" es en realidad el de Sandaconda,
+//   así que usa su sprite estático.
+// - Sandaconda (844): su animación real vive en "animated/843.gif" (no existe
+//   "animated/844.gif"), así que se le asigna ese archivo.
+// Mapa id → archivo de sprite animado que le corresponde (null = sin animación).
+const GEN5_ANIMATED_FILES: Record<number, number | null> = {
+  843: null,
+  844: 843,
+}
+
+// URL del sprite animado (Gen V) para un id, o el estático si su animado no
+// existe/es incorrecto. Se usa en la Pokédex, las cadenas evolutivas, el
+// Coliseo y al construir Pokémon.
+export function pokemonSpriteUrl(id: number, shiny: boolean = false): string {
+  const base = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon'
+  const file = id in GEN5_ANIMATED_FILES ? GEN5_ANIMATED_FILES[id] : id
+  if (file === null) {
+    return shiny ? `${base}/shiny/${id}.png` : `${base}/${id}.png`
+  }
+  const animPath = shiny ? `animated/shiny/${file}.gif` : `animated/${file}.gif`
+  return `${base}/versions/generation-v/black-white/${animPath}`
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -862,6 +1382,12 @@ export async function buildPokemonFromApi(
     baseStatTotal,
     sprite: (() => {
       const id = data.id
+      // Silicobra (843) y Sandaconda (844): PokeAPI mezcló sus sprites animados
+      // de Gen V (el "animated/843.gif" es el de Sandaconda). Se resuelve aquí
+      // la animación correcta o el estático.
+      if (id in GEN5_ANIMATED_FILES) {
+        return pokemonSpriteUrl(id, shiny)
+      }
       const gen5Animated = data.sprites.versions?.['generation-v']?.['black-white']?.animated?.front_default
       const baseSprite = gen5Animated ?? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
       return shiny ? makeShinySprite(baseSprite, id) : baseSprite
@@ -1401,6 +1927,425 @@ export async function getEvolutionInfo(pokemonId: number): Promise<{ nextName: s
     if (pokemonId === 190) {
       return { nextName: 'ambipom', evolutionLevel: 25, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
     }
+    // Cubone → Marowak: 70% Marowak, 30% Marowak de Alola.
+    if (pokemonId === 104) {
+      return { nextName: Math.random() < 0.7 ? 'marowak' : 'marowak-alola', evolutionLevel: 28, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Scyther → Kleavor: evoluciona con el Mineral Negro al nivel 35. También
+    // puede evolucionar a Scizor con el Revestimiento Metálico (nivel 35).
+    if (pokemonId === 123) {
+      return {
+        nextName: 'kleavor',
+        evolutionLevel: 35,
+        heldItem: 'Mineral Negro',
+        heldItemEvolutions: [
+          { item: 'Metal Coat', target: 'scizor', level: 35 },
+          { item: 'Mineral Negro', target: 'kleavor', level: 35 },
+        ],
+        minAppearLevel: null,
+      }
+    }
+    // Kleavor es la evolución de Scyther con el Mineral Negro: no aparece por
+    // debajo del nivel 35.
+    if (pokemonId === 900) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 35 }
+    }
+    // Dusclops → Dusknoir: en este juego evoluciona con el Paño Siniestro al
+    // nivel 45 (la cadena de PokeAPI lo marca como intercambio a nivel 35).
+    if (pokemonId === 356) {
+      return { nextName: 'dusknoir', evolutionLevel: 45, heldItem: 'Reaper Cloth', heldItemEvolutions: [{ item: 'Reaper Cloth', target: 'dusknoir', level: 45 }], minAppearLevel: 37 }
+    }
+    // Dusknoir es la evolución de Dusclops con el Paño Siniestro: no aparece
+    // por debajo del nivel 45.
+    if (pokemonId === 477) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 45 }
+    }
+    // Wurmple → Silcoon o Cascoon: 50% cada uno (la cadena de PokeAPI solo
+    // apunta al primero, Silcoon).
+    if (pokemonId === 265) {
+      return { nextName: Math.random() < 0.5 ? 'silcoon' : 'cascoon', evolutionLevel: 7, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Espurr → Meowstic macho o hembra: 50% cada uno (nivel 25).
+    if (pokemonId === 677) {
+      return { nextName: Math.random() < 0.5 ? 'meowstic-male' : 'meowstic-female', evolutionLevel: 25, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Meowth → Persian (nivel 28). Perrserker NO es evolución de Meowth normal.
+    if (pokemonId === 52) {
+      return { nextName: 'persian', evolutionLevel: 28, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Meowth de Galar → Perrserker (nivel 28).
+    if (pokemonId === 10161) {
+      return { nextName: 'perrserker', evolutionLevel: 28, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Meowth de Alola → Persian de Alola (nivel 28): la forma de Alola no tiene
+    // especie propia en PokeAPI, así que no evolucionaba.
+    if (pokemonId === 10107) {
+      return { nextName: 'persian-alola', evolutionLevel: 28, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Persian de Alola es la evolución de Meowth de Alola: no aparece por
+    // debajo del nivel 28.
+    if (pokemonId === 10108) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 28 }
+    }
+    // Geodude de Alola → Graveler de Alola (nivel 25) → Golem de Alola (nivel 35):
+    // las formas de Alola no tienen especie propia en PokeAPI, así que no
+    // evolucionaban.
+    if (pokemonId === 10109) {
+      return { nextName: 'graveler-alola', evolutionLevel: 25, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    if (pokemonId === 10110) {
+      return { nextName: 'golem-alola', evolutionLevel: 35, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Golem de Alola es la evolución de Graveler de Alola: no aparece por
+    // debajo del nivel 35.
+    if (pokemonId === 10111) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 35 }
+    }
+    // Ponyta de Galar → Rapidash de Galar (nivel 40): la forma de Galar no tiene
+    // especie propia en PokeAPI, así que no evolucionaba.
+    if (pokemonId === 10162) {
+      return { nextName: 'rapidash-galar', evolutionLevel: 40, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Rapidash de Galar es la evolución de Ponyta de Galar: no aparece por
+    // debajo del nivel 40.
+    if (pokemonId === 10163) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 40 }
+    }
+    // Farfetch'd normal NO evoluciona (solo la forma de Galar evoluciona a
+    // Sirfetch'd; la cadena de PokeAPI lo enlaza con la base por error).
+    if (pokemonId === 83) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Farfetch'd de Galar → Sirfetch'd (nivel 35): la forma de Galar no tiene
+    // especie propia en PokeAPI, así que no evolucionaba.
+    if (pokemonId === 10166) {
+      return { nextName: 'sirfetchd', evolutionLevel: 35, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Sirfetch'd es la evolución de Farfetch'd de Galar: no aparece por debajo
+    // del nivel 35.
+    if (pokemonId === 865) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 35 }
+    }
+    // Darumaka → Darmanitan: en este juego evoluciona al nivel 35 un 80% a
+    // Darmanitan normal y un 20% a Darmanitan Modo Daruma (la especie
+    // "darmanitan" no existe como Pokémon en PokeAPI: hay que usar las formas).
+    if (pokemonId === 554) {
+      return { nextName: Math.random() < 0.8 ? 'darmanitan-standard' : 'darmanitan-zen', evolutionLevel: 35, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Darmanitan (normal y Modo Daruma) es la evolución de Darumaka: no aparece
+    // por debajo del nivel 35.
+    if (pokemonId === 555 || pokemonId === 10017) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 35 }
+    }
+    // Darumaka de Galar → Darmanitan de Galar con la Piedra Hielo (la forma de
+    // Galar no tiene especie propia en PokeAPI, así que no evolucionaba con el
+    // objeto).
+    if (pokemonId === 10176) {
+      return { nextName: 'darmanitan-galar-standard', evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Darmanitan de Galar → Modo Daruma con la Piedra Fuego.
+    if (pokemonId === 10177) {
+      return { nextName: 'darmanitan-galar-zen', evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL }
+    }
+    // Darmanitan de Galar Modo Daruma es la evolución de Darmanitan de Galar:
+    // no aparece por debajo del nivel 20.
+    if (pokemonId === 10178) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL }
+    }
+    // Mime Jr. → Mr. Mime (nivel 20) o → Mr. Mime de Galar con la Piedra Hielo
+    // (la cadena de PokeAPI modela la forma de Galar con evolved_form, sin
+    // objeto, así que se engancha aquí). Mr. Mime de Galar luego evoluciona a
+    // Mr. Rime (nivel 42).
+    if (pokemonId === 439) {
+      return { nextName: 'mr-mime', evolutionLevel: 20, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Mr. Mime es la evolución de Mime Jr.: no aparece por debajo del nivel 20.
+    if (pokemonId === 122) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 20 }
+    }
+    // Mr. Mime de Galar → Mr. Rime (nivel 42): la forma de Galar no tiene
+    // especie propia en PokeAPI, así que no evolucionaba.
+    if (pokemonId === 10168) {
+      return { nextName: 'mr-rime', evolutionLevel: 42, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Mr. Rime es la evolución de Mr. Mime de Galar: no aparece por debajo del
+    // nivel 42.
+    if (pokemonId === 866) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 42 }
+    }
+    // Wishiwashi (Forma Solitaria) → Forma Banco (school): en este juego
+    // evoluciona al nivel 45 (PokeAPI no tiene cadena: Wishiwashi es de una
+    // sola etapa y su Forma Banco no tiene especie propia).
+    if (pokemonId === 746) {
+      return { nextName: 'wishiwashi-school', evolutionLevel: 45, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Wishiwashi Forma Banco es la evolución de la Forma Solitaria: no aparece
+    // por debajo del nivel 45.
+    if (pokemonId === 10127) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 45 }
+    }
+    // Koffing → Weezing: 70% Weezing, 30% Weezing de Galar (nivel 35).
+    if (pokemonId === 109) {
+      return { nextName: Math.random() < 0.7 ? 'weezing' : 'weezing-galar', evolutionLevel: 35, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Dewott → Samurott: 70% Samurott, 30% Samurott de Hisui (nivel 36).
+    if (pokemonId === 502) {
+      return { nextName: Math.random() < 0.7 ? 'samurott' : 'samurott-hisui', evolutionLevel: 36, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Seadra → Kingdra: en este juego evoluciona con la Escama Dragón al nivel
+    // 45 (la cadena de PokeAPI lo marca como intercambio a nivel 35).
+    if (pokemonId === 117) {
+      return { nextName: 'kingdra', evolutionLevel: 45, heldItem: 'Dragon Scale', heldItemEvolutions: [{ item: 'Dragon Scale', target: 'kingdra', level: 45 }], minAppearLevel: 32 }
+    }
+    // Kingdra es la evolución de Seadra con la Escama Dragón: no aparece por
+    // debajo del nivel 45.
+    if (pokemonId === 118) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 45 }
+    }
+    // Qwilfish normal NO evoluciona a Overqwil (solo lo hace la línea de Hisui).
+    if (pokemonId === 211) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Qwilfish de Hisui → Overqwil (nivel 45 en este juego).
+    if (pokemonId === 10234) {
+      return { nextName: 'overqwil', evolutionLevel: 45, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Dunsparce → Dudunsparce (2 o 3 segmentos): 50% cada uno (nivel 45).
+    if (pokemonId === 206) {
+      return { nextName: Math.random() < 0.5 ? 'dudunsparce' : 'dudunsparce-three-segment', evolutionLevel: 45, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Slowpoke → Slowking: en este juego evoluciona con la Roca del Rey al
+    // nivel 30 (la cadena de PokeAPI lo marca como intercambio a nivel 35).
+    // Slowbro sigue evolucionando por nivel a 37.
+    if (pokemonId === 79) {
+      return { nextName: 'slowbro', evolutionLevel: 37, heldItem: null, heldItemEvolutions: [{ item: "King's Rock", target: 'slowking', level: 30 }], minAppearLevel: null }
+    }
+    // Slowpoke de Galar → Slowbro de Galar (Brazal Galanuez) o → Slowking de
+    // Galar (Corona Galanuez): evoluciona con los objetos desde el inventario
+    // (la forma de Galar no tiene especie propia en PokeAPI).
+    if (pokemonId === 10164) {
+      return { nextName: 'slowbro-galar', evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Slowbro/Slowking de Galar son las evoluciones de Slowpoke de Galar con
+    // los objetos Galanuez: no aparecen por debajo del nivel 20.
+    if (pokemonId === 10165 || pokemonId === 10172) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL }
+    }
+    // Corsola normal NO evoluciona a Cursola (solo lo hace la línea de Galar).
+    if (pokemonId === 222) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Corsola de Galar → Cursola (nivel 38 en este juego).
+    if (pokemonId === 10173) {
+      return { nextName: 'cursola', evolutionLevel: 38, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Tyrogue → Hitmonlee / Hitmonchan / Hitmontop: 1/3 de probabilidad cada una.
+    if (pokemonId === 236) {
+      const tyrogueEvolutions = ['hitmonlee', 'hitmonchan', 'hitmontop']
+      return { nextName: tyrogueEvolutions[Math.floor(Math.random() * tyrogueEvolutions.length)], evolutionLevel: 20, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Nincada → Ninjask o Shedinja: 50% cada uno (nivel 20).
+    if (pokemonId === 290) {
+      return { nextName: Math.random() < 0.5 ? 'ninjask' : 'shedinja', evolutionLevel: 20, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Shedinja es la evolución alternativa de Nincada: no aparece por debajo
+    // del nivel 20.
+    if (pokemonId === 292) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 20 }
+    }
+    // Burmy → Wormadam o Mothim: 50% cada uno (nivel 20). Wormadam tiene 3
+    // formas (Planta, Arena, Basura) con la misma probabilidad.
+    if (pokemonId === 412) {
+      if (Math.random() < 0.5) {
+        const wormadamForms = ['wormadam', 'wormadam-sandy', 'wormadam-trash']
+        return { nextName: wormadamForms[Math.floor(Math.random() * wormadamForms.length)], evolutionLevel: 20, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+      }
+      return { nextName: 'mothim', evolutionLevel: 20, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Happiny → Chansey: en este juego evoluciona con la Piedra Oval al nivel
+    // 35 (la cadena de PokeAPI no marca nivel, así que por defecto daba 45).
+    if (pokemonId === 440) {
+      return { nextName: 'chansey', evolutionLevel: 35, heldItem: 'Oval Stone', heldItemEvolutions: [{ item: 'Oval Stone', target: 'chansey', level: 35 }], minAppearLevel: null }
+    }
+    // Nosepass → Probopass: en este juego evoluciona solo con la Piedra Trueno
+    // (sin nivel), como las demás evoluciones por piedra.
+    if (pokemonId === 299) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Phione y Manaphy no evolucionan (la cadena de PokeAPI enlaza Phione →
+    // Manaphy por error; en realidad Manaphy genera a Phione por cría).
+    if (pokemonId === 489 || pokemonId === 490) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Yamask → Cofagrigus (nivel 34). Runerigus NO es evolución de Yamask normal.
+    if (pokemonId === 562) {
+      return { nextName: 'cofagrigus', evolutionLevel: 34, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Yamask de Galar → Runerigus (nivel 34 en este juego).
+    if (pokemonId === 10179) {
+      return { nextName: 'runerigus', evolutionLevel: 34, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Runerigus es la evolución de Yamask de Galar: no aparece por debajo de 34.
+    if (pokemonId === 867) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 34 }
+    }
+    // Doublade → Aegislash: en este juego evoluciona con la Piedra Noche un
+    // 50% a la forma Escudo (aegislash-shield) y un 50% a la forma Filo
+    // (aegislash-blade).
+    if (pokemonId === 680) {
+      return { nextName: Math.random() < 0.5 ? 'aegislash-shield' : 'aegislash-blade', evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Familia Pumpkaboo/Gourgeist: en este juego Pumpkaboo evoluciona a
+    // Gourgeist al nivel 35 (la cadena de PokeAPI lo marca como intercambio y
+    // el nombre de especie "gourgeist" no existe como Pokémon, así que la
+    // evolución en juego fallaba). Cada tamaño (normal, pequeño, grande, super)
+    // evoluciona a su Gourgeist del mismo tamaño.
+    if (pokemonId === 710) {
+      return { nextName: 'gourgeist-average', evolutionLevel: 35, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    if (pokemonId === 10027) {
+      return { nextName: 'gourgeist-small', evolutionLevel: 35, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    if (pokemonId === 10028) {
+      return { nextName: 'gourgeist-large', evolutionLevel: 35, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    if (pokemonId === 10029) {
+      return { nextName: 'gourgeist-super', evolutionLevel: 35, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Gourgeist es la evolución de Pumpkaboo: no aparece por debajo del nivel 35.
+    if (pokemonId === 711 || pokemonId === 10030 || pokemonId === 10031 || pokemonId === 10032) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 35 }
+    }
+    // Familia Rockruff/Lycanroc: en este juego Rockruff evoluciona al nivel 25
+    // un 33% a Lycanroc Día, un 33% a Lycanroc Noche y un 33% a Lycanroc
+    // Crepúsculo (la cadena de PokeAPI solo apunta al primero por defecto).
+    if (pokemonId === 744) {
+      const lycanrocForms = ['lycanroc-midday', 'lycanroc-midnight', 'lycanroc-dusk']
+      return { nextName: lycanrocForms[Math.floor(Math.random() * lycanrocForms.length)], evolutionLevel: 25, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Rockruff Tacto Afín evoluciona siempre a Lycanroc Crepúsculo (nivel 25).
+    if (pokemonId === 10151) {
+      return { nextName: 'lycanroc-dusk', evolutionLevel: 25, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Lycanroc es la evolución de Rockruff: no aparece por debajo del nivel 25.
+    if (pokemonId === 745 || pokemonId === 10126 || pokemonId === 10152) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 25 }
+    }
+    // Familia Basculin/Basculegion: en este juego Basculin de Raya Blanca
+    // evoluciona al nivel 35 un 50% a Basculegion macho y un 50% a Basculegion
+    // hembra (la cadena de PokeAPI lo marca como recoil-damage sin nivel y la
+    // forma blanca no tiene especie propia, así que no evolucionaba).
+    if (pokemonId === 10247) {
+      return { nextName: Math.random() < 0.5 ? 'basculegion-male' : 'basculegion-female', evolutionLevel: 35, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Basculegion es la evolución de Basculin de Raya Blanca: no aparece por
+    // debajo del nivel 35.
+    if (pokemonId === 902 || pokemonId === 10248) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 35 }
+    }
+    // Familia Tandemaus/Maushold: en este juego Tandemaus evoluciona al nivel 25
+    // un 90% a Maushold de Cuatro y un 10% a Maushold de Tres (la cadena de
+    // PokeAPI apunta a "maushold", que no existe como Pokémon, así que la
+    // evolución en juego fallaba).
+    if (pokemonId === 924) {
+      return { nextName: Math.random() < 0.9 ? 'maushold-family-of-four' : 'maushold-family-of-three', evolutionLevel: 25, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Maushold es la evolución de Tandemaus: no aparece por debajo del nivel 25.
+    if (pokemonId === 925 || pokemonId === 10257) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 25 }
+    }
+    // Finizen → Palafin: en este juego Finizen evoluciona a Palafin al nivel 38
+    // (la cadena de PokeAPI lo marca por nivel, pero la especie "palafin" no
+    // existe como Pokémon: hay que usar "palafin-zero", id 964, o la evolución
+    // en juego fallaba).
+    if (pokemonId === 963) {
+      return { nextName: 'palafin-zero', evolutionLevel: 38, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Palafin (incluida su forma Hero) es la evolución de Finizen: no aparece
+    // por debajo del nivel 38.
+    if (pokemonId === 964 || pokemonId === 10256) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 38 }
+    }
+    // Wooper de Paldea → Clodsire: en este juego evoluciona al nivel 20 (la
+    // forma de Paldea no tiene especie propia en PokeAPI, así que no
+    // evolucionaba). No evoluciona a Quagsire (eso lo hace Wooper normal).
+    if (pokemonId === 10253) {
+      return { nextName: 'clodsire', evolutionLevel: 20, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Clodsire es la evolución de Wooper de Paldea: no aparece por debajo del
+    // nivel 20.
+    if (pokemonId === 980) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 20 }
+    }
+    // Rattata de Alola → Raticate de Alola: en este juego evoluciona al nivel 20
+    // (la forma de Alola no tiene especie propia en PokeAPI, así que no
+    // evolucionaba).
+    if (pokemonId === 10091) {
+      return { nextName: 'raticate-alola', evolutionLevel: 20, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Raticate de Alola es la evolución de Rattata de Alola: no aparece por
+    // debajo del nivel 20.
+    if (pokemonId === 10092) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 20 }
+    }
+    // Sandshrew de Alola → Sandslash de Alola: en este juego evoluciona con la
+    // Piedra Hielo (la forma de Alola no tiene especie propia en PokeAPI, así
+    // que no evolucionaba con el objeto).
+    if (pokemonId === 10101) {
+      return { nextName: 'sandslash-alola', evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Sandslash de Alola es la evolución de Sandshrew de Alola con la Piedra
+    // Hielo: no aparece por debajo del nivel 20.
+    if (pokemonId === 10102) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL }
+    }
+    // Vulpix de Alola → Ninetales de Alola: en este juego evoluciona con la
+    // Piedra Hielo (la forma de Alola no tiene especie propia en PokeAPI, así
+    // que no evolucionaba con el objeto).
+    if (pokemonId === 10103) {
+      return { nextName: 'ninetales-alola', evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Ninetales de Alola es la evolución de Vulpix de Alola con la Piedra Hielo:
+    // no aparece por debajo del nivel 20.
+    if (pokemonId === 10104) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL }
+    }
+    // Diglett de Alola → Dugtrio de Alola: en este juego evoluciona al nivel 26
+    // (la forma de Alola no tiene especie propia en PokeAPI, así que no
+    // evolucionaba).
+    if (pokemonId === 10105) {
+      return { nextName: 'dugtrio-alola', evolutionLevel: 26, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Dugtrio de Alola es la evolución de Diglett de Alola: no aparece por
+    // debajo del nivel 26.
+    if (pokemonId === 10106) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 26 }
+    }
+    // Grimer de Alola → Muk de Alola: en este juego evoluciona al nivel 38
+    // (la forma de Alola no tiene especie propia en PokeAPI, así que no
+    // evolucionaba).
+    if (pokemonId === 10112) {
+      return { nextName: 'muk-alola', evolutionLevel: 38, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Muk de Alola es la evolución de Grimer de Alola: no aparece por debajo
+    // del nivel 38.
+    if (pokemonId === 10113) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 38 }
+    }
+    // Bisharp → Kingambit: en este juego evoluciona al nivel 70 (la cadena de
+    // PokeAPI usa un trigger especial sin nivel, que por defecto daba 45).
+    if (pokemonId === 625) {
+      return { nextName: 'kingambit', evolutionLevel: 70, heldItem: null, heldItemEvolutions: [], minAppearLevel: 52 }
+    }
+    // Kingambit es la evolución de Bisharp: no aparece por debajo del nivel 70.
+    if (pokemonId === 983) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 70 }
+    }
+    // Probopass es la evolución de Nosepass con la Piedra Trueno: no aparece
+    // por debajo del nivel 20.
+    if (pokemonId === 476) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL }
+    }
     const speciesRes = await fetch(`${API_BASE}/pokemon-species/${pokemonId}`)
     if (!speciesRes.ok) return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
     const speciesData = await speciesRes.json()
@@ -1505,6 +2450,56 @@ export async function canEvolveWithStone(pokemonId: number, stoneItemName: strin
   // Pikachu con Piedra Trueno: 70% Raichu, 30% Raichu de Alola.
   if (pokemonId === 25 && stoneItemName === 'thunder-stone') {
     return { canEvolve: true, evolvedName: Math.random() < 0.7 ? 'raichu' : 'raichu-alola' }
+  }
+
+  // Exeggcute con la Piedra Hoja: 70% Exeggutor, 30% Exeggutor de Alola.
+  if (pokemonId === 102 && stoneItemName === 'leaf-stone') {
+    return { canEvolve: true, evolvedName: Math.random() < 0.7 ? 'exeggutor' : 'exeggutor-alola' }
+  }
+
+  // Nosepass con la Piedra Trueno: evoluciona a Probopass.
+  if (pokemonId === 299 && stoneItemName === 'thunder-stone') {
+    return { canEvolve: true, evolvedName: 'probopass' }
+  }
+
+  // Doublade con la Piedra Noche: 50% Aegislash Escudo, 50% Aegislash Filo.
+  if (pokemonId === 680 && stoneItemName === 'dusk-stone') {
+    return { canEvolve: true, evolvedName: Math.random() < 0.5 ? 'aegislash-shield' : 'aegislash-blade' }
+  }
+
+  // Sandshrew de Alola con la Piedra Hielo: evoluciona a Sandslash de Alola.
+  if (pokemonId === 10101 && stoneItemName === 'ice-stone') {
+    return { canEvolve: true, evolvedName: 'sandslash-alola' }
+  }
+
+  // Vulpix de Alola con la Piedra Hielo: evoluciona a Ninetales de Alola.
+  if (pokemonId === 10103 && stoneItemName === 'ice-stone') {
+    return { canEvolve: true, evolvedName: 'ninetales-alola' }
+  }
+
+  // Slowpoke de Galar con el Brazal Galanuez: evoluciona a Slowbro de Galar.
+  if (pokemonId === 10164 && stoneItemName === 'galarica-cuff') {
+    return { canEvolve: true, evolvedName: 'slowbro-galar' }
+  }
+
+  // Slowpoke de Galar con la Corona Galanuez: evoluciona a Slowking de Galar.
+  if (pokemonId === 10164 && stoneItemName === 'galarica-wreath') {
+    return { canEvolve: true, evolvedName: 'slowking-galar' }
+  }
+
+  // Darumaka de Galar con la Piedra Hielo: evoluciona a Darmanitan de Galar.
+  if (pokemonId === 10176 && stoneItemName === 'ice-stone') {
+    return { canEvolve: true, evolvedName: 'darmanitan-galar-standard' }
+  }
+
+  // Darmanitan de Galar con la Piedra Fuego: evoluciona a su Modo Daruma.
+  if (pokemonId === 10177 && stoneItemName === 'fire-stone') {
+    return { canEvolve: true, evolvedName: 'darmanitan-galar-zen' }
+  }
+
+  // Mime Jr. con la Piedra Hielo: evoluciona a Mr. Mime de Galar.
+  if (pokemonId === 439 && stoneItemName === 'ice-stone') {
+    return { canEvolve: true, evolvedName: 'mr-mime-galar' }
   }
 
   try {

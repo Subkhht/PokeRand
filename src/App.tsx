@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, useCallback, Component, type ReactNode, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { useMemo, useState, useEffect, useRef, useCallback, Component, Fragment, type ReactNode, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
 import { playHover, playClick, playHit, playEvolution, playCoin, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
@@ -15,6 +15,7 @@ import {
   buildPokemonFromApi,
   startersByGen,
   makeShinySprite,
+  pokemonSpriteUrl,
   canEvolveWithStone,
   stripRegional,
   setRunSeed,
@@ -753,6 +754,15 @@ const EVOLUTION_STONE_ITEM_NAMES: Record<string, string> = {
   'Gorra de Ash': 'gorra-de-ash',
   'Auspicious Armor': 'auspicious-armor',
   'Malicious Armor': 'malicious-armor',
+  'Tart Apple': 'tart-apple',
+  'Sweet Apple': 'sweet-apple',
+  'Syrupy Apple': 'syrupy-apple',
+  'Cracked Pot': 'cracked-pot',
+  'Peat Block': 'peat-block',
+  'Unremarkable Teacup': 'unremarkable-teacup',
+  'Metal Alloy': 'metal-alloy',
+  'Galarica Cuff': 'galarica-cuff',
+  'Galarica Wreath': 'galarica-wreath',
 }
 
 const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
@@ -778,6 +788,16 @@ const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
   'Deep Sea Scale': 'unlock_deep_sea_scale',
   'Manuscrito sombras': 'unlock_manuscrito_sombras',
   'Manuscrito aguas': 'unlock_manuscrito_aguas',
+  'Mineral Negro': 'unlock_mineral_negro',
+  'Tart Apple': 'unlock_tart_apple',
+  'Sweet Apple': 'unlock_sweet_apple',
+  'Syrupy Apple': 'unlock_syrupy_apple',
+  'Cracked Pot': 'unlock_cracked_pot',
+  'Peat Block': 'unlock_peat_block',
+  'Unremarkable Teacup': 'unlock_unremarkable_teacup',
+  'Metal Alloy': 'unlock_metal_alloy',
+  'Galarica Cuff': 'unlock_galarica_cuff',
+  'Galarica Wreath': 'unlock_galarica_wreath',
 }
 
 // Bayas que pueden aparecer como drop. Las que están en la tienda meta se
@@ -909,6 +929,15 @@ const itemDescriptions: Record<string, string> = {
   'Baya Chilan': 'Reduce a la mitad un movimiento Normal superefectivo.',
   'Manuscrito sombras': 'Evoluciona a Kubfu en Urshifu Brusco.',
   'Manuscrito aguas': 'Evoluciona a Kubfu en Urshifu Fluido.',
+  'Tart Apple': 'Evoluciona a Applin en Flapple.',
+  'Sweet Apple': 'Evoluciona a Applin en Appletun.',
+  'Syrupy Apple': 'Evoluciona a Applin en Dipplin.',
+  'Cracked Pot': 'Evoluciona a Sinistea en Polteageist.',
+  'Peat Block': 'Evoluciona a Ursaring en Ursaluna.',
+  'Unremarkable Teacup': 'Evoluciona a Poltchageist en Sinistcha.',
+  'Metal Alloy': 'Evoluciona a Duraludon en Archaludon.',
+  'Galarica Cuff': 'Evoluciona a Slowpoke de Galar en Slowbro de Galar.',
+  'Galarica Wreath': 'Evoluciona a Slowpoke de Galar en Slowking de Galar.',
   'Diamansfera': '+20% daño en movimientos Acero y Dragón para Dialga. Transforma a Dialga en su Forma Origen.',
   'Lustresfera': '+20% daño en movimientos Agua y Dragón para Palkia. Transforma a Palkia en su Forma Origen.',
   'Griseosfera': '+20% daño en movimientos Dragón y Fantasma para Giratina. Transforma a Giratina en su Forma Origen.',
@@ -1102,6 +1131,7 @@ const ITEM_SPRITES: Record<string, string> = {
   'Deep Sea Scale': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/deep-sea-scale.png',
   "King's Rock": 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/kings-rock.png',
   'Repartir Exp': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/exp-share.png',
+  'Mineral Negro': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/hard-stone.png',
 }
 
 interface HoldableItem {
@@ -1224,6 +1254,7 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Deep Sea Scale': { name: 'Deep Sea Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
   'Manuscrito sombras': { name: 'Manuscrito sombras', desc: 'Evoluciona a Kubfu en Urshifu Brusco al subir de nivel.', price: 400 },
   'Manuscrito aguas': { name: 'Manuscrito aguas', desc: 'Evoluciona a Kubfu en Urshifu Fluido al subir de nivel.', price: 400 },
+  'Mineral Negro': { name: 'Mineral Negro', desc: 'Evoluciona a Scyther en Kleavor al subir de nivel.', price: 200 },
   'Repartir Exp': { name: 'Repartir Exp', desc: 'Todos los Pokémon del PC ganan 1 nivel tras cada combate.', price: 130, isExpShare: true },
 }
 
@@ -1351,7 +1382,7 @@ const MEGA_CAPABLE_IDS = new Set([
   254, 257, 260, 282, 302, 303, 306, 308,   310, 319, 323, 334, 354, 358, 359, 362, 373, 376, 380, 381, 384, 398,
   428, 445, 448, 460, 475, 478, 485, 491,
   500, 530, 531, 545, 560, 604, 609, 623,
-  652, 655, 658, 668, 670, 678, 687, 689, 691, 701, 718, 719,
+  652, 655, 658, 668, 670, 678, 687, 689, 691, 701, 719, 10025, 10120,
   740, 768, 780, 801, 807,
   870, 952, 970, 978, 998,
 ])
@@ -1373,11 +1404,18 @@ const MEGA_FORM_IDS: Record<number, number | number[]> = {
   604: 10290, 609: 10291, 623: 10313,
   652: 10292, 655: 10293, 658: 10294, 668: 10295, 670: 10296,
   678: [10314, 10326], 687: 10297, 689: 10298, 691: 10299,
-  701: 10300, 718: 10301, 719: 10075,
+  10025: [10314, 10326],
+  701: 10300, 719: 10075, 10120: 10301,
   740: 10315, 768: 10316, 780: 10302, 801: [10317, 10318],
   807: 10319,
   870: 10303, 952: 10320, 970: 10321, 978: [10322, 10323, 10324],
   998: 10325,
+}
+
+// Mega Zygarde (10301) no tiene sprite de batalla estático en PokeAPI: se usa su
+// arte oficial (el mismo diseño que Zygarde Forma Completa).
+const MEGA_SPRITE_OVERRIDES: Record<number, string> = {
+  10301: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10301.png',
 }
 
 const GMAX_CAPABLE_IDS = new Set([
@@ -1862,6 +1900,15 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_gorra_de_ash', name: 'Gorra de Ash', desc: 'Evoluciona a Greninja en Greninja-Ash. Aparece con el Comerciante Misterioso.', price: 50, spriteKey: 'Gorra de Ash', category: 'evolution_item' },
   { id: 'unlock_auspicious_armor', name: 'Auspicious Armor', desc: 'Evoluciona a Charcadet en Armarouge. Aparece con el Comerciante Misterioso.', price: 50, spriteKey: 'Auspicious Armor', category: 'evolution_item' },
   { id: 'unlock_malicious_armor', name: 'Malicious Armor', desc: 'Evoluciona a Charcadet en Ceruledge. Aparece con el Comerciante Misterioso.', price: 50, spriteKey: 'Malicious Armor', category: 'evolution_item' },
+  { id: 'unlock_tart_apple', name: 'Tart Apple', desc: 'Evoluciona a Applin en Flapple. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Tart Apple', category: 'evolution_item' },
+  { id: 'unlock_sweet_apple', name: 'Sweet Apple', desc: 'Evoluciona a Applin en Appletun. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Sweet Apple', category: 'evolution_item' },
+  { id: 'unlock_syrupy_apple', name: 'Syrupy Apple', desc: 'Evoluciona a Applin en Dipplin. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Syrupy Apple', category: 'evolution_item' },
+  { id: 'unlock_cracked_pot', name: 'Cracked Pot', desc: 'Evoluciona a Sinistea en Polteageist. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Cracked Pot', category: 'evolution_item' },
+  { id: 'unlock_peat_block', name: 'Peat Block', desc: 'Evoluciona a Ursaring en Ursaluna. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Peat Block', category: 'evolution_item' },
+  { id: 'unlock_unremarkable_teacup', name: 'Unremarkable Teacup', desc: 'Evoluciona a Poltchageist en Sinistcha. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Unremarkable Teacup', category: 'evolution_item' },
+  { id: 'unlock_metal_alloy', name: 'Metal Alloy', desc: 'Evoluciona a Duraludon en Archaludon. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Metal Alloy', category: 'evolution_item' },
+  { id: 'unlock_galarica_cuff', name: 'Galarica Cuff', desc: 'Evoluciona a Slowpoke de Galar en Slowbro de Galar. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Galarica Cuff', category: 'evolution_item' },
+  { id: 'unlock_galarica_wreath', name: 'Galarica Wreath', desc: 'Evoluciona a Slowpoke de Galar en Slowking de Galar. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Galarica Wreath', category: 'evolution_item' },
   { id: 'music_menu_chill', name: 'Menú Relax', desc: 'Música de menú relajante y ambiental.', price: 40, spriteKey: 'Potion', category: 'music' },
   { id: 'music_battle_epic', name: 'Batalla Épica', desc: 'Música de batalla más intensa y rápida.', price: 60, spriteKey: 'Potion', category: 'music' },
   { id: 'unlock_disco_mt', name: 'Disco MT', desc: 'Desbloquea el Disco MT: un objeto consumible que enseña un movimiento a tu Pokémon, igual que el nodo Move Tutor. Aparece en tiendas.', price: 120, spriteKey: 'Disco MT', category: 'disco_mt' },
@@ -1934,6 +1981,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_deep_sea_tooth', name: 'Deep Sea Tooth', desc: 'Evoluciona a Clamperl en Huntail. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Deep Sea Tooth', category: 'evolution_item' },
   { id: 'unlock_deep_sea_scale', name: 'Deep Sea Scale', desc: 'Evoluciona a Clamperl en Gorebyss. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Deep Sea Scale', category: 'evolution_item' },
   { id: 'unlock_manuscrito_sombras', name: 'Manuscrito sombras', desc: 'Evoluciona a Kubfu en Urshifu Brusco. Aparece con el Comerciante Misterioso.', price: 60, spriteKey: 'Manuscrito sombras', category: 'evolution_item' },
+  { id: 'unlock_mineral_negro', name: 'Mineral Negro', desc: 'Evoluciona a Scyther en Kleavor. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Mineral Negro', category: 'evolution_item' },
   { id: 'unlock_manuscrito_aguas', name: 'Manuscrito aguas', desc: 'Evoluciona a Kubfu en Urshifu Fluido. Aparece con el Comerciante Misterioso.', price: 60, spriteKey: 'Manuscrito aguas', category: 'evolution_item' },
   { id: 'unlock_repartir_exp', name: 'Repartir Exp', desc: 'Todos los Pokémon del PC ganan 1 nivel tras cada combate.', price: 130, spriteKey: 'Repartir Exp', category: 'holdable' },
   { id: 'unlock_tarjeta_roja', name: 'Tarjeta Roja', desc: 'Si te golpean con daño y sobrevives, el rival cambia. Se consume.', price: 100, spriteKey: 'Tarjeta Roja', category: 'holdable' },
@@ -1965,6 +2013,22 @@ const TYPE_COLORS: Record<string, string> = {
   ground: '#e0c068', flying: '#a890f0', psychic: '#f85888', bug: '#a8b820',
   rock: '#b8a038', ghost: '#705898', dragon: '#7038f8', dark: '#705848',
   steel: '#b8b8d0', fairy: '#ee99ac',
+}
+
+// Iconos de tipo del repositorio de sprites de PokeAPI (numerados por el id de
+// tipo: 1 normal, 2 lucha, 3 volador, 4 veneno, 5 tierra, 6 roca, 7 bicho,
+// 8 fantasma, 9 acero, 10 fuego, 11 agua, 12 planta, 13 eléctrico, 14 psíquico,
+// 15 hielo, 16 dragón, 17 siniestro, 18 hada).
+const TYPE_ICON_IDS: Record<string, number> = {
+  normal: 1, fighting: 2, flying: 3, poison: 4, ground: 5, rock: 6,
+  bug: 7, ghost: 8, steel: 9, fire: 10, water: 11, grass: 12,
+  electric: 13, psychic: 14, ice: 15, dragon: 16, dark: 17, fairy: 18,
+}
+
+function typeIconUrl(type: string): string {
+  const id = TYPE_ICON_IDS[type]
+  if (!id) return ''
+  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/types/generation-ix/scarlet-violet/small/${id}.png`
 }
 
 // Entrenadores normales (clase + nombre)
@@ -6975,7 +7039,7 @@ function MainApp() {
             const formId = MEGA_FORM_IDS[p.id]
             if (formId) {
               const megaFormId = Array.isArray(formId) ? formId[Math.floor(Math.random() * formId.length)] : formId
-              const megaSprite = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${megaFormId}.png`
+              const megaSprite = MEGA_SPRITE_OVERRIDES[megaFormId] ?? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${megaFormId}.png`
               seenInPokedex({ ...p, id: megaFormId, sprite: megaSprite })
               return {
                 ...p,
@@ -8823,7 +8887,7 @@ function MainApp() {
     const formId = MEGA_FORM_IDS[activePokemon.id]
     const megaFormId = Array.isArray(formId) ? formId[Math.floor(Math.random() * formId.length)] : formId
     const megaSprite = megaFormId
-      ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${megaFormId}.png`
+      ? MEGA_SPRITE_OVERRIDES[megaFormId] ?? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${megaFormId}.png`
       : null
     setTeam(prev => prev.map((p, i) => i === activeIndex ? {
       ...p,
@@ -9042,7 +9106,7 @@ function MainApp() {
       return
     }
 
-    if (EVOLUTION_STONE_UNLOCK_IDS[itemName] || itemName === 'Gorra de Ash' || itemName === 'Auspicious Armor' || itemName === 'Malicious Armor') {
+    if (EVOLUTION_STONE_UNLOCK_IDS[itemName] || itemName === 'Gorra de Ash' || itemName === 'Auspicious Armor' || itemName === 'Malicious Armor' || itemName === 'Tart Apple' || itemName === 'Sweet Apple' || itemName === 'Syrupy Apple' || itemName === 'Cracked Pot' || itemName === 'Peat Block' || itemName === 'Unremarkable Teacup' || itemName === 'Metal Alloy' || itemName === 'Galarica Cuff' || itemName === 'Galarica Wreath') {
       const candidates = team.filter(p => p.hp > 0)
       if (candidates.length === 0) {
         setBattleLog((prev) => [t('b.noPokemonForStone'), ...prev].slice(0, 15))
@@ -10269,7 +10333,17 @@ function MainApp() {
                       </h2>
                       <div className="types-list" style={{ display: 'flex', gap: '4px' }}>
                         {selectedPokemonDetail.types.map((t) => (
-                          <span key={t} className="type-badge">{t}</span>
+                          <span key={t} className="type-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            {typeIconUrl(t) && (
+                              <img
+                                src={typeIconUrl(t)}
+                                alt={t}
+                                style={{ width: '16px', height: '16px', imageRendering: 'pixelated' }}
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                              />
+                            )}
+                            {t}
+                          </span>
                         ))}
                       </div>
                     </div>
@@ -10292,13 +10366,36 @@ function MainApp() {
                     <>
                       <h3 style={{ fontSize: '0.9rem', color: '#9b98cf', marginTop: '12px' }}>{t('pokedex.evoChain')}</h3>
                       <div className="evolution-chain" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', padding: '8px 0' }}>
-                        {selectedPokemonDetail.evolutions.map((evo, idx) => {
-                          const entry = pokedex[evo.id]
-                          const known = selectedPokemonShiny ? (entry?.shinyCaught ?? false) : !!entry?.caught
-                          const sep = evo.branch === true ? '/' : '→'
-                          return (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              {idx > 0 && <span style={{ color: '#7d7ab5', fontSize: '1.2rem' }}>{sep}</span>}
+                        {(() => {
+                          const evos = selectedPokemonDetail.evolutions
+                          // Se reconstruye el árbol evolutivo. Si el nodo trae
+                          // `parent` (cadenas genéricas) se usa directamente; si
+                          // no (cadenas manuales tipo Eevee/Pikachu) se deduce
+                          // con la rama: un hermano comparte el padre del anterior.
+                          const byId = new Map<number, (typeof evos)[number]>()
+                          evos.forEach(ev => byId.set(ev.id, ev))
+                          const childrenByParent = new Map<number, (typeof evos)[number][]>()
+                          let prevParent: (typeof evos)[number] | undefined
+                          evos.forEach((ev, i) => {
+                            if (i === 0) return
+                            let parent: (typeof evos)[number] | undefined
+                            if (ev.parent != null) {
+                              parent = byId.get(ev.parent)
+                            } else if (!ev.branch) {
+                              parent = evos[i - 1]
+                            } else {
+                              parent = prevParent
+                            }
+                            if (!parent) parent = evos[0]
+                            if (!childrenByParent.has(parent.id)) childrenByParent.set(parent.id, [])
+                            childrenByParent.get(parent.id)!.push(ev)
+                            prevParent = parent
+                          })
+
+                          const renderCard = (evo: (typeof evos)[number]): ReactNode => {
+                            const entry = pokedex[evo.id]
+                            const known = selectedPokemonShiny ? (entry?.shinyCaught ?? false) : !!entry?.caught
+                            return (
                               <div
                                 className="pokedex-card"
                                 style={{
@@ -10310,9 +10407,7 @@ function MainApp() {
                                 onClick={() => known && handleSelectPokedexPokemon(evo.id, selectedPokemonShiny)}
                               >
                                 <img
-                                  src={selectedPokemonShiny
-                                    ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/shiny/${evo.id}.gif`
-                                    : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${evo.id}.gif`}
+                                  src={pokemonSpriteUrl(evo.id, selectedPokemonShiny)}
                                   alt={evo.name}
                                   onError={(e) => { (e.target as HTMLImageElement).src = evo.sprite }}
                                   style={{ width: '56px', height: '56px', imageRendering: 'pixelated', filter: known ? undefined : 'brightness(0) invert(0)' }}
@@ -10333,9 +10428,97 @@ function MainApp() {
                                   <span style={{ fontSize: '0.72rem', color: '#4d9bff', fontWeight: 'bold', textAlign: 'center' }}>{t('pokedex.chance')} {evo.chance}%</span>
                                 )}
                               </div>
-                            </div>
-                          )
-                        })}
+                            )
+                          }
+
+                          const renderNode = (evo: (typeof evos)[number]): ReactNode => {
+                            // Nodo grupo (p. ej. las formas de Wormadam): no se
+                            // dibuja tarjeta propia, solo sus hijos en horizontal.
+                            if (evo.isGroup) {
+                              const groupKids = childrenByParent.get(evo.id) ?? []
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                  {groupKids.map((k, i) => (
+                                    <Fragment key={`${k.id}-g-${i}`}>
+                                      {i > 0 && <span style={{ color: '#7d7ab5', fontSize: '1.2rem' }}>/</span>}
+                                      {renderCard(k)}
+                                    </Fragment>
+                                  ))}
+                                </div>
+                              )
+                            }
+                            const kids = childrenByParent.get(evo.id) ?? []
+                            // Un hijo con el mismo id que su padre (las formas de
+                            // Wormadam, p. ej. planta) se muestra como tarjeta
+                            // hoja para no entrar en bucle.
+                            const realKids = kids.filter(k => k.id !== evo.id)
+                            const selfKids = kids.filter(k => k.id === evo.id)
+                            if (realKids.length === 0) {
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                  {renderCard(evo)}
+                                  {selfKids.map((k, i) => (
+                                    <Fragment key={`${k.id}-s-${i}`}>
+                                      <span style={{ color: '#7d7ab5', fontSize: '1.2rem' }}>{i === 0 ? '→' : '/'}</span>
+                                      {renderCard(k)}
+                                    </Fragment>
+                                  ))}
+                                </div>
+                              )
+                            }
+                            if (realKids.length === 1) {
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                  {renderCard(evo)}
+                                  {selfKids.map((k, i) => (
+                                    <Fragment key={`${k.id}-s-${i}`}>
+                                      <span style={{ color: '#7d7ab5', fontSize: '1.2rem' }}>{i === 0 ? '→' : '/'}</span>
+                                      {renderCard(k)}
+                                    </Fragment>
+                                  ))}
+                                  <span style={{ color: '#7d7ab5', fontSize: '1.2rem' }}>→</span>
+                                  {renderNode(realKids[0])}
+                                </div>
+                              )
+                            }
+                            const hasNested = realKids.some(k => (childrenByParent.get(k.id) ?? []).some(c => c.id !== k.id))
+                            if (!hasNested) {
+                              // Hermanos sin descendencia (Eevee, Ralts, Scyther...):
+                              // se muestran en horizontal separados por "/".
+                              const allKids = [...selfKids, ...realKids]
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                  {renderCard(evo)}
+                                  {allKids.map((k, i) => (
+                                    <Fragment key={`${k.id}-${i}`}>
+                                      <span style={{ color: '#7d7ab5', fontSize: '1.2rem' }}>{i === 0 ? '→' : '/'}</span>
+                                      {renderCard(k)}
+                                    </Fragment>
+                                  ))}
+                                </div>
+                              )
+                            }
+                            // Ramas anidadas (p. ej. Wurmple o Burmy): el Pokémon
+                            // queda a la izquierda y las flechas apuntan hacia cada
+                            // rama a su derecha (↗ arriba, ↘ abajo).
+                            const half = Math.ceil(realKids.length / 2)
+                            return (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {renderCard(evo)}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  {realKids.map((k, i) => (
+                                    <div key={`${k.id}-n-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                      <span style={{ color: '#7d7ab5', fontSize: '1.2rem' }}>{i < half ? '↗' : '↘'}</span>
+                                      {renderNode(k)}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          }
+
+                          return renderNode(evos[0])
+                        })()}
                       </div>
                     </>
                   )}
@@ -10472,9 +10655,7 @@ function MainApp() {
                           >
                             <span className="pokedex-id">#{String(pkmn.id).padStart(3, '0')}</span>
                             <img
-                              src={isShiny
-                                ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/shiny/${pkmn.id}.gif`
-                                : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pkmn.id}.gif`}
+                              src={pokemonSpriteUrl(pkmn.id, isShiny)}
                               alt={pkmn.name}
                               onError={fallbackSprite}
                               style={{ width: '60px', height: '60px', filter: known ? undefined : 'brightness(0) invert(0)', imageRendering: known ? undefined : 'auto' }}
@@ -11211,7 +11392,7 @@ function MainApp() {
                     opacity: selectedIdx < 0 && coliseumTempTeam.length >= 6 ? 0.4 : 1
                   }}
                 >
-                  <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pkmn.id}.gif`}
+                  <img src={pokemonSpriteUrl(pkmn.id)}
                     alt={pkmn.name} onError={fallbackSprite}
                     style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} />
                   <div style={{ fontSize: '0.75rem', textTransform: 'capitalize', color: selectedIdx >= 0 ? '#ffcb05' : '#f3f1ff' }}>{pkmn.name}</div>
