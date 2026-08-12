@@ -760,6 +760,8 @@ begin
     'winner', null::text,
     'switchFor', null::text,
     'log', '[]'::jsonb,
+    'weather', 'none',
+    'entryApplied', false,
     'a', jsonb_build_object('team', coalesce(v_match.team_a, '[]'::jsonb), 'active', 0, 'revealed', v_a_revealed, 'username', v_a_name),
     'b', jsonb_build_object('team', coalesce(v_match.team_b, '[]'::jsonb), 'active', 0, 'revealed', v_b_revealed, 'username', v_b_name)
   );

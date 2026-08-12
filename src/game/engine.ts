@@ -330,6 +330,12 @@ export const RUN_MODIFIERS: RunModifier[] = [
     playerAttackMod: 0.10,
     playerDefenseMod: -0.15,
   },
+  {
+    id: 'weathermania',
+    name: 'Weather Mania',
+    description: 'Lluvia constante durante toda la partida: Agua +50%, Fuego -50% y Trueno siempre acierta.',
+    forcedWeather: 'rain',
+  },
 ]
 
 export function startRun(config: { generation: number }, doubleModifiers = false) {

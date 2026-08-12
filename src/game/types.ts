@@ -12,6 +12,15 @@ export interface StatChange {
   chance?: number
 }
 
+export interface PokemonIVs {
+  hp: number
+  attack: number
+  defense: number
+  spAttack: number
+  spDefense: number
+  speed: number
+}
+
 export interface Move {
   name: string
   enName?: string
@@ -37,6 +46,7 @@ export interface Move {
   leechSeed?: boolean
   disable?: boolean
   fakeOut?: boolean
+  isZMove?: boolean
 }
 
 export interface RawLevelUpMove {
@@ -69,6 +79,9 @@ export interface Pokemon {
   rawLevelUpMoves?: RawLevelUpMove[]
   holdItem?: string | null
   shiny?: boolean
+  ability?: string
+  nature?: string
+  ivs?: PokemonIVs
   megaEvolved?: boolean
   gmaxEvolved?: boolean
   primalEvolved?: boolean
@@ -84,6 +97,7 @@ export interface Pokemon {
   disabled?: { move: string; turns: number }
   justEntered?: boolean
   choiceLockedMove?: string
+  zMoveUsed?: boolean
 }
 
 export interface RouteNode {
@@ -112,6 +126,7 @@ export interface RunModifier {
   playerLifesteal?: number
   moneyMultiplier?: number
   shopDiscount?: number
+  forcedWeather?: string
 }
 
 export interface RunConfig {
@@ -218,4 +233,7 @@ export interface MetaProgression {
   coopRuns: number
   coopWins: number
   coopTrades: number
+  completedGenDex?: number[]
+  totalZMoves?: number
+  zMoveTypes?: string[]
 }

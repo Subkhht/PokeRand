@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef, useCallback, Component, Fragment,
 import { createPortal } from 'react-dom'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
-import { playHover, playClick, playHit, playEvolution, playCoin, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
+import { playHover, playClick, playHit, playEvolution, playCoin, playAchievement, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -24,6 +24,7 @@ import {
   type PokemonDetails
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
+import { abilityName, abilityDesc, weatherName, weatherTypeMultiplier, weatherSpeedMultiplier, weatherChipDmg, WEATHER_SETTERS, WEATHER_INFO, natureName, natureStatMods, hasAbility, type WeatherKind, type MetaStatKey } from './game/pokemonMeta'
 import { isLeaderboardEnabled, submitInfiniteScore, fetchInfiniteLeaderboard, formatDuration, getCurrentUser, onAuthChange, signUpWithUsername, signIn, signOut, getUsername, isUsernameTaken, type LeaderboardEntry, type InfiniteScoreInsert } from './game/leaderboard'
 import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, cancelExchangeOffer, sendCoopChat, getCoopChat, finishCoopSession, resetCoopSession, clearCoopRestart, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange, type CoopChatMessage } from './game/coop'
 import { isPvpEnabled, createPvpRoom, findPvpOpponent, joinPvpRoom, getPvpMatch, getPvpState, submitPvpAction, resolvePvpTurn as resolvePvpTurnRpc, forfeitPvpMatch, cancelPvpMatch, finishPvpMatch, clearPvpAction, startPvpTimer, expirePvpTimer, getPvpElo, getPvpEloLeaderboard, awardPvpElo, rematchPvpRoom, serializePvpPokemon, type PvpTurnSnapshot, type PvpRoomResult, type PvpState, type PvpEloEntry } from './game/pvp'
@@ -881,6 +882,7 @@ const itemDescriptions: Record<string, string> = {
   'Heavy Ball': 'Mejor contra Pokémon pesados (hasta x4).',
   'Mega Stone': 'Permite mega-evolucionar 1 vez por combate.',
   'Dynamax Band': 'Permite gigamaximar 1 vez por combate (3 turnos).',
+  'Z Power Ring': 'Otorga un Movimiento Z (una vez por combate).',
   'Prisma Rojo': 'Despierta la Primal Reversion de Groudon (1 vez por combate).',
   'Prisma Azul': 'Despierta la Primal Reversion de Kyogre (1 vez por combate).',
   'Cuerda Huida': 'Escapa de cualquier combate de la aventura.',
@@ -943,6 +945,29 @@ const itemDescriptions: Record<string, string> = {
   'Diamansfera': '+20% daño en movimientos Acero y Dragón para Dialga. Transforma a Dialga en su Forma Origen.',
   'Lustresfera': '+20% daño en movimientos Agua y Dragón para Palkia. Transforma a Palkia en su Forma Origen.',
   'Griseosfera': '+20% daño en movimientos Dragón y Fantasma para Giratina. Transforma a Giratina en su Forma Origen.',
+}
+
+// Sprites locales de objetos (carpeta src/assets/items). Se cargan automáticamente
+// con import.meta.glob y cada archivo se asocia a su objeto en LOCAL_ITEM_SPRITES.
+// Tienen prioridad sobre los sprites remotos de PokeAPI.
+const localItemSpriteFiles = import.meta.glob('./assets/items/*.png', { eager: true, import: 'default' }) as Record<string, string>
+
+const LOCAL_ITEM_SPRITES: Record<string, string> = {
+  'Galarica Cuff': localItemSpriteFiles['./assets/items/Brazal_galanuez.png'] ?? '',
+  'Galarica Wreath': localItemSpriteFiles['./assets/items/Corona_galanuez.png'] ?? '',
+  'Gorra de Ash': localItemSpriteFiles['./assets/items/Ash\'s_Cap.png'] ?? '',
+  'Tart Apple': localItemSpriteFiles['./assets/items/Manzana_ácida.png'] ?? '',
+  'Sweet Apple': localItemSpriteFiles['./assets/items/Manzana_dulce.png'] ?? '',
+  'Syrupy Apple': localItemSpriteFiles['./assets/items/Manzana_melosa.png'] ?? '',
+  'Cracked Pot': localItemSpriteFiles['./assets/items/Tetera_agrietada.png'] ?? '',
+  'Peat Block': localItemSpriteFiles['./assets/items/Bloque_de_turba.png'] ?? '',
+  'Unremarkable Teacup': localItemSpriteFiles['./assets/items/Cuenco_mediocre.png'] ?? '',
+  'Metal Alloy': localItemSpriteFiles['./assets/items/Metal_compuesto.png'] ?? '',
+  'Mineral Negro': localItemSpriteFiles['./assets/items/Mineral_negro.png'] ?? '',
+  'Auspicious Armor': localItemSpriteFiles['./assets/items/Armadura_auspiciosa.png'] ?? '',
+  'Malicious Armor': localItemSpriteFiles['./assets/items/Armadura_maldita.png'] ?? '',
+  'Manuscrito sombras': localItemSpriteFiles['./assets/items/Manuscrito_de_las_Sombras.png'] ?? '',
+  'Manuscrito aguas': localItemSpriteFiles['./assets/items/Manuscrito_de_las_Aguas.png'] ?? '',
 }
 
 const ITEM_SPRITES: Record<string, string> = {
@@ -1019,6 +1044,7 @@ const ITEM_SPRITES: Record<string, string> = {
   'Twisted Spoon': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/twisted-spoon.png',
   'Mega Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/key-stone.png',
   'Dynamax Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png',
+  'Z Power Ring': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/z-power-ring.png',
   'Prisma Rojo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/red-orb.png',
   'Prisma Azul': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/blue-orb.png',
   'Diamansfera': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/adamant-orb.png',
@@ -1136,6 +1162,11 @@ const ITEM_SPRITES: Record<string, string> = {
   'Mineral Negro': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/hard-stone.png',
 }
 
+// Los sprites locales sobrescriben los remotos de PokeAPI.
+for (const [itemName, spriteUrl] of Object.entries(LOCAL_ITEM_SPRITES)) {
+  if (spriteUrl) ITEM_SPRITES[itemName] = spriteUrl
+}
+
 interface HoldableItem {
   name: string
   desc: string
@@ -1172,6 +1203,7 @@ interface HoldableItem {
   ironBall?: boolean
   isMegaStone?: boolean
   isGmaxBand?: boolean
+  isZPowerRing?: boolean
   isPrimalOrb?: boolean
   isExpShare?: boolean
   isRedCard?: boolean
@@ -1215,6 +1247,7 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Tarjeta Roja': { name: 'Tarjeta Roja', desc: 'Si te golpean con daño y sobrevives, el rival cambia', price: 1000, isRedCard: true },
   'Mega Stone': { name: 'Mega Stone', desc: 'Permite mega-evolucionar 1 vez por combate', price: 700, isMegaStone: true },
   'Dynamax Band': { name: 'Dynamax Band', desc: 'Permite gigamaximar 1 vez por combate (3 turnos)', price: 0, isGmaxBand: true },
+  'Z Power Ring': { name: 'Z Power Ring', desc: 'Otorga un Movimiento Z (una vez por combate)', price: 0, isZPowerRing: true },
   'Prisma Rojo': { name: 'Prisma Rojo', desc: 'Despierta la Primal Reversion de Groudon (1 vez por combate)', price: 0, isPrimalOrb: true },
   'Prisma Azul': { name: 'Prisma Azul', desc: 'Despierta la Primal Reversion de Kyogre (1 vez por combate)', price: 0, isPrimalOrb: true },
   'Diamansfera': { name: 'Diamansfera', desc: '+20% daño en movimientos Acero y Dragón si lo lleva Dialga. Transforma a Dialga en su Forma Origen.', price: 700, typeBoost: { types: ['steel', 'dragon'], boost: 0.20, onlyIds: [483] } },
@@ -1490,6 +1523,21 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: 'item_user_10', name: 'Experimentado', desc: 'Usa 10 objetos en una partida', icon: '🧪', hidden: false, reward: 15 },
   { id: 'gambler', name: 'Jugador', desc: 'Gana un nodo Spin', icon: '🎰', hidden: false, reward: 15 },
   { id: 'pokeRand_master', name: 'Maestro Aleatorio', desc: 'Gana un nodo PokeRand', icon: '🎲', hidden: false, reward: 15 },
+  { id: 'first_z_move', name: 'Primer Z', desc: 'Usa un Movimiento Z por primera vez', icon: '✨', hidden: false, reward: 15 },
+  { id: 'z_move_ko', name: 'Golpe Z', desc: 'Debilita a un rival con un Movimiento Z', icon: '💫', hidden: false, reward: 20 },
+  { id: 'z_move_win', name: 'Poder Z', desc: 'Gana una partida usando un Movimiento Z', icon: '🌟', hidden: false, reward: 30 },
+  { id: 'z_move_master', name: 'Maestro Z', desc: 'Usa 10 Movimientos Z en total', icon: '🔮', hidden: false, reward: 40 },
+  { id: 'z_all_types', name: 'Aurora Z', desc: 'Usa Movimientos Z de al menos 6 tipos distintos', icon: '🌈', hidden: false, reward: 40 },
+  { id: 'mega_z_combo', name: 'Doble Gimmick', desc: 'Mega-evoluciona y usa un Movimiento Z en la misma batalla', icon: '⚡', hidden: false, reward: 25 },
+  { id: 'weather_win', name: 'Climatología', desc: 'Gana una batalla con clima activo', icon: '🌦️', hidden: false, reward: 20 },
+  { id: 'weather_setter', name: 'Creador de Clima', desc: 'Crea un clima con una habilidad (Drizzle, Drought, Sand Stream o Snow Warning)', icon: '🌪️', hidden: false, reward: 20 },
+  { id: 'weather_mania_win', name: 'Maniático del Clima', desc: 'Gana una partida con el modificador Weather Mania', icon: '🌧️', hidden: false, reward: 30 },
+  { id: 'perfect_iv', name: 'Joyas de IVs', desc: 'Captura un Pokémon con un IV de 31 en al menos una stat', icon: '💎', hidden: false, reward: 15 },
+  { id: 'high_iv', name: 'Criador de Élite', desc: 'Captura un Pokémon con IVs totales ≥ 150', icon: '🧬', hidden: false, reward: 25 },
+  { id: 'coliseum_win', name: 'Coloso del Coliseo', desc: 'Gana el Coliseum', icon: '🏟️', hidden: false, reward: 60 },
+  { id: 'double_win', name: 'Dúo Perfecto', desc: 'Gana un Combate Doble sin perder ningún Pokémon', icon: '🥊', hidden: false, reward: 25 },
+  { id: 'level_100', name: 'Nivel Máximo', desc: 'Alcanza el nivel 100 con un Pokémon', icon: '📈', hidden: false, reward: 60 },
+  { id: 'original_win', name: 'Leyenda Original', desc: 'Gana el Modo Original', icon: '🏛️', hidden: false, reward: 40 },
   { id: 'streak_15', name: 'Racha Imparable', desc: 'Gana 15 partidas seguidas', icon: '🔥', hidden: false, reward: 100 },
   { id: 'streak_20', name: 'Leyenda de Racha', desc: 'Gana 20 partidas seguidas', icon: '🔥', hidden: false, reward: 200 },
   { id: 'streak_25', name: 'Dios de la Racha', desc: 'Gana 25 partidas seguidas', icon: '🔥', hidden: false, reward: 250 },
@@ -1873,6 +1921,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'start_money_1', name: 'Inicio: +$100', desc: 'Empiezas cada aventura con $100 extra.', price: 120, spriteKey: 'money', category: 'upgrade' },
   { id: 'start_money_2', name: 'Inicio: +$100 II', desc: 'Empiezas cada aventura con $100 extra (se suma a la anterior).', price: 160, spriteKey: 'money', category: 'upgrade', requires: 'start_money_1' },
   { id: 'start_revive_1', name: 'Inicio: +1 Revive', desc: 'Empiezas cada aventura con 1 Revive extra.', price: 200, spriteKey: 'Revive', category: 'upgrade' },
+  { id: 'unlock_z_power_ring', name: 'Z Power Ring', desc: 'Empiezas cada aventura con la Superpulsera Z. Equipada a un Pokémon, le otorga un Movimiento Z (una vez por combate).', price: 2000, spriteKey: 'Z Power Ring', category: 'upgrade' },
   { id: 'unlock_quick_ball', name: 'Quick Ball', desc: 'x5 en el primer turno. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Quick Ball', category: 'pokeball' },
   { id: 'unlock_timer_ball', name: 'Timer Ball', desc: 'Mejora con los turnos (hasta x4). Aparece en tiendas y descansos.', price: 35, spriteKey: 'Timer Ball', category: 'pokeball' },
   { id: 'unlock_dusk_ball', name: 'Dusk Ball', desc: 'x3 en oscuridad. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Dusk Ball', category: 'pokeball' },
@@ -2248,6 +2297,51 @@ function getNodeMapLayout(nodeCount: number): { positions: Array<{ x: number; y:
   return { positions, width, height }
 }
 
+// Movimientos Z por tipo (los nombres oficiales en español e inglés).
+const Z_MOVES: Record<string, { es: string; en: string; power: number }> = {
+  normal: { es: 'Megatrón', en: 'Breakneck Blitz', power: 190 },
+  fire: { es: 'Pirocañón', en: 'Inferno Overdrive', power: 200 },
+  water: { es: 'Hidrovórtice', en: 'Hydro Vortex', power: 200 },
+  electric: { es: 'Gigavoltio Destructor', en: 'Gigavolt Havoc', power: 190 },
+  grass: { es: 'Macrosierra', en: 'Bloom Doom', power: 190 },
+  ice: { es: 'Frialdad Polar', en: 'Subzero Slammer', power: 200 },
+  fighting: { es: 'Puño Colosal', en: 'All-Out Pummeling', power: 190 },
+  poison: { es: 'Llovizna Ácida', en: 'Acid Downpour', power: 190 },
+  ground: { es: 'Movimiento Sísmico', en: 'Tectonic Rage', power: 190 },
+  flying: { es: 'Onda Supersónica', en: 'Supersonic Skystrike', power: 190 },
+  psychic: { es: 'Presentimiento Onírico', en: 'Shattered Psyche', power: 190 },
+  bug: { es: 'Torbellino Demoledor', en: 'Savage Spin-Out', power: 190 },
+  rock: { es: 'Roca Asoladora', en: 'Continental Crush', power: 190 },
+  ghost: { es: 'Pesadilla Abismal', en: 'Never-Ending Nightmare', power: 190 },
+  dragon: { es: 'Dragoalubia', en: 'Devastating Drake', power: 200 },
+  dark: { es: 'Atracción Siniestra', en: 'Black Hole Eclipse', power: 190 },
+  steel: { es: 'Hélice Acerada', en: 'Corkscrew Crash', power: 190 },
+  fairy: { es: 'Brillo Coraza', en: 'Twinkle Tackle', power: 190 },
+}
+
+// Construye el Movimiento Z de un Pokémon que lleva la Superpulsera Z. El tipo es el
+// tipo principal del Pokémon y la clase física/especial depende de su mejor
+// stat ofensivo, igual que los Movimientos Z basados en el movimiento original.
+function getZMoveFor(pokemon: Pokemon): Move | null {
+  if (pokemon.holdItem !== 'Z Power Ring') return null
+  const type = (pokemon.types ?? [])[0] ?? 'normal'
+  const info = Z_MOVES[type] ?? Z_MOVES.normal
+  const damageClass: 'physical' | 'special' = (pokemon.attack ?? 0) >= (pokemon.spAttack ?? 0) ? 'physical' : 'special'
+  const isEn = getLanguage() === 'en'
+  return {
+    name: info.es,
+    enName: info.en,
+    power: info.power,
+    type,
+    accuracy: null,
+    damageClass,
+    isZMove: true,
+    description: isEn
+      ? `${info.en} Z-Move (${type}). Can only be used once per battle.`
+      : `Movimiento Z ${info.es} (tipo ${type}). Solo puede usarse una vez por combate.`,
+  }
+}
+
 function moveTooltip(move: Move): string {
   const accuracy = move.accuracy === null ? 'Siempre acierta' : `${move.accuracy}% precisión`
   const isStatus = !move.power || move.power <= 0
@@ -2524,7 +2618,6 @@ function MainApp() {
   const [money, setMoney] = useState<number>(100)
   const [shopStock, setShopStock] = useState<string[]>([])
   const [shopRerollsUsed, setShopRerollsUsed] = useState(0)
-  const [shopQty, setShopQty] = useState<Record<string, number>>({})
   const [shopBoughtCount, setShopBoughtCount] = useState<Record<string, number>>({})
   const [sellQty, setSellQty] = useState<Record<string, number>>({})
 
@@ -2606,6 +2699,7 @@ function MainApp() {
   const [tempLeagueTeam, setTempLeagueTeam] = useState<string[]>([])
   const [battleTurns, setBattleTurns] = useState(0)
   const [enemyHitFlash, setEnemyHitFlash] = useState(false)
+  const [weather, setWeather] = useState<WeatherKind>('none')
 
   const battleStartHPRef = useRef<number>(0)
   const battleMinHpRef = useRef<number>(0)
@@ -2711,6 +2805,7 @@ function MainApp() {
   const speedrunTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const megaNodeSpawnedRef = useRef(false)
   const [battleMegaUsed, setBattleMegaUsed] = useState(false)
+  const [battleZMoveUsed, setBattleZMoveUsed] = useState(false)
   const [battleGmaxUsed, setBattleGmaxUsed] = useState(false)
   const [battlePrimalUsed, setBattlePrimalUsed] = useState(false)
   const [battleOriginUsed, setBattleOriginUsed] = useState(false)
@@ -2848,6 +2943,8 @@ function MainApp() {
   const [showMinigamePractice, setShowMinigamePractice] = useState<boolean>(false)
   const [showResetModal, setShowResetModal] = useState<boolean>(false)
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null)
+  const [dexToast, setDexToast] = useState<string | null>(null)
+  const dexToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [shinyNextEncounter, setShinyNextEncounter] = useState<boolean>(false)
   const [legendaryNextEncounter, setLegendaryNextEncounter] = useState<boolean>(false)
   const dailySeed = (() => {
@@ -3015,6 +3112,16 @@ function MainApp() {
   const activePokemon = useMemo(() => team[activeIndex] ?? null, [team, activeIndex])
   const inventoryEntries = useMemo(() => groupInventory(inventory), [inventory])
 
+  // Habilidades de entrada: se aplican una vez al comenzar cada batalla y se
+  // resetean al salir del combate (junto con el clima).
+  const entryAbilitiesAppliedRef = useRef(false)
+  useEffect(() => {
+    if (screen !== 'battle' && screen !== 'double') {
+      entryAbilitiesAppliedRef.current = false
+      setWeather('none')
+    }
+  }, [screen])
+
   useEffect(() => { startMenuMusic() }, [])
 
   // Desbloquear el audio en la primera interacción (los navegadores bloquean el
@@ -3063,6 +3170,7 @@ function MainApp() {
         return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...reset }
       }))
       setBattleMegaUsed(false)
+      setBattleZMoveUsed(false)
       setBattleGmaxUsed(false)
       setBattlePrimalUsed(false)
       setBattleOriginUsed(false)
@@ -3598,6 +3706,41 @@ function MainApp() {
     })
   }
 
+  // Recompensa por completar la Pokédex de cada generación (además de los logros).
+  const lastCaughtCountRef = useRef<number>(-1)
+  const checkGenerationDexCompletion = useCallback(async (): Promise<void> => {
+    for (let gen = 1; gen <= 9; gen++) {
+      if ((metaProgression.completedGenDex ?? []).includes(gen)) continue
+      try {
+        const ids = await getSpeciesIdsByGeneration(gen)
+        if (ids.length === 0) continue
+        const complete = ids.every(id => pokedex[id]?.caught)
+        if (complete) {
+          const reward = 50
+          setMetaProgression(prev => {
+            const completed = prev.completedGenDex ?? []
+            if (completed.includes(gen)) return prev
+            const updated = { ...prev, pokeCoins: prev.pokeCoins + reward, completedGenDex: [...completed, gen] }
+            localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+            return updated
+          })
+          const msg = t('b.genDexComplete', { gen, coins: reward })
+          setDexToast(msg)
+          if (dexToastTimerRef.current) clearTimeout(dexToastTimerRef.current)
+          dexToastTimerRef.current = setTimeout(() => setDexToast(null), 5000)
+        }
+      } catch {}
+    }
+  }, [metaProgression, pokedex])
+
+  useEffect(() => {
+    const caughtCount = Object.values(pokedex).filter(e => e.caught).length
+    if (caughtCount === lastCaughtCountRef.current) return
+    lastCaughtCountRef.current = caughtCount
+    if (caughtCount === 0) return
+    void checkGenerationDexCompletion()
+  }, [pokedex, checkGenerationDexCompletion])
+
   function seenInPokedex(pokemon: Pokemon): void {
     setPokedex((prev) => {
       let pokemonId = Number(pokemon.id)
@@ -3610,7 +3753,6 @@ function MainApp() {
       }
 
       if (isNaN(pokemonId) || !pokemonId) return prev
-
       const current = prev[pokemonId] ?? { id: pokemonId, name: pokemon.name, sprite: pokemon.sprite, types: (pokemon as any).types ?? [], seen: false, caught: false }
 
       // Independencia total entre la Pokédex normal y la shiny.
@@ -3684,7 +3826,10 @@ function MainApp() {
     const updated = { ...achievementsRef.current, [id]: { unlocked: true, date: new Date().toISOString() } }
     achievementsRef.current = updated
     localStorage.setItem('pokerand_achievements', JSON.stringify(updated))
-    if (achievement) setNewAchievement(achievement)
+    if (achievement) {
+      setNewAchievement(achievement)
+      playAchievement()
+    }
   }
 
   function claimAchievement(id: string): void {
@@ -4465,6 +4610,7 @@ function MainApp() {
       for (let i = 0; i < 5 + extraBalls; i++) startingItems.push('Poké Ball')
       for (let i = 0; i < extraPotions; i++) startingItems.push('Potion')
       if (startItems.includes('start_revive_1')) startingItems.push('Revive')
+      if (startItems.includes('unlock_z_power_ring')) startingItems.push('Z Power Ring')
       // Caja Bonguri: 2 Poké Balls + 1 ball de bonguri aleatoria.
       if (startItems.includes('unlock_caja_bonguri')) {
         startingItems.push('Poké Ball', 'Poké Ball')
@@ -4695,6 +4841,9 @@ function MainApp() {
     if (activeChallengeCount >= 5) unlockAchievement('challenge_mania')
     if (battleMegaUsed) unlockAchievement('mega_win')
     if (battleGmaxUsed) unlockAchievement('gmax_win')
+    if (battleZMoveUsed) unlockAchievement('z_move_win')
+    if (modifier?.forcedWeather || modifier2?.forcedWeather) unlockAchievement('weather_mania_win')
+    if (difficulty === 'original') unlockAchievement('original_win')
 
     const hasActiveChallenge = activeChallengeCount > 0
     const baseCoins = difficulty === 'easy' ? 10 : difficulty === 'hard' ? 20 : 15
@@ -4832,6 +4981,7 @@ function MainApp() {
 
       if (difficulty === 'coliseum') {
         unlockAchievement('first_win')
+        unlockAchievement('coliseum_win')
         if (difficulty === 'coliseum') unlockAchievement('hard_win')
         setMetaProgression(prev => {
           const updated = { ...prev, totalRuns: prev.totalRuns + 1, totalWins: prev.totalWins + 1, bestStreak: Math.max(prev.bestStreak, winStreak + 1) }
@@ -6198,17 +6348,137 @@ function MainApp() {
   }
 
   function performDoubleHit(attacker: Pokemon, defender: Pokemon, move: Move): { attacker: Pokemon; defender: Pokemon; log: string[] } {
-    if (move.accuracy != null && move.accuracy < 100 && Math.random() * 100 >= move.accuracy) {
-      return { attacker, defender, log: [t('b.missed', { attacker: attacker.name, move: moveName(move) })] }
+    const log: string[] = []
+    // --- Precisión (Indefenso, Ojo Compuesto y clima sobre Trueno) ---
+    const noGuard = hasAbility(attacker, 'no-guard') || hasAbility(defender, 'no-guard')
+    if (move.accuracy != null && move.accuracy < 100 && !noGuard) {
+      let acc = move.accuracy
+      if (hasAbility(attacker, 'compound-eyes')) acc = Math.min(100, acc * 1.3)
+      if (move.type === 'electric' && (move.name === 'Trueno' || move.enName === 'Thunder')) {
+        if (weather === 'rain') acc = 100
+        else if (weather === 'sun') acc = Math.min(acc, 50)
+      }
+      if (Math.random() * 100 >= acc) {
+        return { attacker, defender, log: [t('b.missed', { attacker: attacker.name, move: moveName(move) })] }
+      }
     }
     const defTypes = defender.types ?? []
-    const { effectiveness, message } = getTypeEffectiveness(move.type, defTypes[0] || 'normal', defTypes[1])
-    const stab = (attacker.types ?? []).some(t => t === move.type) ? 1.5 : 1
-    const result = applyDamage(attacker, defender, move)
-    const damage = Math.max(1, Math.floor(result.damage * effectiveness * stab))
+    let { effectiveness, message } = getTypeEffectiveness(move.type, defTypes[0] || 'normal', defTypes[1])
+
+    // --- Habilidades de inmunidad del defensor ---
+    const defenderAbility = defender.ability
+    const abilityBlocked =
+      (move.type === 'ground' && hasAbility(defender, 'levitate'))
+      || (move.type === 'water' && (hasAbility(defender, 'water-absorb') || hasAbility(defender, 'dry-skin')))
+      || (move.type === 'electric' && (hasAbility(defender, 'volt-absorb') || hasAbility(defender, 'lightning-rod') || hasAbility(defender, 'motor-drive')))
+      || (move.type === 'fire' && hasAbility(defender, 'flash-fire'))
+      || (move.type === 'grass' && hasAbility(defender, 'sap-sipper'))
+    let abilityBlockMsg: string | null = null
+    if (abilityBlocked) {
+      effectiveness = 0
+      message = null
+      abilityBlockMsg = t('b.abilityBlocked', { ability: abilityName(defenderAbility, getLanguage()) })
+    }
+
+    const stab = (attacker.types ?? []).some(t => t === move.type) ? (hasAbility(attacker, 'adaptability') ? 2 : 1.5) : 1
+
+    // --- Stats efectivas con habilidades (Agallas, Potencia Bruta, Poder Solar, Escama Especial) ---
+    const attackerStatused = !!attacker.status
+    const burnNerfD = attacker.status?.type === 'burn' ? 0.5 : 1
+    const gutsMult = hasAbility(attacker, 'guts') && attackerStatused ? 1.5 : 1
+    const hugePowerMult = hasAbility(attacker, 'huge-power') || hasAbility(attacker, 'pure-power') ? 2 : 1
+    const solarPowerMult = hasAbility(attacker, 'solar-power') && weather === 'sun' ? 1.5 : 1
+    const attackerEffective: Pokemon = {
+      ...attacker,
+      attack: Math.round(attacker.attack * burnNerfD * gutsMult * hugePowerMult),
+      spAttack: Math.round(attacker.spAttack * solarPowerMult),
+    }
+    const marvelScale = hasAbility(defender, 'marvel-scale') && defender.status ? 1.5 : 1
+    const defenderEffective: Pokemon = {
+      ...defender,
+      defense: Math.round(defender.defense * marvelScale),
+      spDefense: Math.round(defender.spDefense * marvelScale),
+    }
+
+    const result = applyDamage(attackerEffective, defenderEffective, move)
+    let damage = Math.max(1, Math.floor(result.damage * effectiveness * stab))
+
+    // --- Multiplicadores por habilidad y clima ---
+    damage = Math.floor(damage * weatherTypeMultiplier(weather, move.type))
+    const lowHp = attacker.hp / Math.max(1, attacker.maxHp) <= 1 / 3
+    const pinchMult = (lowHp
+      && ((hasAbility(attacker, 'blaze') && move.type === 'fire')
+        || (hasAbility(attacker, 'overgrow') && move.type === 'grass')
+        || (hasAbility(attacker, 'torrent') && move.type === 'water')
+        || (hasAbility(attacker, 'swarm') && move.type === 'bug')))
+      ? 1.5 : 1
+    const technicianMult = hasAbility(attacker, 'technician') && (move.power ?? 0) <= 60 ? 1.5 : 1
+    const tintedLensMult = hasAbility(attacker, 'tinted-lens') && effectiveness < 1 ? 2 : 1
+    const toughClawsMult = hasAbility(attacker, 'tough-claws') && move.damageClass !== 'special' ? 1.3 : 1
+    const thickFatMult = hasAbility(defender, 'thick-fat') && (move.type === 'fire' || move.type === 'ice') ? 0.5 : 1
+    damage = Math.floor(damage * pinchMult * technicianMult * tintedLensMult * toughClawsMult * thickFatMult)
+    if (hasAbility(defender, 'dry-skin') && move.type === 'fire') damage = Math.floor(damage * 1.25)
+    if (hasAbility(defender, 'multiscale') && defender.hp >= defender.maxHp) damage = Math.floor(damage * 0.5)
+    const isCrit = !runChallenges.noCrits && (move.critRatio ?? 0) > 0 && Math.random() < ((move.critRatio ?? 0) >= 3 ? 0.5 : (move.critRatio ?? 0) === 2 ? 0.25 : 0.125)
+    if (isCrit) damage = Math.floor(damage * (hasAbility(attacker, 'sniper') ? 2 : 1.5))
+
     const newHp = Math.max(0, defender.hp - damage)
-    const log = [t('b.usesHit', { attacker: attacker.name, move: moveName(move), dmg: damage }) + (message ? ` (${message})` : '')]
     let finalDefender: Pokemon = { ...defender, hp: newHp }
+    const hitLine = t('b.usesHit', { attacker: attacker.name, move: moveName(move), dmg: damage })
+      + (isCrit ? t('b.critSuffix') : '')
+      + (message ? ` (${message})` : '')
+      + (abilityBlockMsg ? ` (${abilityBlockMsg})` : '')
+    log.push(hitLine)
+
+    // --- Absorción por habilidad (cura al defensor y sube stats) ---
+    if (abilityBlocked && finalDefender.hp > 0) {
+      const absorbHeal = (hasAbility(defender, 'water-absorb') || hasAbility(defender, 'volt-absorb') || hasAbility(defender, 'flash-fire') || hasAbility(defender, 'dry-skin'))
+        ? Math.max(1, Math.floor(finalDefender.maxHp / 4)) : 0
+      if (absorbHeal > 0) {
+        finalDefender = { ...finalDefender, hp: Math.min(finalDefender.maxHp, finalDefender.hp + absorbHeal) }
+        log.push(t('b.abilityAbsorb', { name: finalDefender.name, hp: absorbHeal, ability: abilityName(defenderAbility, getLanguage()) }))
+      }
+      let boostKey: 'attack' | 'spAttack' | 'speed' | null = hasAbility(defender, 'sap-sipper') ? 'attack' : hasAbility(defender, 'lightning-rod') ? 'spAttack' : hasAbility(defender, 'motor-drive') ? 'speed' : null
+      if (boostKey) {
+        const stages = finalDefender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+        if (stages[boostKey] < 6) {
+          finalDefender = { ...finalDefender, statStages: { ...stages, [boostKey]: stages[boostKey] + 1 } }
+          log.push(t('b.abilityStatUp', { name: finalDefender.name, ability: abilityName(defenderAbility, getLanguage()) }))
+        }
+      }
+    }
+
+    // --- Robustez (Sturdy): aguanta con 1 HP a plena vida ---
+    if (finalDefender.hp <= 0 && hasAbility(defender, 'sturdy') && defender.hp >= defender.maxHp) {
+      finalDefender = { ...finalDefender, hp: 1 }
+      log.push(t('b.abilitySturdy', { name: finalDefender.name, ability: abilityName(defenderAbility, getLanguage()) }))
+    }
+
+    // --- Efectos de contacto del defensor (Piel Áspera, Estática...) ---
+    let finalAttacker = attacker
+    const isContact = move.damageClass !== 'special'
+    if (damage > 0 && isContact && finalDefender.hp > 0 && finalAttacker.hp > 0) {
+      if (hasAbility(defender, 'rough-skin')) {
+        const skinDmg = Math.max(1, Math.floor(finalAttacker.maxHp / 8))
+        finalAttacker = { ...finalAttacker, hp: Math.max(1, finalAttacker.hp - skinDmg) }
+        log.push(t('b.abilityRoughSkin', { name: finalAttacker.name, dmg: skinDmg, ability: abilityName(defenderAbility, getLanguage()) }))
+      }
+      const contactStatus: Array<{ ability: string; status: StatusType }> = [
+        { ability: 'static', status: 'paralysis' },
+        { ability: 'flame-body', status: 'burn' },
+        { ability: 'poison-point', status: 'poison' },
+      ]
+      for (const cs of contactStatus) {
+        if (!hasAbility(defender, cs.ability)) continue
+        if (finalAttacker.status) break
+        if (Math.random() < 0.30) {
+          finalAttacker = { ...finalAttacker, status: { type: cs.status, turns: 999 } }
+          log.push(t('b.abilityContactStatus', { name: finalAttacker.name, status: statusLabel(cs.status), ability: abilityName(defenderAbility, getLanguage()) }))
+          break
+        }
+      }
+    }
+
     // Aplicar estado (parálisis, quemadura, veneno, confusión...) como en el
     // combate normal: solo si el objetivo sobrevive al golpe.
     if (finalDefender.hp > 0) {
@@ -6218,7 +6488,7 @@ function MainApp() {
         log.push(statusAppliedLine(finalDefender.name, ailmented.status.type))
       }
     }
-    return { attacker, defender: finalDefender, log }
+    return { attacker: finalAttacker, defender: finalDefender, log }
   }
 
   function doubleEnemyCounterattack(
@@ -6277,6 +6547,8 @@ function MainApp() {
     const allPlayerFainted = teamCopy.every(p => p.hp <= 0)
 
     if (allEnemiesFainted) {
+      // Dúo Perfecto: ganar el doble sin perder ningún Pokémon.
+      if (teamCopy.every(p => p.hp > 0)) unlockAchievement('double_win')
       const baseMoney = Math.floor(40 + enemies.reduce((s, p) => s + p.level, 0) * 4)
       const moneyReward = runChallenges.noMoney ? 0 : Math.floor(baseMoney * (modifier?.moneyMultiplier ?? 1))
       if (!runChallenges.noMoney) setMoney(prev => prev + moneyReward)
@@ -6343,6 +6615,18 @@ function MainApp() {
     // Los enemigos vivos contraatacan (objetivo aleatorio entre los activos vivos).
     doubleEnemyCounterattack(teamCopy, actives, enemies, log, hits)
 
+    // --- Habilidades y clima por turno (los 4 activos) ---
+    const endLog: string[] = []
+    actives.forEach((ti) => {
+      if (ti === undefined || !teamCopy[ti] || teamCopy[ti].hp <= 0) return
+      teamCopy[ti] = applyTurnAbilities(teamCopy[ti], endLog)
+    })
+    enemies.forEach((e, ei) => {
+      if (!e || e.hp <= 0) return
+      enemies[ei] = applyTurnAbilities(e, endLog)
+    })
+    log.push(...endLog)
+
     // Auto-cambio: si un activo se debilitó, entra el siguiente vivo del equipo.
     const nextActives = doubleAutoSwitchAfterFaint(teamCopy, actives, log)
 
@@ -6367,10 +6651,41 @@ function MainApp() {
     const hits: Array<{ kind: 'enemy' | 'player'; index: number; key: number }> = []
 
     // El cambio gasta el turno: el Pokémon que entra no ataca y los enemigos atacan.
+    const outgoingIdx = actives[slot]
     actives[slot] = teamIdx
     log.push(t('b.enteredBattle', { name: teamCopy[teamIdx].name }))
 
+    // Efectos de salida del que se va (Cura Natural, Regeneración).
+    if (outgoingIdx !== undefined && teamCopy[outgoingIdx]) {
+      let out = teamCopy[outgoingIdx]
+      if (hasAbility(out, 'natural-cure')) out = { ...out, status: undefined }
+      if (hasAbility(out, 'regenerator')) out = { ...out, hp: Math.min(out.maxHp, out.hp + Math.floor(out.maxHp / 3)) }
+      teamCopy[outgoingIdx] = out
+    }
+    // Habilidades de entrada del que entra (Intimidación frente a los enemigos y clima).
+    const entryLogs: string[] = []
+    const incomingPokemon = teamCopy[teamIdx]
+    enemies.forEach((e, ei) => {
+      if (!e || e.hp <= 0) return
+      const entry = applyEntryAbilities(incomingPokemon, e)
+      enemies[ei] = entry.opponentUpdated
+      entryLogs.push(...entry.logs)
+    })
+    log.push(...entryLogs)
+
     doubleEnemyCounterattack(teamCopy, actives, enemies, log, hits)
+
+    // --- Habilidades y clima por turno ---
+    const endLog: string[] = []
+    actives.forEach((ti) => {
+      if (ti === undefined || !teamCopy[ti] || teamCopy[ti].hp <= 0) return
+      teamCopy[ti] = applyTurnAbilities(teamCopy[ti], endLog)
+    })
+    enemies.forEach((e, ei) => {
+      if (!e || e.hp <= 0) return
+      enemies[ei] = applyTurnAbilities(e, endLog)
+    })
+    log.push(...endLog)
 
     const nextActives = doubleAutoSwitchAfterFaint(teamCopy, actives, log)
 
@@ -6542,7 +6857,7 @@ function MainApp() {
 
   function generateShopStock(excludeStone?: string): string[] {
     const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i] && !TREASURES.includes(i))
-    const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
+    const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && n !== 'Z Power Ring' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
     const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
     const shuffledHoldables = [...allHoldableKeys].sort(() => 0.5 - Math.random())
     // Mejoras de Espacio de Tienda: +1 objeto por cada versión desbloqueada.
@@ -6712,12 +7027,42 @@ function MainApp() {
         enemies.forEach(p => seenInPokedex(p))
         // Los 2 primeros Pokémon vivos del equipo son los que participan.
         const aliveIdx = team.map((p, i) => (p.hp > 0 ? i : -1)).filter(i => i >= 0)
-        setDoubleActives(aliveIdx.slice(0, 2))
-        setDoubleEnemies(enemies)
+        const activesIdx = aliveIdx.slice(0, 2)
+        // --- Habilidades de entrada: clima e Intimidación entre los 2v2 ---
+        setWeather('none')
+        const activePokemons = activesIdx.map(i => team[i]).filter(Boolean) as Pokemon[]
+        const entryLogs: string[] = []
+        const enemyWithEntry: Pokemon[] = enemies.map(e => {
+          let en: Pokemon = e
+          for (const ap of activePokemons) {
+            const entry = applyEntryAbilities(ap, en)
+            en = entry.opponentUpdated
+            entryLogs.push(...entry.logs)
+          }
+          return en
+        })
+        const teamWithEntry = team.map((p, i) => {
+          if (!activesIdx.includes(i)) return p
+          let updated = p
+          for (const e of enemies) {
+            const entry = applyEntryAbilities(e, updated)
+            updated = entry.opponentUpdated
+            entryLogs.push(...entry.logs)
+          }
+          return updated
+        })
+        const forcedWeather = (modifier?.forcedWeather ?? modifier2?.forcedWeather) as WeatherKind | undefined
+        if (forcedWeather) {
+          setWeather(forcedWeather)
+          entryLogs.push(t('b.abilityWeather', { name: runModName('weathermania'), weather: weatherName(forcedWeather, getLanguage()) }))
+        }
+        setTeam(teamWithEntry)
+        setDoubleActives(activesIdx)
+        setDoubleEnemies(enemyWithEntry)
         setDoubleMoves([null, null])
         setDoubleActiveSlot(0)
         setDoubleChoosingSwitch(false)
-        setDoubleLog([t('b.doubleChallenge', { a: enemies[0].name, b: enemies[1].name })])
+        setDoubleLog([t('b.doubleChallenge', { a: enemies[0].name, b: enemies[1].name }), ...entryLogs])
         setDoubleHits([])
         doubleHitKeyRef.current = 0
         setDoubleFinished(false)
@@ -6769,7 +7114,7 @@ function MainApp() {
 
     if (currentNode.type === 'spin') {
       const healingPool = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i] && i !== 'Cuerda Huida')
-      const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
+      const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && n !== 'Z Power Ring' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
       const unlockedStones = EVOLUTION_STONES.filter(s => isEvolutionStoneUnlocked(s))
       const selectedStone = unlockedStones.length > 0 ? [unlockedStones[Math.floor(Math.random() * unlockedStones.length)]] : []
       const shuffledH = [...healingPool].sort(() => 0.5 - Math.random())
@@ -7282,10 +7627,11 @@ function MainApp() {
       setTeam(prev => prev.map((p, i) => {
         const orig = p.megaOrig
         const entered = i === activeIndex
-        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: entered, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
-        return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: entered, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
+        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: entered, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false, zMoveUsed: false }
+        return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: entered, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false, zMoveUsed: false }
       }))
       setBattleMegaUsed(false)
+      setBattleZMoveUsed(false)
       setBattleGmaxUsed(false)
       setBattlePrimalUsed(false)
       setBattleOriginUsed(false)
@@ -7603,7 +7949,6 @@ function MainApp() {
     setShopBoughtCount((prev) => ({ ...prev, [itemName]: (prev[itemName] ?? 0) + qty }))
     setRunStats(prev => ({ ...prev, moneySpent: prev.moneySpent + total }))
     setBattleLog((prev) => [t('b.bought', { qty, item: itemLocalizedName(itemName), total }), ...prev].slice(0, 15))
-    setShopQty(prev => ({ ...prev, [itemName]: 1 }))
   }
 
   function buyHoldableItem(itemName: string) {
@@ -7803,6 +8148,15 @@ function MainApp() {
   function applyAilmentToTarget(target: Pokemon, move: Move): Pokemon {
     if (!move.ailment) return target
     if (target.status) return target
+    // Habilidades de inmunidad a estados.
+    const abilityImmune =
+      (move.ailment === 'poison' && (hasAbility(target, 'immunity')))
+      || (move.ailment === 'burn' && hasAbility(target, 'water-veil'))
+      || (move.ailment === 'freeze' && hasAbility(target, 'magma-armor'))
+      || (move.ailment === 'paralysis' && hasAbility(target, 'limber'))
+      || (move.ailment === 'sleep' && (hasAbility(target, 'insomnia') || hasAbility(target, 'vital-spirit')))
+      || (move.ailment === 'confusion' && hasAbility(target, 'own-tempo'))
+    if (abilityImmune) return target
     // Si el movimiento trae afección pero no chance (p. ej. Polvo Veneno con
     // ailment_chance 0 en PokeAPI), se aplica garantizada.
     const chance = move.ailmentChance ?? 1
@@ -7823,6 +8177,95 @@ function MainApp() {
       status: { type: move.ailment, turns: ailmentTurns[move.ailment] },
     }
   }
+
+  // Efectos de habilidades al ENTRAR en combate: Intimidación baja el Ataque
+  // del rival y los creadores de clima establecen el clima de la batalla.
+  const applyEntryAbilities = useCallback((entering: Pokemon, opponent: Pokemon): { opponentUpdated: Pokemon; logs: string[] } => {
+    const logs: string[] = []
+    let opp = opponent
+    const ability = entering.ability
+    if (hasAbility(entering, 'intimidate') && opp.hp > 0) {
+      const stages = opp.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+      if (stages.attack > -6) {
+        opp = { ...opp, statStages: { ...stages, attack: stages.attack - 1 } }
+        logs.push(t('b.abilityIntimidate', { name: entering.name, target: opp.name, ability: abilityName(ability, getLanguage()) }))
+      }
+    }
+    const weatherToSet = ability ? WEATHER_SETTERS[ability] : undefined
+    if (weatherToSet && weatherToSet !== weather) {
+      setWeather(weatherToSet)
+      unlockAchievement('weather_setter')
+      logs.push(t('b.abilityWeather', { name: entering.name, weather: weatherName(weatherToSet, getLanguage()) }))
+    }
+    return { opponentUpdated: opp, logs }
+  }, [weather])
+
+  // Efectos de habilidades y clima al FINAL del turno (compartido entre el
+  // combate normal y los combates dobles).
+  function applyTurnAbilities(p: Pokemon, logs: string[]): Pokemon {
+    let updated = { ...p }
+    if (updated.hp <= 0) return updated
+    // Impulso (Speed Boost): +1 Velocidad al final del turno.
+    if (hasAbility(updated, 'speed-boost')) {
+      const stages = updated.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+      if (stages.speed < 6) {
+        updated = { ...updated, statStages: { ...stages, speed: stages.speed + 1 } }
+        logs.push(t('b.abilitySpeedBoost', { name: updated.name, ability: abilityName(updated.ability, getLanguage()) }))
+      }
+    }
+    // Daño de clima (arena y granizo).
+    const chip = weatherChipDmg(updated, weather)
+    if (chip > 0) {
+      updated = { ...updated, hp: Math.max(0, updated.hp - chip) }
+      logs.push(t('b.weatherChip', { name: updated.name, dmg: chip, weather: weatherName(weather, getLanguage()) }))
+    }
+    // Cura Lluvia (Rain Dish) y Piel Seca (Dry Skin) curan bajo la lluvia.
+    if (weather === 'rain' && (hasAbility(updated, 'rain-dish') || hasAbility(updated, 'dry-skin')) && updated.hp > 0) {
+      const heal = hasAbility(updated, 'rain-dish')
+        ? Math.max(1, Math.floor(updated.maxHp / 16))
+        : Math.max(1, Math.floor(updated.maxHp / 8))
+      updated = { ...updated, hp: Math.min(updated.maxHp, updated.hp + heal) }
+      logs.push(t('b.abilityWeatherHeal', { name: updated.name, hp: heal, ability: abilityName(updated.ability, getLanguage()) }))
+    }
+    // Poder Solar (Solar Power): pierde HP bajo el sol.
+    if (weather === 'sun' && hasAbility(updated, 'solar-power') && updated.hp > 1) {
+      const loss = Math.max(1, Math.floor(updated.maxHp / 8))
+      updated = { ...updated, hp: Math.max(1, updated.hp - loss) }
+      logs.push(t('b.abilitySolarPower', { name: updated.name, dmg: loss, ability: abilityName(updated.ability, getLanguage()) }))
+    }
+    // Hidratación (Hydration) cura estados bajo la lluvia.
+    if (weather === 'rain' && hasAbility(updated, 'hydration') && updated.status) {
+      updated = { ...updated, status: undefined }
+      logs.push(t('b.abilityHydration', { name: updated.name, ability: abilityName(updated.ability, getLanguage()) }))
+    }
+    // Mudar (Shed Skin): 1/3 de curar su estado cada turno.
+    if (hasAbility(updated, 'shed-skin') && updated.status && Math.random() < 1 / 3) {
+      updated = { ...updated, status: undefined }
+      logs.push(t('b.abilityShedSkin', { name: updated.name, ability: abilityName(updated.ability, getLanguage()) }))
+    }
+    return updated
+  }
+
+  // Al comenzar cada batalla, se aplican las habilidades de entrada de ambos
+  // lados (Intimidación y creadores de clima) una sola vez por combate.
+  useEffect(() => {
+    if (screen === 'battle' && enemy && activePokemon && !entryAbilitiesAppliedRef.current) {
+      entryAbilitiesAppliedRef.current = true
+      const playerEntry = applyEntryAbilities(activePokemon, enemy)
+      const enemyEntry = applyEntryAbilities(enemy, activePokemon)
+      setEnemy(playerEntry.opponentUpdated)
+      setTeam(prev => prev.map((p, i) => i === activeIndex ? enemyEntry.opponentUpdated : p))
+      const forcedWeather = (modifier?.forcedWeather ?? modifier2?.forcedWeather) as WeatherKind | undefined
+      const logs = [...playerEntry.logs, ...enemyEntry.logs]
+      if (forcedWeather) {
+        setWeather(forcedWeather)
+        logs.push(t('b.abilityWeather', { name: runModName('weathermania'), weather: weatherName(forcedWeather, getLanguage()) }))
+      }
+      if (logs.length > 0) {
+        setBattleLog(prev => [...logs, ...prev].slice(0, 15))
+      }
+    }
+  }, [screen, enemy, activePokemon, activeIndex, applyEntryAbilities, modifier, modifier2])
 
   function performHit(
     attacker: Pokemon,
@@ -7876,15 +8319,23 @@ function MainApp() {
     const defStageMult = getStageMultiplier(defStages.defense)
     const spDefStageMult = getStageMultiplier(defStages.spDefense ?? 0)
 
+    const attackerStatused = !!attacker.status
+    const gutsMod = hasAbility(attacker, 'guts') && attackerStatused ? 1.5 : 1
+    const hugePowerMod = hasAbility(attacker, 'huge-power') || hasAbility(attacker, 'pure-power') ? 2 : 1
+    const solarPowerMod = hasAbility(attacker, 'solar-power') && weather === 'sun' ? 1.5 : 1
+    const quickFeetMod = hasAbility(attacker, 'quick-feet') && attackerStatused ? 1.5 : 1
+    const abilitySpeed = weatherSpeedMultiplier(attacker, weather)
+    const marvelScaleMod = hasAbility(defender, 'marvel-scale') && !!defender.status ? 1.5 : 1
+
     const effectiveAttacker: Pokemon = {
       ...attacker,
-      attack: Math.round(attacker.attack * (1 + (attackerItem?.attackMod ?? 0) + playerAtkMod) * burnNerf * atkStageMult),
-      spAttack: Math.round(attacker.spAttack * (1 + (attackerItem?.spAttackMod ?? 0) + playerAtkMod) * spaStageMult),
-      speed: Math.round(attacker.speed * (1 + (attackerItem?.speedMod ?? 0) + playerSpdMod) * paralysisSpdNerf * spdStageMult + enemySpdDelta)
+      attack: Math.round(attacker.attack * (1 + (attackerItem?.attackMod ?? 0) + playerAtkMod) * burnNerf * atkStageMult * gutsMod * hugePowerMod),
+      spAttack: Math.round(attacker.spAttack * (1 + (attackerItem?.spAttackMod ?? 0) + playerAtkMod) * spaStageMult * solarPowerMod),
+      speed: Math.round(attacker.speed * (1 + (attackerItem?.speedMod ?? 0) + playerSpdMod) * paralysisSpdNerf * spdStageMult * quickFeetMod * abilitySpeed + enemySpdDelta)
     }
     const effectiveDefender: Pokemon = {
       ...defender,
-      defense: Math.round(defender.defense * (1 + (defenderItem?.defenseMod ?? 0) + (defenderItem?.eviolite && canStillEvolve(defender) ? 0.50 : 0) + playerDefMod) * defStageMult + enemyDefDelta),
+      defense: Math.round(defender.defense * (1 + (defenderItem?.defenseMod ?? 0) + (defenderItem?.eviolite && canStillEvolve(defender) ? 0.50 : 0) + playerDefMod) * defStageMult * marvelScaleMod + enemyDefDelta),
       spDefense: Math.round(defender.spDefense * (1 + (defenderItem?.spDefenseMod ?? 0) + (defenderItem?.eviolite && canStillEvolve(defender) ? 0.50 : 0) + playerDefMod) * spDefStageMult + enemyDefDelta)
     }
 
@@ -7906,16 +8357,49 @@ function MainApp() {
       message = null
     }
 
+    // --- Habilidades de inmunidad del defensor ---
+    const defenderAbility = defender.ability
+    const defenderAbilityBlocked = (() => {
+      if (effectiveMove.type === 'ground' && hasAbility(defender, 'levitate')) return true
+      if (effectiveMove.type === 'water' && (hasAbility(defender, 'water-absorb') || hasAbility(defender, 'dry-skin'))) return true
+      if (effectiveMove.type === 'electric' && (hasAbility(defender, 'volt-absorb') || hasAbility(defender, 'lightning-rod') || hasAbility(defender, 'motor-drive'))) return true
+      if (effectiveMove.type === 'fire' && hasAbility(defender, 'flash-fire')) return true
+      if (effectiveMove.type === 'grass' && hasAbility(defender, 'sap-sipper')) return true
+      return false
+    })()
+    let abilityBlockMessage: string | null = null
+    if (defenderAbilityBlocked) {
+      effectiveness = 0
+      message = null
+      abilityBlockMessage = t('b.abilityBlocked', { ability: abilityName(defenderAbility, getLanguage()) })
+    }
+
+    // --- Sebo (Thick Fat): mitad de daño de Fuego y Hielo ---
+    let thickFatMult = 1
+    if (hasAbility(defender, 'thick-fat') && (effectiveMove.type === 'fire' || effectiveMove.type === 'ice')) {
+      thickFatMult = 0.5
+    }
+
     // --- STAB (Same-Type Attack Bonus) ---
     const attackerTypes: string[] = (attacker as any).types ?? []
-    const stabBonus = attackerTypes.some(t => t === effectiveMove.type) ? 1.5 : 1
+    const stabBonus = attackerTypes.some(t => t === effectiveMove.type)
+      ? (hasAbility(attacker, 'adaptability') ? 2 : 1.5)
+      : 1
 
     // --- Accuracy check ---
-    if (move.accuracy !== null && move.accuracy < 100) {
+    const noGuardBoth = hasAbility(attacker, 'no-guard') || hasAbility(defender, 'no-guard')
+    if (move.accuracy !== null && move.accuracy < 100 && !noGuardBoth) {
       const attackerItem = attacker.holdItem ? HOLDABLE_ITEMS[attacker.holdItem] : null
       let effectiveAccuracy = move.accuracy
+      const abilityAcc = hasAbility(attacker, 'compound-eyes') ? 1.3 : 1
+      effectiveAccuracy = Math.min(100, effectiveAccuracy * abilityAcc)
+      // Trueno (Thunder): bajo lluvia acierta siempre; bajo sol solo 50%.
+      if (effectiveMove.type === 'electric' && (effectiveMove.name === 'Trueno' || effectiveMove.enName === 'Thunder')) {
+        if (weather === 'rain') effectiveAccuracy = 100
+        else if (weather === 'sun') effectiveAccuracy = Math.min(effectiveAccuracy, 50)
+      }
       if (defenderMovedFirst && attackerItem?.accuracyMod) {
-        effectiveAccuracy = Math.min(100, move.accuracy * (1 + attackerItem.accuracyMod))
+        effectiveAccuracy = Math.min(100, effectiveAccuracy * (1 + attackerItem.accuracyMod))
       }
       const accRoll = Math.random() * 100
       if (accRoll >= effectiveAccuracy) {
@@ -7948,10 +8432,50 @@ function MainApp() {
       // Movimiento sin efecto (p. ej. Eléctrico contra Tierra): no golpea ni
       // aplica efectos secundarios.
       lines.push(t('battle.noEffect'))
+      // Habilidades que absorben el ataque y curan o suben stats al defensor.
+      if (defenderAbilityBlocked && currentDefender.hp > 0) {
+        const absorbHeal = (hasAbility(defender, 'water-absorb') || hasAbility(defender, 'volt-absorb') || hasAbility(defender, 'flash-fire') || hasAbility(defender, 'dry-skin'))
+          ? Math.max(1, Math.floor(currentDefender.maxHp / 4))
+          : 0
+        if (absorbHeal > 0) {
+          currentDefender = { ...currentDefender, hp: Math.min(currentDefender.maxHp, currentDefender.hp + absorbHeal) }
+          lines.push(t('b.abilityAbsorb', { name: currentDefender.name, hp: absorbHeal, ability: abilityName(defenderAbility, getLanguage()) }))
+        }
+        let boostedStages = currentDefender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+        let boostKey: keyof typeof boostedStages | null = null
+        if (hasAbility(defender, 'sap-sipper')) boostKey = 'attack'
+        else if (hasAbility(defender, 'lightning-rod')) boostKey = 'spAttack'
+        else if (hasAbility(defender, 'motor-drive')) boostKey = 'speed'
+        if (boostKey && boostedStages[boostKey] < 6) {
+          boostedStages = { ...boostedStages, [boostKey]: boostedStages[boostKey] + 1 }
+          currentDefender = { ...currentDefender, statStages: boostedStages }
+          lines.push(t('b.abilityStatUp', { name: currentDefender.name, ability: abilityName(defenderAbility, getLanguage()) }))
+        }
+      }
     } else if (isDamagingMove) {
     for (let hit = 0; hit < totalHits; hit++) {
       const result = applyDamage(effectiveAttacker, currentDefender, effectiveMove, enemyBoost)
       let finalDamage = Math.floor(result.damage * effectiveness * stabBonus)
+      // --- Multiplicadores por habilidad y clima del atacante ---
+      const weatherMult = weatherTypeMultiplier(weather, effectiveMove.type)
+      const lowHpAbility = attacker.hp / Math.max(1, attacker.maxHp) <= 1 / 3
+      const pinchType = effectiveMove.type
+      const pinchMult = (lowHpAbility
+        && ((hasAbility(attacker, 'blaze') && pinchType === 'fire')
+          || (hasAbility(attacker, 'overgrow') && pinchType === 'grass')
+          || (hasAbility(attacker, 'torrent') && pinchType === 'water')
+          || (hasAbility(attacker, 'swarm') && pinchType === 'bug')))
+        ? 1.5 : 1
+      const technicianMult = hasAbility(attacker, 'technician') && (move.power ?? 0) <= 60 ? 1.5 : 1
+      const tintedLensMult = hasAbility(attacker, 'tinted-lens') && effectiveness < 1 ? 2 : 1
+      const toughClawsMult = hasAbility(attacker, 'tough-claws') && effectiveMove.damageClass !== 'special' ? 1.3 : 1
+      finalDamage = Math.floor(finalDamage * weatherMult * pinchMult * technicianMult * tintedLensMult * toughClawsMult * thickFatMult)
+      if (hasAbility(defender, 'dry-skin') && effectiveMove.type === 'fire') {
+        finalDamage = Math.floor(finalDamage * 1.25)
+      }
+      if (hasAbility(defender, 'multiscale') && defenderAtFullHp) {
+        finalDamage = Math.floor(finalDamage * 0.5)
+      }
       if (attackerItem?.damageBoost) {
         finalDamage = Math.floor(finalDamage * (1 + attackerItem.damageBoost))
       }
@@ -7993,7 +8517,7 @@ function MainApp() {
       const totalCrit = (attackerItem?.critChance ?? 0) + modCrit + moveCritChance
       const isCrit = !runChallenges.noCrits && totalCrit > 0 && Math.random() < totalCrit
       if (isCrit) {
-        finalDamage = Math.floor(finalDamage * 1.5)
+        finalDamage = Math.floor(finalDamage * (hasAbility(attacker, 'sniper') ? 2 : 1.5))
         totalCrits++
       }
 
@@ -8007,6 +8531,7 @@ function MainApp() {
         : t('b.usesHit', { attacker: attacker.name, move: moveName(effectiveMove) + typeNote, dmg: finalDamage })
       if (isCrit) hitLine += t('b.critSuffix')
       if (message) hitLine += ` (${message})`
+      if (abilityBlockMessage) hitLine += ` (${abilityBlockMessage})`
       lines.push(hitLine)
 
       if (currentDefender.hp <= 0) break
@@ -8025,6 +8550,10 @@ function MainApp() {
       // Cinta Focus (Focus Band): probabilidad de aguantar un golpe letal.
       currentDefender = { ...currentDefender, hp: 1 }
       lines.push(t('b.focusBand', { name: currentDefender.name }))
+    } else if (currentDefender.hp <= 0 && hasAbility(defender, 'sturdy') && defenderAtFullHp) {
+      // Robustez (Sturdy): a plena vida aguanta un golpe letal con 1 HP.
+      currentDefender = { ...currentDefender, hp: 1 }
+      lines.push(t('b.abilitySturdy', { name: currentDefender.name, ability: abilityName(defender.ability, getLanguage()) }))
     }
     // Baya Sitrus: restaura HP al estar por debajo del 50%. Se consume.
     if (defenderItem?.berryHeal && totalDamage > 0 && currentDefender.hp > 0 && currentDefender.hp < currentDefender.maxHp / 2) {
@@ -8106,6 +8635,16 @@ function MainApp() {
           let newStages = currentDefender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
           const stageKey: keyof typeof newStages = sc.stat === 'special-attack' ? 'spAttack' : sc.stat === 'special-defense' ? 'spDefense' : sc.stat
           const change = Number.isFinite(sc.change) ? sc.change : 0
+          // Habilidades de protección: Cuerpo Claro/Humo Blanco bloquean toda
+          // bajada de stats y Cortador la de Ataque.
+          const statDropBlocked = change < 0 && (
+            hasAbility(currentDefender, 'clear-body') || hasAbility(currentDefender, 'white-smoke')
+            || (hasAbility(currentDefender, 'hyper-cutter') && stageKey === 'attack')
+          )
+          if (statDropBlocked) {
+            lines.push(t('b.abilityNoStatDown', { name: currentDefender.name, ability: abilityName(currentDefender.ability, getLanguage()) }))
+            continue
+          }
           const oldStage = newStages[stageKey] ?? 0
           const newStage = Math.max(-6, Math.min(6, oldStage + change))
           if (newStage !== oldStage) {
@@ -8143,7 +8682,7 @@ function MainApp() {
     let updatedAttacker = hasAttackerStageChange
       ? { ...attacker, statStages: attackerStages, furiaActive, protected: protectUsed, lastMove: effectiveMove.name, justEntered: false }
       : { ...attacker, furiaActive, protected: protectUsed, lastMove: effectiveMove.name, justEntered: false }
-    if (move.recoilPercent && move.recoilPercent > 0 && totalDamage > 0) {
+    if (move.recoilPercent && move.recoilPercent > 0 && totalDamage > 0 && !hasAbility(attacker, 'rock-head')) {
       recoilDamage = Math.floor(totalDamage * move.recoilPercent)
       updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - recoilDamage) }
       lines.push(t('b.recoil', { name: attacker.name, dmg: recoilDamage }))
@@ -8159,6 +8698,30 @@ function MainApp() {
       const helmetRecoil = Math.max(1, Math.floor(attacker.maxHp / 6))
       updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - helmetRecoil) }
       lines.push(t('b.rockyHelmet', { name: attacker.name, hp: helmetRecoil }))
+    }
+    // --- Habilidades de contacto del defensor (movimientos físicos) ---
+    const isContact = effectiveMove.damageClass !== 'special'
+    if (totalDamage > 0 && isContact && updatedAttacker.hp > 0) {
+      const contactAbility = defender.ability
+      if (hasAbility(defender, 'rough-skin')) {
+        const skinDmg = Math.max(1, Math.floor(attacker.maxHp / 8))
+        updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - skinDmg) }
+        lines.push(t('b.abilityRoughSkin', { name: attacker.name, dmg: skinDmg, ability: abilityName(contactAbility, getLanguage()) }))
+      }
+      const contactStatus: Array<{ ability: string; status: StatusType; turns: number }> = [
+        { ability: 'static', status: 'paralysis', turns: 999 },
+        { ability: 'flame-body', status: 'burn', turns: 999 },
+        { ability: 'poison-point', status: 'poison', turns: 999 },
+      ]
+      for (const cs of contactStatus) {
+        if (!hasAbility(defender, cs.ability)) continue
+        if (updatedAttacker.status) break
+        if (Math.random() < 0.30) {
+          updatedAttacker = { ...updatedAttacker, status: { type: cs.status, turns: cs.turns } }
+          lines.push(t('b.abilityContactStatus', { name: attacker.name, status: statusLabel(cs.status), ability: abilityName(contactAbility, getLanguage()) }))
+          break
+        }
+      }
     }
 
     // --- Drain (Absorb, Megaagotar, etc.) ---
@@ -8217,6 +8780,9 @@ function MainApp() {
     if (levelsGained > 0) {
       updatedPokemon = { ...updatedPokemon, level: newLevel }
     }
+
+    // Nivel Máximo: alcanzar el nivel 100 con un Pokémon.
+    if (updatedPokemon.level >= 100) unlockAchievement('level_100')
 
     // Auto-evolución al alcanzar el nivel de evolución
     if (!runChallenges.noEvolution && updatedPokemon.evolutionLevel && updatedPokemon.level >= updatedPokemon.evolutionLevel) {
@@ -8308,6 +8874,30 @@ function MainApp() {
     if (choiceLockedMove) {
       nextPlayer = { ...nextPlayer, choiceLockedMove }
       nextTeam[activeIndex] = nextPlayer
+    }
+    // Movimiento Z: solo puede usarse una vez por combate. Se marca al activarlo.
+    if (move.isZMove) {
+      nextPlayer = { ...nextPlayer, zMoveUsed: true }
+      nextTeam[activeIndex] = nextPlayer
+      setBattleZMoveUsed(true)
+      unlockAchievement('first_z_move')
+      if (battleMegaUsed) unlockAchievement('mega_z_combo')
+      // Contadores de Movimientos Z (meta): total y tipos distintos.
+      const zTypes = metaProgression.zMoveTypes ?? []
+      const newZTotal = (metaProgression.totalZMoves ?? 0) + 1
+      const newZTypes = zTypes.includes(move.type) ? zTypes : [...zTypes, move.type]
+      if (newZTotal >= 10) unlockAchievement('z_move_master')
+      if (newZTypes.length >= 6) unlockAchievement('z_all_types')
+      setMetaProgression(prev => {
+        const types = prev.zMoveTypes ?? []
+        const updated = {
+          ...prev,
+          totalZMoves: (prev.totalZMoves ?? 0) + 1,
+          zMoveTypes: types.includes(move.type) ? types : [...types, move.type],
+        }
+        localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+        return updated
+      })
     }
     let nextEnemy = { ...enemy }
     const logs: string[] = []
@@ -8430,8 +9020,8 @@ function MainApp() {
       const eStages = nextEnemy.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
       const pSpdStage = getStageMultiplier(pStages.speed)
       const eSpdStage = getStageMultiplier(eStages.speed)
-      const playerEffectiveSpeed = Math.round(nextPlayer.speed * (1 + (playerItem?.speedMod ?? 0)) * playerParalysisNerf * pSpdStage)
-      const enemyEffectiveSpeed = Math.round(nextEnemy.speed * (1 + (enemyItem?.speedMod ?? 0)) * enemyParalysisNerf * eSpdStage)
+      const playerEffectiveSpeed = Math.round(nextPlayer.speed * (1 + (playerItem?.speedMod ?? 0)) * playerParalysisNerf * pSpdStage * weatherSpeedMultiplier(nextPlayer, weather))
+      const enemyEffectiveSpeed = Math.round(nextEnemy.speed * (1 + (enemyItem?.speedMod ?? 0)) * enemyParalysisNerf * eSpdStage * weatherSpeedMultiplier(nextEnemy, weather))
       playerStarts = playerEffectiveSpeed >= enemyEffectiveSpeed
     }
 
@@ -8457,6 +9047,7 @@ function MainApp() {
       // Golpe Definitivo: el ataque del jugador debilita al enemigo de un golpe.
       if (prevEnemyHp > 0 && nextEnemy.hp <= 0) {
         setRunStats(prev => ({ ...prev, koFirstTurn: prev.koFirstTurn + 1 }))
+        if (move.isZMove) unlockAchievement('z_move_ko')
       }
       if (playerHit.superEffective) {
         setRunStats(prev => ({ ...prev, superEffectiveHits: prev.superEffectiveHits + 1 }))
@@ -8532,11 +9123,16 @@ function MainApp() {
           if (aliveOthers.length > 0) {
             const picked = aliveOthers[Math.floor(Math.random() * aliveOthers.length)]
             nextPlayer = { ...nextPlayer, holdItem: undefined }
-            nextEnemy = { ...picked.p, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, justEntered: true }
+            const redCardEnemy: Pokemon = { ...picked.p, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, justEntered: true }
+            const redEnemyEntry = applyEntryAbilities(redCardEnemy, nextPlayer)
+            const redPlayerEntry = applyEntryAbilities(nextPlayer, redCardEnemy)
+            nextPlayer = redEnemyEntry.opponentUpdated
+            nextEnemy = redPlayerEntry.opponentUpdated
             setTrainerTeam(teamWithCurrent)
             setTrainerPokemonIndex(picked.idx)
             logs.push(t('b.redCard', { name: nextPlayer.name }))
             logs.push(t('b.enemySendsOut', { trainer: trainerName, name: picked.p.name, lvl: picked.p.level }))
+            logs.push(...redPlayerEntry.logs, ...redEnemyEntry.logs)
           }
         }
       }
@@ -8581,6 +9177,10 @@ function MainApp() {
 
     nextPlayer = applyTurnEffects(nextPlayer)
     nextEnemy = applyTurnEffects(nextEnemy)
+
+    // --- Habilidades y clima por turno ---
+    nextPlayer = applyTurnAbilities(nextPlayer, logs)
+    nextEnemy = applyTurnAbilities(nextEnemy, logs)
 
     // --- G-MAX turn counter decrement ---
     if (nextPlayer.gmaxEvolved && nextPlayer.gmaxTurnsLeft) {
@@ -8668,6 +9268,8 @@ function MainApp() {
 
     // --- Enemigo derrotado ---
     if (nextEnemy.hp <= 0) {
+      // Climatología: la batalla se gana con clima activo.
+      if (weather !== 'none') unlockAchievement('weather_win')
       // Logros de remontada: se comprueban en la victoria (antes de la curación
       // automática por subir de nivel). Para entrenadores, solo cuando es la
       // victoria final de todo el equipo rival.
@@ -8874,12 +9476,18 @@ function MainApp() {
         }
 
         const nextPkmn = updatedTrainerTeam[nextTrainerIndex]
+        const newEnemyBase: Pokemon = { ...nextPkmn, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, justEntered: true }
+        // Habilidades de entrada del nuevo enemigo y del activo del jugador.
+        const enemyEntry = applyEntryAbilities(newEnemyBase, newTeam[activeIndex])
+        const playerEntry = applyEntryAbilities(newTeam[activeIndex], newEnemyBase)
         setTrainerTeam(updatedTrainerTeam)
         setTrainerPokemonIndex(nextTrainerIndex)
-        setEnemy({ ...nextPkmn, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, justEntered: true })
-        setTeam(newTeam)
+        setEnemy(playerEntry.opponentUpdated)
+        setTeam(newTeam.map((p, i) => i === activeIndex ? enemyEntry.opponentUpdated : p))
         setBattleLog((prev) => [
           t('b.enemySendsOut', { trainer: trainerName, name: nextPkmn.name, lvl: nextPkmn.level }),
+          ...playerEntry.logs,
+          ...enemyEntry.logs,
           logMsg,
           ...logs,
           ...prev
@@ -8919,6 +9527,18 @@ function MainApp() {
     setBattleLog((prev) => [...logs, ...prev].slice(0, 15))
   }
 
+  // Logros por IVs del Pokémon capturado (Joyas de IVs y Criador de Élite).
+  function checkIvAchievements(p: Pokemon): void {
+    if (!p.ivs) return
+    const ivs = p.ivs
+    if ([ivs.hp, ivs.attack, ivs.defense, ivs.spAttack, ivs.spDefense, ivs.speed].some(v => v >= 31)) {
+      unlockAchievement('perfect_iv')
+    }
+    if (ivs.hp + ivs.attack + ivs.defense + ivs.spAttack + ivs.spDefense + ivs.speed >= 150) {
+      unlockAchievement('high_iv')
+    }
+  }
+
   async function attemptCapture(ballName: string): Promise<void> {
     if (!enemy || !activePokemon) return
 
@@ -8937,7 +9557,7 @@ function MainApp() {
     // herede esa inflación en el equipo del jugador.
     const buildCleanCaptured = async (): Promise<Pokemon> => {
       try {
-        const fresh = await buildPokemonFromApi(enemy.id, getEffectiveGen(), enemy.level, enemy.shiny ?? false, difficulty)
+        const fresh = await buildPokemonFromApi(enemy.id, getEffectiveGen(), enemy.level, enemy.shiny ?? false, difficulty, false, { nature: enemy.nature, ivs: enemy.ivs })
         return {
           ...fresh,
           hp: Math.min(fresh.maxHp, enemy.hp),
@@ -8957,6 +9577,7 @@ function MainApp() {
       if (capturedPkmn.shiny) unlockAchievement('shiny_catch')
       const bst = capturedPkmn.attack + capturedPkmn.defense + capturedPkmn.speed + capturedPkmn.maxHp
       if (bst >= 600) unlockAchievement('legendary_catch')
+      checkIvAchievements(capturedPkmn)
       setBattleLog(prev => [`🏆 ¡${capturedPkmn.name} fue capturado con ${ballName}!`, ...prev].slice(0, 15))
       if (team.length >= maxTeamSize) {
         setPcStorage(prev => [...prev, capturedPkmn])
@@ -8990,6 +9611,7 @@ function MainApp() {
       if (capturedPkmn.shiny) unlockAchievement('shiny_catch')
       const bst = capturedPkmn.attack + capturedPkmn.defense + capturedPkmn.speed + capturedPkmn.maxHp
       if (bst >= 600) unlockAchievement('legendary_catch')
+      checkIvAchievements(capturedPkmn)
       setBattleLog(prev => [`🏆 ¡${capturedPkmn.name} fue capturado con ${ballName}! (${Math.round(catchProbability * 100)}%)`, ...prev].slice(0, 15))
       if (team.length >= maxTeamSize) {
         setPcStorage(prev => [...prev, capturedPkmn])
@@ -9147,12 +9769,31 @@ function MainApp() {
     setTeam(prev => prev.map((p, i) => {
       // Al cambiar de Pokémon se pierden Drenadoras y Anulación (como en los juegos reales),
       // y el que entra cuenta como "recién llegado" para Sorpresa/Abatimiento.
-      if (i === activeIndex && orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false, choiceLockedMove: undefined, ...orig }
-      if (i === activeIndex) return { ...p, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false, choiceLockedMove: undefined }
+      if (i === activeIndex && orig) {
+        let outgoing: Pokemon = { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false, choiceLockedMove: undefined, ...orig }
+        if (hasAbility(outgoing, 'natural-cure')) outgoing = { ...outgoing, status: undefined }
+        if (hasAbility(outgoing, 'regenerator')) outgoing = { ...outgoing, hp: Math.min(outgoing.maxHp, outgoing.hp + Math.floor(outgoing.maxHp / 3)) }
+        return outgoing
+      }
+      if (i === activeIndex) {
+        let outgoing = { ...p, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false, choiceLockedMove: undefined }
+        if (hasAbility(outgoing, 'natural-cure')) outgoing = { ...outgoing, status: undefined }
+        if (hasAbility(outgoing, 'regenerator')) outgoing = { ...outgoing, hp: Math.min(outgoing.maxHp, outgoing.hp + Math.floor(outgoing.maxHp / 3)) }
+        return outgoing
+      }
       if (i === index) return { ...p, justEntered: true }
       return p
     }))
     setActiveIndex(index)
+    // Habilidades de entrada del Pokémon que entra (Intimidación, clima) y
+    // efectos de salida (Cura Natural, Regeneración) ya aplicados arriba.
+    if (screen === 'battle' && enemy) {
+      const entry = applyEntryAbilities(target, enemy)
+      setEnemy(entry.opponentUpdated)
+      if (entry.logs.length > 0) {
+        setBattleLog(prev => [...entry.logs, ...prev].slice(0, 15))
+      }
+    }
     if (screen === 'move') {
       setSelectedNewMove(null)
       if (moveOptionsByIndex[index]) {
@@ -9194,7 +9835,7 @@ function MainApp() {
       }
 
       const evolvedName = result.evolvedName.includes('-') ? stripRegional(result.evolvedName) : result.evolvedName
-      const newBase = await buildPokemonFromApi(evolvedName, 1, targetPokemon.level, targetPokemon.shiny ?? false)
+      const newBase = await buildPokemonFromApi(evolvedName, 1, targetPokemon.level, targetPokemon.shiny ?? false, 'medium', false, { nature: targetPokemon.nature, ivs: targetPokemon.ivs })
       const evolved: Pokemon = {
         ...newBase,
         name: evolvedName === 'greninja-ash' ? 'Greninja Ash' : newBase.name,
@@ -11115,8 +11756,8 @@ function MainApp() {
       {teamRocketPickModal && (
         <div className="modal-backdrop" onClick={() => { setTeamRocketPickModal(false); setTeamRocketTeam([]); completeCurrentNode() }}>
           <div className="teamrocket-pick-panel" onClick={(e) => e.stopPropagation()}>
-            <h3>🔴 ¡TeamR derrotado!</h3>
-            <p className="muted" style={{ margin: '0.5rem 0 1rem' }}>No perdiste ningún Pokémon. ¡Elige uno del equipo enemigo para unirlo al tuyo!</p>
+            <h3>{t('teamRocket.defeated')}</h3>
+            <p className="muted" style={{ margin: '0.5rem 0 1rem' }}>{t('teamRocket.pickDesc')}</p>
             <div className="teamrocket-pick-grid">
               {teamRocketTeam.filter((p) => p.hp <= 0).map((pkmn, idx) => (
                 <button
@@ -11146,7 +11787,7 @@ function MainApp() {
                 onMouseEnter={playHover}
                 type="button"
               >
-                Omitir (no quedarse con ninguno)
+                {t('teamRocket.skip')}
               </button>
             </div>
           </div>
@@ -11341,6 +11982,12 @@ function MainApp() {
                     })()}
                   </div>
                 </div>
+
+                {st.weather && st.weather !== 'none' && (
+                  <div style={{ display: 'inline-block', alignSelf: 'center', padding: '2px 10px', borderRadius: '999px', background: 'rgba(154,152,207,0.18)', color: '#c4b5fd', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                    {WEATHER_INFO[st.weather].icon} {weatherName(st.weather, getLanguage())}
+                  </div>
+                )}
 
                 <div style={{ maxHeight: '220px', minHeight: '120px', overflowY: 'auto', padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid #3f3f6e' }}>
                   {st.log.length === 0 ? (
@@ -12291,6 +12938,55 @@ function MainApp() {
                       return (
                         <>
                           <div className="tooltip-stat"><span>{t('stat.level')}</span><strong>{pokemon.level}</strong></div>
+                          {pokemon.ability && (
+                            <div style={{ margin: '2px 0 4px', padding: '3px 6px', borderRadius: '6px', background: 'rgba(157,166,255,0.10)', border: '1px solid rgba(157,166,255,0.25)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <span style={{ fontSize: '0.68rem', color: '#9b98cf' }}>{t('stat.ability')}</span>
+                                <strong style={{ fontSize: '0.78rem', color: '#9da6ff', fontWeight: 'bold' }}>{abilityName(pokemon.ability, getLanguage())}</strong>
+                              </div>
+                              <div style={{ fontSize: '0.65rem', color: '#b8b5dc', lineHeight: 1.35, marginTop: '1px' }}>{abilityDesc(pokemon.ability, getLanguage())}</div>
+                            </div>
+                          )}
+                          {pokemon.nature && (() => {
+                            const mods = natureStatMods(pokemon.nature)
+                            const statLabel = (k: MetaStatKey) => k === 'attack' ? t('stat.attack') : k === 'defense' ? t('stat.defense') : k === 'spAttack' ? t('stat.spAtk') : k === 'spDefense' ? t('stat.spDef') : t('stat.speed')
+                            return (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', margin: '2px 0' }}>
+                                <span style={{ fontSize: '0.68rem', color: '#9b98cf' }}>{t('stat.nature')}</span>
+                                <strong style={{ fontSize: '0.75rem', color: '#7ceb95', fontWeight: 'bold' }}>{natureName(pokemon.nature, getLanguage())}</strong>
+                                {mods.up && <span style={{ fontSize: '0.62rem', color: '#4ade80', fontWeight: 'bold' }}>↑{statLabel(mods.up)}</span>}
+                                {mods.down && <span style={{ fontSize: '0.62rem', color: '#f87171', fontWeight: 'bold' }}>↓{statLabel(mods.down)}</span>}
+                              </div>
+                            )
+                          })()}
+                          {pokemon.ivs && (() => {
+                            const ivs = [
+                              { label: t('stat.hp'), val: pokemon.ivs.hp },
+                              { label: t('stat.attack'), val: pokemon.ivs.attack },
+                              { label: t('stat.defense'), val: pokemon.ivs.defense },
+                              { label: t('stat.spAtk'), val: pokemon.ivs.spAttack },
+                              { label: t('stat.spDef'), val: pokemon.ivs.spDefense },
+                              { label: t('stat.speed'), val: pokemon.ivs.speed },
+                            ]
+                            const total = ivs.reduce((s, x) => s + x.val, 0)
+                            const ivColor = (v: number) => v >= 31 ? '#facc15' : v >= 25 ? '#4ade80' : v >= 15 ? '#fbbf24' : '#94a3b8'
+                            const totalColor = total >= 170 ? '#facc15' : total >= 120 ? '#7ceb95' : '#9b98cf'
+                            return (
+                              <div style={{ margin: '3px 0' }}>
+                                <div style={{ fontSize: '0.68rem', color: '#9b98cf' }}>
+                                  {t('stat.ivs')} <strong style={{ color: totalColor }}>{total}/186</strong>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '2px 6px', marginTop: '2px' }}>
+                                  {ivs.map(iv => (
+                                    <div key={iv.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.63rem', color: '#d9d6f2', background: 'rgba(154,152,207,0.10)', borderRadius: '4px', padding: '1px 5px' }}>
+                                      <span>{iv.label}</span>
+                                      <strong style={{ color: ivColor(iv.val) }}>{iv.val}</strong>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          })()}
                           <div className="tooltip-stat"><span>{t('stat.hp')}</span><strong>{pokemon.hp}/{pokemon.maxHp}</strong></div>
                           <div className="tooltip-stat"><span>{t('stat.attack')}</span>{fmt(pokemon.attack, eff.attack, stages.attack)}</div>
                           <div className="tooltip-stat"><span>{t('stat.defense')}</span>{fmt(pokemon.defense, eff.defense, stages.defense)}</div>
@@ -12598,26 +13294,12 @@ function MainApp() {
                     const hardMarkup = (difficulty === 'hard' || difficulty === 'infinite') ? 1.4 : 1
                     const stageMarkup = 1 + badges.length * 0.15
                     const finalPrice = Math.floor(data.price * (1 - (modifier?.shopDiscount ?? 0)) * hardMarkup * stageMarkup)
-                    const qty = shopQty[itemName] ?? 1
                     const bought = shopBoughtCount[itemName] ?? 0
                     const allowance = shopBuyAllowance
                     const remaining = Math.max(0, allowance - bought)
                     const soldOut = remaining <= 0
-                    const maxQty = isHoldable ? 1 : Math.max(0, Math.min(remaining, Math.floor(money / finalPrice)))
-                    const totalPrice = finalPrice * qty
-                    const canBuy = money >= totalPrice && remaining >= qty
-
-                        const stepperBtnStyle: CSSProperties = {
-                      background: '#2a2a55',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '4px',
-                      width: '26px',
-                      height: '26px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      lineHeight: '1',
-                    }
+                    const totalPrice = finalPrice
+                    const canBuy = money >= totalPrice && remaining >= 1
 
                     return (
                       <div
@@ -12647,25 +13329,6 @@ function MainApp() {
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          {!isHoldable && !soldOut && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <button
-                                type="button"
-                                aria-label={`Reducir cantidad de ${itemName}`}
-                                style={stepperBtnStyle}
-                                onClick={() => setShopQty(prev => ({ ...prev, [itemName]: Math.max(1, (prev[itemName] ?? 1) - 1) }))}
-                              >−</button>
-                              <span style={{ minWidth: '20px', textAlign: 'center', color: '#f3f1ff', fontWeight: 'bold', fontSize: '0.85rem' }}>
-                                {qty}
-                              </span>
-                              <button
-                                type="button"
-                                aria-label={`Aumentar cantidad de ${itemName}`}
-                                style={{ ...stepperBtnStyle, background: '#10b981' }}
-                                onClick={() => setShopQty(prev => ({ ...prev, [itemName]: Math.min(maxQty, (prev[itemName] ?? 1) + 1) }))}
-                              >+</button>
-                            </div>
-                          )}
                           {soldOut ? (
                             <button
                               className="tiny-btn"
@@ -12673,13 +13336,13 @@ function MainApp() {
                               disabled
                               style={{ background: '#475569', minWidth: '70px', color: '#d9d6f2', fontWeight: 'bold', cursor: 'not-allowed' }}
                             >
-                              Agotado
+                              {t('shop.soldOut')}
                             </button>
                           ) : (
                             <button
                               className="tiny-btn"
                               type="button"
-                              onClick={() => isHoldable ? buyHoldableItem(itemName) : buyShopItem(itemName, qty)}
+                              onClick={() => isHoldable ? buyHoldableItem(itemName) : buyShopItem(itemName, 1)}
                               disabled={!canBuy}
                               style={{
                                 background: canBuy ? '#10b981' : '#475569',
@@ -12689,7 +13352,7 @@ function MainApp() {
                                 cursor: canBuy ? 'pointer' : 'not-allowed'
                               }}
                             >
-                              {isHoldable ? `$${finalPrice}` : `${qty > 1 ? `${qty}× ` : ''}$${totalPrice}`}
+                              ${totalPrice}
                             </button>
                           )}
                         </div>
@@ -12723,7 +13386,7 @@ function MainApp() {
                       <p style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No tienes objetos para vender.</p>
                     ) : (
                       inventoryEntries.map((entry) => {
-                        if (entry.name === 'Mega Stone' || entry.name === 'Dynamax Band' || entry.name === 'Prisma Rojo' || entry.name === 'Prisma Azul') return null
+                        if (entry.name === 'Mega Stone' || entry.name === 'Dynamax Band' || entry.name === 'Prisma Rojo' || entry.name === 'Prisma Azul' || entry.name === 'Z Power Ring') return null
                         const consumable = ALL_SHOP_ITEMS[entry.name]
                         const holdable = HOLDABLE_ITEMS[entry.name]
                         if (!consumable && !holdable) return null
@@ -12829,7 +13492,7 @@ function MainApp() {
                   {inventory.length === 0 ? (
                     <p style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No tienes objetos para vender.</p>
                   ) : (
-                    Array.from(new Set(inventory)).filter(i => i !== 'Mega Stone' && i !== 'Dynamax Band' && i !== 'Prisma Rojo' && i !== 'Prisma Azul').map((itemName) => {
+                    Array.from(new Set(inventory)).filter(i => i !== 'Mega Stone' && i !== 'Dynamax Band' && i !== 'Prisma Rojo' && i !== 'Prisma Azul' && i !== 'Z Power Ring').map((itemName) => {
                       const count = inventory.filter(i => i === itemName).length
                       const data = ALL_SHOP_ITEMS[itemName] ?? HOLDABLE_ITEMS[itemName]
                       const value = data ? Math.max(1, Math.floor(data.price * 0.5)) : 10
@@ -12901,7 +13564,7 @@ function MainApp() {
                       })}
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '0.75rem' }}>
-                      {Array.from(new Set(inventory)).filter(i => i !== 'Mega Stone' && i !== 'Dynamax Band' && i !== 'Prisma Rojo' && i !== 'Prisma Azul').map((itemName) => {
+                      {Array.from(new Set(inventory)).filter(i => i !== 'Mega Stone' && i !== 'Dynamax Band' && i !== 'Prisma Rojo' && i !== 'Prisma Azul' && i !== 'Z Power Ring').map((itemName) => {
                         const count = inventory.filter(i => i === itemName).length
                         const selected = coopMyOffer?.kind === 'item' && coopMyOffer.itemName === itemName
                         return (
@@ -13350,6 +14013,12 @@ function MainApp() {
                   })}
                 </div>
 
+                {weather !== 'none' && (
+                  <div style={{ display: 'inline-block', margin: '0 auto 0.5rem', padding: '2px 10px', borderRadius: '999px', background: 'rgba(154,152,207,0.18)', color: '#c4b5fd', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                    {WEATHER_INFO[weather].icon} {weatherName(weather, getLanguage())}
+                  </div>
+                )}
+
                 <div style={{ maxHeight: '110px', overflowY: 'auto', padding: '0.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid #3f3f6e', marginBottom: '0.75rem' }}>
                   {doubleLog.map((line, i) => (
                     <p key={i} style={{ margin: '0 0 0.2rem', fontSize: '0.78rem', color: '#d9d6f2' }}>{line}</p>
@@ -13566,6 +14235,11 @@ function MainApp() {
                   <StatusBadge status={enemy.status} />
                   {' · '}Nv. {enemy.level}
                 </p>
+                {weather !== 'none' && (
+                  <div style={{ display: 'inline-block', margin: '0 0 6px 0', padding: '2px 8px', borderRadius: '999px', background: 'rgba(154,152,207,0.18)', color: '#c4b5fd', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                    {WEATHER_INFO[weather].icon} {weatherName(weather, getLanguage())}
+                  </div>
+                )}
                 <div style={{ position: 'relative', display: 'inline-block' }}>
                   <img className={`sprite enemy-sprite${enemy.gmaxEvolved ? ' gmax-active' : ''} ${statusSpriteClass(enemy.status, enemy.leechSeed)}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={enemyHitFlash ? { filter: 'brightness(1.5) sepia(1) hue-rotate(-40deg) saturate(5)', transition: 'filter 0.05s' } : { transition: 'filter 0.3s' }} />
                   <StatusFloat pokemon={enemy} />
@@ -13629,6 +14303,25 @@ function MainApp() {
                     </ThemedTooltip>
                     )
                   })}
+                  {(() => {
+                    const zm = getZMoveFor(activePokemon)
+                    if (!zm || activePokemon.zMoveUsed) return null
+                    const zDisabled = isLoading || (runChallenges.speedrun && speedrunSeconds <= 0)
+                    return (
+                      <ThemedTooltip key="z-move" content={moveTooltip(zm)}>
+                        <button
+                          className="move-btn"
+                          onClick={() => onPlayerMove(zm)}
+                          type="button"
+                          disabled={zDisabled}
+                          style={{ borderColor: '#facc15' }}
+                        >
+                          <span className="move-btn-line">✨ {moveName(zm)} ({zm.type})</span>
+                          <span className="move-btn-effect">{t('b.zMoveOnce')}</span>
+                        </button>
+                      </ThemedTooltip>
+                    )
+                  })()}
                   </>
                   )}
                 </div>
@@ -13967,6 +14660,12 @@ function MainApp() {
         </div>
         <button onClick={handleAchievementDismiss} style={{ position: 'absolute', top: '4px', right: '8px', background: 'none', border: 'none', color: '#7d7ab5', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
       </div>
+      )}
+
+      {dexToast && (
+        <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9998, background: '#1c1c3a', border: '2px solid #4d9bff', borderRadius: '6px', padding: '0.7rem 1.1rem', boxShadow: '4px 4px 0 0 rgba(0,0,0,0.6)', maxWidth: '320px', color: '#f3f1ff', fontSize: '0.9rem', animation: 'slideInRight 0.5s ease' }}>
+          {dexToast}
+        </div>
       )}
 
       {/* Random Event Modal */}

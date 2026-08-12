@@ -163,6 +163,26 @@ export function playCoin(): void {
   } catch { /* silent */ }
 }
 
+// Fanfarria corta y alegre al desbloquear un logro: arpegio ascendente brillante.
+export function playAchievement(): void {
+  try {
+    const ac = getCtx()
+    const notes = [784, 988, 1175, 1568]
+    notes.forEach((freq, i) => {
+      const osc = ac.createOscillator()
+      const g = ac.createGain()
+      osc.type = 'triangle'
+      const t = ac.currentTime + i * 0.09
+      osc.frequency.setValueAtTime(freq, t)
+      g.gain.setValueAtTime(0.3 * sfxVolume * SFX_SOFTNESS, t)
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.28)
+      osc.connect(g).connect(ac.destination)
+      osc.start(t)
+      osc.stop(t + 0.3)
+    })
+  } catch { /* silent */ }
+}
+
 export function setMenuMusicTrack(id: string): void {
   activeMenuMusic = id
 }

@@ -1,5 +1,6 @@
-import type { Move, Pokemon, RawLevelUpMove, StatusType, StatChange } from './types'
+import type { Move, Pokemon, PokemonIVs, RawLevelUpMove, StatusType, StatChange } from './types'
 import { getLanguage } from './i18n'
+import { generateIVs, ivStatBonus, natureMultiplier, randomNature } from './pokemonMeta'
 
 const API_BASE = 'https://pokeapi.co/api/v2'
 
@@ -61,6 +62,11 @@ interface PokeApiPokemon {
   types: Array<{
     slot: number
     type: PokeApiNamedResource
+  }>
+  abilities: Array<{
+    is_hidden: boolean
+    slot: number
+    ability: PokeApiNamedResource
   }>
   moves: Array<{
     move: PokeApiNamedResource
@@ -1370,18 +1376,19 @@ export async function buildPokemonFromApi(
   targetLevel: number = 10,
   shiny: boolean = false,
   difficulty: string = 'medium',
-  bypassMinAppearLevel: boolean = false
+  bypassMinAppearLevel: boolean = false,
+  meta?: { nature?: string; ivs?: PokemonIVs }
 ): Promise<Pokemon> {
   const cacheKey = `${identifier}_lvl${targetLevel}_${difficulty}_b${bypassMinAppearLevel ? 1 : 0}_r${runSeed}`
+  let base: Pokemon
   const cached = pokemonCache.get(cacheKey)
   if (cached) {
-    const result = { ...cached, hp: cached.maxHp }
+    base = { ...cached, hp: cached.maxHp }
     if (shiny) {
-      result.shiny = true
-      result.sprite = makeShinySprite(result.sprite, result.id)
+      base.shiny = true
+      base.sprite = makeShinySprite(base.sprite, base.id)
     }
-    return result
-  }
+  } else {
 
   const data = await fetchJson<PokeApiPokemon>(`${API_BASE}/pokemon/${identifier}`)
 
@@ -1399,6 +1406,10 @@ export async function buildPokemonFromApi(
   
   const { moves: parsedMoves, rawLevelUpMoves } = await fetchPokemonMoves(data.moves, targetLevel, difficulty, data.id)
   const sortedTypes = [...data.types].sort((a, b) => a.slot - b.slot).map(t => t.type.name)
+
+  // Habilidad: se prefiere la primera no oculta (slot 1), si existe.
+  const visibleAbilities = [...data.abilities].sort((a, b) => a.slot - b.slot).filter(a => !a.is_hidden)
+  const ability = (visibleAbilities[0] ?? [...data.abilities].sort((a, b) => a.slot - b.slot)[0])?.ability?.name
 
   const pokemon: Pokemon = {
     id: data.id,
@@ -1429,6 +1440,7 @@ export async function buildPokemonFromApi(
     moves: parsedMoves,
     rawLevelUpMoves,
     captureRate,
+    ability,
     evolutionLevel: undefined,
     evolutionChainId: data.id
   }
@@ -1462,7 +1474,31 @@ export async function buildPokemonFromApi(
   }
 
   pokemonCache.set(cacheKey, pokemon)
-  return pokemon
+  base = pokemon
+  }
+
+  return applyMetaToPokemon(base, meta)
+}
+
+// Aplica naturaleza e IVs a un Pokémon recién creado. Si `meta` se pasa (p. ej.
+// en una evolución, para conservar los valores del Pokémon original), se usan
+// esos; si no, se generan al azar en cada aparición.
+function applyMetaToPokemon(pokemon: Pokemon, meta?: { nature?: string; ivs?: PokemonIVs }): Pokemon {
+  const nature = meta?.nature ?? randomNature()
+  const ivs = meta?.ivs ?? generateIVs()
+  const level = pokemon.level
+  return {
+    ...pokemon,
+    nature,
+    ivs,
+    maxHp: pokemon.maxHp + ivStatBonus(ivs.hp, level),
+    hp: (pokemon.hp > 0 ? pokemon.hp : 0) + ivStatBonus(ivs.hp, level),
+    attack: Math.floor((pokemon.attack + ivStatBonus(ivs.attack, level)) * natureMultiplier(nature, 'attack')),
+    defense: Math.floor((pokemon.defense + ivStatBonus(ivs.defense, level)) * natureMultiplier(nature, 'defense')),
+    spAttack: Math.floor((pokemon.spAttack + ivStatBonus(ivs.spAttack, level)) * natureMultiplier(nature, 'spAttack')),
+    spDefense: Math.floor((pokemon.spDefense + ivStatBonus(ivs.spDefense, level)) * natureMultiplier(nature, 'spDefense')),
+    speed: Math.floor((pokemon.speed + ivStatBonus(ivs.speed, level)) * natureMultiplier(nature, 'speed')),
+  }
 }
 
 // Verifica e imparte nuevos movimientos cuando el Pokémon sube de nivel
@@ -2443,7 +2479,7 @@ export async function evolvePokemon(currentPokemon: Pokemon, targetName?: string
     const chosen = targetName ?? info.nextName
     if (!chosen) return null
     const nextName = chosen.includes('-') ? stripRegional(chosen) : chosen
-    const newBasePokemon = await buildPokemonFromApi(nextName, 1, currentPokemon.level, currentPokemon.shiny ?? false)
+    const newBasePokemon = await buildPokemonFromApi(nextName, 1, currentPokemon.level, currentPokemon.shiny ?? false, 'medium', false, { nature: currentPokemon.nature, ivs: currentPokemon.ivs })
     return {
       ...newBasePokemon,
       level: currentPokemon.level,

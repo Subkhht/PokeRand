@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Move, Pokemon } from './types'
+import type { WeatherKind } from './pokemonMeta'
 
 export interface PvpMatchInfo {
   id: string
@@ -32,6 +33,8 @@ export interface PvpState {
   winner: 'a' | 'b' | null
   switchFor: 'a' | 'b' | 'both' | null
   log: string[]
+  weather?: WeatherKind
+  entryApplied?: boolean
   a: PvpPlayerState
   b: PvpPlayerState
 }
@@ -74,7 +77,8 @@ export function isPvpEnabled(): boolean {
 }
 
 // Serializa un Pokémon a un snapshot JSON seguro para la red. Incluye todo lo
-// necesario para el combate (stats, movimientos completos, estado).
+// necesario para el combate (stats, movimientos completos, estado, habilidad,
+// naturaleza e IVs).
 export function serializePvpPokemon(p: Pokemon): Pokemon {
   return {
     id: p.id,
@@ -91,6 +95,9 @@ export function serializePvpPokemon(p: Pokemon): Pokemon {
     types: p.types ?? [],
     baseStatTotal: p.baseStatTotal,
     shiny: p.shiny,
+    ability: p.ability,
+    nature: p.nature,
+    ivs: p.ivs,
     moves: p.moves.map((m: Move): Move => ({ ...m, pp: m.pp ?? 10, maxPp: m.maxPp ?? 10 })),
   }
 }
