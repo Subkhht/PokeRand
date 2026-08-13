@@ -46,7 +46,6 @@ export interface Move {
   leechSeed?: boolean
   disable?: boolean
   fakeOut?: boolean
-  isZMove?: boolean
 }
 
 export interface RawLevelUpMove {
@@ -97,7 +96,6 @@ export interface Pokemon {
   disabled?: { move: string; turns: number }
   justEntered?: boolean
   choiceLockedMove?: string
-  zMoveUsed?: boolean
 }
 
 export interface RouteNode {
@@ -234,6 +232,4 @@ export interface MetaProgression {
   coopWins: number
   coopTrades: number
   completedGenDex?: number[]
-  totalZMoves?: number
-  zMoveTypes?: string[]
 }

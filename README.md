@@ -43,7 +43,7 @@ Cada ruta es una línea de nodos (combates, tiendas, descansos, etc.). El tipo d
 - **Estados**: quemado, envenenado, paralizado, congelado, dormido y confuso, con efectos por turno.
 - **Etapas de stats**: Ataque, Defensa, At. Esp., Def. Esp. y Velocidad suben/bajan durante el combate (máx **±6**, el multiplicador se bloquea a 4x). Se **resetean al terminar cada combate**.
 - **Críticos**, recoil (daño de retroceso), drenaje, robo de vida (lifesteal) y movimientos de protección.
-- **Mega-evolución**, **Gigamax**, **Primal Reversion** y **Movimientos Z**: 1 vez por combate, con objetos equipables (Mega Stone, Dynamax Band, Prisma Rojo/Azul y Z Power Ring). La **Superpulsera Z** (Tienda Meta) da a un Pokémon un 5º movimiento Z según su tipo principal.
+- **Mega-evolución**, **Gigamax** y **Primal Reversion**: 1 vez por combate, con objetos equipables (Mega Stone, Dynamax Band, Prisma Rojo/Azul).
 - **Habilidades**: cada Pokémon usa su habilidad real de PokeAPI (~60 implementadas: Intimidación, Levitación, Piel Áspera, Estática, Sebo, Robustez, Agallas, Absorbes, Mar Llamas/Espesura, Impulso, creadores de clima, etc.). Activas también en Combates Dobles y en el PvP 1vs1.
 - **Clima**: lluvia, sol abrasador, tormenta de arena y granizo con efectos sobre los tipos y daño por turno. Lo crean las habilidades, también en Dobles y PvP.
 - **Naturalezas**: 25 naturalezas (+10%/−10% en una stat) asignadas al nacer.

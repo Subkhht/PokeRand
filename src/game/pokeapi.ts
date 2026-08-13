@@ -20,7 +20,7 @@ const generationSpeciesCache = new Map<number, number[]>()
 const pokemonCache = new Map<string | number, Pokemon>()
 const moveDetailsCache = new Map<string, Move>()
 const legendaryIdsCache = new Map<number, Promise<Set<number>>>()
-let allFormIdsPromise: Promise<number[]> | null = null
+let allPokemonListPromise: Promise<Array<{ id: number; name: string }>> | null = null
 let runSeed = 0
 
 export function setRunSeed(seed: number): void {
@@ -385,6 +385,19 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
       { id: 102, name: 'exeggcute', sprite: spriteFor(102), level: null, trigger: 'level-up', item: null },
       { id: 103, name: 'exeggutor', sprite: spriteFor(103), level: null, trigger: 'use-item', item: 'Leaf Stone', chance: 70 },
       { id: 10114, name: 'exeggutor-alola', sprite: spriteFor(10114), level: null, trigger: 'use-item', item: 'Leaf Stone', chance: 30, branch: true },
+    ]
+  }
+
+  // Familia Petilil: en este juego Petilil con la Piedra Solar evoluciona un
+  // 50% a Lilligant y un 50% a Lilligant de Hisui. La línea muestra ambas
+  // formas como ramas alternativas, sea cual sea el miembro visto.
+  const PETILIL_FAMILY = new Set([548, 549, 10237])
+  if (PETILIL_FAMILY.has(dataPokemon.id)) {
+    const spriteFor = (id: number) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
+    evolutions = [
+      { id: 548, name: 'petilil', sprite: spriteFor(548), level: null, trigger: 'level-up', item: null },
+      { id: 549, name: 'lilligant', sprite: spriteFor(549), level: null, trigger: 'use-item', item: 'Sun Stone', chance: 50 },
+      { id: 10237, name: 'lilligant-hisui', sprite: spriteFor(10237), level: null, trigger: 'use-item', item: 'Sun Stone', chance: 50, branch: true },
     ]
   }
 
@@ -989,6 +1002,17 @@ export function pokemonSpriteUrl(id: number, shiny: boolean = false): string {
   return `${base}/versions/generation-v/black-white/${animPath}`
 }
 
+// Icono de la Pokédex de Gen VIII (64x64) para rejillas compactas. Para las
+// formas shiny se usa el sprite shiny estándar, ya que los iconos de Gen VIII
+// no tienen versión shiny. Los Pokémon de la Gen 8 DLC y Gen 9 (id > 898) no
+// tienen icono de Gen VIII: se usa su sprite frontal estándar.
+export function pokemonIconUrl(id: number, shiny: boolean = false): string {
+  const base = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon'
+  if (shiny) return `${base}/shiny/${id}.png`
+  if (id > 898) return `${base}/${id}.png`
+  return `${base}/versions/generation-viii/icons/${id}.png`
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url)
   if (!response.ok) {
@@ -1011,18 +1035,55 @@ const REGIONAL_FORM_RANGES = [
 // solo se obtienen transformando al legendario con su esfera.
 const EXCLUDED_FORM_IDS = new Set([10007, 10245, 10246])
 
-async function getAllFormIds(): Promise<number[]> {
-  if (allFormIdsPromise) return allFormIdsPromise
+// Región → generación en la que aparecen sus Pokémon regionales. Hisui es la
+// región de Leyendas Pokémon: Arceus, de octava generación.
+const REGIONAL_SUFFIX_GENERATION: Record<string, number> = {
+  '-alola': 7,
+  '-galar': 8,
+  '-hisui': 8,
+  '-paldea': 9,
+}
 
-  allFormIdsPromise = (async () => {
+// Formas regionales de Hisui que no llevan el sufijo "-hisui" en su nombre
+// (Basculin de Raya Blanca y su evolución Basculegion solo existen en Hisui).
+const NON_SUFFIXED_REGIONAL_FORM_IDS = new Set<number>([10247, 10248])
+
+async function getAllPokemonList(): Promise<Array<{ id: number; name: string }>> {
+  if (allPokemonListPromise) return allPokemonListPromise
+  allPokemonListPromise = (async () => {
     const data = await fetchJson<{ results: PokeApiNamedResource[] }>(
       `${API_BASE}/pokemon?limit=1351&offset=0`
     )
-    const allIds = data.results.map(r => extractIdFromResourceUrl(r.url))
-    return allIds.filter(id => REGIONAL_FORM_RANGES.some(([lo, hi]) => id >= lo && id <= hi) && !EXCLUDED_FORM_IDS.has(id))
+    return data.results.map(r => ({ id: extractIdFromResourceUrl(r.url), name: r.name }))
   })()
+  return allPokemonListPromise
+}
 
-  return allFormIdsPromise
+// IDs de las formas regionales (Alola/Galar/Hisui/Paldea) que pertenecen a la
+// generación dada. Los Pokémon regionales solo deben aparecer como salvajes en
+// su propia generación.
+async function getRegionalFormIdsByGeneration(generation: number): Promise<number[]> {
+  const list = await getAllPokemonList()
+  const suffixes = Object.entries(REGIONAL_SUFFIX_GENERATION)
+    .filter(([, gen]) => gen === generation)
+    .map(([suffix]) => suffix)
+  return list
+    .filter(p =>
+      (suffixes.some(suffix => p.name.includes(suffix)) || NON_SUFFIXED_REGIONAL_FORM_IDS.has(p.id)) &&
+      !EXCLUDED_FORM_IDS.has(p.id)
+    )
+    .map(p => p.id)
+}
+
+// Resto de formas (no regionales: Rotom, Deoxys, Pikachu cap, Totem, etc.) que
+// pueden aparecer como salvajes en cualquier generación.
+async function getNonRegionalFormIds(): Promise<number[]> {
+  const list = await getAllPokemonList()
+  return list
+    .filter(p => REGIONAL_FORM_RANGES.some(([lo, hi]) => p.id >= lo && p.id <= hi))
+    .filter(p => !Object.keys(REGIONAL_SUFFIX_GENERATION).some(suffix => p.name.includes(suffix)) && !NON_SUFFIXED_REGIONAL_FORM_IDS.has(p.id))
+    .filter(p => !EXCLUDED_FORM_IDS.has(p.id))
+    .map(p => p.id)
 }
 
 let allSpeciesListPromise: Promise<Array<{ id: number; name: string }>> | null = null
@@ -1044,6 +1105,15 @@ export function getAllSpeciesList(): Promise<Array<{ id: number; name: string }>
 export async function fetchPokemonTypes(id: number): Promise<string[]> {
   const data = await fetchJson<PokeApiPokemon>(`${API_BASE}/pokemon/${id}`)
   return data.types.map(t => t.type.name)
+}
+
+// Devuelve las habilidades (no ocultas) de una especie, para la Cápsula de Habilidad.
+export async function getPokemonAbilities(identifier: string | number): Promise<string[]> {
+  const data = await fetchJson<PokeApiPokemon>(`${API_BASE}/pokemon/${identifier}`)
+  return [...data.abilities]
+    .sort((a, b) => a.slot - b.slot)
+    .filter(a => !a.is_hidden)
+    .map(a => a.ability.name)
 }
 
 export async function getSpeciesIdsByGeneration(generation: number): Promise<number[]> {
@@ -1628,10 +1698,17 @@ export async function getBalancedPokemonByGeneration(
   // Progreso efectivo: combina la etapa actual con la posición dentro de la ruta.
   // Infinite no tiene etapas, así que usa el progreso de la ruta directamente.
   // El Modo Original tiene 8 etapas (medallas), el resto 3 (insignias).
-  const stageDivisor = difficulty === 'original' ? 8 : 3
+  // El Modo Aventura también tiene 8 etapas (insignias).
+  const stageDivisor = difficulty === 'original' || difficulty.startsWith('aventura') ? 8 : 3
   const progressRatio = difficulty === 'infinite'
     ? routeProgress
     : (stageIndex + routeProgress) / stageDivisor
+
+  // Nivel de la Aventura (incremental): cada victoria sube el nivel y hace la
+  // próxima partida más difícil. La dificultad llega como "aventura_<nivel>".
+  const aventuraLevel = difficulty.startsWith('aventura_')
+    ? parseInt(difficulty.split('_')[1] ?? '0', 10) || 0
+    : 0
 
   const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss, bossStage, legendaryIds)
 
@@ -1646,7 +1723,9 @@ export async function getBalancedPokemonByGeneration(
   // objetivo del rival) para que la especie, sus evoluciones y sus movimientos
   // sean coherentes con ese nivel y no aparezcan formas evolucionadas a niveles
   // bajos (p. ej. un Venusaur nivel 16).
-  const scaledLevel = forcedLevel ?? (10 + Math.floor((stageIndex * totalNodes + stepIndex) * levelMult) + (isBoss ? 2 : 0))
+  // En Aventura se añade siempre el nivel incremental (+2 por victoria), tanto
+  // con forcedLevel como sin él, para que cada partida sea más difícil.
+  const scaledLevel = (forcedLevel ?? (10 + Math.floor((stageIndex * totalNodes + stepIndex) * levelMult) + (isBoss ? 2 : 0))) + aventuraLevel * 2
 
   let minBst = 150
   let maxBst = 999
@@ -1716,6 +1795,23 @@ export async function getBalancedPokemonByGeneration(
       minBst = 340
       maxBst = 540
     }
+  } else if (difficulty.startsWith('aventura')) {
+    // Aventura: como Intermedia, pero con un rango de BST que sube con el
+    // nivel incremental (cada victoria hace la próxima partida más difícil).
+    const bstBoost = aventuraLevel * 45
+    if (isBoss) {
+      minBst = 500 + bstBoost
+      maxBst = 999
+    } else if (progressRatio < 0.35) {
+      minBst = 160 + bstBoost
+      maxBst = 420 + bstBoost
+    } else if (progressRatio < 0.70) {
+      minBst = 330 + bstBoost
+      maxBst = 540 + bstBoost
+    } else {
+      minBst = 430 + bstBoost
+      maxBst = 680 + bstBoost
+    }
   } else {
     if (isBoss) {
       minBst = 470
@@ -1732,10 +1828,14 @@ export async function getBalancedPokemonByGeneration(
     }
   }
 
-  // Formas regionales (Alola/Galar/Hisui/Paldea) como antes, pero respetando
-  // su nivel mínimo de aparición (no formas evolucionadas por piedra a niveles bajos).
+  // Formas (2%): las regionales (Alola/Galar/Hisui/Paldea) solo pueden salir en
+  // su propia generación; el resto de formas pueden aparecer en cualquiera.
+  // Se respeta su nivel mínimo de aparición (no formas evolucionadas por
+  // piedra a niveles bajos).
   if (Math.random() < 0.02) {
-    const formIds = await getAllFormIds()
+    const nonRegionalFormIds = await getNonRegionalFormIds()
+    const regionalFormIds = await getRegionalFormIdsByGeneration(generation)
+    const formIds = [...nonRegionalFormIds, ...regionalFormIds]
     if (formIds.length > 0) {
       const randomId = formIds[Math.floor(Math.random() * formIds.length)]
       const form = await buildPokemonFromApi(randomId, generation, scaledLevel, shiny, difficulty)
@@ -1799,9 +1899,11 @@ export async function getBalancedPokemonByGeneration(
 
 export async function getRandomPokemonByGeneration(generation: number): Promise<Pokemon> {
   if (Math.random() < 0.02) {
-    const formIds = await getAllFormIds()
+    const nonRegionalFormIds = await getNonRegionalFormIds()
+    const regionalFormIds = await getRegionalFormIdsByGeneration(generation)
+    const formIds = [...nonRegionalFormIds, ...regionalFormIds]
     if (formIds.length > 0) {
-      const randomId = formIds[Math.floor(Math.random() * formIds.length)]
+      const randomId = randomFrom(formIds)
       return buildPokemonFromApi(randomId, generation)
     }
   }
@@ -2037,6 +2139,17 @@ export async function getEvolutionInfo(pokemonId: number): Promise<{ nextName: s
     // Espurr → Meowstic macho o hembra: 50% cada uno (nivel 25).
     if (pokemonId === 677) {
       return { nextName: Math.random() < 0.5 ? 'meowstic-male' : 'meowstic-female', evolutionLevel: 25, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Petilil con la Piedra Solar → Lilligant o Lilligant de Hisui: 50% cada uno
+    // (Lilligant de Hisui no tiene cadena propia en PokeAPI, así que no
+    // evolucionaba con el objeto).
+    if (pokemonId === 548) {
+      return { nextName: Math.random() < 0.5 ? 'lilligant' : 'lilligant-hisui', evolutionLevel: null, heldItem: 'Sun Stone', heldItemEvolutions: [], minAppearLevel: null }
+    }
+    // Lilligant (y Lilligant de Hisui) es la evolución de Petilil con la Piedra
+    // Solar: no aparece por debajo del nivel 20.
+    if (pokemonId === 549 || pokemonId === 10237) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: SPECIAL_EVOLUTION_MIN_APPEAR_LEVEL }
     }
     // Meowth → Persian (nivel 28). Perrserker NO es evolución de Meowth normal.
     if (pokemonId === 52) {
@@ -2550,6 +2663,11 @@ export async function canEvolveWithStone(pokemonId: number, stoneItemName: strin
   // Pikachu con Piedra Trueno: 70% Raichu, 30% Raichu de Alola.
   if (pokemonId === 25 && stoneItemName === 'thunder-stone') {
     return { canEvolve: true, evolvedName: Math.random() < 0.7 ? 'raichu' : 'raichu-alola' }
+  }
+
+  // Petilil con la Piedra Solar: 50% Lilligant, 50% Lilligant de Hisui.
+  if (pokemonId === 548 && stoneItemName === 'sun-stone') {
+    return { canEvolve: true, evolvedName: Math.random() < 0.5 ? 'lilligant' : 'lilligant-hisui' }
   }
 
   // Exeggcute con la Piedra Hoja: 70% Exeggutor, 30% Exeggutor de Alola.

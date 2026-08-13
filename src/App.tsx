@@ -18,13 +18,15 @@ import {
   startersByGen,
   makeShinySprite,
   pokemonSpriteUrl,
+  pokemonIconUrl,
   canEvolveWithStone,
   stripRegional,
   setRunSeed,
+  getPokemonAbilities,
   type PokemonDetails
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
-import { abilityName, abilityDesc, weatherName, weatherTypeMultiplier, weatherSpeedMultiplier, weatherChipDmg, WEATHER_SETTERS, WEATHER_INFO, natureName, natureStatMods, hasAbility, type WeatherKind, type MetaStatKey } from './game/pokemonMeta'
+import { abilityName, abilityDesc, weatherName, weatherTypeMultiplier, weatherSpeedMultiplier, weatherChipDmg, WEATHER_SETTERS, WEATHER_INFO, natureName, natureStatMods, natureMultiplier, randomNature, generateIVs, ivStatBonus, hasAbility, type WeatherKind, type MetaStatKey } from './game/pokemonMeta'
 import { isLeaderboardEnabled, submitInfiniteScore, fetchInfiniteLeaderboard, formatDuration, getCurrentUser, onAuthChange, signUpWithUsername, signIn, signOut, getUsername, isUsernameTaken, type LeaderboardEntry, type InfiniteScoreInsert } from './game/leaderboard'
 import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, cancelExchangeOffer, sendCoopChat, getCoopChat, finishCoopSession, resetCoopSession, clearCoopRestart, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange, type CoopChatMessage } from './game/coop'
 import { isPvpEnabled, createPvpRoom, findPvpOpponent, joinPvpRoom, getPvpMatch, getPvpState, submitPvpAction, resolvePvpTurn as resolvePvpTurnRpc, forfeitPvpMatch, cancelPvpMatch, finishPvpMatch, clearPvpAction, startPvpTimer, expirePvpTimer, getPvpElo, getPvpEloLeaderboard, awardPvpElo, rematchPvpRoom, serializePvpPokemon, type PvpTurnSnapshot, type PvpRoomResult, type PvpState, type PvpEloEntry } from './game/pvp'
@@ -35,11 +37,11 @@ import BackgroundLayer from './BackgroundLayer'
 import BackgroundPreview from './BackgroundPreview'
 import { BACKGROUNDS } from './game/backgrounds'
 import type { User } from '@supabase/supabase-js'
-import type { Move, Pokemon, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
+import type { Move, Pokemon, PokemonIVs, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, itemLocalizedName, metaItemDesc, moveName, statusLabel, statusAppliedLine, themeName, themeDesc, bgName, bgDesc, type Language, getChangelog } from './game/i18n'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
-type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum' | 'original'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'aventura_select' | 'pvp'
+type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum' | 'original' | 'aventura'
 
 // Historial local de partidas finalizadas (victorias/derrotas). Solo se
 // registran runs que terminan de verdad: no se cuentan reinicios ni abandonos.
@@ -572,7 +574,8 @@ const difficultyNodeCounts: Record<Difficulty, number> = {
   hard: 25,
   infinite: 0,
   coliseum: 8,
-  original: 10
+  original: 10,
+  aventura: 15
 }
 
 const authInputStyle: CSSProperties = {
@@ -593,6 +596,7 @@ const difficultyLabels: Record<Difficulty, { title: string; desc: string }> = {
   infinite: { title: 'Infinite', desc: 'Sin límite (Aventura infinita)' },
   coliseum: { title: 'COLISEUM', desc: '8 jefes a nivel 50' },
   original: { title: 'Original', desc: '10 nodos · 8 etapas (Tienda/Combate/Descanso/Rival)' },
+  aventura: { title: 'Aventura', desc: '15 nodos aleatorios · 8 etapas · incremental' },
 }
 
 function difficultyLabel(lang: Language, d: Difficulty): { title: string; desc: string } {
@@ -604,6 +608,7 @@ function difficultyLabel(lang: Language, d: Difficulty): { title: string; desc: 
       infinite: { title: 'Infinite', desc: 'No limit (endless adventure)' },
       coliseum: { title: 'COLISEUM', desc: '8 bosses at level 50' },
       original: { title: 'Original', desc: '10 nodes · 8 stages (Shop/Battle/Rest/Rival)' },
+      aventura: { title: 'Adventure', desc: '15 random nodes · 8 stages · incremental' },
     }
     return map[d]
   }
@@ -708,6 +713,9 @@ const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
   'Zinc': { price: 200, desc: 'Aumenta permanentemente en +15 la Defensa Especial de un Pokémon.' },
   'Carburante': { price: 200, desc: 'Aumenta permanentemente en +15 la velocidad de un Pokémon.' },
   'Sacred Ash': { price: 400, desc: 'Revive a todos los Pokémon debilitados con el HP completo.' },
+  'Máquina de Naturalezas': { price: 400, desc: 'Cambia la naturaleza de un Pokémon del equipo.' },
+  'Reroll de IVs': { price: 300, desc: 'Re-tira los IVs de un Pokémon del equipo.' },
+  'Cápsula de Habilidad': { price: 500, desc: 'Cambia la habilidad de un Pokémon por otra de su especie.' },
   'Perla Grande': { price: 1000, desc: 'Una perla grande y valiosa. Se vende por 500.' },
   'Polvo Estelar': { price: 200, desc: 'Polvo de estrella. Se vende por 100.' },
   'Perla': { price: 200, desc: 'Una perla valiosa. Se vende por 100.' },
@@ -882,7 +890,6 @@ const itemDescriptions: Record<string, string> = {
   'Heavy Ball': 'Mejor contra Pokémon pesados (hasta x4).',
   'Mega Stone': 'Permite mega-evolucionar 1 vez por combate.',
   'Dynamax Band': 'Permite gigamaximar 1 vez por combate (3 turnos).',
-  'Z Power Ring': 'Otorga un Movimiento Z (una vez por combate).',
   'Prisma Rojo': 'Despierta la Primal Reversion de Groudon (1 vez por combate).',
   'Prisma Azul': 'Despierta la Primal Reversion de Kyogre (1 vez por combate).',
   'Cuerda Huida': 'Escapa de cualquier combate de la aventura.',
@@ -1044,7 +1051,6 @@ const ITEM_SPRITES: Record<string, string> = {
   'Twisted Spoon': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/twisted-spoon.png',
   'Mega Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/key-stone.png',
   'Dynamax Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png',
-  'Z Power Ring': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/z-power-ring.png',
   'Prisma Rojo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/red-orb.png',
   'Prisma Azul': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/blue-orb.png',
   'Diamansfera': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/adamant-orb.png',
@@ -1115,6 +1121,9 @@ const ITEM_SPRITES: Record<string, string> = {
   'Zinc': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/zinc.png',
   'Carburante': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/carbos.png',
   'Sacred Ash': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sacred-ash.png',
+  'Máquina de Naturalezas': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/colress-machine.png',
+  'Reroll de IVs': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/bottle-cap.png',
+  'Cápsula de Habilidad': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ability-capsule.png',
   'Perla Grande': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/big-pearl.png',
   'Polvo Estelar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/stardust.png',
   'Perla': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/pearl.png',
@@ -1203,7 +1212,6 @@ interface HoldableItem {
   ironBall?: boolean
   isMegaStone?: boolean
   isGmaxBand?: boolean
-  isZPowerRing?: boolean
   isPrimalOrb?: boolean
   isExpShare?: boolean
   isRedCard?: boolean
@@ -1247,7 +1255,6 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Tarjeta Roja': { name: 'Tarjeta Roja', desc: 'Si te golpean con daño y sobrevives, el rival cambia', price: 1000, isRedCard: true },
   'Mega Stone': { name: 'Mega Stone', desc: 'Permite mega-evolucionar 1 vez por combate', price: 700, isMegaStone: true },
   'Dynamax Band': { name: 'Dynamax Band', desc: 'Permite gigamaximar 1 vez por combate (3 turnos)', price: 0, isGmaxBand: true },
-  'Z Power Ring': { name: 'Z Power Ring', desc: 'Otorga un Movimiento Z (una vez por combate)', price: 0, isZPowerRing: true },
   'Prisma Rojo': { name: 'Prisma Rojo', desc: 'Despierta la Primal Reversion de Groudon (1 vez por combate)', price: 0, isPrimalOrb: true },
   'Prisma Azul': { name: 'Prisma Azul', desc: 'Despierta la Primal Reversion de Kyogre (1 vez por combate)', price: 0, isPrimalOrb: true },
   'Diamansfera': { name: 'Diamansfera', desc: '+20% daño en movimientos Acero y Dragón si lo lleva Dialga. Transforma a Dialga en su Forma Origen.', price: 700, typeBoost: { types: ['steel', 'dragon'], boost: 0.20, onlyIds: [483] } },
@@ -1523,12 +1530,6 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: 'item_user_10', name: 'Experimentado', desc: 'Usa 10 objetos en una partida', icon: '🧪', hidden: false, reward: 15 },
   { id: 'gambler', name: 'Jugador', desc: 'Gana un nodo Spin', icon: '🎰', hidden: false, reward: 15 },
   { id: 'pokeRand_master', name: 'Maestro Aleatorio', desc: 'Gana un nodo PokeRand', icon: '🎲', hidden: false, reward: 15 },
-  { id: 'first_z_move', name: 'Primer Z', desc: 'Usa un Movimiento Z por primera vez', icon: '✨', hidden: false, reward: 15 },
-  { id: 'z_move_ko', name: 'Golpe Z', desc: 'Debilita a un rival con un Movimiento Z', icon: '💫', hidden: false, reward: 20 },
-  { id: 'z_move_win', name: 'Poder Z', desc: 'Gana una partida usando un Movimiento Z', icon: '🌟', hidden: false, reward: 30 },
-  { id: 'z_move_master', name: 'Maestro Z', desc: 'Usa 10 Movimientos Z en total', icon: '🔮', hidden: false, reward: 40 },
-  { id: 'z_all_types', name: 'Aurora Z', desc: 'Usa Movimientos Z de al menos 6 tipos distintos', icon: '🌈', hidden: false, reward: 40 },
-  { id: 'mega_z_combo', name: 'Doble Gimmick', desc: 'Mega-evoluciona y usa un Movimiento Z en la misma batalla', icon: '⚡', hidden: false, reward: 25 },
   { id: 'weather_win', name: 'Climatología', desc: 'Gana una batalla con clima activo', icon: '🌦️', hidden: false, reward: 20 },
   { id: 'weather_setter', name: 'Creador de Clima', desc: 'Crea un clima con una habilidad (Drizzle, Drought, Sand Stream o Snow Warning)', icon: '🌪️', hidden: false, reward: 20 },
   { id: 'weather_mania_win', name: 'Maniático del Clima', desc: 'Gana una partida con el modificador Weather Mania', icon: '🌧️', hidden: false, reward: 30 },
@@ -1538,6 +1539,7 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: 'double_win', name: 'Dúo Perfecto', desc: 'Gana un Combate Doble sin perder ningún Pokémon', icon: '🥊', hidden: false, reward: 25 },
   { id: 'level_100', name: 'Nivel Máximo', desc: 'Alcanza el nivel 100 con un Pokémon', icon: '📈', hidden: false, reward: 60 },
   { id: 'original_win', name: 'Leyenda Original', desc: 'Gana el Modo Original', icon: '🏛️', hidden: false, reward: 40 },
+  { id: 'aventura_win', name: 'Explorador de Aventura', desc: 'Gana el Modo Aventura', icon: '🗺️', hidden: false, reward: 40 },
   { id: 'streak_15', name: 'Racha Imparable', desc: 'Gana 15 partidas seguidas', icon: '🔥', hidden: false, reward: 100 },
   { id: 'streak_20', name: 'Leyenda de Racha', desc: 'Gana 20 partidas seguidas', icon: '🔥', hidden: false, reward: 200 },
   { id: 'streak_25', name: 'Dios de la Racha', desc: 'Gana 25 partidas seguidas', icon: '🔥', hidden: false, reward: 250 },
@@ -1843,6 +1845,9 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_full_restore', name: 'Full Restore', desc: 'Cura total. Aparece en tiendas.', price: 60, spriteKey: 'Full Restore', category: 'consumable' },
   { id: 'unlock_max_revive', name: 'Max Revive', desc: 'Revive con HP completo.', price: 80, spriteKey: 'Max Revive', category: 'consumable' },
   { id: 'unlock_rare_candy', name: 'Rare Candy', desc: 'Sube 1 nivel. Aparece en drops.', price: 40, spriteKey: 'Rare Candy', category: 'consumable' },
+  { id: 'unlock_nature_machine', name: 'Máquina de Naturalezas', desc: 'Cambia la naturaleza de un Pokémon. Aparece en tiendas.', price: 250, spriteKey: 'Máquina de Naturalezas', category: 'consumable' },
+  { id: 'unlock_iv_reroll', name: 'Reroll de IVs', desc: 'Re-tira los IVs de un Pokémon. Aparece en tiendas.', price: 200, spriteKey: 'Reroll de IVs', category: 'consumable' },
+  { id: 'unlock_ability_capsule', name: 'Cápsula de Habilidad', desc: 'Cambia la habilidad de un Pokémon por otra de su especie. Aparece en tiendas.', price: 300, spriteKey: 'Cápsula de Habilidad', category: 'consumable' },
   { id: 'unlock_elixir', name: 'Elixir', desc: 'Restaura 80 HP.', price: 25, spriteKey: 'Elixir', category: 'consumable' },
   { id: 'unlock_super_elixir', name: 'Super Elixir', desc: 'Restaura 200 HP.', price: 50, spriteKey: 'Super Elixir', category: 'consumable' },
   { id: 'unlock_full_elixir', name: 'Full Elixir', desc: 'Restaura todo HP y cura estados.', price: 80, spriteKey: 'Full Elixir', category: 'consumable' },
@@ -1921,7 +1926,6 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'start_money_1', name: 'Inicio: +$100', desc: 'Empiezas cada aventura con $100 extra.', price: 120, spriteKey: 'money', category: 'upgrade' },
   { id: 'start_money_2', name: 'Inicio: +$100 II', desc: 'Empiezas cada aventura con $100 extra (se suma a la anterior).', price: 160, spriteKey: 'money', category: 'upgrade', requires: 'start_money_1' },
   { id: 'start_revive_1', name: 'Inicio: +1 Revive', desc: 'Empiezas cada aventura con 1 Revive extra.', price: 200, spriteKey: 'Revive', category: 'upgrade' },
-  { id: 'unlock_z_power_ring', name: 'Z Power Ring', desc: 'Empiezas cada aventura con la Superpulsera Z. Equipada a un Pokémon, le otorga un Movimiento Z (una vez por combate).', price: 2000, spriteKey: 'Z Power Ring', category: 'upgrade' },
   { id: 'unlock_quick_ball', name: 'Quick Ball', desc: 'x5 en el primer turno. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Quick Ball', category: 'pokeball' },
   { id: 'unlock_timer_ball', name: 'Timer Ball', desc: 'Mejora con los turnos (hasta x4). Aparece en tiendas y descansos.', price: 35, spriteKey: 'Timer Ball', category: 'pokeball' },
   { id: 'unlock_dusk_ball', name: 'Dusk Ball', desc: 'x3 en oscuridad. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Dusk Ball', category: 'pokeball' },
@@ -2297,81 +2301,104 @@ function getNodeMapLayout(nodeCount: number): { positions: Array<{ x: number; y:
   return { positions, width, height }
 }
 
-// Movimientos Z por tipo (los nombres oficiales en español e inglés).
-const Z_MOVES: Record<string, { es: string; en: string; power: number }> = {
-  normal: { es: 'Megatrón', en: 'Breakneck Blitz', power: 190 },
-  fire: { es: 'Pirocañón', en: 'Inferno Overdrive', power: 200 },
-  water: { es: 'Hidrovórtice', en: 'Hydro Vortex', power: 200 },
-  electric: { es: 'Gigavoltio Destructor', en: 'Gigavolt Havoc', power: 190 },
-  grass: { es: 'Macrosierra', en: 'Bloom Doom', power: 190 },
-  ice: { es: 'Frialdad Polar', en: 'Subzero Slammer', power: 200 },
-  fighting: { es: 'Puño Colosal', en: 'All-Out Pummeling', power: 190 },
-  poison: { es: 'Llovizna Ácida', en: 'Acid Downpour', power: 190 },
-  ground: { es: 'Movimiento Sísmico', en: 'Tectonic Rage', power: 190 },
-  flying: { es: 'Onda Supersónica', en: 'Supersonic Skystrike', power: 190 },
-  psychic: { es: 'Presentimiento Onírico', en: 'Shattered Psyche', power: 190 },
-  bug: { es: 'Torbellino Demoledor', en: 'Savage Spin-Out', power: 190 },
-  rock: { es: 'Roca Asoladora', en: 'Continental Crush', power: 190 },
-  ghost: { es: 'Pesadilla Abismal', en: 'Never-Ending Nightmare', power: 190 },
-  dragon: { es: 'Dragoalubia', en: 'Devastating Drake', power: 200 },
-  dark: { es: 'Atracción Siniestra', en: 'Black Hole Eclipse', power: 190 },
-  steel: { es: 'Hélice Acerada', en: 'Corkscrew Crash', power: 190 },
-  fairy: { es: 'Brillo Coraza', en: 'Twinkle Tackle', power: 190 },
-}
-
-// Construye el Movimiento Z de un Pokémon que lleva la Superpulsera Z. El tipo es el
-// tipo principal del Pokémon y la clase física/especial depende de su mejor
-// stat ofensivo, igual que los Movimientos Z basados en el movimiento original.
-function getZMoveFor(pokemon: Pokemon): Move | null {
-  if (pokemon.holdItem !== 'Z Power Ring') return null
-  const type = (pokemon.types ?? [])[0] ?? 'normal'
-  const info = Z_MOVES[type] ?? Z_MOVES.normal
-  const damageClass: 'physical' | 'special' = (pokemon.attack ?? 0) >= (pokemon.spAttack ?? 0) ? 'physical' : 'special'
-  const isEn = getLanguage() === 'en'
-  return {
-    name: info.es,
-    enName: info.en,
-    power: info.power,
-    type,
-    accuracy: null,
-    damageClass,
-    isZMove: true,
-    description: isEn
-      ? `${info.en} Z-Move (${type}). Can only be used once per battle.`
-      : `Movimiento Z ${info.es} (tipo ${type}). Solo puede usarse una vez por combate.`,
-  }
+// Tooltip del Pokémon (al pasar el cursor por encima en combate): muestra la
+// habilidad, la naturaleza y los IVs del ejemplar en tarjetas de colores.
+function PokemonMetaTooltip({ p, showHeader = true }: { p: Pokemon; showHeader?: boolean }): ReactNode {
+  const en = getLanguage() === 'en'
+  const lang = en ? 'en' : 'es'
+  const statLabel = (k: MetaStatKey) => k === 'attack' ? (en ? 'Attack' : 'Ataque') : k === 'defense' ? (en ? 'Defense' : 'Defensa') : k === 'spAttack' ? (en ? 'Sp. Atk' : 'At. Esp.') : k === 'spDefense' ? (en ? 'Sp. Def' : 'Def. Esp.') : (en ? 'Speed' : 'Velocidad')
+  const ivs = p.ivs ? [
+    { key: 'hp', label: en ? 'HP' : 'PS', val: p.ivs.hp },
+    { key: 'attack', label: en ? 'Atk' : 'Ata', val: p.ivs.attack },
+    { key: 'defense', label: en ? 'Def' : 'Def', val: p.ivs.defense },
+    { key: 'spAttack', label: en ? 'SpA' : 'AE', val: p.ivs.spAttack },
+    { key: 'spDefense', label: en ? 'SpD' : 'DE', val: p.ivs.spDefense },
+    { key: 'speed', label: en ? 'Spe' : 'Vel', val: p.ivs.speed },
+  ] : null
+  const ivColor = (v: number) => v >= 31 ? '#facc15' : v >= 25 ? '#4ade80' : v >= 15 ? '#fbbf24' : '#94a3b8'
+  const total = ivs ? ivs.reduce((s, x) => s + x.val, 0) : 0
+  const totalColor = total >= 170 ? '#facc15' : total >= 120 ? '#4ade80' : '#94a3b8'
+  return (
+    <div style={{ minWidth: '220px' }}>
+      {showHeader && (
+        <div style={{ fontSize: '0.72rem', color: '#9b98cf', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.12)', paddingBottom: '5px', marginBottom: '6px' }}>
+          {p.name}{p.shiny ? ' ✨' : ''}
+        </div>
+      )}
+      {p.ability && (
+        <div style={{ margin: '4px 0 6px', padding: '6px 9px', borderRadius: '8px', background: 'rgba(157,166,255,0.12)', border: '1px solid rgba(157,166,255,0.35)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.6rem', color: '#9b98cf', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{en ? 'Ability' : 'Habilidad'}</span>
+            <strong style={{ fontSize: '0.82rem', color: '#9da6ff' }}>{abilityName(p.ability, lang)}</strong>
+          </div>
+          <div style={{ fontSize: '0.7rem', color: '#b8b5dc', lineHeight: 1.35, marginTop: '2px' }}>{abilityDesc(p.ability, lang)}</div>
+        </div>
+      )}
+      {p.nature && (() => {
+        const mods = natureStatMods(p.nature)
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', margin: '2px 0 6px' }}>
+            <span style={{ fontSize: '0.6rem', color: '#9b98cf', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{en ? 'Nature' : 'Naturaleza'}</span>
+            <strong style={{ fontSize: '0.8rem', color: '#7ceb95' }}>{natureName(p.nature, lang)}</strong>
+            {mods.up && <span style={{ fontSize: '0.66rem', color: '#4ade80', fontWeight: 'bold', background: 'rgba(74,222,128,0.12)', padding: '1px 5px', borderRadius: '4px' }}>↑ {statLabel(mods.up)}</span>}
+            {mods.down && <span style={{ fontSize: '0.66rem', color: '#f87171', fontWeight: 'bold', background: 'rgba(248,113,113,0.12)', padding: '1px 5px', borderRadius: '4px' }}>↓ {statLabel(mods.down)}</span>}
+          </div>
+        )
+      })()}
+      {ivs && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+            <span style={{ fontSize: '0.6rem', color: '#9b98cf', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{en ? 'IVs' : 'IVs'}</span>
+            <strong style={{ fontSize: '0.72rem', color: totalColor }}>{total}/186</strong>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '3px 6px' }}>
+            {ivs.map(iv => (
+              <div key={iv.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.66rem', color: '#d9d6f2', background: 'rgba(154,152,207,0.10)', borderRadius: '5px', padding: '2px 6px' }}>
+                <span>{iv.label}</span>
+                <strong style={{ color: ivColor(iv.val) }}>{iv.val}{iv.val >= 31 ? '★' : ''}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function moveTooltip(move: Move): string {
-  const accuracy = move.accuracy === null ? 'Siempre acierta' : `${move.accuracy}% precisión`
+  const en = getLanguage() === 'en'
+  const accuracy = move.accuracy === null
+    ? (en ? 'Always hits' : 'Siempre acierta')
+    : `${move.accuracy}% ${en ? 'accuracy' : 'precisión'}`
   const isStatus = !move.power || move.power <= 0
-  const cls = isStatus ? 'Estado' : move.damageClass === 'special' ? 'Especial' : 'Físico'
-  let info = `${moveName(move)}\n${isStatus ? 'Movimiento de estado' : `${cls} · Potencia: ${move.power}`}\n${accuracy}`
+  const cls = isStatus
+    ? (en ? 'Status' : 'Estado')
+    : move.damageClass === 'special' ? (en ? 'Special' : 'Especial') : (en ? 'Physical' : 'Físico')
+  let info = `${moveName(move)}\n${isStatus ? (en ? 'Status move' : 'Movimiento de estado') : `${cls} · ${en ? 'Power' : 'Potencia'}: ${move.power}`}\n${accuracy}`
   if (move.ailment) {
     const pct = Math.round((move.ailmentChance ?? 1) * 100)
-    info += `\nEfecto: ${statusLabel(move.ailment ?? '')} (${pct}%)`
+    info += `\n${en ? 'Effect' : 'Efecto'}: ${statusLabel(move.ailment ?? '')} (${pct}%)`
   }
   if (move.statChanges && move.statChanges.length > 0) {
     for (const sc of move.statChanges) {
-      const statName = sc.stat === 'attack' ? 'Ataque' : sc.stat === 'defense' ? 'Defensa' : sc.stat === 'speed' ? 'Velocidad' : sc.stat === 'special-attack' ? 'At. Esp.' : 'Def. Esp.'
-      const dir = sc.change > 0 ? 'Sube' : 'Baja'
+      const statName = sc.stat === 'attack' ? (en ? 'Attack' : 'Ataque') : sc.stat === 'defense' ? (en ? 'Defense' : 'Defensa') : sc.stat === 'speed' ? (en ? 'Speed' : 'Velocidad') : sc.stat === 'special-attack' ? (en ? 'Sp. Atk' : 'At. Esp.') : (en ? 'Sp. Def' : 'Def. Esp.')
+      const dir = sc.change > 0 ? (en ? 'Raises' : 'Sube') : (en ? 'Lowers' : 'Baja')
       const pct = sc.chance != null ? ` (${sc.chance}%)` : ''
-      info += `\nEfecto: ${dir} ${statName}${pct}`
+      info += `\n${en ? 'Effect' : 'Efecto'}: ${dir} ${statName}${pct}`
     }
   }
   if (move.minHits && move.maxHits) {
-    info += `\nGolpes: ${move.minHits}-${move.maxHits}`
+    info += `\n${en ? 'Hits' : 'Golpes'}: ${move.minHits}-${move.maxHits}`
   }
   if (move.recoilPercent) {
     info += `\nRecoil: ${Math.round(move.recoilPercent * 100)}%`
   }
   if (move.drainPercent) {
-    info += `\nDrena: ${Math.round(move.drainPercent * 100)}% HP`
+    info += `\n${en ? 'Drains' : 'Drena'}: ${Math.round(move.drainPercent * 100)}% HP`
   }
   if (move.critRatio && move.critRatio > 0) {
-    info += `\nAlto ratio de crítico`
+    info += `\n${en ? 'High critical hit ratio' : 'Alto ratio de crítico'}`
   }
-  info += `\n${move.description}`
   return info
 }
 
@@ -2416,7 +2443,7 @@ function getStageMultiplier(stage: number): number {
 // Tooltip con el tema integrado para descripciones de objetos y movimientos.
 // Usa display:contents para no alterar el layout y un portal fijo que sigue al
 // cursor (posicionado por ref, sin re-renderizar en cada movimiento).
-function ThemedTooltip({ content, children }: { content: string; children: ReactNode }): ReactNode {
+function ThemedTooltip({ content, children }: { content: ReactNode; children: ReactNode }): ReactNode {
   const tooltipRef = useRef<HTMLDivElement | null>(null)
   const [visible, setVisible] = useState(false)
   if (!content) return <>{children}</>
@@ -2530,7 +2557,30 @@ interface ProgressionData {
   completedColiseum: number[]
   completedLeague: number[]
   completedOriginal: number[]
+  completedAventura: number[]
 }
+
+// Progresión persistente del Modo Aventura (incremental), por generación: cada
+// victoria en una generación sube su nivel (la próxima partida en ESA generación
+// es más difícil) y guarda los objetos del inventario para esa generación.
+interface AventuraGenProgress {
+  level: number
+  totalWins: number
+  carriedItems: string[]
+}
+// Clave = generación (1-9). La generación 0 (Random) usa la generación que se
+// elija al azar para esa run.
+type AventuraProgress = Record<number, AventuraGenProgress>
+
+const AVENTURA_KEY = 'pokerand_aventura'
+
+function emptyAventuraGen(): AventuraGenProgress {
+  return { level: 0, totalWins: 0, carriedItems: [] }
+}
+
+// Todos los iniciales de todas las generaciones: son los únicos seleccionables
+// al empezar la Aventura (el resto se desbloquea capturándolos).
+const allStarterIds = new Set(Object.values(startersByGen).flat())
 
 interface VictoryUnlocks {
   genName: string
@@ -2573,6 +2623,44 @@ function MainApp() {
   // Medallas del Modo Original: cada una es una insignia distinta (no se repiten).
   const [originalMedals, setOriginalMedals] = useState<Array<{ id: string; name: string; sprite: string }>>([])
 
+  // Progresión persistente del Modo Aventura (incremental), por generación.
+  const [aventuraProgress, setAventuraProgress] = useState<AventuraProgress>(() => {
+    try {
+      const saved = localStorage.getItem(AVENTURA_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        // Formato por generación: { "1": {...}, "2": {...}, ... }
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+          const hasFlatLevel = typeof parsed.level === 'number'
+          if (!hasFlatLevel) {
+            const result: AventuraProgress = {}
+            for (const [k, v] of Object.entries(parsed)) {
+              const gen = Number(k)
+              if (!Number.isFinite(gen) || gen < 1) continue
+              result[gen] = {
+                level: typeof (v as any)?.level === 'number' ? (v as any).level : 0,
+                totalWins: typeof (v as any)?.totalWins === 'number' ? (v as any).totalWins : 0,
+                carriedItems: Array.isArray((v as any)?.carriedItems) ? (v as any).carriedItems : [],
+              }
+            }
+            return result
+          }
+        }
+        // Formato antiguo (global): se ignora al pasar a progresión por generación.
+      }
+    } catch {
+      // fallback
+    }
+    return {}
+  })
+  // Un modificador por etapa del Modo Aventura (8 en total, cambian cada etapa).
+  const [aventuraStageModifiers, setAventuraStageModifiers] = useState<RunModifier[]>([])
+  const [aventuraSpecies, setAventuraSpecies] = useState<Array<{ id: number; name: string }>>([])
+  const [aventuraTab, setAventuraTab] = useState<'normal' | 'shiny'>('normal')
+  const [aventuraSearch, setAventuraSearch] = useState('')
+  const [aventuraSelectedId, setAventuraSelectedId] = useState<number | null>(null)
+  const chosenAventuraStarterRef = useRef<Pokemon | null>(null)
+
   const [progression, setProgression] = useState<ProgressionData>(() => {
     try {
       const saved = localStorage.getItem('pokerand_progression')
@@ -2584,13 +2672,14 @@ function MainApp() {
           completedHard: Array.isArray(parsed.completedHard) ? parsed.completedHard : [],
           completedColiseum: Array.isArray(parsed.completedColiseum) ? parsed.completedColiseum : [],
           completedLeague: Array.isArray(parsed.completedLeague) ? parsed.completedLeague : [],
-          completedOriginal: Array.isArray(parsed.completedOriginal) ? parsed.completedOriginal : []
+          completedOriginal: Array.isArray(parsed.completedOriginal) ? parsed.completedOriginal : [],
+          completedAventura: Array.isArray(parsed.completedAventura) ? parsed.completedAventura : []
         }
       }
     } catch {
       // fallback
     }
-    return { completedMedium: [], completedAny: [], completedHard: [], completedColiseum: [], completedLeague: [], completedOriginal: [] }
+    return { completedMedium: [], completedAny: [], completedHard: [], completedColiseum: [], completedLeague: [], completedOriginal: [], completedAventura: [] }
   })
 
   const [team, setTeam] = useState<Pokemon[]>([])
@@ -2693,6 +2782,11 @@ function MainApp() {
   // Captura de Pokémon salvaje
   const [captureModal, setCaptureModal] = useState(false)
   const [captureMessage, setCaptureMessage] = useState<string | null>(null)
+  const [captureSummary, setCaptureSummary] = useState<Pokemon | null>(null)
+  const captureSummaryCompleteNodeRef = useRef(false)
+  const [metaEditModal, setMetaEditModal] = useState<{ kind: 'nature' | 'ivs' | 'ability'; itemIndex: number } | null>(null)
+  const [abilityTargetIdx, setAbilityTargetIdx] = useState<number | null>(null)
+  const [abilityChoices, setAbilityChoices] = useState<string[] | null>(null)
   const [evoPopup, setEvoPopup] = useState<{ oldSprite: string; newSprite: string; oldName: string; newName: string } | null>(null)
   const [leagueOffer, setLeagueOffer] = useState(false)
   const [leagueTeamSelection, setLeagueTeamSelection] = useState(false)
@@ -2805,7 +2899,6 @@ function MainApp() {
   const speedrunTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const megaNodeSpawnedRef = useRef(false)
   const [battleMegaUsed, setBattleMegaUsed] = useState(false)
-  const [battleZMoveUsed, setBattleZMoveUsed] = useState(false)
   const [battleGmaxUsed, setBattleGmaxUsed] = useState(false)
   const [battlePrimalUsed, setBattlePrimalUsed] = useState(false)
   const [battleOriginUsed, setBattleOriginUsed] = useState(false)
@@ -2987,6 +3080,7 @@ function MainApp() {
   const [coopExchange, setCoopExchange] = useState<CoopExchange | null>(null)
   const [coopTradeMsg, setCoopTradeMsg] = useState<string>('')
   const [coopError, setCoopError] = useState<string>('')
+  const [coopRestartBlockedMsg, setCoopRestartBlockedMsg] = useState<string>('')
   const [coopChatOpen, setCoopChatOpen] = useState<boolean>(false)
   const [coopChatMsgs, setCoopChatMsgs] = useState<CoopChatMessage[]>([])
   const [coopChatText, setCoopChatText] = useState<string>('')
@@ -3170,7 +3264,6 @@ function MainApp() {
         return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...reset }
       }))
       setBattleMegaUsed(false)
-      setBattleZMoveUsed(false)
       setBattleGmaxUsed(false)
       setBattlePrimalUsed(false)
       setBattleOriginUsed(false)
@@ -3415,6 +3508,9 @@ function MainApp() {
     unlock_full_restore: 'Full Restore',
     unlock_max_revive: 'Max Revive',
     unlock_rare_candy: 'Rare Candy',
+    unlock_nature_machine: 'Máquina de Naturalezas',
+    unlock_iv_reroll: 'Reroll de IVs',
+    unlock_ability_capsule: 'Cápsula de Habilidad',
     unlock_elixir: 'Elixir',
     unlock_super_elixir: 'Super Elixir',
     unlock_full_elixir: 'Full Elixir',
@@ -3620,6 +3716,25 @@ function MainApp() {
   // usa las medallas ganadas como progreso entre etapas.
   function getStageProgression(): number {
     return difficulty === 'original' ? originalMedals.length : badges.length
+  }
+
+  // Dificultad para las funciones de balanceo. El Modo Aventura codifica su
+  // nivel incremental de ESA generación ("aventura_<nivel>") para que los
+  // enemigos sean más fuertes con cada victoria acumulada en esa generación.
+  function balDiff(d: Difficulty): string {
+    return d === 'aventura' ? `aventura_${getAventuraGen(currentRunGen).level}` : d
+  }
+
+  function getAventuraGen(gen: number): AventuraGenProgress {
+    return aventuraProgress[gen] ?? emptyAventuraGen()
+  }
+
+  function saveAventuraProgress(gen: number, p: AventuraGenProgress): void {
+    setAventuraProgress(prev => {
+      const updated = { ...prev, [gen]: p }
+      localStorage.setItem(AVENTURA_KEY, JSON.stringify(updated))
+      return updated
+    })
   }
 
   function getMaxTeamLevel(): number {
@@ -4025,9 +4140,9 @@ function MainApp() {
     let eligible = onlyMerchant
       ? RANDOM_EVENTS.filter(e => e.id === 'evolution_merchant' && routeProgress >= e.minRouteProgress)
       : RANDOM_EVENTS.filter(e => routeProgress >= e.minRouteProgress && !randomEventUsed.has(e.id))
-    // En modo Infinite la run es infinita: si ya se usaron todos los eventos,
-    // se reinicia el conjunto para que sigan apareciendo más adelante.
-    if (!onlyMerchant && eligible.length === 0 && difficulty === 'infinite' && randomEventUsed.size > 0) {
+    // En modo Infinite y Aventura la run es larga/infinita: si ya se usaron
+    // todos los eventos, se reinicia el conjunto para que sigan apareciendo.
+    if (!onlyMerchant && eligible.length === 0 && (difficulty === 'infinite' || difficulty === 'aventura') && randomEventUsed.size > 0) {
       setRandomEventUsed(new Set())
       eligible = RANDOM_EVENTS.filter(e => routeProgress >= e.minRouteProgress)
     }
@@ -4232,6 +4347,19 @@ function MainApp() {
     }
   }
 
+  // Ruta de una etapa del Modo Aventura: 15 nodos aleatorios + 1 jefe que otorga
+  // una insignia al final. Los ids empiezan en 6000 para no chocar con la Liga
+  // (1000-1999) ni la Calle Victoria (2000-2999).
+  function buildAventuraStageRoute(stageNum: number, rr: () => number): RouteNode[] {
+    const nodes: RouteNode[] = []
+    const startId = 6000 + stageNum * 100
+    for (let i = 0; i < 15; i++) {
+      nodes.push(generateRandomNodeType(startId + i, rr))
+    }
+    nodes.push({ id: startId + 15, type: 'boss', label: `Jefe #${stageNum}`, done: false })
+    return nodes
+  }
+
   function handleStartRunClick(): void {
     playClick()
     if (coopMode) {
@@ -4242,7 +4370,170 @@ function MainApp() {
       void openStarterSelect()
       return
     }
+    if (difficulty === 'aventura') {
+      void openAventuraSelect()
+      return
+    }
     startNewRun()
+  }
+
+  // Modo Aventura: abre la pantalla de selección de Pokémon de inicio. Al
+  // principio solo se pueden elegir iniciales; el resto se desbloquea al
+  // capturarlos (normales y shinies por separado).
+  async function openAventuraSelect(): Promise<void> {
+    setIsLoading(true)
+    setApiError('')
+    try {
+      const species = await getAllSpeciesList()
+      // Fija la generación de esta Aventura (la progresión incremental, los
+      // objetos guardados y las victorias son por generación).
+      setCurrentRunGen(getEffectiveGen())
+      setAventuraSpecies(species)
+      setAventuraTab('normal')
+      setAventuraSearch('')
+      setAventuraSelectedId(null)
+      setScreen('aventura_select')
+    } catch {
+      setApiError('No se pudieron cargar los Pokémon.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  function isAventuraUnlocked(id: number, shiny: boolean): boolean {
+    if (shiny) return !!pokedex[id]?.shinyCaught
+    return allStarterIds.has(id) || !!pokedex[id]?.caught
+  }
+
+  async function confirmAventuraStarter(): Promise<void> {
+    if (aventuraSelectedId === null) return
+    setIsLoading(true)
+    setApiError('')
+    try {
+      const starter = await buildPokemonFromApi(aventuraSelectedId, 1, 10, aventuraTab === 'shiny', 'aventura')
+      chosenAventuraStarterRef.current = starter
+      startAventuraRun(starter)
+    } catch {
+      setApiError('No se pudo iniciar la Aventura.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  function startAventuraRun(starter: Pokemon): void {
+    setRunSeed(Math.random())
+    const targetGen = currentRunGen || getEffectiveGen()
+    setCurrentRunGen(targetGen)
+    const routeSeed = String(Math.random()).slice(2, 12)
+    routeSeedRef.current = routeSeed
+    // Un único RNG con semilla para toda la run: crear uno nuevo en cada llamada
+    // devolvía siempre el mismo número y hacía que los 15 nodos fueran iguales.
+    const rng = createSeededRandom(routeSeed)
+    const rr = () => rng()
+    routeRandRef.current = rr
+
+    // Un modificador aleatorio por etapa (8 en total), cambian en cada etapa.
+    const stageMods = Array.from({ length: 8 }, () => randomFrom(RUN_MODIFIERS.filter(m => m.id && m.id !== 'none')))
+    setAventuraStageModifiers(stageMods)
+    setModifier(stageMods[0] ?? null)
+    setModifier2(null)
+    setBadges([])
+    setCurrentStage(1)
+    setOriginalMedals([])
+    const hpBonus = stageMods[0]?.playerMaxHpBonus ?? 0
+    let starterWithBonus = {
+      ...starter,
+      maxHp: starter.maxHp + hpBonus,
+      hp: starter.hp + hpBonus,
+    }
+    if (runChallenges.noEvolution) {
+      starterWithBonus = applyNoEvolutionBuff(starterWithBonus)
+    }
+    if (runChallenges.fixedLevel) {
+      starterWithBonus = { ...starterWithBonus, level: 50 }
+    }
+    setTeam([starterWithBonus])
+    setActiveIndex(0)
+    setEnemy(null)
+    setIsTrainerBattle(false)
+    setTrainerTeam([])
+    setTrainerPokemonIndex(0)
+    setTrainerName('')
+    setTrainerSprite('')
+    setTrainerBadge('')
+    setRestEncounter(null)
+    setDefeatSummary(null)
+    setVictoryUnlocks(null)
+    setPcStorage([])
+    setEggInventory([])
+    setRandomEventUsed(new Set())
+    setShinyNextEncounter(false)
+    setLegendaryNextEncounter(false)
+    setActiveRandomEvent(null)
+    if (speedrunTimerRef.current) {
+      clearInterval(speedrunTimerRef.current)
+      speedrunTimerRef.current = null
+    }
+    setSpeedrunSeconds(0)
+
+    // Dinero e inventario: se conservan los objetos guardados de la victoria
+    // anterior + los objetos de inicio habituales.
+    const startItems = metaProgression.permanentlyUnlockedItems
+    const extraBalls = startItems.includes('start_pokeballs_5') ? 5 : 0
+    const extraPotions =
+      (startItems.includes('start_potion_1') ? 1 : 0) +
+      (startItems.includes('start_potion_2') ? 1 : 0)
+    const extraMoney =
+      ((startItems.includes('start_money_1') ? 1 : 0) +
+       (startItems.includes('start_money_2') ? 1 : 0)) * 100
+    setMoney(runChallenges.noMoney ? 0 : 100 + extraMoney)
+    // Objetos guardados de la última victoria en ESTA generación + los de inicio.
+    const carriedItems = getAventuraGen(targetGen).carriedItems
+    const startingItems: string[] = runChallenges.noItems ? [] : [...carriedItems]
+    if (!runChallenges.noItems) {
+      startingItems.push('Potion')
+      for (let i = 0; i < 5 + extraBalls; i++) startingItems.push('Poké Ball')
+      for (let i = 0; i < extraPotions; i++) startingItems.push('Potion')
+      if (startItems.includes('start_revive_1')) startingItems.push('Revive')
+      if (startItems.includes('unlock_caja_bonguri')) {
+        startingItems.push('Poké Ball', 'Poké Ball')
+        const apricornBalls = ['Level Ball', 'Friend Ball', 'Love Ball', 'Heavy Ball', 'Fast Ball'].filter(isPokeballUnlocked)
+        startingItems.push(apricornBalls.length > 0 ? apricornBalls[Math.floor(Math.random() * apricornBalls.length)] : 'Poké Ball')
+      }
+      if (startItems.includes('unlock_estuche_mt')) startingItems.push('Disco MT')
+      if (startItems.includes('unlock_saco_bayas')) {
+        const unlockedBerries = BERRY_DROPS.filter(isBerryUnlocked)
+        if (unlockedBerries.length > 0) startingItems.push(unlockedBerries[Math.floor(Math.random() * unlockedBerries.length)])
+      }
+    }
+    setInventory(startingItems)
+
+    registerInPokedex(starter)
+    setRoute(buildAventuraStageRoute(1, rr))
+    setRouteIndex(0)
+
+    const activeChallengeNames: string[] = []
+    if (runChallenges.nuzlocke) activeChallengeNames.push('Nuzlocke')
+    if (runChallenges.soloStarter) activeChallengeNames.push('Solo Starter')
+    if (runChallenges.noItems) activeChallengeNames.push('Sin Items')
+    if (runChallenges.noHealing) activeChallengeNames.push('Sin Curación')
+    setRunStats({
+      battlesWon: 0, battlesLost: 0, totalDamageDealt: 0, totalDamageTaken: 0,
+      critsLanded: 0, superEffectiveHits: 0, koFirstTurn: 0, captures: 0,
+      itemsUsed: 0, moneySpent: 0, moneyEarned: 0, nodesCleared: 0, evolutions: 0,
+      teamSizeMax: 1, lowestHPEver: starter.hp, totalTurns: 0,
+      pokemonUsed: [starter.name], challengesActive: activeChallengeNames,
+    })
+    setBattleLog([
+      t('b.starter', { name: `${starter.name}${starter.shiny ? ' ✨' : ''}` }),
+      t('b.aventuraIntro', { gen: currentRunGen === 0 ? 'Random' : `Gen ${currentRunGen}` }),
+    ])
+    runStartTimeRef.current = Date.now()
+    setScoreSubmitState('idle')
+    setVoluntaryRunEnd(false)
+    setShowEndRunModal(false)
+    setScreen('route')
+    startBattleMusic()
   }
 
   async function openStarterSelect(): Promise<void> {
@@ -4271,6 +4562,12 @@ function MainApp() {
     const dailyCfg = isDailyRunRef.current ? getDailyConfig(dailySeed, [1,2,3,4,5,6,7,8,9]) : null
     const effectiveGen = coopModeRef.current ? (coopGenRef.current || generation) : (dailyCfg ? dailyCfg.generation : generation)
     const effectiveDifficulty = coopModeRef.current ? (coopDiffRef.current || 'medium') : (dailyCfg ? dailyCfg.difficulty : difficulty)
+    // El Modo Aventura no pasa por startNewRun: usa su propia pantalla de
+    // selección de inicial y su propio arranque (startAventuraRun).
+    if (effectiveDifficulty === 'aventura') {
+      void openAventuraSelect()
+      return
+    }
     // El Desafío Diario tiene su propia dificultad (no la del menú): se aplica
     // durante la run y se restaura al volver al menú.
     if (isDailyRunRef.current && dailyCfg) {
@@ -4610,7 +4907,6 @@ function MainApp() {
       for (let i = 0; i < 5 + extraBalls; i++) startingItems.push('Poké Ball')
       for (let i = 0; i < extraPotions; i++) startingItems.push('Potion')
       if (startItems.includes('start_revive_1')) startingItems.push('Revive')
-      if (startItems.includes('unlock_z_power_ring')) startingItems.push('Z Power Ring')
       // Caja Bonguri: 2 Poké Balls + 1 ball de bonguri aleatoria.
       if (startItems.includes('unlock_caja_bonguri')) {
         startingItems.push('Poké Ball', 'Poké Ball')
@@ -4780,7 +5076,10 @@ function MainApp() {
         : progression.completedLeague,
       completedOriginal: difficulty === 'original'
         ? Array.from(new Set([...progression.completedOriginal, genPlayed]))
-        : progression.completedOriginal
+        : progression.completedOriginal,
+      completedAventura: difficulty === 'aventura'
+        ? Array.from(new Set([...progression.completedAventura, genPlayed]))
+        : progression.completedAventura
     }
 
     localStorage.setItem('pokerand_progression', JSON.stringify(updatedProgression))
@@ -4841,7 +5140,6 @@ function MainApp() {
     if (activeChallengeCount >= 5) unlockAchievement('challenge_mania')
     if (battleMegaUsed) unlockAchievement('mega_win')
     if (battleGmaxUsed) unlockAchievement('gmax_win')
-    if (battleZMoveUsed) unlockAchievement('z_move_win')
     if (modifier?.forcedWeather || modifier2?.forcedWeather) unlockAchievement('weather_mania_win')
     if (difficulty === 'original') unlockAchievement('original_win')
 
@@ -4855,7 +5153,7 @@ function MainApp() {
       return updated
     })
     awardPokeCoins(baseCoins, `¡Victoria! (${difficulty === 'easy' ? 'Fácil' : difficulty === 'hard' ? 'Difícil' : 'Medio'})`)
-    if (currentNode && currentNode.id >= 1000) {
+    if (currentNode && currentNode.id >= 1000 && difficulty !== 'aventura') {
       awardPokeCoins(15, '🏆 Victoria en la Liga Pokémon')
     }
     if (hasActiveChallenge) awardPokeCoins(15, 'Bonus Desafío Activo')
@@ -4918,6 +5216,44 @@ function MainApp() {
     }
 
     if (routeIndex >= route.length - 1) {
+      // Modo Aventura: 8 etapas de 15 nodos aleatorios. Al derrotar el jefe de
+      // una etapa se gana una insignia, se cambia el modificador y se pasa a la
+      // siguiente etapa. Tras la 8ª insignia, victoria (se guardan los objetos).
+      if (difficulty === 'aventura') {
+        if (currentNode?.type === 'boss') {
+          const available = GYM_BADGES.filter(b => !badges.some(h => h.id === b.id))
+          const badge = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : null
+          if (!badge) return
+          const newBadges = [...badges, badge]
+          setBadges(newBadges)
+          setCurrentStage(newBadges.length + 1)
+          awardPokeCoins(10, '🎖️ Bonus por derrotar a un jefe del Modo Aventura')
+          if (newBadges.length >= 8) {
+            // Victoria: se guarda el inventario y sube el nivel incremental de
+            // ESTA generación (la próxima Aventura en esa gen será más difícil).
+            const genProgress = getAventuraGen(currentRunGen)
+            saveAventuraProgress(currentRunGen, {
+              level: genProgress.level + 1,
+              totalWins: genProgress.totalWins + 1,
+              carriedItems: [...inventory],
+            })
+            unlockAchievement('aventura_win')
+            setModifier(null)
+            finalizeRunVictory()
+            return
+          }
+          // Siguiente etapa: nuevo modificador y 15 nodos aleatorios nuevos.
+          const nextModifier = aventuraStageModifiers[newBadges.length] ?? null
+          setModifier(nextModifier)
+          setRoute(buildAventuraStageRoute(newBadges.length + 1, routeRandRef.current))
+          setRouteIndex(0)
+          setScreen('route')
+          setBattleLog((prev) => [t('b.aventuraStage', { n: newBadges.length + 1, modifier: nextModifier ? runModName(nextModifier.id ?? '') : '—' }), ...prev].slice(0, 15))
+          return
+        }
+        finalizeRunVictory()
+        return
+      }
       // Modo Original: al derrotar el jefe de una etapa se gana una medalla.
       // Con 8 medallas, la Calle Victoria y la Liga son obligatorias.
       if (currentNode && currentNode.id >= 4000 && difficulty === 'original') {
@@ -5255,16 +5591,24 @@ function MainApp() {
   }
 
   async function restartRun(): Promise<void> {
+    if (difficulty === 'aventura') {
+      setVoluntaryRunEnd(false)
+      setDefeatSummary(null)
+      void openAventuraSelect()
+      return
+    }
     if (coopModeRef.current && coopSessionCodeRef.current) {
       coopRestartInitiatedRef.current = true
       const reset = await resetCoopSession(coopSessionCodeRef.current)
       if (reset === 'blocked') {
         coopRestartInitiatedRef.current = false
         setCoopError(t('coop.waitPartnerFinish'))
+        setCoopRestartBlockedMsg(t('coop.waitPartnerFinish'))
         return
       }
       let exists = reset === 'ok'
       setCoopSessionEndedMsg('')
+      setCoopRestartBlockedMsg('')
       setCoopWaiting(false)
       if (!exists) {
         // La sesión fue eliminada (p. ej. esquema antiguo o cancelada). Se recrea
@@ -5348,11 +5692,15 @@ function MainApp() {
       if (cancelled) return
       const sess = await getCoopSession(code)
       if (!sess) return
+      // Si el compañero ya terminó, se puede reiniciar: se limpia el aviso.
+      const otherFinished = coopMyRoleRef.current === 'a' ? sess.finished_b : sess.finished_a
+      if (otherFinished) setCoopRestartBlockedMsg('')
       if (sess.restart_requested && !coopRestartInitiatedRef.current) {
         cancelled = true
         clearInterval(timer)
         await clearCoopRestart(code)
         setCoopSessionEndedMsg('')
+        setCoopRestartBlockedMsg('')
         setVoluntaryRunEnd(false)
         setDefeatSummary(null)
         await startNewRun(true)
@@ -5367,6 +5715,7 @@ function MainApp() {
   useEffect(() => {
     if (screen !== 'victory' && screen !== 'defeat') {
       coopRestartInitiatedRef.current = false
+      setCoopRestartBlockedMsg('')
     }
   }, [screen])
 
@@ -6857,7 +7206,7 @@ function MainApp() {
 
   function generateShopStock(excludeStone?: string): string[] {
     const allConsumableKeys = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i] && !TREASURES.includes(i))
-    const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && n !== 'Z Power Ring' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
+    const allHoldableKeys = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
     const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
     const shuffledHoldables = [...allHoldableKeys].sort(() => 0.5 - Math.random())
     // Mejoras de Espacio de Tienda: +1 objeto por cada versión desbloqueada.
@@ -6980,10 +7329,10 @@ function MainApp() {
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const targetLevel = difficulty === 'infinite' ? getInfiniteTargetLevel() : avgPlayerLevel
         const fetches = Array.from({ length: 4 }, () =>
-          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression(), targetLevel)
+          getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression(), targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
-              let scaled = scalePokemonForNode(base, currentNode, routeIndex, levelDiff, difficulty)
+              let scaled = scalePokemonForNode(base, currentNode, routeIndex, levelDiff, balDiff(difficulty))
               if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
               return scaled
             })
@@ -7007,10 +7356,10 @@ function MainApp() {
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const targetLevel = difficulty === 'infinite' ? getInfiniteTargetLevel() : avgPlayerLevel + 1
         const fetches = Array.from({ length: 2 }, (_, idx) =>
-          getBalancedPokemonByGeneration(targetGen, routeIndex + idx, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression(), targetLevel)
+          getBalancedPokemonByGeneration(targetGen, routeIndex + idx, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression(), targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
-              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff, difficulty)
+              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff, balDiff(difficulty))
               if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
               if (runChallenges.totalRandomizer) {
                 scaled = {
@@ -7114,7 +7463,7 @@ function MainApp() {
 
     if (currentNode.type === 'spin') {
       const healingPool = Object.keys(ALL_SHOP_ITEMS).filter(i => isConsumableUnlocked(i) && !POKEBALL_NAMES.includes(i) && !EVOLUTION_STONE_UNLOCK_IDS[i] && i !== 'Cuerda Huida')
-      const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && n !== 'Z Power Ring' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
+      const passivePool = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked).filter(n => n !== 'Mega Stone' && n !== 'Dynamax Band' && n !== 'Prisma Rojo' && n !== 'Prisma Azul' && !EVOLUTION_ITEM_UNLOCK_IDS[n])
       const unlockedStones = EVOLUTION_STONES.filter(s => isEvolutionStoneUnlocked(s))
       const selectedStone = unlockedStones.length > 0 ? [unlockedStones[Math.floor(Math.random() * unlockedStones.length)]] : []
       const shuffledH = [...healingPool].sort(() => 0.5 - Math.random())
@@ -7138,10 +7487,10 @@ function MainApp() {
           const targetLevel = difficulty === 'infinite'
             ? getInfiniteTargetLevel() + 1 + Math.floor(Math.random() * 2)
             : avgPlayerLevel + Math.floor(Math.random() * 3) - 1
-          return getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression(), targetLevel)
+          return getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression(), targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
-              const scaled = scalePokemonForNode(base, currentNode, routeIndex, levelDiff, difficulty)
+              const scaled = scalePokemonForNode(base, currentNode, routeIndex, levelDiff, balDiff(difficulty))
               return runChallenges.fixedLevel ? { ...scaled, level: 50 } : scaled
             })
         })
@@ -7184,7 +7533,7 @@ function MainApp() {
           : avgPlayerLevel + 2
         const base = await buildPokemonFromApi(gmaxId, targetGen, gmaxTargetLevel, false, difficulty, true)
         const gmaxLevelDelta = modifier?.enemyLevelDelta ?? 0
-        let scaled = scalePokemonForNode({ ...base, minAppearLevel: undefined }, currentNode, routeIndex, gmaxLevelDelta, difficulty)
+        let scaled = scalePokemonForNode({ ...base, minAppearLevel: undefined }, currentNode, routeIndex, gmaxLevelDelta, balDiff(difficulty))
         if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
         if (runChallenges.totalRandomizer) {
           scaled = {
@@ -7267,7 +7616,7 @@ function MainApp() {
     try {
       if (runChallenges.egglocke) {
         const targetGen = getEffectiveGen()
-        const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression())
+        const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression())
         const eggId = Math.floor(Math.random() * 900) + 1
         const eggEntry = {
           name: restPokemonBase.name,
@@ -7309,9 +7658,9 @@ function MainApp() {
       const restTargetLevel = difficulty === 'infinite'
             ? getInfiniteTargetLevel() + (Math.floor(Math.random() * 3) - 1)
         : avgPlayerLevel - 2 + Math.floor(Math.random() * 3) - 1
-      const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression(), restTargetLevel)
+      const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression(), restTargetLevel)
       const levelDiff = restTargetLevel - restPokemonBase.level
-      const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, levelDiff, difficulty)
+      const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, levelDiff, balDiff(difficulty))
       generatedEncounter.holdItem = null
       if (shinyNextEncounter) {
         generatedEncounter.shiny = true
@@ -7372,10 +7721,10 @@ function MainApp() {
             ? getInfiniteTargetLevel() + trainerMemberLevelOffset(idx, teamSize, true, difficulty)
             : avgPlayerLevel + trainerMemberLevelOffset(idx, teamSize, true, difficulty)
           const baseStepIndex = difficulty === 'infinite' ? Math.max(0, targetLevel - 10) : routeIndex
-          return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression(), targetLevel)
+          return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression(), targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
-              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels, difficulty)
+              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels, balDiff(difficulty))
               if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
               if (runChallenges.totalRandomizer) {
                 scaled = {
@@ -7416,10 +7765,10 @@ function MainApp() {
           // En Infinite, genera al rival directamente a su nivel objetivo para que
           // respete etapas evolutivas y movimientos según el nivel. En Co-op, igual.
           const baseStepIndex = difficulty === 'infinite' ? Math.max(0, targetLevel - 10) : routeIndex
-          return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression(), targetLevel)
+          return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression(), targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
-              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
+              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , balDiff(difficulty))
               if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
               if (runChallenges.totalRandomizer) {
                 scaled = {
@@ -7485,10 +7834,10 @@ function MainApp() {
                 // respete etapas evolutivas y movimientos según el nivel. En Co-op,
                 // igual: la especie debe ser coherente con el nivel objetivo real.
                 const baseStepIndex = difficulty === 'infinite' ? Math.max(0, targetLevel - 10) : routeIndex
-                return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, isBoss, runChallenges.allShiny, difficulty, isBoss ? getStageProgression() : -1, getStageProgression(), targetLevel, isElite)
+                return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, isBoss, runChallenges.allShiny, balDiff(difficulty), isBoss ? getStageProgression() : -1, getStageProgression(), targetLevel, isElite)
                   .then((base) => {
                     const levelDiff = targetLevel - base.level
-                    let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
+                    let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , balDiff(difficulty))
                     if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
                     if (runChallenges.totalRandomizer) {
                       scaled = {
@@ -7573,10 +7922,10 @@ function MainApp() {
         const targetLevel = difficulty === 'infinite'
             ? getInfiniteTargetLevel() + (Math.floor(Math.random() * 3) - 1)
           : avgPlayerLevel + wildLevelOffset
-        const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, difficulty, -1, getStageProgression(), targetLevel)
+        const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression(), targetLevel)
         const levelDiff = targetLevel - enemyBase.level
-        let generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , difficulty)
-        generatedEnemy = balanceWildPokemonToTeam(generatedEnemy, team, difficulty)
+        let generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , balDiff(difficulty))
+        generatedEnemy = balanceWildPokemonToTeam(generatedEnemy, team, balDiff(difficulty))
         if (runChallenges.fixedLevel) generatedEnemy = { ...generatedEnemy, level: 50 }
         if (runChallenges.totalRandomizer) {
           generatedEnemy = {
@@ -7590,8 +7939,8 @@ function MainApp() {
         if (legendaryNextEncounter) {
           const ids = REGION_LEGENDARIES[getEffectiveGen()] ?? REGION_LEGENDARIES[1]
           const legendId = ids[Math.floor(Math.random() * ids.length)]
-          const legendBase = await buildPokemonFromApi(legendId, getEffectiveGen(), Math.max(targetLevel, 40), runChallenges.allShiny || shinyNextEncounter, difficulty, true)
-          generatedEnemy = scalePokemonForNode(legendBase, currentNode, routeIndex, 0, difficulty)
+          const legendBase = await buildPokemonFromApi(legendId, getEffectiveGen(), Math.max(targetLevel, 40), runChallenges.allShiny || shinyNextEncounter, balDiff(difficulty), true)
+          generatedEnemy = scalePokemonForNode(legendBase, currentNode, routeIndex, 0, balDiff(difficulty))
           generatedEnemy = { ...generatedEnemy, holdItem: null, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
           setLegendaryNextEncounter(false)
           if (shinyNextEncounter) setShinyNextEncounter(false)
@@ -7627,11 +7976,10 @@ function MainApp() {
       setTeam(prev => prev.map((p, i) => {
         const orig = p.megaOrig
         const entered = i === activeIndex
-        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: entered, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false, zMoveUsed: false }
-        return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: entered, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false, zMoveUsed: false }
+        if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: entered, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
+        return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: entered, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false }
       }))
       setBattleMegaUsed(false)
-      setBattleZMoveUsed(false)
       setBattleGmaxUsed(false)
       setBattlePrimalUsed(false)
       setBattleOriginUsed(false)
@@ -8875,30 +9223,6 @@ function MainApp() {
       nextPlayer = { ...nextPlayer, choiceLockedMove }
       nextTeam[activeIndex] = nextPlayer
     }
-    // Movimiento Z: solo puede usarse una vez por combate. Se marca al activarlo.
-    if (move.isZMove) {
-      nextPlayer = { ...nextPlayer, zMoveUsed: true }
-      nextTeam[activeIndex] = nextPlayer
-      setBattleZMoveUsed(true)
-      unlockAchievement('first_z_move')
-      if (battleMegaUsed) unlockAchievement('mega_z_combo')
-      // Contadores de Movimientos Z (meta): total y tipos distintos.
-      const zTypes = metaProgression.zMoveTypes ?? []
-      const newZTotal = (metaProgression.totalZMoves ?? 0) + 1
-      const newZTypes = zTypes.includes(move.type) ? zTypes : [...zTypes, move.type]
-      if (newZTotal >= 10) unlockAchievement('z_move_master')
-      if (newZTypes.length >= 6) unlockAchievement('z_all_types')
-      setMetaProgression(prev => {
-        const types = prev.zMoveTypes ?? []
-        const updated = {
-          ...prev,
-          totalZMoves: (prev.totalZMoves ?? 0) + 1,
-          zMoveTypes: types.includes(move.type) ? types : [...types, move.type],
-        }
-        localStorage.setItem('pokerand_meta', JSON.stringify(updated))
-        return updated
-      })
-    }
     let nextEnemy = { ...enemy }
     const logs: string[] = []
 
@@ -9047,7 +9371,6 @@ function MainApp() {
       // Golpe Definitivo: el ataque del jugador debilita al enemigo de un golpe.
       if (prevEnemyHp > 0 && nextEnemy.hp <= 0) {
         setRunStats(prev => ({ ...prev, koFirstTurn: prev.koFirstTurn + 1 }))
-        if (move.isZMove) unlockAchievement('z_move_ko')
       }
       if (playerHit.superEffective) {
         setRunStats(prev => ({ ...prev, superEffectiveHits: prev.superEffectiveHits + 1 }))
@@ -9585,7 +9908,8 @@ function MainApp() {
       } else {
         setTeam(prev => [...prev, capturedPkmn])
       }
-      completeCurrentNode()
+      captureSummaryCompleteNodeRef.current = true
+      setCaptureSummary(capturedPkmn)
       return
     }
 
@@ -9619,13 +9943,23 @@ function MainApp() {
       } else {
         setTeam(prev => [...prev, capturedPkmn])
       }
-      completeCurrentNode()
+      captureSummaryCompleteNodeRef.current = true
+      setCaptureSummary(capturedPkmn)
     } else {
       // Falló
       setBattleLog(prev => [t('b.escapedBall', { name: enemy.name, ball: ballName, pct: Math.round(catchProbability * 100) }), ...prev].slice(0, 15))
       setCaptureMessage(`¡${enemy.name} escapó!`)
       setTimeout(() => setCaptureMessage(null), 2000)
     }
+  }
+
+  // Cierra el resumen de captura y continúa con el nodo (combate/descanso) o
+  // simplemente se cierra (legendario).
+  function closeCaptureSummary(): void {
+    const shouldComplete = captureSummaryCompleteNodeRef.current
+    setCaptureSummary(null)
+    captureSummaryCompleteNodeRef.current = false
+    if (shouldComplete) void completeCurrentNode()
   }
 
   function openCaptureMenu(): void {
@@ -9872,8 +10206,7 @@ function MainApp() {
     const itemIndex = inventory.indexOf(itemName)
     if (itemIndex === -1) return
     if (HOLDABLE_ITEMS[itemName]) return
-    if (POKEBALL_NAMES.includes(itemName)) {
-      if (screen === 'battle' && enemy && !isTrainerBattle && currentNode?.type !== 'gmax') {
+    if (POKEBALL_NAMES.includes(itemName)) {      if (screen === 'battle' && enemy && !isTrainerBattle && currentNode?.type !== 'gmax') {
         if (isLoading) return
         if (runChallenges.soloStarter) {
           setBattleLog((prev) => [t('b.challengeSoloStarter'), ...prev].slice(0, 15))
@@ -9981,6 +10314,18 @@ function MainApp() {
       playCoin()
       setCoinExchangeMsg(t('b.magmaEmblemRedeemed'))
       setTimeout(() => setCoinExchangeMsg(null), 3000)
+      return
+    }
+
+    if (itemName === 'Máquina de Naturalezas' || itemName === 'Reroll de IVs' || itemName === 'Cápsula de Habilidad') {
+      const candidates = team.filter(p => p.hp > 0)
+      if (candidates.length === 0) {
+        setBattleLog((prev) => [t('b.noPokemonForStone'), ...prev].slice(0, 15))
+        return
+      }
+      setAbilityTargetIdx(null)
+      setAbilityChoices(null)
+      setMetaEditModal({ kind: itemName === 'Máquina de Naturalezas' ? 'nature' : itemName === 'Reroll de IVs' ? 'ivs' : 'ability', itemIndex })
       return
     }
 
@@ -10133,6 +10478,91 @@ function MainApp() {
     setBattleLog((prev) => [t('b.usedItem', { item: itemLocalizedName(itemName), name: activePokemon.name }), ...prev].slice(0, 15))
   }
 
+  // Aplica la Máquina de Naturalezas a un Pokémon del equipo.
+  function applyNatureMachine(teamIdx: number): void {
+    const modal = metaEditModal
+    const pokemon = team[teamIdx]
+    if (!modal || !pokemon) return
+    const oldNature = pokemon.nature
+    const newNature = randomNature()
+    let updated: Pokemon = { ...pokemon, nature: newNature }
+    const statFields: Array<[MetaStatKey, 'attack' | 'defense' | 'spAttack' | 'spDefense' | 'speed']> = [
+      ['attack', 'attack'], ['defense', 'defense'], ['spAttack', 'spAttack'], ['spDefense', 'spDefense'], ['speed', 'speed'],
+    ]
+    for (const [key, field] of statFields) {
+      const oldMult = natureMultiplier(oldNature, key)
+      const newMult = natureMultiplier(newNature, key)
+      const val = pokemon[field]
+      updated = { ...updated, [field]: Math.round(val / oldMult * newMult) }
+    }
+    setTeam(prev => prev.map((p, i) => (i === teamIdx ? updated : p)))
+    setInventory(prev => prev.filter((_, i) => i !== modal.itemIndex))
+    setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
+    setBattleLog(prev => [t('b.natureChanged', { name: pokemon.name, nature: natureName(newNature, getLanguage()) }), ...prev].slice(0, 15))
+    setMetaEditModal(null)
+  }
+
+  // Re-tira los IVs de un Pokémon del equipo con el Reroll de IVs.
+  function applyIvReroll(teamIdx: number): void {
+    const modal = metaEditModal
+    const pokemon = team[teamIdx]
+    if (!modal || !pokemon) return
+    const oldIvs = pokemon.ivs ?? { hp: 0, attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+    const newIvs = generateIVs()
+    const applyStat = (ivField: keyof PokemonIVs, statField: keyof Pokemon): Pokemon => {
+      const oldBonus = ivStatBonus(oldIvs[ivField], pokemon.level)
+      const newBonus = ivStatBonus(newIvs[ivField], pokemon.level)
+      const val = pokemon[statField] as number
+      return { ...updated, [statField]: val - oldBonus + newBonus }
+    }
+    let updated: Pokemon = { ...pokemon, ivs: newIvs }
+    updated = applyStat('hp', 'maxHp')
+    updated = applyStat('attack', 'attack')
+    updated = applyStat('defense', 'defense')
+    updated = applyStat('spAttack', 'spAttack')
+    updated = applyStat('spDefense', 'spDefense')
+    updated = applyStat('speed', 'speed')
+    const hpRatio = pokemon.maxHp > 0 ? pokemon.hp / pokemon.maxHp : 1
+    updated = { ...updated, hp: Math.min(updated.maxHp, Math.max(0, Math.round(updated.maxHp * hpRatio))) }
+    const total = newIvs.hp + newIvs.attack + newIvs.defense + newIvs.spAttack + newIvs.spDefense + newIvs.speed
+    setTeam(prev => prev.map((p, i) => (i === teamIdx ? updated : p)))
+    setInventory(prev => prev.filter((_, i) => i !== modal.itemIndex))
+    setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
+    setBattleLog(prev => [t('b.ivsRerolled', { name: pokemon.name, total }), ...prev].slice(0, 15))
+    setMetaEditModal(null)
+  }
+
+  // Cambia la habilidad de un Pokémon por otra de su especie (Cápsula de Habilidad).
+  async function applyAbilityChange(teamIdx: number, chosenAbility?: string): Promise<void> {
+    const modal = metaEditModal
+    const pokemon = team[teamIdx]
+    if (!modal || !pokemon) return
+    let newAbility = chosenAbility
+    if (!newAbility) {
+      let abilities: string[] = []
+      try {
+        abilities = await getPokemonAbilities(pokemon.id)
+      } catch {}
+      const alternatives = abilities.filter(a => a !== pokemon.ability)
+      if (alternatives.length === 0) {
+        setBattleLog(prev => [t('b.abilityNoAlternative', { name: pokemon.name }), ...prev].slice(0, 15))
+        setMetaEditModal(null)
+        setAbilityTargetIdx(null)
+        setAbilityChoices(null)
+        return
+      }
+      newAbility = alternatives[Math.floor(Math.random() * alternatives.length)]
+    }
+    const updated: Pokemon = { ...pokemon, ability: newAbility }
+    setTeam(prev => prev.map((p, i) => (i === teamIdx ? updated : p)))
+    setInventory(prev => prev.filter((_, i) => i !== modal.itemIndex))
+    setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
+    setBattleLog(prev => [t('b.abilityChanged', { name: pokemon.name, ability: abilityName(newAbility, getLanguage()) }), ...prev].slice(0, 15))
+    setMetaEditModal(null)
+    setAbilityTargetIdx(null)
+    setAbilityChoices(null)
+  }
+
   function applyRevive(targetIndex: number): void {
     if (!reviveModal) return
     const { itemName, itemIndex } = reviveModal
@@ -10179,7 +10609,8 @@ function MainApp() {
       setTeam((previous) => [...previous, captured])
       setBattleLog((prev) => [t('b.captured', { name: captured.name }), ...prev].slice(0, 15))
     }
-    completeCurrentNode()
+    captureSummaryCompleteNodeRef.current = true
+    setCaptureSummary(captured)
   }
 
   function skipRestCapture(): void {
@@ -10218,6 +10649,8 @@ function MainApp() {
       setBattleLog((prev) => [t('b.capturedLegend', { name: captured.name }), ...prev].slice(0, 15))
     }
     setLegendaryEncounter(null)
+    captureSummaryCompleteNodeRef.current = false
+    setCaptureSummary(captured)
   }
 
   function skipLegendaryCapture(): void {
@@ -10228,6 +10661,11 @@ function MainApp() {
   }
 
   function handleInfiniteRunDefeat(finalTeam: Pokemon[]): void {
+    // En el Modo Aventura, perder (o terminar sin ganar) reinicia la progresión
+    // incremental de ESTA generación: nivel, victorias y objetos guardados.
+    if (difficulty === 'aventura') {
+      saveAventuraProgress(currentRunGen, emptyAventuraGen())
+    }
     if (difficulty !== 'infinite') {
       setScoreSubmitState('idle')
       return
@@ -10795,6 +11233,116 @@ function MainApp() {
         </div>
       )}
 
+      {/* Modal Máquina de Naturalezas / Reroll de IVs / Cápsula de Habilidad */}
+      {metaEditModal && (
+        <div className="modal-backdrop" onClick={() => { setMetaEditModal(null); setAbilityTargetIdx(null); setAbilityChoices(null) }}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ padding: '1.5rem', maxWidth: '380px', width: '90%', margin: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
+              {ITEM_SPRITES[metaEditModal.kind === 'nature' ? 'Máquina de Naturalezas' : metaEditModal.kind === 'ivs' ? 'Reroll de IVs' : 'Cápsula de Habilidad'] && (
+                <img
+                  src={ITEM_SPRITES[metaEditModal.kind === 'nature' ? 'Máquina de Naturalezas' : metaEditModal.kind === 'ivs' ? 'Reroll de IVs' : 'Cápsula de Habilidad']}
+                  alt=""
+                  style={{ width: '36px', height: '36px', imageRendering: 'pixelated' }}
+                />
+              )}
+              <div>
+                <h3 style={{ margin: 0, color: '#ffcb05', fontSize: '1.1rem' }}>
+                  {itemLocalizedName(metaEditModal.kind === 'nature' ? 'Máquina de Naturalezas' : metaEditModal.kind === 'ivs' ? 'Reroll de IVs' : 'Cápsula de Habilidad')}
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#9b98cf' }}>
+                  {metaEditModal.kind === 'nature' ? t('metaEdit.naturePrompt') : metaEditModal.kind === 'ivs' ? t('metaEdit.ivsPrompt') : t('metaEdit.abilityPrompt')}
+                </p>
+              </div>
+            </div>
+
+            {metaEditModal.kind === 'ability' && abilityChoices !== null && abilityTargetIdx !== null ? (
+              <>
+                <p style={{ color: '#d9d6f2', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                  {t('metaEdit.abilityCurrent', { name: team[abilityTargetIdx]?.name ?? '', ability: abilityName(team[abilityTargetIdx]?.ability, getLanguage()) })}
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {abilityChoices.map((ab) => (
+                    <button
+                      key={ab}
+                      type="button"
+                      className="tiny-btn"
+                      style={{ width: '100%', justifyContent: 'flex-start', color: '#9da6ff' }}
+                      onClick={() => void applyAbilityChange(abilityTargetIdx, ab)}
+                    >
+                      {abilityName(ab, getLanguage())} — {abilityDesc(ab, getLanguage())}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" className="secondary" style={{ width: '100%', marginTop: '1rem' }} onClick={() => { setAbilityChoices(null); setAbilityTargetIdx(null) }}>
+                  {t('common.cancel')}
+                </button>
+              </>
+            ) : (
+              <>
+                <p style={{ color: '#d9d6f2', fontSize: '0.85rem', marginBottom: '1rem' }}>{t('metaEdit.choosePokemon')}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {team.map((pkmn, idx) => {
+                    const isAlive = pkmn.hp > 0
+                    const showAbilityPreview = metaEditModal.kind === 'ability'
+                    return (
+                      <button
+                        key={`metaedit-target-${idx}`}
+                        type="button"
+                        disabled={!isAlive}
+                        onClick={() => {
+                          if (metaEditModal.kind === 'ability') {
+                            setAbilityTargetIdx(idx)
+                            void getPokemonAbilities(pkmn.id).then((list) => {
+                              const alts = list.filter(a => a !== pkmn.ability)
+                              setAbilityChoices(alts.length > 0 ? alts : [])
+                              if (alts.length === 0) {
+                                setBattleLog(prev => [t('b.abilityNoAlternative', { name: pkmn.name }), ...prev].slice(0, 15))
+                                setMetaEditModal(null)
+                                setAbilityTargetIdx(null)
+                                setAbilityChoices(null)
+                              }
+                            }).catch(() => {
+                              setBattleLog(prev => [t('b.abilityNoAlternative', { name: pkmn.name }), ...prev].slice(0, 15))
+                              setMetaEditModal(null)
+                              setAbilityTargetIdx(null)
+                              setAbilityChoices(null)
+                            })
+                          } else if (metaEditModal.kind === 'nature') {
+                            applyNatureMachine(idx)
+                          } else {
+                            applyIvReroll(idx)
+                          }
+                        }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
+                          opacity: isAlive ? 1 : 0.45, cursor: isAlive ? 'pointer' : 'not-allowed',
+                          background: 'rgba(15,23,42,0.5)', border: '1px solid rgba(168,85,247,0.4)', borderRadius: '8px', padding: '8px 10px'
+                        }}
+                      >
+                        <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
+                        <div style={{ textAlign: 'left', flex: 1, minWidth: 0 }}>
+                          <strong style={{ display: 'block', fontSize: '0.85rem', textTransform: 'capitalize', color: isAlive ? '#f8fafc' : '#7d7ab5' }}>{pkmn.name}</strong>
+                          {showAbilityPreview && pkmn.ability && (
+                            <span style={{ fontSize: '0.7rem', color: '#9da6ff' }}>{abilityName(pkmn.ability, getLanguage())}</span>
+                          )}
+                          {!showAbilityPreview && (
+                            <span style={{ fontSize: '0.7rem', color: '#7d7ab5' }}>Nv. {pkmn.level}</span>
+                          )}
+                        </div>
+                        {!isAlive && <span style={{ fontSize: '0.7rem', color: '#ff8a80' }}>{t('pvp.defeated')}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+                <button type="button" className="secondary" style={{ width: '100%', marginTop: '1rem' }} onClick={() => { setMetaEditModal(null); setAbilityTargetIdx(null); setAbilityChoices(null) }}>
+                  {t('common.cancel')}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Modal Equipar Objeto Pasivo */}
       {equipModal && (
         <div className="modal-backdrop" onClick={() => setEquipModal(null)}>
@@ -11042,6 +11590,25 @@ function MainApp() {
             >
               Cancelar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Resumen de captura: naturaleza, IVs y habilidad del ejemplar */}
+      {captureSummary && (
+        <div className="modal-backdrop" onClick={closeCaptureSummary}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '360px', textAlign: 'center', padding: '1.5rem' }}>
+            <h3 style={{ color: '#4d9bff', margin: '0 0 0.5rem' }}>{t('capture.summary')}</h3>
+            <div style={{ margin: '0.25rem 0' }}>
+              <img className="sprite" src={captureSummary.sprite} alt={captureSummary.name} onError={fallbackSprite} style={{ width: '96px', height: '96px', imageRendering: 'pixelated' }} />
+            </div>
+            <h4 style={{ margin: '0 0 0.75rem', color: '#f3f1ff', textTransform: 'capitalize' }}>
+              {captureSummary.name}{captureSummary.shiny ? ' ✨' : ''} <span style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>Nv.{captureSummary.level}</span>
+            </h4>
+            <div style={{ textAlign: 'left', background: 'rgba(0,0,0,0.25)', borderRadius: '10px', padding: '0.75rem' }}>
+              <PokemonMetaTooltip p={captureSummary} showHeader={false} />
+            </div>
+            <button className="cta" onClick={closeCaptureSummary} type="button" style={{ marginTop: '1rem', width: '100%' }}>{t('route.continue')}</button>
           </div>
         </div>
       )}
@@ -12192,6 +12759,104 @@ function MainApp() {
         </section>
       )}
 
+      {screen === 'aventura_select' && (
+        <section className="panel setup-panel" style={{ maxWidth: '820px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <h2 style={{ margin: 0, color: '#34d399' }}>{t('setup.aventura')}</h2>
+            <button className="tiny-btn" onClick={() => { playClick(); setScreen('setup'); startMenuMusic() }} type="button" style={{ color: '#ff8a80' }}>
+              {t('common.close')}
+            </button>
+          </div>
+          <p style={{ textAlign: 'center', color: '#9b98cf', marginBottom: '0.5rem' }}>
+            {t('setup.aventuraPick')}
+          </p>
+          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#7d7ab5', marginBottom: '0.5rem' }}>
+            {(() => {
+              const gen = currentRunGen || getEffectiveGen()
+              const gp = getAventuraGen(gen)
+              return t('setup.aventuraProgressInfo', { gen: generationRegions[gen] ?? `Gen ${gen}`, level: gp.level, wins: gp.totalWins, items: gp.carriedItems.length })
+            })()}
+          </p>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '0.75rem', justifyContent: 'center' }}>
+            <button
+              type="button"
+              className="cta"
+              onClick={() => { playClick(); setAventuraTab('normal'); setAventuraSelectedId(null) }}
+              style={{ background: aventuraTab === 'normal' ? '#34d399' : '#475569', color: '#000', padding: '6px 18px', fontSize: '0.85rem' }}
+            >
+              {t('setup.aventuraNormal')}
+            </button>
+            <button
+              type="button"
+              className="cta"
+              onClick={() => { playClick(); setAventuraTab('shiny'); setAventuraSelectedId(null) }}
+              style={{ background: aventuraTab === 'shiny' ? '#fbbf24' : '#475569', color: '#000', padding: '6px 18px', fontSize: '0.85rem' }}
+            >
+              {t('setup.aventuraShiny')}
+            </button>
+          </div>
+          <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
+            <input
+              type="text"
+              placeholder="🔍 Buscar Pokémon..."
+              value={aventuraSearch}
+              onChange={(e) => setAventuraSearch(e.target.value)}
+              style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(52,211,153,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }}
+            />
+            {aventuraSearch && (
+              <button type="button" onClick={() => setAventuraSearch('')}
+                style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#9b98cf', cursor: 'pointer', fontSize: '0.9rem' }}>✖</button>
+            )}
+          </div>
+          <div className="aventura-grid">
+            {aventuraSpecies
+              .filter(p => {
+                const term = aventuraSearch.toLowerCase().trim()
+                return !term || p.name.toLowerCase().includes(term) || String(p.id).includes(term)
+              })
+              .sort((a, b) => a.id - b.id)
+              .map(p => {
+                const unlocked = isAventuraUnlocked(p.id, aventuraTab === 'shiny')
+                const isSelected = aventuraSelectedId === p.id
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`aventura-tile ${isSelected ? 'is-selected' : ''}`}
+                    onClick={() => { if (unlocked) { playClick(); setAventuraSelectedId(p.id) } }}
+                    style={{ opacity: unlocked ? 1 : 0.4, cursor: unlocked ? 'pointer' : 'not-allowed' }}
+                    title={`#${p.id} ${p.name}`}
+                  >
+                    <div className="aventura-sprite-wrap">
+                      <img
+                        src={pokemonIconUrl(p.id, aventuraTab === 'shiny')}
+                        alt={p.name}
+                        onError={fallbackSprite}
+                        className={`aventura-poke-icon${aventuraTab === 'shiny' ? ' is-shiny' : ''}`}
+                        loading="lazy"
+                        style={{ animationDelay: `${(p.id % 12) * 0.12}s` }}
+                      />
+                      {!unlocked && <span className="aventura-lock">🔒</span>}
+                    </div>
+                    <span className="aventura-name">{p.name.replace(/-/g, ' ')}</span>
+                  </button>
+                )
+              })}
+          </div>
+          <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+            <button
+              className="cta"
+              onClick={() => { if (aventuraSelectedId !== null) void confirmAventuraStarter() }}
+              disabled={aventuraSelectedId === null || isLoading}
+              style={{ background: '#34d399', color: '#000', fontSize: '1rem' }}
+            >
+              {isLoading ? t('setup.loading') : t('setup.aventuraStart')}
+            </button>
+            {apiError && <p className="error-line">{apiError}</p>}
+          </div>
+        </section>
+      )}
+
       {screen === 'setup' && (
         <section className="panel setup-panel">
           <div className="setup-hero">
@@ -12227,6 +12892,7 @@ function MainApp() {
               const completedColiseum = progression.completedColiseum.includes(gen)
               const completedLeague = progression.completedLeague.includes(gen)
               const completedOriginal = progression.completedOriginal.includes(gen)
+              const completedAventura = progression.completedAventura.includes(gen)
 
               return (
                 <button
@@ -12256,6 +12922,9 @@ function MainApp() {
                       {completedOriginal && (
                         <span className="badge-medium" title={language === 'en' ? 'Completed on Original' : 'Completado en Modo Original'}>🕹️</span>
                       )}
+                      {completedAventura && (
+                        <span className="badge-medium" title={language === 'en' ? 'Completed on Adventure' : 'Completado en Modo Aventura'}>🗺️</span>
+                      )}
                     </span>
                   </div>
                   <strong>{generationRegions[gen]}</strong>
@@ -12282,6 +12951,7 @@ function MainApp() {
               const randomCompletedAny = progression.completedAny.length > 0
               const randomCompletedColiseum = generations.every((g) => progression.completedColiseum.includes(g))
               const randomCompletedLeague = generations.every((g) => progression.completedLeague.includes(g))
+              const randomCompletedAventura = generations.every((g) => progression.completedAventura.includes(g))
               return (
                 <button
                   key={0}
@@ -12325,6 +12995,9 @@ function MainApp() {
                       )}
                       {randomCompletedLeague && (
                         <span className="badge-medium" title={language === 'en' ? 'Completed on the League' : 'Completado en Liga'}>🏅</span>
+                      )}
+                      {randomCompletedAventura && (
+                        <span className="badge-medium" title={language === 'en' ? 'Completed on Adventure' : 'Completado en Modo Aventura'}>🗺️</span>
                       )}
                     </span>
                     <strong style={{ fontSize: '1rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5', whiteSpace: 'nowrap' }}>
@@ -12524,6 +13197,37 @@ function MainApp() {
               )}
             </button>
             )})()}
+          </div>
+
+          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
+            <button
+              className={`gen-tile ${difficulty === 'aventura' ? 'is-active' : ''}`}
+              onClick={() => { playClick(); handleSelectDifficulty('aventura') }}
+              onMouseEnter={playHover}
+              type="button"
+              disabled={isLoading}
+              style={{
+                borderColor: difficulty === 'aventura' ? '#ef4444' : '#7f1d1d',
+                background: difficulty === 'aventura' ? 'rgba(239,68,68,0.18)' : 'rgba(127,29,29,0.08)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: '4px', padding: '12px', cursor: isLoading ? 'not-allowed' : 'pointer'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.2rem', color: '#f87171' }}>{t('setup.aventura')}</span>
+              </div>
+              {(() => {
+                // Victorias de la generación seleccionada (en Random, el total).
+                const wins = generation === 0
+                  ? Object.values(aventuraProgress).reduce((s, p) => s + p.totalWins, 0)
+                  : getAventuraGen(generation).totalWins
+                return wins > 0 && (
+                  <span style={{ fontSize: '0.78rem', color: '#fca5a5' }}>
+                    {t('setup.aventuraWins', { n: wins })}
+                  </span>
+                )
+              })()}
+            </button>
           </div>
 
           <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>🎲 {t('setup.daily')}</h2>
@@ -12824,7 +13528,9 @@ function MainApp() {
           <article className="panel trainer-panel">
             <p className="muted small-tag">{t('route.trainer')}</p>
             <div style={{ position: 'relative', display: 'block', width: 'fit-content', margin: '0 auto' }}>
-              <img className={`sprite trainer-sprite${activePokemon.megaEvolved ? ' mega-active' : ''}${activePokemon.gmaxEvolved ? ' gmax-active' : ''} ${statusSpriteClass(activePokemon.status, activePokemon.leechSeed)}`} src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
+              <ThemedTooltip content={<PokemonMetaTooltip p={activePokemon} />}>
+                <img className={`sprite trainer-sprite${activePokemon.megaEvolved ? ' mega-active' : ''}${activePokemon.gmaxEvolved ? ' gmax-active' : ''} ${statusSpriteClass(activePokemon.status, activePokemon.leechSeed)}`} src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
+              </ThemedTooltip>
               <StatusFloat pokemon={activePokemon} />
             </div>
             <h2>
@@ -12938,55 +13644,6 @@ function MainApp() {
                       return (
                         <>
                           <div className="tooltip-stat"><span>{t('stat.level')}</span><strong>{pokemon.level}</strong></div>
-                          {pokemon.ability && (
-                            <div style={{ margin: '2px 0 4px', padding: '3px 6px', borderRadius: '6px', background: 'rgba(157,166,255,0.10)', border: '1px solid rgba(157,166,255,0.25)' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                <span style={{ fontSize: '0.68rem', color: '#9b98cf' }}>{t('stat.ability')}</span>
-                                <strong style={{ fontSize: '0.78rem', color: '#9da6ff', fontWeight: 'bold' }}>{abilityName(pokemon.ability, getLanguage())}</strong>
-                              </div>
-                              <div style={{ fontSize: '0.65rem', color: '#b8b5dc', lineHeight: 1.35, marginTop: '1px' }}>{abilityDesc(pokemon.ability, getLanguage())}</div>
-                            </div>
-                          )}
-                          {pokemon.nature && (() => {
-                            const mods = natureStatMods(pokemon.nature)
-                            const statLabel = (k: MetaStatKey) => k === 'attack' ? t('stat.attack') : k === 'defense' ? t('stat.defense') : k === 'spAttack' ? t('stat.spAtk') : k === 'spDefense' ? t('stat.spDef') : t('stat.speed')
-                            return (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', margin: '2px 0' }}>
-                                <span style={{ fontSize: '0.68rem', color: '#9b98cf' }}>{t('stat.nature')}</span>
-                                <strong style={{ fontSize: '0.75rem', color: '#7ceb95', fontWeight: 'bold' }}>{natureName(pokemon.nature, getLanguage())}</strong>
-                                {mods.up && <span style={{ fontSize: '0.62rem', color: '#4ade80', fontWeight: 'bold' }}>↑{statLabel(mods.up)}</span>}
-                                {mods.down && <span style={{ fontSize: '0.62rem', color: '#f87171', fontWeight: 'bold' }}>↓{statLabel(mods.down)}</span>}
-                              </div>
-                            )
-                          })()}
-                          {pokemon.ivs && (() => {
-                            const ivs = [
-                              { label: t('stat.hp'), val: pokemon.ivs.hp },
-                              { label: t('stat.attack'), val: pokemon.ivs.attack },
-                              { label: t('stat.defense'), val: pokemon.ivs.defense },
-                              { label: t('stat.spAtk'), val: pokemon.ivs.spAttack },
-                              { label: t('stat.spDef'), val: pokemon.ivs.spDefense },
-                              { label: t('stat.speed'), val: pokemon.ivs.speed },
-                            ]
-                            const total = ivs.reduce((s, x) => s + x.val, 0)
-                            const ivColor = (v: number) => v >= 31 ? '#facc15' : v >= 25 ? '#4ade80' : v >= 15 ? '#fbbf24' : '#94a3b8'
-                            const totalColor = total >= 170 ? '#facc15' : total >= 120 ? '#7ceb95' : '#9b98cf'
-                            return (
-                              <div style={{ margin: '3px 0' }}>
-                                <div style={{ fontSize: '0.68rem', color: '#9b98cf' }}>
-                                  {t('stat.ivs')} <strong style={{ color: totalColor }}>{total}/186</strong>
-                                </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '2px 6px', marginTop: '2px' }}>
-                                  {ivs.map(iv => (
-                                    <div key={iv.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.63rem', color: '#d9d6f2', background: 'rgba(154,152,207,0.10)', borderRadius: '4px', padding: '1px 5px' }}>
-                                      <span>{iv.label}</span>
-                                      <strong style={{ color: ivColor(iv.val) }}>{iv.val}</strong>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )
-                          })()}
                           <div className="tooltip-stat"><span>{t('stat.hp')}</span><strong>{pokemon.hp}/{pokemon.maxHp}</strong></div>
                           <div className="tooltip-stat"><span>{t('stat.attack')}</span>{fmt(pokemon.attack, eff.attack, stages.attack)}</div>
                           <div className="tooltip-stat"><span>{t('stat.defense')}</span>{fmt(pokemon.defense, eff.defense, stages.defense)}</div>
@@ -13181,7 +13838,27 @@ function MainApp() {
                 </div>
               </div>
             )}
-            {difficulty !== 'infinite' && difficulty !== 'coliseum' && difficulty !== 'original' && (
+            {difficulty === 'aventura' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', padding: '6px 10px', background: 'rgba(52,211,153,0.1)', borderRadius: '8px', border: '1px solid rgba(52,211,153,0.35)' }}>
+                <span style={{ fontSize: '0.85rem', color: '#34d399', fontWeight: 'bold' }}>🏅 {language === 'en' ? 'Badges' : 'Insignias'}: {badges.length}/8</span>
+                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                  {Array.from({ length: 8 }, (_, i) => {
+                    const badge = badges[i]
+                    return (
+                      <div key={i} style={{
+                        width: '18px', height: '18px', borderRadius: '50%',
+                        background: badge ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.05)',
+                        border: badge ? '2px solid #34d399' : '2px dashed #475569',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                      }}>
+                        {badge ? <img src={badge.sprite} alt={badge.name} style={{ width: '13px', height: '13px', imageRendering: 'pixelated' }} /> : <span style={{ fontSize: '0.55rem', color: '#475569' }}>?</span>}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+            {difficulty !== 'infinite' && difficulty !== 'coliseum' && difficulty !== 'original' && difficulty !== 'aventura' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', padding: '6px 10px', background: 'rgba(250,204,21,0.08)', borderRadius: '8px', border: '1px solid rgba(250,204,21,0.2)' }}>
                 <span style={{ fontSize: '0.85rem', color: '#ffcb05', fontWeight: 'bold' }}>{t('route.stage')} {currentStage}/3</span>
                 <div style={{ display: 'flex', gap: '4px' }}>
@@ -13386,7 +14063,7 @@ function MainApp() {
                       <p style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No tienes objetos para vender.</p>
                     ) : (
                       inventoryEntries.map((entry) => {
-                        if (entry.name === 'Mega Stone' || entry.name === 'Dynamax Band' || entry.name === 'Prisma Rojo' || entry.name === 'Prisma Azul' || entry.name === 'Z Power Ring') return null
+                        if (entry.name === 'Mega Stone' || entry.name === 'Dynamax Band' || entry.name === 'Prisma Rojo' || entry.name === 'Prisma Azul') return null
                         const consumable = ALL_SHOP_ITEMS[entry.name]
                         const holdable = HOLDABLE_ITEMS[entry.name]
                         if (!consumable && !holdable) return null
@@ -13492,7 +14169,7 @@ function MainApp() {
                   {inventory.length === 0 ? (
                     <p style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>No tienes objetos para vender.</p>
                   ) : (
-                    Array.from(new Set(inventory)).filter(i => i !== 'Mega Stone' && i !== 'Dynamax Band' && i !== 'Prisma Rojo' && i !== 'Prisma Azul' && i !== 'Z Power Ring').map((itemName) => {
+                    Array.from(new Set(inventory)).filter(i => i !== 'Mega Stone' && i !== 'Dynamax Band' && i !== 'Prisma Rojo' && i !== 'Prisma Azul').map((itemName) => {
                       const count = inventory.filter(i => i === itemName).length
                       const data = ALL_SHOP_ITEMS[itemName] ?? HOLDABLE_ITEMS[itemName]
                       const value = data ? Math.max(1, Math.floor(data.price * 0.5)) : 10
@@ -13564,7 +14241,7 @@ function MainApp() {
                       })}
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '0.75rem' }}>
-                      {Array.from(new Set(inventory)).filter(i => i !== 'Mega Stone' && i !== 'Dynamax Band' && i !== 'Prisma Rojo' && i !== 'Prisma Azul' && i !== 'Z Power Ring').map((itemName) => {
+                      {Array.from(new Set(inventory)).filter(i => i !== 'Mega Stone' && i !== 'Dynamax Band' && i !== 'Prisma Rojo' && i !== 'Prisma Azul').map((itemName) => {
                         const count = inventory.filter(i => i === itemName).length
                         const selected = coopMyOffer?.kind === 'item' && coopMyOffer.itemName === itemName
                         return (
@@ -14303,25 +14980,6 @@ function MainApp() {
                     </ThemedTooltip>
                     )
                   })}
-                  {(() => {
-                    const zm = getZMoveFor(activePokemon)
-                    if (!zm || activePokemon.zMoveUsed) return null
-                    const zDisabled = isLoading || (runChallenges.speedrun && speedrunSeconds <= 0)
-                    return (
-                      <ThemedTooltip key="z-move" content={moveTooltip(zm)}>
-                        <button
-                          className="move-btn"
-                          onClick={() => onPlayerMove(zm)}
-                          type="button"
-                          disabled={zDisabled}
-                          style={{ borderColor: '#facc15' }}
-                        >
-                          <span className="move-btn-line">✨ {moveName(zm)} ({zm.type})</span>
-                          <span className="move-btn-effect">{t('b.zMoveOnce')}</span>
-                        </button>
-                      </ThemedTooltip>
-                    )
-                  })()}
                   </>
                   )}
                 </div>
@@ -14544,6 +15202,12 @@ function MainApp() {
             </p>
           )}
 
+          {coopRestartBlockedMsg && (
+            <p style={{ margin: '0 0 1rem 0', padding: '0.6rem 0.9rem', borderRadius: '8px', background: 'rgba(255,138,128,0.12)', border: '1px solid rgba(255,138,128,0.4)', color: '#ff8a80', fontSize: '0.85rem' }}>
+              ⏳ {coopRestartBlockedMsg}
+            </p>
+          )}
+
           {defeatSummary && (
             <div className="defeat-details-grid" style={{ marginTop: '1rem', textAlign: 'left' }}>
               <div className="defeat-box" style={{ marginBottom: '1.5rem' }}>
@@ -14599,6 +15263,12 @@ function MainApp() {
                 </button>
               </div>
             </div>
+          )}
+
+          {coopRestartBlockedMsg && (
+            <p style={{ margin: '0 0 1rem 0', padding: '0.6rem 0.9rem', borderRadius: '8px', background: 'rgba(255,138,128,0.12)', border: '1px solid rgba(255,138,128,0.4)', color: '#ff8a80', fontSize: '0.85rem' }}>
+              ⏳ {coopRestartBlockedMsg}
+            </p>
           )}
 
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '1.5rem', flexWrap: 'wrap' }}>
