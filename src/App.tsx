@@ -1421,7 +1421,7 @@ const GYM_BADGES = [
 const MEGA_CAPABLE_IDS = new Set([
   3, 6, 9, 15, 18, 26, 36, 65, 71, 80, 94, 115, 121, 127, 130, 142, 149, 150,
   154, 160, 181, 208, 212, 214, 227, 229, 248,
-  254, 257, 260, 282, 302, 303, 306, 308,   310, 319, 323, 334, 354, 358, 359, 362, 373, 376, 380, 381, 384, 398,
+  254, 257, 260, 282, 302, 303, 306, 308, 310, 319, 323, 334, 354, 358, 359, 362, 373, 376, 380, 381, 384, 398,
   428, 445, 448, 460, 475, 478, 485, 491,
   500, 530, 531, 545, 560, 604, 609, 623,
   652, 655, 658, 668, 670, 678, 687, 689, 691, 701, 719, 10025, 10120,
@@ -1437,7 +1437,7 @@ const MEGA_FORM_IDS: Record<number, number | number[]> = {
   154: 10282, 160: 10283, 181: 10045, 208: 10072, 212: 10046,
   214: 10047, 227: 10284, 229: 10048, 248: 10049,
   254: 10065, 257: 10050, 260: 10064, 282: 10051, 302: 10066,
-  303: 10052, 306: 10053, 308: 10054,   310: 10055, 319: 10070, 323: 10087, 334: 10067, 354: 10056,
+  303: 10052, 306: 10053, 308: 10054, 310: 10055, 319: 10070, 323: 10087, 334: 10067, 354: 10056,
   358: 10306, 359: [10057, 10307], 362: 10074, 373: 10089, 376: 10076,
   380: 10062, 381: 10063, 384: 10079, 398: 10308,
   428: 10088, 445: [10058, 10309], 448: [10059, 10310],
@@ -1905,7 +1905,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_cursed_blade', name: 'Twisted Spoon', desc: '+20% daño en movimientos de tipo Psíquico.', price: 60, spriteKey: 'Twisted Spoon', category: 'holdable' },
   { id: 'unlock_mega_node', name: 'Nodo Mega', desc: 'Desbloquea nodos de Mega Piedra en Hard/Infinite.', price: 150, spriteKey: 'Mega Stone', category: 'upgrade' },
   { id: 'unlock_gmax_node', name: 'Nodo G-MAX', desc: 'Desbloquea nodos G-MAX en Hard/Infinite.', price: 200, spriteKey: 'Dynamax Band', category: 'upgrade' },
-  { id: 'unlock_primal_node', name: 'Nodo Primal', desc: 'Desbloquea nodos Primal en Hard/Infinite. Otorgan Prisma Rojo o Azul.', price: 250, spriteKey: 'Prisma Rojo', category: 'upgrade' },  { id: 'unlock_casino_node', name: 'Nodo Casino', desc: 'Desbloquea nodos Casino en Hard/Infinite. Juega al Pachinko para ganar premios según tu puntuación.', price: 220, spriteKey: 'money', category: 'upgrade' },
+  { id: 'unlock_primal_node', name: 'Nodo Primal', desc: 'Desbloquea nodos Primal en Hard/Infinite. Otorgan Prisma Rojo o Azul.', price: 250, spriteKey: 'Prisma Rojo', category: 'upgrade' }, { id: 'unlock_casino_node', name: 'Nodo Casino', desc: 'Desbloquea nodos Casino en Hard/Infinite. Juega al Pachinko para ganar premios según tu puntuación.', price: 220, spriteKey: 'money', category: 'upgrade' },
   { id: 'unlock_reroll', name: 'Reroll', desc: 'Permite rerollear la tienda 1 vez por visita.', price: 120, spriteKey: 'dice', category: 'upgrade' },
   { id: 'unlock_reroll_2', name: 'Reroll II', desc: 'Otorga 1 reroll extra de tienda por visita.', price: 200, spriteKey: 'dice', category: 'upgrade', requires: 'unlock_reroll' },
   { id: 'unlock_shop_slot', name: 'Espacio de Tienda', desc: 'Las tiendas ofrecen 1 objeto más.', price: 100, spriteKey: 'money', category: 'upgrade' },
@@ -3019,7 +3019,7 @@ function MainApp() {
         if (typeof data.gameboyMode !== 'boolean') data.gameboyMode = false
         return data
       }
-    } catch {}
+    } catch { }
     return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark', ownedBackgrounds: ['none'], activeBackground: 'none', ownedMusic: [], activeMenuMusic: 'default', activeBattleMusic: 'default', gameboyMode: false, totalMegas: 0, totalGmax: 0, coopRuns: 0, coopWins: 0, coopTrades: 0 }
   })
 
@@ -3783,7 +3783,7 @@ function MainApp() {
 
       if (isNaN(pokemonId) || !pokemonId) return prev
 
-      const current = prev[pokemonId] ?? { id: pokemonId, name: pokemon.name, sprite: pokemon.sprite, types: (pokemon as any).types ?? [], seen: false, caught: false }
+      const current: PokedexEntry = prev[pokemonId] ?? { id: pokemonId, name: pokemon.name, sprite: pokemon.sprite, types: (pokemon as any).types ?? [], seen: false, caught: false }
 
       // La Pokédex normal y la de shinies son independientes: un shiny no
       // desbloquea la entrada normal y un Pokémon normal no toca la shiny.
@@ -3844,7 +3844,7 @@ function MainApp() {
           if (dexToastTimerRef.current) clearTimeout(dexToastTimerRef.current)
           dexToastTimerRef.current = setTimeout(() => setDexToast(null), 5000)
         }
-      } catch {}
+      } catch { }
     }
   }, [metaProgression, pokedex])
 
@@ -3868,7 +3868,7 @@ function MainApp() {
       }
 
       if (isNaN(pokemonId) || !pokemonId) return prev
-      const current = prev[pokemonId] ?? { id: pokemonId, name: pokemon.name, sprite: pokemon.sprite, types: (pokemon as any).types ?? [], seen: false, caught: false }
+      const current: PokedexEntry = prev[pokemonId] ?? { id: pokemonId, name: pokemon.name, sprite: pokemon.sprite, types: (pokemon as any).types ?? [], seen: false, caught: false }
 
       // Independencia total entre la Pokédex normal y la shiny.
       if (pokemon.shiny) {
@@ -4109,7 +4109,7 @@ function MainApp() {
   }, [pokedex])
 
   useEffect(() => {
-    const legendaryIds = Object.entries(pokedex).filter(([,e]) => e.name.startsWith('legendary-')).map(([id]) => Number(id))
+    const legendaryIds = Object.entries(pokedex).filter(([, e]) => e.name.startsWith('legendary-')).map(([id]) => Number(id))
     if (legendaryIds.length === 0) return
     legendaryIds.forEach(id => {
       fetchPokemonDetails(id).then(details => {
@@ -4119,7 +4119,7 @@ function MainApp() {
           localStorage.setItem('pokerand_pokedex', JSON.stringify(updated))
           return updated
         })
-      }).catch(() => {})
+      }).catch(() => { })
     })
   }, [pokedex])
 
@@ -4170,7 +4170,7 @@ function MainApp() {
 
     switch (event.id) {
       case 'legendary_appears': {
-        const legendaryIds = [144,145,146,150,151,243,244,245,249,250,251,377,378,379,380,381,382,383,384,385,480,481,482,483,484,485,486,487,488,491,492,493,494,638,639,640,641,642,643,644,645,646,647,648,649]
+        const legendaryIds = [144, 145, 146, 150, 151, 243, 244, 245, 249, 250, 251, 377, 378, 379, 380, 381, 382, 383, 384, 385, 480, 481, 482, 483, 484, 485, 486, 487, 488, 491, 492, 493, 494, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649]
         const id = legendaryIds[Math.floor(Math.random() * legendaryIds.length)]
         const legendaryData = await buildPokemonFromApi(id, 1, current.level)
         const legendary: Pokemon = {
@@ -4485,7 +4485,7 @@ function MainApp() {
       (startItems.includes('start_potion_2') ? 1 : 0)
     const extraMoney =
       ((startItems.includes('start_money_1') ? 1 : 0) +
-       (startItems.includes('start_money_2') ? 1 : 0)) * 100
+        (startItems.includes('start_money_2') ? 1 : 0)) * 100
     setMoney(runChallenges.noMoney ? 0 : 100 + extraMoney)
     // Objetos guardados de la última victoria en ESTA generación + los de inicio.
     const carriedItems = getAventuraGen(targetGen).carriedItems
@@ -4559,7 +4559,7 @@ function MainApp() {
   }
 
   async function startNewRun(sameRoute = false): Promise<void> {
-    const dailyCfg = isDailyRunRef.current ? getDailyConfig(dailySeed, [1,2,3,4,5,6,7,8,9]) : null
+    const dailyCfg = isDailyRunRef.current ? getDailyConfig(dailySeed, [1, 2, 3, 4, 5, 6, 7, 8, 9]) : null
     const effectiveGen = coopModeRef.current ? (coopGenRef.current || generation) : (dailyCfg ? dailyCfg.generation : generation)
     const effectiveDifficulty = coopModeRef.current ? (coopDiffRef.current || 'medium') : (dailyCfg ? dailyCfg.difficulty : difficulty)
     // El Modo Aventura no pasa por startNewRun: usa su propia pantalla de
@@ -4901,7 +4901,7 @@ function MainApp() {
         (startItems.includes('start_potion_2') ? 1 : 0)
       const extraMoney =
         ((startItems.includes('start_money_1') ? 1 : 0) +
-         (startItems.includes('start_money_2') ? 1 : 0)) * 100
+          (startItems.includes('start_money_2') ? 1 : 0)) * 100
       setMoney(activeChallenges.noMoney ? 0 : 100 + extraMoney)
       const startingItems: string[] = [run.item]
       for (let i = 0; i < 5 + extraBalls; i++) startingItems.push('Poké Ball')
@@ -5359,30 +5359,30 @@ function MainApp() {
           const newRoute = coopModeRef.current
             ? generateCoopRouteSegment(startId, totalNodesPerStage, routeRandRef.current, runChallenges, coopDiffRef.current || 'medium')
             : (() => {
-                const nr: RouteNode[] = []
-                for (let i = 0; i < totalNodesPerStage - 1; i++) {
-                  nr.push(generateRandomNodeType(startId + i, routeRandRef.current))
+              const nr: RouteNode[] = []
+              for (let i = 0; i < totalNodesPerStage - 1; i++) {
+                nr.push(generateRandomNodeType(startId + i, routeRandRef.current))
+              }
+              nr.push({ id: startId + totalNodesPerStage - 1, label: `Jefe #${startId + totalNodesPerStage - 1}`, type: 'boss', done: false })
+              // En dificultad Difícil, garantizar 2 nodos de Casino por etapa.
+              if (
+                difficulty === 'hard' &&
+                !runChallenges.allTeamRocket &&
+                metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node') &&
+                nr.length > 2
+              ) {
+                const candidates = nr.map((_, idx) => idx).filter(idx => idx < nr.length - 1 && nr[idx].type !== 'boss')
+                const rr = routeRandRef.current
+                let placed = 0
+                while (placed < 2 && candidates.length > 0) {
+                  const idx = Math.floor(rr() * candidates.length)
+                  const pos = candidates.splice(idx, 1)[0]
+                  nr[pos] = { ...nr[pos], id: nr[pos].id, type: 'casino', label: `Casino #${nr[pos].id}`, done: false }
+                  placed++
                 }
-                nr.push({ id: startId + totalNodesPerStage - 1, label: `Jefe #${startId + totalNodesPerStage - 1}`, type: 'boss', done: false })
-                // En dificultad Difícil, garantizar 2 nodos de Casino por etapa.
-                if (
-                  difficulty === 'hard' &&
-                  !runChallenges.allTeamRocket &&
-                  metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node') &&
-                  nr.length > 2
-                ) {
-                  const candidates = nr.map((_, idx) => idx).filter(idx => idx < nr.length - 1 && nr[idx].type !== 'boss')
-                  const rr = routeRandRef.current
-                  let placed = 0
-                  while (placed < 2 && candidates.length > 0) {
-                    const idx = Math.floor(rr() * candidates.length)
-                    const pos = candidates.splice(idx, 1)[0]
-                    nr[pos] = { ...nr[pos], id: nr[pos].id, type: 'casino', label: `Casino #${nr[pos].id}`, done: false }
-                    placed++
-                  }
-                }
-                return nr
-              })()
+              }
+              return nr
+            })()
           setRoute(newRoute)
           setRouteIndex(0)
           setScreen('route')
@@ -7529,7 +7529,7 @@ function MainApp() {
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
         const gmaxId = Array.from(GMAX_CAPABLE_IDS)[Math.floor(Math.random() * GMAX_CAPABLE_IDS.size)]
         const gmaxTargetLevel = difficulty === 'infinite'
-            ? getInfiniteTargetLevel() + 2
+          ? getInfiniteTargetLevel() + 2
           : avgPlayerLevel + 2
         const base = await buildPokemonFromApi(gmaxId, targetGen, gmaxTargetLevel, false, difficulty, true)
         const gmaxLevelDelta = modifier?.enemyLevelDelta ?? 0
@@ -7609,97 +7609,97 @@ function MainApp() {
     }
 
     if (currentNode.type === 'rest') {
-    if (restEncounter) return
-    setIsLoading(true)
-    setApiError('')
+      if (restEncounter) return
+      setIsLoading(true)
+      setApiError('')
 
-    try {
-      if (runChallenges.egglocke) {
-        const targetGen = getEffectiveGen()
-        const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression())
-        const eggId = Math.floor(Math.random() * 900) + 1
-        const eggEntry = {
-          name: restPokemonBase.name,
-          sprite: restPokemonBase.sprite,
-          types: (restPokemonBase as any).types ?? ['normal'],
-          hatchIn: 2 + Math.floor(Math.random() * 2),
-          id: eggId
+      try {
+        if (runChallenges.egglocke) {
+          const targetGen = getEffectiveGen()
+          const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression())
+          const eggId = Math.floor(Math.random() * 900) + 1
+          const eggEntry = {
+            name: restPokemonBase.name,
+            sprite: restPokemonBase.sprite,
+            types: (restPokemonBase as any).types ?? ['normal'],
+            hatchIn: 2 + Math.floor(Math.random() * 2),
+            id: eggId
+          }
+          setEggInventory(prev => [...prev, eggEntry])
+          const unlockedBalls = POKEBALL_NAMES.filter(b => isPokeballUnlocked(b) && b !== 'Master Ball')
+          const ballReward = Math.random() < 0.35 ? randomFrom(unlockedBalls) : null
+          const rewardItem = ballReward ?? (runChallenges.noHealing
+            ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
+            : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]))
+          const dowsingExtraEgg = (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing') ? 1 : 0) + (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing_2') ? 1 : 0)
+          const restExtraPoolEgg = runChallenges.noHealing
+            ? ['X Attack', 'X Defense', 'X Speed']
+            : ['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked), ...unlockedBalls]
+          const extraItemsEgg: string[] = []
+          for (let i = 0; i < dowsingExtraEgg; i++) extraItemsEgg.push(randomFrom(restExtraPoolEgg))
+          const magmaEmblemEgg = rollMagmaEmblem()
+          setRestRewardItem(rewardItem)
+          setRestExtraItems([...extraItemsEgg, ...magmaEmblemEgg])
+          setInventory((previous) => [...previous, rewardItem, ...extraItemsEgg, ...magmaEmblemEgg])
+          setBattleLog((prev) => [
+            t('rest.eggFound', { name: eggEntry.name, n: eggEntry.hatchIn, label: currentNode.label }),
+            t('rest.eggItem', { item: itemLocalizedName(rewardItem) }),
+            ...extraItemsEgg.map(item => t('rest.dowsingFound', { item: itemLocalizedName(item) })),
+            ...(magmaEmblemEgg.length > 0 ? [t('rest.magmaEmblemFound')] : []),
+            ...prev
+          ].slice(0, 15))
+          completeCurrentNode()
+          setScreen('route')
+          return
         }
-        setEggInventory(prev => [...prev, eggEntry])
+
+        const targetGen = getEffectiveGen()
+        const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
+        const restTargetLevel = difficulty === 'infinite'
+          ? getInfiniteTargetLevel() + (Math.floor(Math.random() * 3) - 1)
+          : avgPlayerLevel - 2 + Math.floor(Math.random() * 3) - 1
+        const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression(), restTargetLevel)
+        const levelDiff = restTargetLevel - restPokemonBase.level
+        const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, levelDiff, balDiff(difficulty))
+        generatedEncounter.holdItem = null
+        if (shinyNextEncounter) {
+          generatedEncounter.shiny = true
+          generatedEncounter.sprite = makeShinySprite(generatedEncounter.sprite, generatedEncounter.id)
+          setShinyNextEncounter(false)
+        } else if (!runChallenges.allShiny && Math.random() < 0.02) {
+          generatedEncounter.shiny = true
+          generatedEncounter.sprite = makeShinySprite(generatedEncounter.sprite, generatedEncounter.id)
+        }
         const unlockedBalls = POKEBALL_NAMES.filter(b => isPokeballUnlocked(b) && b !== 'Master Ball')
         const ballReward = Math.random() < 0.35 ? randomFrom(unlockedBalls) : null
         const rewardItem = ballReward ?? (runChallenges.noHealing
           ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
           : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]))
-        const dowsingExtraEgg = (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing') ? 1 : 0) + (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing_2') ? 1 : 0)
-        const restExtraPoolEgg = runChallenges.noHealing
+        const dowsingExtra = (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing') ? 1 : 0) + (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing_2') ? 1 : 0)
+        const restExtraPool = runChallenges.noHealing
           ? ['X Attack', 'X Defense', 'X Speed']
           : ['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked), ...unlockedBalls]
-        const extraItemsEgg: string[] = []
-        for (let i = 0; i < dowsingExtraEgg; i++) extraItemsEgg.push(randomFrom(restExtraPoolEgg))
-        const magmaEmblemEgg = rollMagmaEmblem()
+        const extraItems: string[] = []
+        for (let i = 0; i < dowsingExtra; i++) extraItems.push(randomFrom(restExtraPool))
+        const magmaEmblem = rollMagmaEmblem()
+
+        setRestEncounter(generatedEncounter)
+        seenInPokedex(generatedEncounter)
         setRestRewardItem(rewardItem)
-        setRestExtraItems([...extraItemsEgg, ...magmaEmblemEgg])
-        setInventory((previous) => [...previous, rewardItem, ...extraItemsEgg, ...magmaEmblemEgg])
+        setRestExtraItems([...extraItems, ...magmaEmblem])
+        setInventory((previous) => [...previous, rewardItem, ...extraItems, ...magmaEmblem])
         setBattleLog((prev) => [
-          t('rest.eggFound', { name: eggEntry.name, n: eggEntry.hatchIn, label: currentNode.label }),
-          t('rest.eggItem', { item: itemLocalizedName(rewardItem) }),
-          ...extraItemsEgg.map(item => t('rest.dowsingFound', { item: itemLocalizedName(item) })),
-          ...(magmaEmblemEgg.length > 0 ? [t('rest.magmaEmblemFound')] : []),
+          t('rest.found', { label: currentNode.label, name: generatedEncounter.name, item: itemLocalizedName(rewardItem) }),
+          ...extraItems.map(item => t('rest.dowsingFound', { item: itemLocalizedName(item) })),
+          ...(magmaEmblem.length > 0 ? [t('rest.magmaEmblemFound')] : []),
           ...prev
-        ].slice(0, 15))
-        completeCurrentNode()
-        setScreen('route')
-        return
+        ])
+      } catch {
+        setApiError(t('rest.error'))
+      } finally {
+        setIsLoading(false)
       }
-
-      const targetGen = getEffectiveGen()
-      const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
-      const restTargetLevel = difficulty === 'infinite'
-            ? getInfiniteTargetLevel() + (Math.floor(Math.random() * 3) - 1)
-        : avgPlayerLevel - 2 + Math.floor(Math.random() * 3) - 1
-      const restPokemonBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression(), restTargetLevel)
-      const levelDiff = restTargetLevel - restPokemonBase.level
-      const generatedEncounter = scalePokemonForNode(restPokemonBase, currentNode, routeIndex, levelDiff, balDiff(difficulty))
-      generatedEncounter.holdItem = null
-      if (shinyNextEncounter) {
-        generatedEncounter.shiny = true
-        generatedEncounter.sprite = makeShinySprite(generatedEncounter.sprite, generatedEncounter.id)
-        setShinyNextEncounter(false)
-      } else if (!runChallenges.allShiny && Math.random() < 0.02) {
-        generatedEncounter.shiny = true
-        generatedEncounter.sprite = makeShinySprite(generatedEncounter.sprite, generatedEncounter.id)
-      }
-      const unlockedBalls = POKEBALL_NAMES.filter(b => isPokeballUnlocked(b) && b !== 'Master Ball')
-      const ballReward = Math.random() < 0.35 ? randomFrom(unlockedBalls) : null
-      const rewardItem = ballReward ?? (runChallenges.noHealing
-        ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
-        : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]))
-      const dowsingExtra = (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing') ? 1 : 0) + (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing_2') ? 1 : 0)
-      const restExtraPool = runChallenges.noHealing
-        ? ['X Attack', 'X Defense', 'X Speed']
-        : ['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked), ...unlockedBalls]
-      const extraItems: string[] = []
-      for (let i = 0; i < dowsingExtra; i++) extraItems.push(randomFrom(restExtraPool))
-      const magmaEmblem = rollMagmaEmblem()
-
-      setRestEncounter(generatedEncounter)
-      seenInPokedex(generatedEncounter)
-      setRestRewardItem(rewardItem)
-      setRestExtraItems([...extraItems, ...magmaEmblem])
-      setInventory((previous) => [...previous, rewardItem, ...extraItems, ...magmaEmblem])
-      setBattleLog((prev) => [
-        t('rest.found', { label: currentNode.label, name: generatedEncounter.name, item: itemLocalizedName(rewardItem) }),
-        ...extraItems.map(item => t('rest.dowsingFound', { item: itemLocalizedName(item) })),
-        ...(magmaEmblem.length > 0 ? [t('rest.magmaEmblemFound')] : []),
-        ...prev
-      ])
-    } catch {
-      setApiError(t('rest.error'))
-    } finally {
-      setIsLoading(false)
-    }
-    return
+      return
     }
 
     setIsLoading(true)
@@ -7768,7 +7768,7 @@ function MainApp() {
           return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression(), targetLevel)
             .then((base) => {
               const levelDiff = targetLevel - base.level
-              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , balDiff(difficulty))
+              let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels, balDiff(difficulty))
               if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
               if (runChallenges.totalRandomizer) {
                 scaled = {
@@ -7805,18 +7805,18 @@ function MainApp() {
         const isElite = currentNode.type === 'elite'
         const willBeTrainer = isBoss || isElite || Math.random() < 0.5
 
-      if (willBeTrainer) {
-        const isLeague = currentNode.id >= 1000
-        // En Fácil, los jefes de las etapas 1 y 2 llevan la mitad de Pokémon (3);
-        // el jefe de la última etapa (3ª insignia) conserva los 6.
-        const maxSize = isBoss ? ((difficulty === 'easy' && !isLeague && badges.length < 2) ? 3 : 6) : trainerMaxSize(routeIndex, route.length, difficulty)
-        // Élite: equipo mínimo de 4 y hasta 6 a lo largo de la Calle Victoria.
-        const teamSize = isBoss ? maxSize : isElite ? Math.max(4, maxSize) : Math.max(1, Math.min(maxSize, 1 + Math.floor(Math.random() * maxSize)))
-        const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
+        if (willBeTrainer) {
+          const isLeague = currentNode.id >= 1000
+          // En Fácil, los jefes de las etapas 1 y 2 llevan la mitad de Pokémon (3);
+          // el jefe de la última etapa (3ª insignia) conserva los 6.
+          const maxSize = isBoss ? ((difficulty === 'easy' && !isLeague && badges.length < 2) ? 3 : 6) : trainerMaxSize(routeIndex, route.length, difficulty)
+          // Élite: equipo mínimo de 4 y hasta 6 a lo largo de la Calle Victoria.
+          const teamSize = isBoss ? maxSize : isElite ? Math.max(4, maxSize) : Math.max(1, Math.min(maxSize, 1 + Math.floor(Math.random() * maxSize)))
+          const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
 
-        const fetches = Array.from({ length: teamSize }, (_, idx) =>
-          difficulty === 'coliseum'
-            ? (async () => {
+          const fetches = Array.from({ length: teamSize }, (_, idx) =>
+            difficulty === 'coliseum'
+              ? (async () => {
                 try {
                   const ids = await getSpeciesIdsByGeneration(targetGen)
                   const id = ids[Math.floor(Math.random() * ids.length)] || 1
@@ -7826,9 +7826,9 @@ function MainApp() {
                   return { id: 1, name: 'Bulbasaur', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png', level: 50, hp: 100, maxHp: 100, attack: 50, defense: 50, spAttack: 50, spDefense: 50, speed: 50, moves: [], statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } } as Pokemon
                 }
               })()
-            : (() => {
+              : (() => {
                 const targetLevel = difficulty === 'infinite'
-            ? getInfiniteTargetLevel() + trainerMemberLevelOffset(idx, teamSize, isBoss, difficulty) + (isLeague ? 2 : 0)
+                  ? getInfiniteTargetLevel() + trainerMemberLevelOffset(idx, teamSize, isBoss, difficulty) + (isLeague ? 2 : 0)
                   : avgPlayerLevel + trainerMemberLevelOffset(idx, teamSize, isBoss, difficulty) + (isLeague ? 2 : 0)
                 // En Infinite, genera al rival directamente a su nivel objetivo para que
                 // respete etapas evolutivas y movimientos según el nivel. En Co-op,
@@ -7837,7 +7837,7 @@ function MainApp() {
                 return getBalancedPokemonByGeneration(targetGen, baseStepIndex, route.length, isBoss, runChallenges.allShiny, balDiff(difficulty), isBoss ? getStageProgression() : -1, getStageProgression(), targetLevel, isElite)
                   .then((base) => {
                     const levelDiff = targetLevel - base.level
-                    let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , balDiff(difficulty))
+                    let scaled = scalePokemonForNode(base, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels, balDiff(difficulty))
                     if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
                     if (runChallenges.totalRandomizer) {
                       scaled = {
@@ -7850,127 +7850,127 @@ function MainApp() {
                     return scaled
                   })
               })()
-        )
-        const newTrainerTeam = await Promise.all(fetches)
+          )
+          const newTrainerTeam = await Promise.all(fetches)
 
-        let chosenName = ''
-        let chosenSprite = ''
-        let chosenBadge = ''
-        if (isBoss) {
-          const leader = randomFrom(GYM_LEADERS)
-          chosenName = leader.name
-          chosenSprite = leader.sprite
-          chosenBadge = leader.badge
-        } else {
-          const trainer = randomFrom(TRAINER_TYPES)
-          chosenName = isElite ? `Elite ${trainer.label} ${trainer.name}` : `${trainer.label} ${trainer.name}`
-          chosenSprite = trainer.sprite
-          chosenBadge = ''
-        }
+          let chosenName = ''
+          let chosenSprite = ''
+          let chosenBadge = ''
+          if (isBoss) {
+            const leader = randomFrom(GYM_LEADERS)
+            chosenName = leader.name
+            chosenSprite = leader.sprite
+            chosenBadge = leader.badge
+          } else {
+            const trainer = randomFrom(TRAINER_TYPES)
+            chosenName = isElite ? `Elite ${trainer.label} ${trainer.name}` : `${trainer.label} ${trainer.name}`
+            chosenSprite = trainer.sprite
+            chosenBadge = ''
+          }
 
-        setIsTrainerBattle(true)
-        const megaTeam = newTrainerTeam.map(p => {
-          if (isBoss && (difficulty === 'hard' || difficulty === 'infinite') && Math.random() < 0.15 && MEGA_CAPABLE_IDS.has(p.id)) {
-            const formId = MEGA_FORM_IDS[p.id]
-            if (formId) {
-              const megaFormId = Array.isArray(formId) ? formId[Math.floor(Math.random() * formId.length)] : formId
-              const megaSprite = MEGA_SPRITE_OVERRIDES[megaFormId] ?? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${megaFormId}.png`
-              seenInPokedex({ ...p, id: megaFormId, sprite: megaSprite })
-              return {
-                ...p,
-                id: megaFormId,
-                sprite: megaSprite,
-                attack: Math.floor(p.attack * 1.15),
-                defense: Math.floor(p.defense * 1.15),
-                speed: Math.floor(p.speed * 1.15),
+          setIsTrainerBattle(true)
+          const megaTeam = newTrainerTeam.map(p => {
+            if (isBoss && (difficulty === 'hard' || difficulty === 'infinite') && Math.random() < 0.15 && MEGA_CAPABLE_IDS.has(p.id)) {
+              const formId = MEGA_FORM_IDS[p.id]
+              if (formId) {
+                const megaFormId = Array.isArray(formId) ? formId[Math.floor(Math.random() * formId.length)] : formId
+                const megaSprite = MEGA_SPRITE_OVERRIDES[megaFormId] ?? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${megaFormId}.png`
+                seenInPokedex({ ...p, id: megaFormId, sprite: megaSprite })
+                return {
+                  ...p,
+                  id: megaFormId,
+                  sprite: megaSprite,
+                  attack: Math.floor(p.attack * 1.15),
+                  defense: Math.floor(p.defense * 1.15),
+                  speed: Math.floor(p.speed * 1.15),
+                }
               }
             }
+            return p
+          })
+          const trainerTeamShiny = !runChallenges.allShiny && Math.random() < 0.01
+          const shinyTrainerTeam = trainerTeamShiny
+            ? megaTeam.map(p => ({ ...p, shiny: true, sprite: makeShinySprite(p.sprite, p.id) }))
+            : megaTeam
+          setTrainerTeam(shinyTrainerTeam.map(p => ({ ...p, statStages: p.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } })))
+          shinyTrainerTeam.forEach(p => seenInPokedex(p))
+          setTrainerPokemonIndex(0)
+          setTrainerName(chosenName)
+          setTrainerSprite(chosenSprite)
+          setTrainerBadge(chosenBadge)
+          // Primer combate de la run: se suaviza al rival para que no pueda
+          // debilitar al starter de un golpe y el jugador pueda empezar a actuar.
+          let firstEnemy: Pokemon = { ...shinyTrainerTeam[0], statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
+          if (routeIndex === 0 && !isBoss) {
+            firstEnemy = { ...softenFirstBattleEnemy(firstEnemy, team), statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
           }
-          return p
-        })
-        const trainerTeamShiny = !runChallenges.allShiny && Math.random() < 0.01
-        const shinyTrainerTeam = trainerTeamShiny
-          ? megaTeam.map(p => ({ ...p, shiny: true, sprite: makeShinySprite(p.sprite, p.id) }))
-          : megaTeam
-        setTrainerTeam(shinyTrainerTeam.map(p => ({ ...p, statStages: p.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } })))
-        shinyTrainerTeam.forEach(p => seenInPokedex(p))
-        setTrainerPokemonIndex(0)
-        setTrainerName(chosenName)
-        setTrainerSprite(chosenSprite)
-        setTrainerBadge(chosenBadge)
-        // Primer combate de la run: se suaviza al rival para que no pueda
-        // debilitar al starter de un golpe y el jugador pueda empezar a actuar.
-        let firstEnemy: Pokemon = { ...shinyTrainerTeam[0], statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
-        if (routeIndex === 0 && !isBoss) {
-          firstEnemy = { ...softenFirstBattleEnemy(firstEnemy, team), statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
-        }
-        setEnemy(firstEnemy)
-        setBattleLog((prev) => [
-          isBoss
-            ? t('b.leaderChallenge', { name: chosenName, badge: chosenBadge })
-            : isElite
-              ? t('b.eliteChallenge', { name: chosenName, n: teamSize })
-              : t('b.trainerChallenge', { name: chosenName, n: teamSize }),
-          t('b.sendsOut', { name: firstEnemy.name, lvl: firstEnemy.level }),
-          ...prev
-        ])
-      } else {
-        const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
-        const wildLevelOffset = difficulty === 'easy'
-          ? Math.floor(Math.random() * 3) - 2 // -2..0
-          : Math.floor(Math.random() * 3) - 1 // -1..0..+1
-        const targetLevel = difficulty === 'infinite'
+          setEnemy(firstEnemy)
+          setBattleLog((prev) => [
+            isBoss
+              ? t('b.leaderChallenge', { name: chosenName, badge: chosenBadge })
+              : isElite
+                ? t('b.eliteChallenge', { name: chosenName, n: teamSize })
+                : t('b.trainerChallenge', { name: chosenName, n: teamSize }),
+            t('b.sendsOut', { name: firstEnemy.name, lvl: firstEnemy.level }),
+            ...prev
+          ])
+        } else {
+          const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
+          const wildLevelOffset = difficulty === 'easy'
+            ? Math.floor(Math.random() * 3) - 2 // -2..0
+            : Math.floor(Math.random() * 3) - 1 // -1..0..+1
+          const targetLevel = difficulty === 'infinite'
             ? getInfiniteTargetLevel() + (Math.floor(Math.random() * 3) - 1)
-          : avgPlayerLevel + wildLevelOffset
-        const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression(), targetLevel)
-        const levelDiff = targetLevel - enemyBase.level
-        let generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels , balDiff(difficulty))
-        generatedEnemy = balanceWildPokemonToTeam(generatedEnemy, team, balDiff(difficulty))
-        if (runChallenges.fixedLevel) generatedEnemy = { ...generatedEnemy, level: 50 }
-        if (runChallenges.totalRandomizer) {
-          generatedEnemy = {
-            ...generatedEnemy,
-            attack: generatedEnemy.attack + Math.floor(Math.random() * 20) - 10,
-            defense: generatedEnemy.defense + Math.floor(Math.random() * 20) - 10,
-            speed: generatedEnemy.speed + Math.floor(Math.random() * 20) - 10,
+            : avgPlayerLevel + wildLevelOffset
+          const enemyBase = await getBalancedPokemonByGeneration(targetGen, routeIndex, route.length, false, runChallenges.allShiny, balDiff(difficulty), -1, getStageProgression(), targetLevel)
+          const levelDiff = targetLevel - enemyBase.level
+          let generatedEnemy = scalePokemonForNode(enemyBase, currentNode, routeIndex, (modifier?.enemyLevelDelta ?? 0) + levelDiff + extraEnemyLevels, balDiff(difficulty))
+          generatedEnemy = balanceWildPokemonToTeam(generatedEnemy, team, balDiff(difficulty))
+          if (runChallenges.fixedLevel) generatedEnemy = { ...generatedEnemy, level: 50 }
+          if (runChallenges.totalRandomizer) {
+            generatedEnemy = {
+              ...generatedEnemy,
+              attack: generatedEnemy.attack + Math.floor(Math.random() * 20) - 10,
+              defense: generatedEnemy.defense + Math.floor(Math.random() * 20) - 10,
+              speed: generatedEnemy.speed + Math.floor(Math.random() * 20) - 10,
+            }
           }
-        }
-        generatedEnemy = { ...generatedEnemy, holdItem: null, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
-        if (legendaryNextEncounter) {
-          const ids = REGION_LEGENDARIES[getEffectiveGen()] ?? REGION_LEGENDARIES[1]
-          const legendId = ids[Math.floor(Math.random() * ids.length)]
-          const legendBase = await buildPokemonFromApi(legendId, getEffectiveGen(), Math.max(targetLevel, 40), runChallenges.allShiny || shinyNextEncounter, balDiff(difficulty), true)
-          generatedEnemy = scalePokemonForNode(legendBase, currentNode, routeIndex, 0, balDiff(difficulty))
           generatedEnemy = { ...generatedEnemy, holdItem: null, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
-          setLegendaryNextEncounter(false)
-          if (shinyNextEncounter) setShinyNextEncounter(false)
+          if (legendaryNextEncounter) {
+            const ids = REGION_LEGENDARIES[getEffectiveGen()] ?? REGION_LEGENDARIES[1]
+            const legendId = ids[Math.floor(Math.random() * ids.length)]
+            const legendBase = await buildPokemonFromApi(legendId, getEffectiveGen(), Math.max(targetLevel, 40), runChallenges.allShiny || shinyNextEncounter, balDiff(difficulty), true)
+            generatedEnemy = scalePokemonForNode(legendBase, currentNode, routeIndex, 0, balDiff(difficulty))
+            generatedEnemy = { ...generatedEnemy, holdItem: null, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
+            setLegendaryNextEncounter(false)
+            if (shinyNextEncounter) setShinyNextEncounter(false)
+          }
+          if (shinyNextEncounter) {
+            generatedEnemy = { ...generatedEnemy, shiny: true, sprite: makeShinySprite(generatedEnemy.sprite, generatedEnemy.id) }
+            setShinyNextEncounter(false)
+          } else if (!runChallenges.allShiny && Math.random() < 0.02) {
+            generatedEnemy = { ...generatedEnemy, shiny: true, sprite: makeShinySprite(generatedEnemy.sprite, generatedEnemy.id) }
+          }
+          // Primer combate de la run: se suaviza al rival para que no pueda
+          // debilitar al starter de un golpe y el jugador pueda empezar a actuar.
+          if (routeIndex === 0 && !isBoss) {
+            generatedEnemy = softenFirstBattleEnemy(generatedEnemy, team)
+          }
+          setIsTrainerBattle(false)
+          setTrainerTeam([])
+          setTrainerPokemonIndex(0)
+          setTrainerName('')
+          setTrainerSprite('')
+          setTrainerBadge('')
+          setReviveModal(null)
+          setEquipModal(null)
+          setEnemy({ ...generatedEnemy, justEntered: true })
+          seenInPokedex(generatedEnemy)
+          setBattleLog((prev) => [
+            t('b.wildAppeared', { name: generatedEnemy.name, lvl: generatedEnemy.level }),
+            ...prev
+          ])
         }
-        if (shinyNextEncounter) {
-          generatedEnemy = { ...generatedEnemy, shiny: true, sprite: makeShinySprite(generatedEnemy.sprite, generatedEnemy.id) }
-          setShinyNextEncounter(false)
-        } else if (!runChallenges.allShiny && Math.random() < 0.02) {
-          generatedEnemy = { ...generatedEnemy, shiny: true, sprite: makeShinySprite(generatedEnemy.sprite, generatedEnemy.id) }
-        }
-        // Primer combate de la run: se suaviza al rival para que no pueda
-        // debilitar al starter de un golpe y el jugador pueda empezar a actuar.
-        if (routeIndex === 0 && !isBoss) {
-          generatedEnemy = softenFirstBattleEnemy(generatedEnemy, team)
-        }
-        setIsTrainerBattle(false)
-        setTrainerTeam([])
-        setTrainerPokemonIndex(0)
-        setTrainerName('')
-        setTrainerSprite('')
-    setTrainerBadge('')
-    setReviveModal(null)
-    setEquipModal(null)
-        setEnemy({ ...generatedEnemy, justEntered: true })
-        seenInPokedex(generatedEnemy)
-        setBattleLog((prev) => [
-          t('b.wildAppeared', { name: generatedEnemy.name, lvl: generatedEnemy.level }),
-          ...prev
-        ])
-      }
       }
 
       setTeam(prev => prev.map((p, i) => {
@@ -8025,11 +8025,11 @@ function MainApp() {
         requestAnimationFrame(tick)
       } else {
         setSpinWinnerIndex(winner)
-    setSpinAnimating(false)
-    setPokeRandPokemon([])
-    setPokeRandWinnerIndex(null)
-    setPokeRandRevealed(false)
-    setPokeRandAnimating(false)
+        setSpinAnimating(false)
+        setPokeRandPokemon([])
+        setPokeRandWinnerIndex(null)
+        setPokeRandRevealed(false)
+        setPokeRandAnimating(false)
         setSpinRevealed(true)
       }
     }
@@ -8801,114 +8801,114 @@ function MainApp() {
         }
       }
     } else if (isDamagingMove) {
-    for (let hit = 0; hit < totalHits; hit++) {
-      const result = applyDamage(effectiveAttacker, currentDefender, effectiveMove, enemyBoost)
-      let finalDamage = Math.floor(result.damage * effectiveness * stabBonus)
-      // --- Multiplicadores por habilidad y clima del atacante ---
-      const weatherMult = weatherTypeMultiplier(weather, effectiveMove.type)
-      const lowHpAbility = attacker.hp / Math.max(1, attacker.maxHp) <= 1 / 3
-      const pinchType = effectiveMove.type
-      const pinchMult = (lowHpAbility
-        && ((hasAbility(attacker, 'blaze') && pinchType === 'fire')
-          || (hasAbility(attacker, 'overgrow') && pinchType === 'grass')
-          || (hasAbility(attacker, 'torrent') && pinchType === 'water')
-          || (hasAbility(attacker, 'swarm') && pinchType === 'bug')))
-        ? 1.5 : 1
-      const technicianMult = hasAbility(attacker, 'technician') && (move.power ?? 0) <= 60 ? 1.5 : 1
-      const tintedLensMult = hasAbility(attacker, 'tinted-lens') && effectiveness < 1 ? 2 : 1
-      const toughClawsMult = hasAbility(attacker, 'tough-claws') && effectiveMove.damageClass !== 'special' ? 1.3 : 1
-      finalDamage = Math.floor(finalDamage * weatherMult * pinchMult * technicianMult * tintedLensMult * toughClawsMult * thickFatMult)
-      if (hasAbility(defender, 'dry-skin') && effectiveMove.type === 'fire') {
-        finalDamage = Math.floor(finalDamage * 1.25)
-      }
-      if (hasAbility(defender, 'multiscale') && defenderAtFullHp) {
-        finalDamage = Math.floor(finalDamage * 0.5)
-      }
-      if (attackerItem?.damageBoost) {
-        finalDamage = Math.floor(finalDamage * (1 + attackerItem.damageBoost))
-      }
-      // Potenciadores por tipo y Pokémon (Diamansfera/Lustresfera): solo afectan
-      // a Dialga/Palkia y a movimientos de los tipos indicados.
-      const typeBoost = attackerItem?.typeBoost
-      if (typeBoost && (!typeBoost.onlyIds || typeBoost.onlyIds.includes(attacker.id)) && typeBoost.types.includes(effectiveMove.type)) {
-        finalDamage = Math.floor(finalDamage * (1 + typeBoost.boost))
-      }
-      // Potenciadores de categoría (Muscle Band / Wise Glasses).
-      const categoryBoost = effectiveMove.damageClass === 'special' ? (attackerItem?.specialBoost ?? 0) : (attackerItem?.physicalBoost ?? 0)
-      if (categoryBoost) {
-        finalDamage = Math.floor(finalDamage * (1 + categoryBoost))
-      }
-      // Cinturón Experto (Expert Belt): +daño si el movimiento es superefectivo.
-      if (attackerItem?.superEffectiveBoost && effectiveness > 1) {
-        finalDamage = Math.floor(finalDamage * (1 + attackerItem.superEffectiveBoost))
-      }
-      if (attackerItem?.lowHpBonus && attacker.hp < attacker.maxHp * 0.3) {
-        finalDamage = Math.floor(finalDamage * (1 + attackerItem.lowHpBonus))
-      }
-      if (attackerItem?.firstStrikeBonus && attacker.hp === attacker.maxHp) {
-        finalDamage = Math.floor(finalDamage * (1 + attackerItem.firstStrikeBonus))
-      }
-      if (defenderItem?.damageReduction) {
-        finalDamage = Math.floor(finalDamage * (1 - defenderItem.damageReduction))
-      }
-      // Baya resistente (Baya Oca, Kasib, Babiri...): reduce a la mitad un
-      // movimiento superefectivo de su tipo. Se consume al activarse.
-      if (defenderItem?.resistType && !resistBerryUsed && effectiveMove.type === defenderItem.resistType && effectiveness > 1) {
-        finalDamage = Math.floor(finalDamage / 2)
-        resistBerryUsed = true
-      }
+      for (let hit = 0; hit < totalHits; hit++) {
+        const result = applyDamage(effectiveAttacker, currentDefender, effectiveMove, enemyBoost)
+        let finalDamage = Math.floor(result.damage * effectiveness * stabBonus)
+        // --- Multiplicadores por habilidad y clima del atacante ---
+        const weatherMult = weatherTypeMultiplier(weather, effectiveMove.type)
+        const lowHpAbility = attacker.hp / Math.max(1, attacker.maxHp) <= 1 / 3
+        const pinchType = effectiveMove.type
+        const pinchMult = (lowHpAbility
+          && ((hasAbility(attacker, 'blaze') && pinchType === 'fire')
+            || (hasAbility(attacker, 'overgrow') && pinchType === 'grass')
+            || (hasAbility(attacker, 'torrent') && pinchType === 'water')
+            || (hasAbility(attacker, 'swarm') && pinchType === 'bug')))
+          ? 1.5 : 1
+        const technicianMult = hasAbility(attacker, 'technician') && (move.power ?? 0) <= 60 ? 1.5 : 1
+        const tintedLensMult = hasAbility(attacker, 'tinted-lens') && effectiveness < 1 ? 2 : 1
+        const toughClawsMult = hasAbility(attacker, 'tough-claws') && effectiveMove.damageClass !== 'special' ? 1.3 : 1
+        finalDamage = Math.floor(finalDamage * weatherMult * pinchMult * technicianMult * tintedLensMult * toughClawsMult * thickFatMult)
+        if (hasAbility(defender, 'dry-skin') && effectiveMove.type === 'fire') {
+          finalDamage = Math.floor(finalDamage * 1.25)
+        }
+        if (hasAbility(defender, 'multiscale') && defenderAtFullHp) {
+          finalDamage = Math.floor(finalDamage * 0.5)
+        }
+        if (attackerItem?.damageBoost) {
+          finalDamage = Math.floor(finalDamage * (1 + attackerItem.damageBoost))
+        }
+        // Potenciadores por tipo y Pokémon (Diamansfera/Lustresfera): solo afectan
+        // a Dialga/Palkia y a movimientos de los tipos indicados.
+        const typeBoost = attackerItem?.typeBoost
+        if (typeBoost && (!typeBoost.onlyIds || typeBoost.onlyIds.includes(attacker.id)) && typeBoost.types.includes(effectiveMove.type)) {
+          finalDamage = Math.floor(finalDamage * (1 + typeBoost.boost))
+        }
+        // Potenciadores de categoría (Muscle Band / Wise Glasses).
+        const categoryBoost = effectiveMove.damageClass === 'special' ? (attackerItem?.specialBoost ?? 0) : (attackerItem?.physicalBoost ?? 0)
+        if (categoryBoost) {
+          finalDamage = Math.floor(finalDamage * (1 + categoryBoost))
+        }
+        // Cinturón Experto (Expert Belt): +daño si el movimiento es superefectivo.
+        if (attackerItem?.superEffectiveBoost && effectiveness > 1) {
+          finalDamage = Math.floor(finalDamage * (1 + attackerItem.superEffectiveBoost))
+        }
+        if (attackerItem?.lowHpBonus && attacker.hp < attacker.maxHp * 0.3) {
+          finalDamage = Math.floor(finalDamage * (1 + attackerItem.lowHpBonus))
+        }
+        if (attackerItem?.firstStrikeBonus && attacker.hp === attacker.maxHp) {
+          finalDamage = Math.floor(finalDamage * (1 + attackerItem.firstStrikeBonus))
+        }
+        if (defenderItem?.damageReduction) {
+          finalDamage = Math.floor(finalDamage * (1 - defenderItem.damageReduction))
+        }
+        // Baya resistente (Baya Oca, Kasib, Babiri...): reduce a la mitad un
+        // movimiento superefectivo de su tipo. Se consume al activarse.
+        if (defenderItem?.resistType && !resistBerryUsed && effectiveMove.type === defenderItem.resistType && effectiveness > 1) {
+          finalDamage = Math.floor(finalDamage / 2)
+          resistBerryUsed = true
+        }
 
-      // --- Crit: base from items/modifiers + move crit stage ---
-      const modCrit = !isEnemyHit ? (modifier?.playerCritChance ?? 0) : 0
-      const moveCritStage = move.critRatio ?? 0
-      const moveCritChance = moveCritStage >= 3 ? 0.5 : moveCritStage === 2 ? 0.25 : moveCritStage === 1 ? 0.125 : 0
-      const totalCrit = (attackerItem?.critChance ?? 0) + modCrit + moveCritChance
-      const isCrit = !runChallenges.noCrits && totalCrit > 0 && Math.random() < totalCrit
-      if (isCrit) {
-        finalDamage = Math.floor(finalDamage * (hasAbility(attacker, 'sniper') ? 2 : 1.5))
-        totalCrits++
+        // --- Crit: base from items/modifiers + move crit stage ---
+        const modCrit = !isEnemyHit ? (modifier?.playerCritChance ?? 0) : 0
+        const moveCritStage = move.critRatio ?? 0
+        const moveCritChance = moveCritStage >= 3 ? 0.5 : moveCritStage === 2 ? 0.25 : moveCritStage === 1 ? 0.125 : 0
+        const totalCrit = (attackerItem?.critChance ?? 0) + modCrit + moveCritChance
+        const isCrit = !runChallenges.noCrits && totalCrit > 0 && Math.random() < totalCrit
+        if (isCrit) {
+          finalDamage = Math.floor(finalDamage * (hasAbility(attacker, 'sniper') ? 2 : 1.5))
+          totalCrits++
+        }
+
+        const newHp = Math.max(0, currentDefender.hp - finalDamage)
+        currentDefender = { ...currentDefender, hp: newHp }
+        totalDamage += finalDamage
+
+        const typeNote = runChallenges.typeRandomizer && effectiveMove.type !== move.type ? ` [${effectiveMove.type}]` : ''
+        let hitLine = totalHits > 1
+          ? t('b.usesHitMulti', { attacker: attacker.name, move: moveName(effectiveMove) + typeNote, dmg: finalDamage, hit: hit + 1, total: totalHits })
+          : t('b.usesHit', { attacker: attacker.name, move: moveName(effectiveMove) + typeNote, dmg: finalDamage })
+        if (isCrit) hitLine += t('b.critSuffix')
+        if (message) hitLine += ` (${message})`
+        if (abilityBlockMessage) hitLine += ` (${abilityBlockMessage})`
+        lines.push(hitLine)
+
+        if (currentDefender.hp <= 0) break
       }
-
-      const newHp = Math.max(0, currentDefender.hp - finalDamage)
-      currentDefender = { ...currentDefender, hp: newHp }
-      totalDamage += finalDamage
-
-      const typeNote = runChallenges.typeRandomizer && effectiveMove.type !== move.type ? ` [${effectiveMove.type}]` : ''
-      let hitLine = totalHits > 1
-        ? t('b.usesHitMulti', { attacker: attacker.name, move: moveName(effectiveMove) + typeNote, dmg: finalDamage, hit: hit + 1, total: totalHits })
-        : t('b.usesHit', { attacker: attacker.name, move: moveName(effectiveMove) + typeNote, dmg: finalDamage })
-      if (isCrit) hitLine += t('b.critSuffix')
-      if (message) hitLine += ` (${message})`
-      if (abilityBlockMessage) hitLine += ` (${abilityBlockMessage})`
-      lines.push(hitLine)
-
-      if (currentDefender.hp <= 0) break
-    }
-    // --- Objetos de supervivencia y bayas (se resuelven tras los golpes) ---
-    // Baya resistente consumida: se elimina del Pokémon.
-    if (resistBerryUsed) {
-      currentDefender = { ...currentDefender, holdItem: undefined }
-      lines.push(t('b.resistBerry', { name: currentDefender.name, berry: itemLocalizedName(defender.holdItem ?? '') }))
-    }
-    // Cinta Focus (Focus Sash): a plena vida aguanta un golpe letal y se consume.
-    if (currentDefender.hp <= 0 && defenderItem?.focusSash && defenderAtFullHp) {
-      currentDefender = { ...currentDefender, hp: 1, holdItem: undefined }
-      lines.push(t('b.focusSash', { name: currentDefender.name }))
-    } else if (currentDefender.hp <= 0 && defenderItem?.endureChance && Math.random() < defenderItem.endureChance) {
-      // Cinta Focus (Focus Band): probabilidad de aguantar un golpe letal.
-      currentDefender = { ...currentDefender, hp: 1 }
-      lines.push(t('b.focusBand', { name: currentDefender.name }))
-    } else if (currentDefender.hp <= 0 && hasAbility(defender, 'sturdy') && defenderAtFullHp) {
-      // Robustez (Sturdy): a plena vida aguanta un golpe letal con 1 HP.
-      currentDefender = { ...currentDefender, hp: 1 }
-      lines.push(t('b.abilitySturdy', { name: currentDefender.name, ability: abilityName(defender.ability, getLanguage()) }))
-    }
-    // Baya Sitrus: restaura HP al estar por debajo del 50%. Se consume.
-    if (defenderItem?.berryHeal && totalDamage > 0 && currentDefender.hp > 0 && currentDefender.hp < currentDefender.maxHp / 2) {
-      const sitrusHeal = Math.floor(currentDefender.maxHp * defenderItem.berryHeal)
-      currentDefender = { ...currentDefender, hp: Math.min(currentDefender.maxHp, currentDefender.hp + sitrusHeal), holdItem: undefined }
-      lines.push(t('b.sitrusHeal', { name: currentDefender.name, hp: sitrusHeal }))
-    }
+      // --- Objetos de supervivencia y bayas (se resuelven tras los golpes) ---
+      // Baya resistente consumida: se elimina del Pokémon.
+      if (resistBerryUsed) {
+        currentDefender = { ...currentDefender, holdItem: undefined }
+        lines.push(t('b.resistBerry', { name: currentDefender.name, berry: itemLocalizedName(defender.holdItem ?? '') }))
+      }
+      // Cinta Focus (Focus Sash): a plena vida aguanta un golpe letal y se consume.
+      if (currentDefender.hp <= 0 && defenderItem?.focusSash && defenderAtFullHp) {
+        currentDefender = { ...currentDefender, hp: 1, holdItem: undefined }
+        lines.push(t('b.focusSash', { name: currentDefender.name }))
+      } else if (currentDefender.hp <= 0 && defenderItem?.endureChance && Math.random() < defenderItem.endureChance) {
+        // Cinta Focus (Focus Band): probabilidad de aguantar un golpe letal.
+        currentDefender = { ...currentDefender, hp: 1 }
+        lines.push(t('b.focusBand', { name: currentDefender.name }))
+      } else if (currentDefender.hp <= 0 && hasAbility(defender, 'sturdy') && defenderAtFullHp) {
+        // Robustez (Sturdy): a plena vida aguanta un golpe letal con 1 HP.
+        currentDefender = { ...currentDefender, hp: 1 }
+        lines.push(t('b.abilitySturdy', { name: currentDefender.name, ability: abilityName(defender.ability, getLanguage()) }))
+      }
+      // Baya Sitrus: restaura HP al estar por debajo del 50%. Se consume.
+      if (defenderItem?.berryHeal && totalDamage > 0 && currentDefender.hp > 0 && currentDefender.hp < currentDefender.maxHp / 2) {
+        const sitrusHeal = Math.floor(currentDefender.maxHp * defenderItem.berryHeal)
+        currentDefender = { ...currentDefender, hp: Math.min(currentDefender.maxHp, currentDefender.hp + sitrusHeal), holdItem: undefined }
+        lines.push(t('b.sitrusHeal', { name: currentDefender.name, hp: sitrusHeal }))
+      }
     } else {
       // Movimiento de estado: no hace daño, solo puede aplicar su efecto.
       lines.push(effectiveness === 0 && (move.ailment || move.leechSeed || move.disable)
@@ -9166,7 +9166,7 @@ function MainApp() {
             setRunStats(prev => ({ ...prev, evolutions: prev.evolutions + 1 }))
             logs.push(t('b.evolved', { name: updatedPokemon.name, evolved: finalEvolved.name }))
           }
-        } catch {}
+        } catch { }
       }
     }
 
@@ -10206,7 +10206,8 @@ function MainApp() {
     const itemIndex = inventory.indexOf(itemName)
     if (itemIndex === -1) return
     if (HOLDABLE_ITEMS[itemName]) return
-    if (POKEBALL_NAMES.includes(itemName)) {      if (screen === 'battle' && enemy && !isTrainerBattle && currentNode?.type !== 'gmax') {
+    if (POKEBALL_NAMES.includes(itemName)) {
+      if (screen === 'battle' && enemy && !isTrainerBattle && currentNode?.type !== 'gmax') {
         if (isLoading) return
         if (runChallenges.soloStarter) {
           setBattleLog((prev) => [t('b.challengeSoloStarter'), ...prev].slice(0, 15))
@@ -10542,7 +10543,7 @@ function MainApp() {
       let abilities: string[] = []
       try {
         abilities = await getPokemonAbilities(pokemon.id)
-      } catch {}
+      } catch { }
       const alternatives = abilities.filter(a => a !== pokemon.ability)
       if (alternatives.length === 0) {
         setBattleLog(prev => [t('b.abilityNoAlternative', { name: pokemon.name }), ...prev].slice(0, 15))
@@ -12095,142 +12096,142 @@ function MainApp() {
                     />
                     <span style={{ fontSize: '0.8rem', color: '#9b98cf', minWidth: '32px', textAlign: 'right' }}>{sfxVol}%</span>
                   </div>
-              </div>
-
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
-                <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
-                  🎨 {t('options.theme')}
-                </strong>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {THEMES.filter(t => metaProgression.ownedThemes.includes(t.id)).map(theme => (
-                    <button key={theme.id} type="button"
-                      onClick={() => { playClick(); setTheme(theme.id) }}
-                      style={{
-                        padding: '6px 12px', borderRadius: '8px', border: `2px solid ${metaProgression.activeTheme === theme.id ? '#ffcb05' : '#475569'}`,
-                        background: theme.colors.bg, color: theme.colors.text, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold',
-                      }}>
-                      {themeName(theme.id)}
-                    </button>
-                  ))}
                 </div>
-                {metaProgression.permanentlyUnlockedItems.includes('gameboy') && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.6rem', cursor: 'pointer', fontSize: '0.8rem', color: '#9b98cf' }}>
-                    <input
-                      type="checkbox"
-                      checked={metaProgression.gameboyMode}
-                      onChange={(e) => {
-                        playClick()
-                        const updated = { ...metaProgression, gameboyMode: e.target.checked }
-                        setMetaProgression(updated)
-                        localStorage.setItem('pokerand_meta', JSON.stringify(updated))
-                      }}
-                      style={{ width: '16px', height: '16px', accentColor: '#8bac0f', cursor: 'pointer' }}
-                    />
-                    🕹️ {language === 'en' ? 'Game Boy redesign' : 'Rediseño Game Boy'}
-                  </label>
-                )}
-              </div>
 
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
-                <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
-                  🌐 {t('options.language')}
-                </strong>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  {([['es', t('lang.spanish')], ['en', t('lang.english')]] as Array<[Language, string]>).map(([lang, label]) => (
-                    <button key={lang} type="button"
-                      onClick={() => changeLanguage(lang)}
-                      style={{
-                        padding: '6px 12px', borderRadius: '8px', cursor: 'pointer',
-                        border: `2px solid ${language === lang ? '#ffcb05' : '#475569'}`,
-                        background: language === lang ? 'rgba(250,204,21,0.15)' : 'transparent',
-                        color: language === lang ? '#ffcb05' : '#9b98cf', fontWeight: 'bold', fontSize: '0.8rem',
-                      }}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Music selectors */}
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
-                <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.75rem' }}>
-                  🎵 {t('options.music')}
-                </strong>
-                <div style={{ marginBottom: '0.75rem' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#9b98cf', marginBottom: '0.25rem' }}>{t('options.menu')}:</div>
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+                  <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
+                    🎨 {t('options.theme')}
+                  </strong>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    {[
-                      { id: 'default', name: 'Menú Clásico', always: true },
-                      { id: 'chill', name: 'Menú Relax', always: false },
-                    ].map(track => {
-                      const unlocked = track.always || metaProgression.ownedMusic.includes('music_menu_chill')
-                      const active = metaProgression.activeMenuMusic === track.id
-                      return (
-                        <button key={track.id} type="button"
-                          onClick={() => {
-                            if (!unlocked) return
-                            playClick()
-                            const updated = { ...metaProgression, activeMenuMusic: track.id }
-                            setMetaProgression(updated)
-                            localStorage.setItem('pokerand_meta', JSON.stringify(updated))
-                            setMenuMusicTrack(track.id)
-                            stopMusic()
-                            setTimeout(startMenuMusic, 350)
-                          }}
-                          disabled={!unlocked}
-                          style={{
-                            padding: '6px 12px', borderRadius: '8px',
-                            border: `2px solid ${active ? '#ffcb05' : '#475569'}`,
-                            background: unlocked ? '#1c1c3a' : '#12122b',
-                            color: unlocked ? '#f3f1ff' : '#475569',
-                            cursor: unlocked ? 'pointer' : 'not-allowed',
-                            fontSize: '0.75rem', fontWeight: 'bold',
-                            opacity: unlocked ? 1 : 0.5,
-                          }}>
-                          {track.id === 'default' ? (language === 'en' ? 'Classic Menu' : 'Menú Clásico') : (language === 'en' ? 'Relax Menu' : 'Menú Relax')}
-                        </button>
-                      )
-                    })}
+                    {THEMES.filter(t => metaProgression.ownedThemes.includes(t.id)).map(theme => (
+                      <button key={theme.id} type="button"
+                        onClick={() => { playClick(); setTheme(theme.id) }}
+                        style={{
+                          padding: '6px 12px', borderRadius: '8px', border: `2px solid ${metaProgression.activeTheme === theme.id ? '#ffcb05' : '#475569'}`,
+                          background: theme.colors.bg, color: theme.colors.text, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold',
+                        }}>
+                        {themeName(theme.id)}
+                      </button>
+                    ))}
+                  </div>
+                  {metaProgression.permanentlyUnlockedItems.includes('gameboy') && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.6rem', cursor: 'pointer', fontSize: '0.8rem', color: '#9b98cf' }}>
+                      <input
+                        type="checkbox"
+                        checked={metaProgression.gameboyMode}
+                        onChange={(e) => {
+                          playClick()
+                          const updated = { ...metaProgression, gameboyMode: e.target.checked }
+                          setMetaProgression(updated)
+                          localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+                        }}
+                        style={{ width: '16px', height: '16px', accentColor: '#8bac0f', cursor: 'pointer' }}
+                      />
+                      🕹️ {language === 'en' ? 'Game Boy redesign' : 'Rediseño Game Boy'}
+                    </label>
+                  )}
+                </div>
+
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+                  <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.5rem' }}>
+                    🌐 {t('options.language')}
+                  </strong>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {([['es', t('lang.spanish')], ['en', t('lang.english')]] as Array<[Language, string]>).map(([lang, label]) => (
+                      <button key={lang} type="button"
+                        onClick={() => changeLanguage(lang)}
+                        style={{
+                          padding: '6px 12px', borderRadius: '8px', cursor: 'pointer',
+                          border: `2px solid ${language === lang ? '#ffcb05' : '#475569'}`,
+                          background: language === lang ? 'rgba(250,204,21,0.15)' : 'transparent',
+                          color: language === lang ? '#ffcb05' : '#9b98cf', fontWeight: 'bold', fontSize: '0.8rem',
+                        }}>
+                        {label}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <div>
-                  <div style={{ fontSize: '0.8rem', color: '#9b98cf', marginBottom: '0.25rem' }}>Batalla:</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    {[
-                      { id: 'default', name: 'Batalla Clásica', always: true },
-                      { id: 'epic', name: 'Batalla Épica', always: false },
-                    ].map(track => {
-                      const unlocked = track.always || metaProgression.ownedMusic.includes('music_battle_epic')
-                      const active = metaProgression.activeBattleMusic === track.id
-                      return (
-                        <button key={track.id} type="button"
-                          onClick={() => {
-                            if (!unlocked) return
-                            playClick()
-                            const updated = { ...metaProgression, activeBattleMusic: track.id }
-                            setMetaProgression(updated)
-                            localStorage.setItem('pokerand_meta', JSON.stringify(updated))
-                            setBattleMusicTrack(track.id)
-                            startBattleMusic(true)
-                          }}
-                          disabled={!unlocked}
-                          style={{
-                            padding: '6px 12px', borderRadius: '8px',
-                            border: `2px solid ${active ? '#ffcb05' : '#475569'}`,
-                            background: unlocked ? '#1c1c3a' : '#12122b',
-                            color: unlocked ? '#f3f1ff' : '#475569',
-                            cursor: unlocked ? 'pointer' : 'not-allowed',
-                            fontSize: '0.75rem', fontWeight: 'bold',
-                            opacity: unlocked ? 1 : 0.5,
-                          }}>
-                          {track.id === 'default' ? (language === 'en' ? 'Classic Menu' : 'Menú Clásico') : (language === 'en' ? 'Relax Menu' : 'Menú Relax')}
-                        </button>
-                      )
-                    })}
+
+                {/* Music selectors */}
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+                  <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.75rem' }}>
+                    🎵 {t('options.music')}
+                  </strong>
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#9b98cf', marginBottom: '0.25rem' }}>{t('options.menu')}:</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      {[
+                        { id: 'default', name: 'Menú Clásico', always: true },
+                        { id: 'chill', name: 'Menú Relax', always: false },
+                      ].map(track => {
+                        const unlocked = track.always || metaProgression.ownedMusic.includes('music_menu_chill')
+                        const active = metaProgression.activeMenuMusic === track.id
+                        return (
+                          <button key={track.id} type="button"
+                            onClick={() => {
+                              if (!unlocked) return
+                              playClick()
+                              const updated = { ...metaProgression, activeMenuMusic: track.id }
+                              setMetaProgression(updated)
+                              localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+                              setMenuMusicTrack(track.id)
+                              stopMusic()
+                              setTimeout(startMenuMusic, 350)
+                            }}
+                            disabled={!unlocked}
+                            style={{
+                              padding: '6px 12px', borderRadius: '8px',
+                              border: `2px solid ${active ? '#ffcb05' : '#475569'}`,
+                              background: unlocked ? '#1c1c3a' : '#12122b',
+                              color: unlocked ? '#f3f1ff' : '#475569',
+                              cursor: unlocked ? 'pointer' : 'not-allowed',
+                              fontSize: '0.75rem', fontWeight: 'bold',
+                              opacity: unlocked ? 1 : 0.5,
+                            }}>
+                            {track.id === 'default' ? (language === 'en' ? 'Classic Menu' : 'Menú Clásico') : (language === 'en' ? 'Relax Menu' : 'Menú Relax')}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.8rem', color: '#9b98cf', marginBottom: '0.25rem' }}>Batalla:</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      {[
+                        { id: 'default', name: 'Batalla Clásica', always: true },
+                        { id: 'epic', name: 'Batalla Épica', always: false },
+                      ].map(track => {
+                        const unlocked = track.always || metaProgression.ownedMusic.includes('music_battle_epic')
+                        const active = metaProgression.activeBattleMusic === track.id
+                        return (
+                          <button key={track.id} type="button"
+                            onClick={() => {
+                              if (!unlocked) return
+                              playClick()
+                              const updated = { ...metaProgression, activeBattleMusic: track.id }
+                              setMetaProgression(updated)
+                              localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+                              setBattleMusicTrack(track.id)
+                              startBattleMusic(true)
+                            }}
+                            disabled={!unlocked}
+                            style={{
+                              padding: '6px 12px', borderRadius: '8px',
+                              border: `2px solid ${active ? '#ffcb05' : '#475569'}`,
+                              background: unlocked ? '#1c1c3a' : '#12122b',
+                              color: unlocked ? '#f3f1ff' : '#475569',
+                              cursor: unlocked ? 'pointer' : 'not-allowed',
+                              fontSize: '0.75rem', fontWeight: 'bold',
+                              opacity: unlocked ? 1 : 0.5,
+                            }}>
+                            {track.id === 'default' ? (language === 'en' ? 'Classic Menu' : 'Menú Clásico') : (language === 'en' ? 'Relax Menu' : 'Menú Relax')}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
             </div>
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem', marginTop: '0.75rem' }}>
@@ -12485,22 +12486,22 @@ function MainApp() {
           )
         }
 
-          return (
-            <section className="panel setup-panel" style={{ maxWidth: '1280px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <h2 style={{ margin: 0, color: '#cba3ff', fontSize: '1.5rem' }}>{t('pvp.setupTitle')}</h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span style={{ color: '#9b98cf', fontSize: '0.9rem' }}>{t('pvp.turn', { n: pvpSnapshot.turn + 1 })}</span>
-                  {pvpSnapshot.timer_by && pvpSnapshot.timer_until ? (
-                    <span style={{ color: pvpTimerLeft <= 60 ? '#ff8a80' : '#ffcb05', fontSize: '0.95rem', fontWeight: 'bold' }}>
-                      ⏱️ {Math.floor(pvpTimerLeft / 60)}:{String(pvpTimerLeft % 60).padStart(2, '0')}
-                    </span>
-                  ) : (
-                    <button className="tiny-btn" type="button" onClick={() => void pvpStartTimer()} style={{ color: '#ffcb05' }}>{t('pvp.countdown')}</button>
-                  )}
-                  <button className="tiny-btn" type="button" onClick={() => void pvpForfeit()} style={{ color: '#ff8a80' }}>{t('pvp.surrender')}</button>
-                </div>
+        return (
+          <section className="panel setup-panel" style={{ maxWidth: '1280px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h2 style={{ margin: 0, color: '#cba3ff', fontSize: '1.5rem' }}>{t('pvp.setupTitle')}</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{ color: '#9b98cf', fontSize: '0.9rem' }}>{t('pvp.turn', { n: pvpSnapshot.turn + 1 })}</span>
+                {pvpSnapshot.timer_by && pvpSnapshot.timer_until ? (
+                  <span style={{ color: pvpTimerLeft <= 60 ? '#ff8a80' : '#ffcb05', fontSize: '0.95rem', fontWeight: 'bold' }}>
+                    ⏱️ {Math.floor(pvpTimerLeft / 60)}:{String(pvpTimerLeft % 60).padStart(2, '0')}
+                  </span>
+                ) : (
+                  <button className="tiny-btn" type="button" onClick={() => void pvpStartTimer()} style={{ color: '#ffcb05' }}>{t('pvp.countdown')}</button>
+                )}
+                <button className="tiny-btn" type="button" onClick={() => void pvpForfeit()} style={{ color: '#ff8a80' }}>{t('pvp.surrender')}</button>
               </div>
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr 1fr', gap: '1rem', alignItems: 'start' }}>
               {/* Columna izquierda: siempre el Jugador A */}
@@ -12569,111 +12570,111 @@ function MainApp() {
                 {/* Altura fija: el panel no cambia de tamaño al realizar acciones ni al esperar al rival */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', height: '240px', minHeight: '240px', justifyContent: 'flex-start', overflowY: 'auto' }}>
 
-                {st.phase === 'switch' && mySwitchNeeded && !iSubmitted && (
-                  <div style={{ padding: '0.7rem', borderRadius: '8px', background: 'rgba(168,85,247,0.1)', border: '1px solid #a855f7' }}>
-                    <strong style={{ color: '#cba3ff', fontSize: '0.95rem' }}>{t('pvp.pickNext')}</strong>
-                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
-                      {my.team.map((p, i) => (
-                        p.hp > 0 && p.id !== myActive?.id ? (
-                          <button key={i} className="tiny-btn" type="button" onClick={() => void pvpSubmitSwitch(i)}>
-                            <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
-                            {p.name}
-                          </button>
-                        ) : null
-                      ))}
+                  {st.phase === 'switch' && mySwitchNeeded && !iSubmitted && (
+                    <div style={{ padding: '0.7rem', borderRadius: '8px', background: 'rgba(168,85,247,0.1)', border: '1px solid #a855f7' }}>
+                      <strong style={{ color: '#cba3ff', fontSize: '0.95rem' }}>{t('pvp.pickNext')}</strong>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                        {my.team.map((p, i) => (
+                          p.hp > 0 && p.id !== myActive?.id ? (
+                            <button key={i} className="tiny-btn" type="button" onClick={() => void pvpSubmitSwitch(i)}>
+                              <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
+                              {p.name}
+                            </button>
+                          ) : null
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {st.phase === 'picking' && canActPicking && myActive && !pvpChoosingSwitch && (
-                  <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-                      {myActive.moves.map((m, i) => {
-                        const pp = m.pp ?? 0
-                        const outOfPp = pp <= 0
-                        return (
-                          <button
-                            key={i}
-                            className="move-btn"
-                            type="button"
-                            disabled={outOfPp}
-                            onClick={() => void pvpSubmitMove(i)}
-                            style={{
-                              padding: '0.65rem 0.75rem',
-                              borderRadius: '10px',
-                              border: '1px solid #3f3f6e',
-                              background: 'rgba(15,23,42,0.6)',
-                              color: '#d9d6f2',
-                              cursor: outOfPp ? 'not-allowed' : 'pointer',
-                              opacity: outOfPp ? 0.45 : 1,
-                              letterSpacing: '0.02em',
-                              textAlign: 'left',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '0.3rem',
-                              lineHeight: 1.3,
-                            }}
-                          >
-                            <div style={{ fontSize: '0.88rem', fontWeight: 'bold', color: outOfPp ? '#7d7ab5' : '#f3f1ff' }}>{moveName(m)}</div>
-                            <div style={{ fontSize: '0.72rem', color: '#9b98cf' }}>{m.type.toUpperCase()} · PWR {m.power} · {m.accuracy}%</div>
-                            {moveEffectSummary(m) && <div style={{ fontSize: '0.7rem', color: '#7dd3fc' }}>{moveEffectSummary(m)}</div>}
-                            <div style={{ fontSize: '0.68rem', color: outOfPp ? '#ee3b2f' : '#7d7ab5' }}>
-                              {outOfPp ? t('pvp.noPP') : t('pvp.pp', { n: pp, max: m.maxPp ?? 10 })}
-                            </div>
-                          </button>
-                        )
-                      })}
+                  {st.phase === 'picking' && canActPicking && myActive && !pvpChoosingSwitch && (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                        {myActive.moves.map((m, i) => {
+                          const pp = m.pp ?? 0
+                          const outOfPp = pp <= 0
+                          return (
+                            <button
+                              key={i}
+                              className="move-btn"
+                              type="button"
+                              disabled={outOfPp}
+                              onClick={() => void pvpSubmitMove(i)}
+                              style={{
+                                padding: '0.65rem 0.75rem',
+                                borderRadius: '10px',
+                                border: '1px solid #3f3f6e',
+                                background: 'rgba(15,23,42,0.6)',
+                                color: '#d9d6f2',
+                                cursor: outOfPp ? 'not-allowed' : 'pointer',
+                                opacity: outOfPp ? 0.45 : 1,
+                                letterSpacing: '0.02em',
+                                textAlign: 'left',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.3rem',
+                                lineHeight: 1.3,
+                              }}
+                            >
+                              <div style={{ fontSize: '0.88rem', fontWeight: 'bold', color: outOfPp ? '#7d7ab5' : '#f3f1ff' }}>{moveName(m)}</div>
+                              <div style={{ fontSize: '0.72rem', color: '#9b98cf' }}>{m.type.toUpperCase()} · PWR {m.power} · {m.accuracy}%</div>
+                              {moveEffectSummary(m) && <div style={{ fontSize: '0.7rem', color: '#7dd3fc' }}>{moveEffectSummary(m)}</div>}
+                              <div style={{ fontSize: '0.68rem', color: outOfPp ? '#ee3b2f' : '#7d7ab5' }}>
+                                {outOfPp ? t('pvp.noPP') : t('pvp.pp', { n: pp, max: m.maxPp ?? 10 })}
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <button className="cta" type="button" disabled={!canSwitchNow} onClick={() => setPvpChoosingSwitch(true)} style={{ width: '100%', padding: '0.55rem 0.75rem', fontSize: '0.95rem' }}>
+                        🔁 Cambiar de Pokémon
+                      </button>
+                    </>
+                  )}
+
+                  {st.phase === 'picking' && canActPicking && myActive && pvpChoosingSwitch && (
+                    <div style={{ padding: '0.7rem', borderRadius: '8px', background: 'rgba(56,189,248,0.08)', border: '1px solid #38bdf8' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                        <strong style={{ color: '#7dd3fc', fontSize: '0.95rem' }}>{t('pvp.switchPokemon')}</strong>
+                        <button className="tiny-btn" type="button" onClick={() => setPvpChoosingSwitch(false)}>{t('pvp.backToMoves')}</button>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        {my.team.map((p, i) => (
+                          p.hp > 0 && i !== my.active ? (
+                            <button key={i} className="tiny-btn" type="button" onClick={() => void pvpSubmitSwitch(i)}>
+                              <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
+                              {p.name}
+                            </button>
+                          ) : null
+                        ))}
+                        {!canSwitchNow && <span style={{ color: '#7d7ab5', fontSize: '0.85rem' }}>{t('common.noPokemon')}</span>}
+                      </div>
                     </div>
-                    <button className="cta" type="button" disabled={!canSwitchNow} onClick={() => setPvpChoosingSwitch(true)} style={{ width: '100%', padding: '0.55rem 0.75rem', fontSize: '0.95rem' }}>
-                      🔁 Cambiar de Pokémon
-                    </button>
-                  </>
-                )}
+                  )}
 
-                {st.phase === 'picking' && canActPicking && myActive && pvpChoosingSwitch && (
-                  <div style={{ padding: '0.7rem', borderRadius: '8px', background: 'rgba(56,189,248,0.08)', border: '1px solid #38bdf8' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                      <strong style={{ color: '#7dd3fc', fontSize: '0.95rem' }}>{t('pvp.switchPokemon')}</strong>
-                      <button className="tiny-btn" type="button" onClick={() => setPvpChoosingSwitch(false)}>{t('pvp.backToMoves')}</button>
+                  {iSubmitted && (
+                    <div style={{ textAlign: 'center', padding: '0.9rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                      <p style={{ margin: '0 0 0.6rem', color: '#37d16b', fontSize: '1rem', fontWeight: 'bold' }}>
+                        {t('pvp.waitingRival')}
+                      </p>
+                      <button className="tiny-btn" type="button" onClick={() => void pvpCancelAction()} style={{ color: '#ff8a80' }}>
+                        {t('coop.cancelAction')}
+                      </button>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                      {my.team.map((p, i) => (
-                        p.hp > 0 && i !== my.active ? (
-                          <button key={i} className="tiny-btn" type="button" onClick={() => void pvpSubmitSwitch(i)}>
-                            <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
-                            {p.name}
-                          </button>
-                        ) : null
-                      ))}
-                      {!canSwitchNow && <span style={{ color: '#7d7ab5', fontSize: '0.85rem' }}>{t('common.noPokemon')}</span>}
+                  )}
+
+                  {!iSubmitted && st.phase === 'picking' && !canActPicking && (
+                    <div style={{ textAlign: 'center', padding: '0.9rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                      <p style={{ margin: 0, color: '#37d16b', fontSize: '1rem', fontWeight: 'bold' }}>{t('pvp.rivalChoosing')}</p>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {iSubmitted && (
-                  <div style={{ textAlign: 'center', padding: '0.9rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
-                    <p style={{ margin: '0 0 0.6rem', color: '#37d16b', fontSize: '1rem', fontWeight: 'bold' }}>
-                      {t('pvp.waitingRival')}
-                    </p>
-                    <button className="tiny-btn" type="button" onClick={() => void pvpCancelAction()} style={{ color: '#ff8a80' }}>
-                      {t('coop.cancelAction')}
-                    </button>
-                  </div>
-                )}
+                  {st.phase === 'switch' && !mySwitchNeeded && !iSubmitted && (
+                    <div style={{ textAlign: 'center', padding: '0.9rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                      <p style={{ margin: 0, color: '#37d16b', fontSize: '1rem', fontWeight: 'bold' }}>{t('pvp.rivalPickingNext')}</p>
+                    </div>
+                  )}
 
-                {!iSubmitted && st.phase === 'picking' && !canActPicking && (
-                  <div style={{ textAlign: 'center', padding: '0.9rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
-                    <p style={{ margin: 0, color: '#37d16b', fontSize: '1rem', fontWeight: 'bold' }}>{t('pvp.rivalChoosing')}</p>
-                  </div>
-                )}
-
-                {st.phase === 'switch' && !mySwitchNeeded && !iSubmitted && (
-                  <div style={{ textAlign: 'center', padding: '0.9rem', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
-                    <p style={{ margin: 0, color: '#37d16b', fontSize: '1rem', fontWeight: 'bold' }}>{t('pvp.rivalPickingNext')}</p>
-                  </div>
-                )}
-
-                {pvpError && <p style={{ margin: 0, textAlign: 'center', color: '#ff8a80', fontSize: '0.85rem' }}>{pvpError}</p>}
+                  {pvpError && <p style={{ margin: 0, textAlign: 'center', color: '#ff8a80', fontSize: '0.85rem' }}>{pvpError}</p>}
                 </div>
               </div>
 
@@ -12882,137 +12883,137 @@ function MainApp() {
               <div className="setup-card setup-card-gen">
                 <h2 className="setup-card-title"><span className="setup-step">1</span> {t('setup.selectGeneration')}</h2>
                 <div className="generation-grid">
-            {generations.map((gen) => {
-              const unlocked = isGenUnlocked(gen)
-              const hardUnlocked = isHardUnlocked(gen)
-              const infUnlocked = isInfiniteUnlocked(gen)
-              const completedMed = progression.completedMedium.includes(gen)
-              const completedAny = progression.completedAny.includes(gen)
-              const completedHard = progression.completedHard.includes(gen)
-              const completedColiseum = progression.completedColiseum.includes(gen)
-              const completedLeague = progression.completedLeague.includes(gen)
-              const completedOriginal = progression.completedOriginal.includes(gen)
-              const completedAventura = progression.completedAventura.includes(gen)
+                  {generations.map((gen) => {
+                    const unlocked = isGenUnlocked(gen)
+                    const hardUnlocked = isHardUnlocked(gen)
+                    const infUnlocked = isInfiniteUnlocked(gen)
+                    const completedMed = progression.completedMedium.includes(gen)
+                    const completedAny = progression.completedAny.includes(gen)
+                    const completedHard = progression.completedHard.includes(gen)
+                    const completedColiseum = progression.completedColiseum.includes(gen)
+                    const completedLeague = progression.completedLeague.includes(gen)
+                    const completedOriginal = progression.completedOriginal.includes(gen)
+                    const completedAventura = progression.completedAventura.includes(gen)
 
-              return (
-                <button
-                  key={gen}
-                  className={`gen-tile ${generation === gen ? 'is-active' : ''} ${!unlocked ? 'is-locked' : ''}`}
-                  onClick={() => { playClick(); handleSelectGeneration(gen) }}
-                  onMouseEnter={playHover}
-                  type="button"
-                  disabled={isLoading || !unlocked}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0 8px' }}>
-                    <span style={{ whiteSpace: 'nowrap' }}>Gen {gen} {unlocked ? '' : '🔒'}</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      {completedHard ? (
-                        <span className="badge-medium" title={language === 'en' ? 'Completed on Hard' : 'Completado en Difícil'}>🏆🏆</span>
-                      ) : completedMed ? (
-                        <span className="badge-medium" title={language === 'en' ? 'Completed on Medium' : 'Completado en Intermedio'}>🏆</span>
-                      ) : completedAny ? (
-                        <span className="badge-easy" title={language === 'en' ? 'Completed on Easy' : 'Completado en Fácil'}>⭐</span>
-                      ) : null}
-                      {completedColiseum && (
-                        <span className="badge-medium" title={language === 'en' ? 'Completed on COLISEUM' : 'Completado en COLISEUM'}>👑</span>
-                      )}
-                      {completedLeague && (
-                        <span className="badge-medium" title={language === 'en' ? 'Completed on the League' : 'Completado en Liga'}>🏅</span>
-                      )}
-                      {completedOriginal && (
-                        <span className="badge-medium" title={language === 'en' ? 'Completed on Original' : 'Completado en Modo Original'}>🕹️</span>
-                      )}
-                      {completedAventura && (
-                        <span className="badge-medium" title={language === 'en' ? 'Completed on Adventure' : 'Completado en Modo Aventura'}>🗺️</span>
-                      )}
-                    </span>
-                  </div>
-                  <strong>{generationRegions[gen]}</strong>
+                    return (
+                      <button
+                        key={gen}
+                        className={`gen-tile ${generation === gen ? 'is-active' : ''} ${!unlocked ? 'is-locked' : ''}`}
+                        onClick={() => { playClick(); handleSelectGeneration(gen) }}
+                        onMouseEnter={playHover}
+                        type="button"
+                        disabled={isLoading || !unlocked}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0 8px' }}>
+                          <span style={{ whiteSpace: 'nowrap' }}>Gen {gen} {unlocked ? '' : '🔒'}</span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            {completedHard ? (
+                              <span className="badge-medium" title={language === 'en' ? 'Completed on Hard' : 'Completado en Difícil'}>🏆🏆</span>
+                            ) : completedMed ? (
+                              <span className="badge-medium" title={language === 'en' ? 'Completed on Medium' : 'Completado en Intermedio'}>🏆</span>
+                            ) : completedAny ? (
+                              <span className="badge-easy" title={language === 'en' ? 'Completed on Easy' : 'Completado en Fácil'}>⭐</span>
+                            ) : null}
+                            {completedColiseum && (
+                              <span className="badge-medium" title={language === 'en' ? 'Completed on COLISEUM' : 'Completado en COLISEUM'}>👑</span>
+                            )}
+                            {completedLeague && (
+                              <span className="badge-medium" title={language === 'en' ? 'Completed on the League' : 'Completado en Liga'}>🏅</span>
+                            )}
+                            {completedOriginal && (
+                              <span className="badge-medium" title={language === 'en' ? 'Completed on Original' : 'Completado en Modo Original'}>🕹️</span>
+                            )}
+                            {completedAventura && (
+                              <span className="badge-medium" title={language === 'en' ? 'Completed on Adventure' : 'Completado en Modo Aventura'}>🗺️</span>
+                            )}
+                          </span>
+                        </div>
+                        <strong>{generationRegions[gen]}</strong>
 
-                  {!unlocked && (
-                    <span className="lock-text">
-                      🔒 {t('setup.passGen', { gen: gen - 1 })}
-                    </span>
-                  )}
-                  {unlocked && infUnlocked && (
-                    <span className="unlock-tag-infinite">{t('setup.infiniteUnlocked')}</span>
-                  )}
-                  {unlocked && !infUnlocked && hardUnlocked && (
-                    <span className="unlock-tag">{t('setup.hardAvailable')}</span>
-                  )}
-                </button>
-              )
-            })}
+                        {!unlocked && (
+                          <span className="lock-text">
+                            🔒 {t('setup.passGen', { gen: gen - 1 })}
+                          </span>
+                        )}
+                        {unlocked && infUnlocked && (
+                          <span className="unlock-tag-infinite">{t('setup.infiniteUnlocked')}</span>
+                        )}
+                        {unlocked && !infUnlocked && hardUnlocked && (
+                          <span className="unlock-tag">{t('setup.hardAvailable')}</span>
+                        )}
+                      </button>
+                    )
+                  })}
 
-            {(() => {
-              const randomUnlocked = isGenUnlocked(0)
-              const randomCompletedHard = generations.every((g) => progression.completedHard.includes(g))
-              const randomCompletedMed = generations.every((g) => progression.completedMedium.includes(g))
-              const randomCompletedAny = progression.completedAny.length > 0
-              const randomCompletedColiseum = generations.every((g) => progression.completedColiseum.includes(g))
-              const randomCompletedLeague = generations.every((g) => progression.completedLeague.includes(g))
-              const randomCompletedAventura = generations.every((g) => progression.completedAventura.includes(g))
-              return (
-                <button
-                  key={0}
-                  className={`gen-tile ${generation === 0 ? 'is-active' : ''} ${!randomUnlocked ? 'is-locked' : ''}`}
-                  onClick={() => { playClick(); handleSelectGeneration(0) }}
-                  onMouseEnter={playHover}
-                  type="button"
-                  disabled={isLoading || !randomUnlocked}
-                  style={{
-                    gridColumn: '1 / -1',
-                    borderColor: randomUnlocked ? '#eab308' : '#475569',
-                    background: !randomUnlocked
-                      ? 'rgba(15, 23, 42, 0.6)'
-                      : generation === 0
-                        ? 'rgba(234, 179, 8, 0.25)'
-                        : 'rgba(234, 179, 8, 0.05)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                    padding: '12px',
-                    opacity: randomUnlocked ? 1 : 0.65,
-                    cursor: randomUnlocked ? 'pointer' : 'not-allowed'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '0 8px' }}>
-                    <span style={{ fontSize: '1.2rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5', whiteSpace: 'nowrap' }}>
-                      {t('setup.randomAllStars')} {randomUnlocked ? '' : '🔒'}
-                    </span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                      {randomCompletedHard ? (
-                        <span className="badge-medium" title={language === 'en' ? 'Completed on Hard' : 'Completado en Difícil'}>🏆🏆</span>
-                      ) : randomCompletedMed ? (
-                        <span className="badge-medium" title={language === 'en' ? 'Completed on Medium' : 'Completado en Intermedio'}>🏆</span>
-                      ) : randomCompletedAny ? (
-                        <span className="badge-easy" title={language === 'en' ? 'Completed on Easy' : 'Completado en Fácil'}>⭐</span>
-                      ) : null}
-                      {randomCompletedColiseum && (
-                        <span className="badge-medium" title={language === 'en' ? 'Completed on COLISEUM' : 'Completado en COLISEUM'}>👑</span>
-                      )}
-                      {randomCompletedLeague && (
-                        <span className="badge-medium" title={language === 'en' ? 'Completed on the League' : 'Completado en Liga'}>🏅</span>
-                      )}
-                      {randomCompletedAventura && (
-                        <span className="badge-medium" title={language === 'en' ? 'Completed on Adventure' : 'Completado en Modo Aventura'}>🗺️</span>
-                      )}
-                    </span>
-                    <strong style={{ fontSize: '1rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5', whiteSpace: 'nowrap' }}>
-                      — {randomUnlocked ? t('setup.mixAllGens') : t('setup.allGens')}
-                    </strong>
-                  </div>
-                  {!randomUnlocked && (
-                    <span className="lock-text">
-                      {t('setup.unlockAllGens')}
-                    </span>
-                  )}
-                </button>
-              )
-            })()}
-          </div>
+                  {(() => {
+                    const randomUnlocked = isGenUnlocked(0)
+                    const randomCompletedHard = generations.every((g) => progression.completedHard.includes(g))
+                    const randomCompletedMed = generations.every((g) => progression.completedMedium.includes(g))
+                    const randomCompletedAny = progression.completedAny.length > 0
+                    const randomCompletedColiseum = generations.every((g) => progression.completedColiseum.includes(g))
+                    const randomCompletedLeague = generations.every((g) => progression.completedLeague.includes(g))
+                    const randomCompletedAventura = generations.every((g) => progression.completedAventura.includes(g))
+                    return (
+                      <button
+                        key={0}
+                        className={`gen-tile ${generation === 0 ? 'is-active' : ''} ${!randomUnlocked ? 'is-locked' : ''}`}
+                        onClick={() => { playClick(); handleSelectGeneration(0) }}
+                        onMouseEnter={playHover}
+                        type="button"
+                        disabled={isLoading || !randomUnlocked}
+                        style={{
+                          gridColumn: '1 / -1',
+                          borderColor: randomUnlocked ? '#eab308' : '#475569',
+                          background: !randomUnlocked
+                            ? 'rgba(15, 23, 42, 0.6)'
+                            : generation === 0
+                              ? 'rgba(234, 179, 8, 0.25)'
+                              : 'rgba(234, 179, 8, 0.05)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          padding: '12px',
+                          opacity: randomUnlocked ? 1 : 0.65,
+                          cursor: randomUnlocked ? 'pointer' : 'not-allowed'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '0 8px' }}>
+                          <span style={{ fontSize: '1.2rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5', whiteSpace: 'nowrap' }}>
+                            {t('setup.randomAllStars')} {randomUnlocked ? '' : '🔒'}
+                          </span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                            {randomCompletedHard ? (
+                              <span className="badge-medium" title={language === 'en' ? 'Completed on Hard' : 'Completado en Difícil'}>🏆🏆</span>
+                            ) : randomCompletedMed ? (
+                              <span className="badge-medium" title={language === 'en' ? 'Completed on Medium' : 'Completado en Intermedio'}>🏆</span>
+                            ) : randomCompletedAny ? (
+                              <span className="badge-easy" title={language === 'en' ? 'Completed on Easy' : 'Completado en Fácil'}>⭐</span>
+                            ) : null}
+                            {randomCompletedColiseum && (
+                              <span className="badge-medium" title={language === 'en' ? 'Completed on COLISEUM' : 'Completado en COLISEUM'}>👑</span>
+                            )}
+                            {randomCompletedLeague && (
+                              <span className="badge-medium" title={language === 'en' ? 'Completed on the League' : 'Completado en Liga'}>🏅</span>
+                            )}
+                            {randomCompletedAventura && (
+                              <span className="badge-medium" title={language === 'en' ? 'Completed on Adventure' : 'Completado en Modo Aventura'}>🗺️</span>
+                            )}
+                          </span>
+                          <strong style={{ fontSize: '1rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5', whiteSpace: 'nowrap' }}>
+                            — {randomUnlocked ? t('setup.mixAllGens') : t('setup.allGens')}
+                          </strong>
+                        </div>
+                        {!randomUnlocked && (
+                          <span className="lock-text">
+                            {t('setup.unlockAllGens')}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })()}
+                </div>
               </div>
 
               <div className="setup-card setup-card-pvp" style={{ marginTop: '0.75rem' }}>
@@ -13036,335 +13037,336 @@ function MainApp() {
             <div className="setup-col">
               <div className="setup-card setup-card-diff">
                 <h2 className="setup-card-title"><span className="setup-step">2</span> {t('setup.selectDifficulty')}</h2>
-          <div className="generation-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-            {(['easy', 'medium', 'hard'] as Difficulty[]).map((diff) => {
-              const isHard = diff === 'hard'
-              const hardUnlocked = isHardUnlocked(generation)
-              const isLocked = isHard && !hardUnlocked
+                <div className="generation-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
+                  {(['easy', 'medium', 'hard'] as Difficulty[]).map((diff) => {
+                    const isHard = diff === 'hard'
+                    const hardUnlocked = isHardUnlocked(generation)
+                    const isLocked = isHard && !hardUnlocked
 
-              return (
-                <button
-                  key={diff}
-                  className={`gen-tile ${difficulty === diff ? 'is-active' : ''} ${isLocked ? 'is-locked' : ''}`}
-                  onClick={() => { playClick(); handleSelectDifficulty(diff) }}
-                  onMouseEnter={playHover}
-                  type="button"
-                  disabled={isLoading || isLocked}
-                  style={{ opacity: isLocked ? 0.65 : 1, cursor: isLocked ? 'not-allowed' : 'pointer' }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>{difficultyLabel(language, diff).title} {isLocked ? '🔒' : ''}</span>
-                  </div>
-                  <strong>{difficultyNodeCounts[diff]} {language === 'en' ? 'routes/stage' : 'rutas/etapa'} ({difficultyNodeCounts[diff] * 3} {language === 'en' ? 'total' : 'total'})</strong>
-                  {isLocked && (
-                    <span className="lock-text">
-                      {t('setup.completeRegionOnce', { region: generationRegions[generation] })}
-                    </span>
+                    return (
+                      <button
+                        key={diff}
+                        className={`gen-tile ${difficulty === diff ? 'is-active' : ''} ${isLocked ? 'is-locked' : ''}`}
+                        onClick={() => { playClick(); handleSelectDifficulty(diff) }}
+                        onMouseEnter={playHover}
+                        type="button"
+                        disabled={isLoading || isLocked}
+                        style={{ opacity: isLocked ? 0.65 : 1, cursor: isLocked ? 'not-allowed' : 'pointer' }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>{difficultyLabel(language, diff).title} {isLocked ? '🔒' : ''}</span>
+                        </div>
+                        <strong>{difficultyNodeCounts[diff]} {language === 'en' ? 'routes/stage' : 'rutas/etapa'} ({difficultyNodeCounts[diff] * 3} {language === 'en' ? 'total' : 'total'})</strong>
+                        {isLocked && (
+                          <span className="lock-text">
+                            {t('setup.completeRegionOnce', { region: generationRegions[generation] })}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                  <button
+                    className={`gen-tile ${difficulty === 'original' ? 'is-active' : ''}`}
+                    onClick={() => { playClick(); handleSelectDifficulty('original') }}
+                    onMouseEnter={playHover}
+                    type="button"
+                    disabled={isLoading}
+                    style={{
+                      borderColor: difficulty === 'original' ? '#4d9bff' : 'rgba(77, 155, 255, 0.5)',
+                      background: difficulty === 'original' ? 'rgba(77, 155, 255, 0.25)' : 'rgba(77, 155, 255, 0.06)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      padding: '10px',
+                    }}
+                  >
+                    <span style={{ fontSize: '1rem', color: '#4d9bff', whiteSpace: 'nowrap' }}>🕹️ {language === 'en' ? 'Original' : 'Original'}</span>
+                    <strong style={{ fontSize: '1.1rem', color: '#9b98cf' }}>{language === 'en' ? 'Pick starter' : 'Elige inicial'}</strong>
+                  </button>
+                </div>
+
+                <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
+                  {(() => {
+                    const infUnlocked = isInfiniteUnlocked(generation)
+                    return (
+                      <button
+                        className={`gen-tile ${difficulty === 'infinite' ? 'is-active' : ''} ${!infUnlocked ? 'is-locked' : ''}`}
+                        onClick={() => {
+                          playClick()
+                          handleSelectDifficulty('infinite')
+                          if (infUnlocked && !authUser) {
+                            setApiError('Para jugar al modo Infinite necesitas una cuenta. Crea una o inicia sesión en el ranking.')
+                            openLeaderboard()
+                          }
+                        }}
+                        onMouseEnter={playHover}
+                        type="button"
+                        disabled={isLoading || !infUnlocked}
+                        style={{
+                          borderColor: infUnlocked ? '#a855f7' : '#475569',
+                          background: !infUnlocked
+                            ? 'rgba(15, 23, 42, 0.6)'
+                            : difficulty === 'infinite' ? 'rgba(168, 85, 247, 0.25)' : 'rgba(168, 85, 247, 0.05)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          padding: '12px',
+                          opacity: infUnlocked ? 1 : 0.65,
+                          cursor: infUnlocked ? 'pointer' : 'not-allowed'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '1.2rem', color: infUnlocked ? '#cba3ff' : '#7d7ab5' }}>♾️ INFINITE {infUnlocked ? '' : '🔒'}</span>
+                          <strong style={{ fontSize: '1rem', color: infUnlocked ? '#cba3ff' : '#7d7ab5' }}>— {language === 'en' ? 'Endless routes' : 'Rutas infinitas'}</strong>
+                        </div>
+                        {infUnlocked && !authUser && (
+                          <span className="lock-text" style={{ color: '#ffcb05' }}>
+                            🔑 Requiere cuenta (inicia sesión en Ranking ♾️)
+                          </span>
+                        )}
+                        {!infUnlocked && (
+                          <span className="lock-text">
+                            🔒 Completa {generationRegions[generation]} en Difícil
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })()}
+                  {difficulty === 'infinite' && (
+                    <div
+                      className="panel"
+                      style={{
+                        marginTop: '0.5rem',
+                        padding: '0.75rem 1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.4rem',
+                      }}
+                    >
+                      <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                        <span>{language === 'en' ? 'Nodes per batch' : 'Nodos por lote'}</span>
+                        <strong style={{ color: '#cba3ff' }}>{infiniteNodeSize}</strong>
+                      </label>
+                      <input
+                        type="range"
+                        min={3}
+                        max={12}
+                        step={1}
+                        value={infiniteNodeSize}
+                        onChange={(e) => setInfiniteNodeSize(Number(e.target.value))}
+                        style={{ width: '100%', accentColor: '#a855f7' }}
+                      />
+                      <span className="muted" style={{ fontSize: '0.7rem' }}>
+                        {language === 'en'
+                          ? `Each stage shows ${infiniteNodeSize} nodes. Lower = shorter, faster stages. Higher = longer routes.`
+                          : `Cada etapa muestra ${infiniteNodeSize} nodos. Menos = etapas más cortas y rápidas. Más = rutas más largas.`}
+                      </span>
+                    </div>
                   )}
-                </button>
-              )
-            })}
-            <button
-              className={`gen-tile ${difficulty === 'original' ? 'is-active' : ''}`}
-              onClick={() => { playClick(); handleSelectDifficulty('original') }}
-              onMouseEnter={playHover}
-              type="button"
-              disabled={isLoading}
-              style={{
-                borderColor: difficulty === 'original' ? '#4d9bff' : 'rgba(77, 155, 255, 0.5)',
-                background: difficulty === 'original' ? 'rgba(77, 155, 255, 0.25)' : 'rgba(77, 155, 255, 0.06)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '4px',
-                padding: '10px',
-              }}
-            >
-              <span style={{ fontSize: '1rem', color: '#4d9bff', whiteSpace: 'nowrap' }}>🕹️ {language === 'en' ? 'Original' : 'Original'}</span>
-              <strong style={{ fontSize: '1.1rem', color: '#9b98cf' }}>{language === 'en' ? 'Pick starter' : 'Elige inicial'}</strong>
-            </button>
-          </div>
+                </div>
 
-          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
-            {(() => {
-              const infUnlocked = isInfiniteUnlocked(generation)
-              return (
-                <button
-                  className={`gen-tile ${difficulty === 'infinite' ? 'is-active' : ''} ${!infUnlocked ? 'is-locked' : ''}`}
-                  onClick={() => {
-                    playClick()
-                    handleSelectDifficulty('infinite')
-                    if (infUnlocked && !authUser) {
-                      setApiError('Para jugar al modo Infinite necesitas una cuenta. Crea una o inicia sesión en el ranking.')
-                      openLeaderboard()
-                    }
-                  }}
-                  onMouseEnter={playHover}
-                  type="button"
-                  disabled={isLoading || !infUnlocked}
-                  style={{
-                    borderColor: infUnlocked ? '#a855f7' : '#475569',
-                    background: !infUnlocked
-                      ? 'rgba(15, 23, 42, 0.6)'
-                      : difficulty === 'infinite' ? 'rgba(168, 85, 247, 0.25)' : 'rgba(168, 85, 247, 0.05)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                    padding: '12px',
-                    opacity: infUnlocked ? 1 : 0.65,
-                    cursor: infUnlocked ? 'pointer' : 'not-allowed'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.2rem', color: infUnlocked ? '#cba3ff' : '#7d7ab5' }}>♾️ INFINITE {infUnlocked ? '' : '🔒'}</span>
-                    <strong style={{ fontSize: '1rem', color: infUnlocked ? '#cba3ff' : '#7d7ab5' }}>— {language === 'en' ? 'Endless routes' : 'Rutas infinitas'}</strong>
-                  </div>
-                  {infUnlocked && !authUser && (
-                    <span className="lock-text" style={{ color: '#ffcb05' }}>
-                      🔑 Requiere cuenta (inicia sesión en Ranking ♾️)
-                    </span>
-                  )}
-                  {!infUnlocked && (
-                    <span className="lock-text">
-                      🔒 Completa {generationRegions[generation]} en Difícil
-                    </span>
-                  )}
-                </button>
-              )
-            })()}
-            {difficulty === 'infinite' && (
-              <div
-                className="panel"
-                style={{
-                  marginTop: '0.5rem',
-                  padding: '0.75rem 1rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.4rem',
-                }}
-              >
-                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                  <span>{language === 'en' ? 'Nodes per batch' : 'Nodos por lote'}</span>
-                  <strong style={{ color: '#cba3ff' }}>{infiniteNodeSize}</strong>
-                </label>
-                <input
-                  type="range"
-                  min={3}
-                  max={12}
-                  step={1}
-                  value={infiniteNodeSize}
-                  onChange={(e) => setInfiniteNodeSize(Number(e.target.value))}
-                  style={{ width: '100%', accentColor: '#a855f7' }}
-                />
-                <span className="muted" style={{ fontSize: '0.7rem' }}>
-                  {language === 'en'
-                    ? `Each stage shows ${infiniteNodeSize} nodes. Lower = shorter, faster stages. Higher = longer routes.`
-                    : `Cada etapa muestra ${infiniteNodeSize} nodos. Menos = etapas más cortas y rápidas. Más = rutas más largas.`}
-                </span>
-              </div>
-            )}
-          </div>
+                <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
+                  {(() => {
+                    const coliseumUnlocked = isColiseumUnlocked()
+                    return (
+                      <button
+                        className={`gen-tile ${difficulty === 'coliseum' ? 'is-active' : ''}`}
+                        onClick={() => { if (!coliseumUnlocked) return; playClick(); handleSelectDifficulty('coliseum') }}
+                        onMouseEnter={playHover}
+                        type="button"
+                        disabled={isLoading || !coliseumUnlocked}
+                        style={{
+                          borderColor: difficulty === 'coliseum' ? '#ffcb05' : '#475569',
+                          background: difficulty === 'coliseum' ? 'rgba(250,204,21,0.15)' : 'rgba(15,23,42,0.6)',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                          gap: '4px', padding: '12px', opacity: coliseumUnlocked ? 1 : 0.65,
+                          cursor: (!isLoading && coliseumUnlocked) ? 'pointer' : 'not-allowed'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '1.2rem', color: coliseumUnlocked ? '#ffcb05' : '#7d7ab5' }}>{t('setup.coliseum')} {coliseumUnlocked ? '' : '🔒'}</span>
+                          <strong style={{ fontSize: '1rem', color: coliseumUnlocked ? '#ffcb05' : '#7d7ab5' }}>{t('setup.coliseum8')}</strong>
+                        </div>
+                        {!coliseumUnlocked && (
+                          <span className="lock-text">
+                            {t('setup.unlockColiseum')}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })()}
+                </div>
 
-          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
-            {(() => {
-              const coliseumUnlocked = isColiseumUnlocked()
-              return (
-            <button
-              className={`gen-tile ${difficulty === 'coliseum' ? 'is-active' : ''}`}
-              onClick={() => { if (!coliseumUnlocked) return; playClick(); handleSelectDifficulty('coliseum') }}
-              onMouseEnter={playHover}
-              type="button"
-              disabled={isLoading || !coliseumUnlocked}
-              style={{
-                borderColor: difficulty === 'coliseum' ? '#ffcb05' : '#475569',
-                background: difficulty === 'coliseum' ? 'rgba(250,204,21,0.15)' : 'rgba(15,23,42,0.6)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: '4px', padding: '12px', opacity: coliseumUnlocked ? 1 : 0.65,
-                cursor: (!isLoading && coliseumUnlocked) ? 'pointer' : 'not-allowed'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem', color: coliseumUnlocked ? '#ffcb05' : '#7d7ab5' }}>{t('setup.coliseum')} {coliseumUnlocked ? '' : '🔒'}</span>
-                <strong style={{ fontSize: '1rem', color: coliseumUnlocked ? '#ffcb05' : '#7d7ab5' }}>{t('setup.coliseum8')}</strong>
-              </div>
-              {!coliseumUnlocked && (
-                <span className="lock-text">
-                  {t('setup.unlockColiseum')}
-                </span>
-              )}
-            </button>
-            )})()}
-          </div>
+                <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
+                  <button
+                    className={`gen-tile ${difficulty === 'aventura' ? 'is-active' : ''}`}
+                    onClick={() => { playClick(); handleSelectDifficulty('aventura') }}
+                    onMouseEnter={playHover}
+                    type="button"
+                    disabled={isLoading}
+                    style={{
+                      borderColor: difficulty === 'aventura' ? '#ef4444' : '#7f1d1d',
+                      background: difficulty === 'aventura' ? 'rgba(239,68,68,0.18)' : 'rgba(127,29,29,0.08)',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      gap: '4px', padding: '12px', cursor: isLoading ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.2rem', color: '#f87171' }}>{t('setup.aventura')}</span>
+                    </div>
+                    {(() => {
+                      // Victorias de la generación seleccionada (en Random, el total).
+                      const wins = generation === 0
+                        ? Object.values(aventuraProgress).reduce((s, p) => s + p.totalWins, 0)
+                        : getAventuraGen(generation).totalWins
+                      return wins > 0 && (
+                        <span style={{ fontSize: '0.78rem', color: '#fca5a5' }}>
+                          {t('setup.aventuraWins', { n: wins })}
+                        </span>
+                      )
+                    })()}
+                  </button>
+                </div>
 
-          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
-            <button
-              className={`gen-tile ${difficulty === 'aventura' ? 'is-active' : ''}`}
-              onClick={() => { playClick(); handleSelectDifficulty('aventura') }}
-              onMouseEnter={playHover}
-              type="button"
-              disabled={isLoading}
-              style={{
-                borderColor: difficulty === 'aventura' ? '#ef4444' : '#7f1d1d',
-                background: difficulty === 'aventura' ? 'rgba(239,68,68,0.18)' : 'rgba(127,29,29,0.08)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: '4px', padding: '12px', cursor: isLoading ? 'not-allowed' : 'pointer'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem', color: '#f87171' }}>{t('setup.aventura')}</span>
-              </div>
-              {(() => {
-                // Victorias de la generación seleccionada (en Random, el total).
-                const wins = generation === 0
-                  ? Object.values(aventuraProgress).reduce((s, p) => s + p.totalWins, 0)
-                  : getAventuraGen(generation).totalWins
-                return wins > 0 && (
-                  <span style={{ fontSize: '0.78rem', color: '#fca5a5' }}>
-                    {t('setup.aventuraWins', { n: wins })}
-                  </span>
-                )
-              })()}
-            </button>
-          </div>
-
-          <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>🎲 {t('setup.daily')}</h2>
-          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
-            {(() => {
-              const dailyConfig = getDailyConfig(dailySeed, [1,2,3,4,5,6,7,8,9])
-              const diffLabel = dailyConfig ? difficultyLabel(language, dailyConfig.difficulty).title : ''
-              const genLabel = dailyConfig ? `${generationRegions[dailyConfig.generation]}` : ''
-              const modName = dailyConfig ? runModName(dailyConfig.modifierId) : ''
-              return (
-            <button
-              className="gen-tile"
-              onClick={() => {
-                if (!dailyConfig) return
-                playClick()
-                isDailyRunRef.current = true
-                startNewRun()
-              }}
-              onMouseEnter={playHover}
-              type="button"
-              disabled={isLoading || dailyPlayed || !dailyConfig || coopMode}
-              style={{
-                borderColor: dailyPlayed ? '#475569' : '#37d16b',
-                background: dailyPlayed ? 'rgba(15,23,42,0.6)' : 'rgba(34,197,94,0.1)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '12px',
-                opacity: dailyPlayed ? 0.65 : 1, cursor: dailyPlayed ? 'not-allowed' : 'pointer',
-                border: `1px solid ${dailyPlayed ? '#475569' : '#37d16b'}`, borderRadius: '12px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem', color: dailyPlayed ? '#7d7ab5' : '#37d16b' }}>📅 {dailyPlayed ? t('setup.dailyDone2') : t('setup.dailyTitle')}</span>
-              </div>
-              <strong style={{ fontSize: '0.85rem', color: '#9b98cf' }}>
-                {dailyPlayed ? t('setup.dailyTomorrow') : `Gen ${dailyConfig?.generation} (${genLabel}) — ${diffLabel} — ${modName}`}
-              </strong>
-            </button>
-              )
-            })()}
-          </div>
+                <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>🎲 {t('setup.daily')}</h2>
+                <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
+                  {(() => {
+                    const dailyConfig = getDailyConfig(dailySeed, [1, 2, 3, 4, 5, 6, 7, 8, 9])
+                    const diffLabel = dailyConfig ? difficultyLabel(language, dailyConfig.difficulty).title : ''
+                    const genLabel = dailyConfig ? `${generationRegions[dailyConfig.generation]}` : ''
+                    const modName = dailyConfig ? runModName(dailyConfig.modifierId) : ''
+                    return (
+                      <button
+                        className="gen-tile"
+                        onClick={() => {
+                          if (!dailyConfig) return
+                          playClick()
+                          isDailyRunRef.current = true
+                          startNewRun()
+                        }}
+                        onMouseEnter={playHover}
+                        type="button"
+                        disabled={isLoading || dailyPlayed || !dailyConfig || coopMode}
+                        style={{
+                          borderColor: dailyPlayed ? '#475569' : '#37d16b',
+                          background: dailyPlayed ? 'rgba(15,23,42,0.6)' : 'rgba(34,197,94,0.1)',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '12px',
+                          opacity: dailyPlayed ? 0.65 : 1, cursor: dailyPlayed ? 'not-allowed' : 'pointer',
+                          border: `1px solid ${dailyPlayed ? '#475569' : '#37d16b'}`, borderRadius: '12px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '1.2rem', color: dailyPlayed ? '#7d7ab5' : '#37d16b' }}>📅 {dailyPlayed ? t('setup.dailyDone2') : t('setup.dailyTitle')}</span>
+                        </div>
+                        <strong style={{ fontSize: '0.85rem', color: '#9b98cf' }}>
+                          {dailyPlayed ? t('setup.dailyTomorrow') : `Gen ${dailyConfig?.generation} (${genLabel}) — ${diffLabel} — ${modName}`}
+                        </strong>
+                      </button>
+                    )
+                  })()}
+                </div>
               </div>
 
               <div className="setup-card setup-card-coop">
                 <h2 className="setup-card-title">{t('coop.title2')}</h2>
-          <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0' }}>
-            {!coopMode ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', border: '1px solid #3f3f6e', borderRadius: '12px', background: 'rgba(15,23,42,0.6)' }}>
-                <p style={{ margin: '0', color: '#9b98cf', fontSize: '0.8rem' }}>
-                  {t('coop.intro')}
-                </p>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <label style={{ flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '4px', color: '#9b98cf', fontSize: '0.75rem' }}>
-                    {t('coop.generation')}
-                    <select
-                      value={coopGen}
-                      onChange={(e) => setCoopGen(Number(e.target.value))}
-                      style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
-                    >
-                      {generations.map((g) => (
-                        <option key={g} value={g} disabled={!isGenUnlocked(g)}>Gen {g} — {generationRegions[g]}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label style={{ flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '4px', color: '#9b98cf', fontSize: '0.75rem' }}>
-                    {t('coop.difficulty')}
-                    <select
-                      value={coopDiff}
-                      onChange={(e) => setCoopDiff(e.target.value as 'easy' | 'medium' | 'hard')}
-                      style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
-                    >
-                      <option value="easy">{t('coop.easy')}</option>
-                      <option value="medium">{t('coop.medium')}</option>
-                      <option value="hard">{t('coop.hard')}</option>
-                    </select>
-                  </label>
-                </div>
-                <button
-                  className="cta"
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => { playClick(); void handleCreateCoopSession() }}
-                  style={{ background: '#37d16b', color: '#12122b' }}
-                >
-                  {t('coop.create')}
-                </button>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <input
-                    type="text"
-                    value={coopJoinCode}
-                    onChange={(e) => setCoopJoinCode(e.target.value.toUpperCase())}
-                    placeholder={t('coop.joinCode')}
-                    maxLength={6}
-                    style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box', textTransform: 'uppercase' }}
-                  />
-                  <button
-                    className="secondary"
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() => { playClick(); void handleJoinCoopSession() }}
-                  >
-                    {t('coop.join')}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', border: '1px solid #37d16b', borderRadius: '12px', background: 'rgba(34,197,94,0.08)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                  <div style={{ textAlign: 'center', flex: 1 }}>
-                    <div style={{ color: '#37d16b', fontWeight: 'bold', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>
-                      {t('coop.sessionCode')}
+                <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0' }}>
+                  {!coopMode ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', border: '1px solid #3f3f6e', borderRadius: '12px', background: 'rgba(15,23,42,0.6)' }}>
+                      <p style={{ margin: '0', color: '#9b98cf', fontSize: '0.8rem' }}>
+                        {t('coop.intro')}
+                      </p>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <label style={{ flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '4px', color: '#9b98cf', fontSize: '0.75rem' }}>
+                          {t('coop.generation')}
+                          <select
+                            value={coopGen}
+                            onChange={(e) => setCoopGen(Number(e.target.value))}
+                            style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
+                          >
+                            {generations.map((g) => (
+                              <option key={g} value={g} disabled={!isGenUnlocked(g)}>Gen {g} — {generationRegions[g]}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label style={{ flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '4px', color: '#9b98cf', fontSize: '0.75rem' }}>
+                          {t('coop.difficulty')}
+                          <select
+                            value={coopDiff}
+                            onChange={(e) => setCoopDiff(e.target.value as 'easy' | 'medium' | 'hard')}
+                            style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
+                          >
+                            <option value="easy">{t('coop.easy')}</option>
+                            <option value="medium">{t('coop.medium')}</option>
+                            <option value="hard">{t('coop.hard')}</option>
+                          </select>
+                        </label>
+                      </div>
+                      <button
+                        className="cta"
+                        type="button"
+                        disabled={isLoading}
+                        onClick={() => { playClick(); void handleCreateCoopSession() }}
+                        style={{ background: '#37d16b', color: '#12122b' }}
+                      >
+                        {t('coop.create')}
+                      </button>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="text"
+                          value={coopJoinCode}
+                          onChange={(e) => setCoopJoinCode(e.target.value.toUpperCase())}
+                          placeholder={t('coop.joinCode')}
+                          maxLength={6}
+                          style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box', textTransform: 'uppercase' }}
+                        />
+                        <button
+                          className="secondary"
+                          type="button"
+                          disabled={isLoading}
+                          onClick={() => { playClick(); void handleJoinCoopSession() }}
+                        >
+                          {t('coop.join')}
+                        </button>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                      <span style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '2rem', letterSpacing: '8px', textShadow: '0 2px 0 rgba(0,0,0,0.5)' }}>
-                        {coopSessionCode}
-                      </span>
-                      <CopyCodeButton code={coopSessionCode} />
-                    </div>
-                  </div>
-                  <button className="tiny-btn" type="button" onClick={cancelCoopSession} style={{ color: '#ff8a80', alignSelf: 'flex-start' }}>
-                    {t('pvp.cancel')}
-                  </button>
-                </div>
-                {coopMyRole === 'a' ? (
-                  coopPartnerJoined ? (
-                    <p style={{ margin: '0', color: '#37d16b', fontSize: '0.85rem' }}>{t('coop.partnerJoined')}</p>
                   ) : (
-                    <p style={{ margin: '0', color: '#ffcb05', fontSize: '0.85rem' }}>{t('coop.shareCode')}</p>
-                  )
-                ) : (
-                  <p style={{ margin: '0', color: '#37d16b', fontSize: '0.85rem' }}>{t('coop.sessionJoined')}</p>
-                )}
-                <p style={{ margin: '0', color: '#7d7ab5', fontSize: '0.75rem' }}>
-                  {t('coop.sessionInfo', { gen: coopGen, region: generationRegions[coopGen], diff: difficultyLabel(language, coopDiff).title })}
-                </p>
-              </div>
-            )}
-              {coopError && <p className="error-line" style={{ marginTop: '4px' }}>{coopError}</p>}
-          </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', border: '1px solid #37d16b', borderRadius: '12px', background: 'rgba(34,197,94,0.08)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <div style={{ textAlign: 'center', flex: 1 }}>
+                          <div style={{ color: '#37d16b', fontWeight: 'bold', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>
+                            {t('coop.sessionCode')}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                            <span style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '2rem', letterSpacing: '8px', textShadow: '0 2px 0 rgba(0,0,0,0.5)' }}>
+                              {coopSessionCode}
+                            </span>
+                            <CopyCodeButton code={coopSessionCode} />
+                          </div>
+                        </div>
+                        <button className="tiny-btn" type="button" onClick={cancelCoopSession} style={{ color: '#ff8a80', alignSelf: 'flex-start' }}>
+                          {t('pvp.cancel')}
+                        </button>
+                      </div>
+                      {coopMyRole === 'a' ? (
+                        coopPartnerJoined ? (
+                          <p style={{ margin: '0', color: '#37d16b', fontSize: '0.85rem' }}>{t('coop.partnerJoined')}</p>
+                        ) : (
+                          <p style={{ margin: '0', color: '#ffcb05', fontSize: '0.85rem' }}>{t('coop.shareCode')}</p>
+                        )
+                      ) : (
+                        <p style={{ margin: '0', color: '#37d16b', fontSize: '0.85rem' }}>{t('coop.sessionJoined')}</p>
+                      )}
+                      <p style={{ margin: '0', color: '#7d7ab5', fontSize: '0.75rem' }}>
+                        {t('coop.sessionInfo', { gen: coopGen, region: generationRegions[coopGen], diff: difficultyLabel(language, coopDiff).title })}
+                      </p>
+                    </div>
+                  )}
+                  {coopError && <p className="error-line" style={{ marginTop: '4px' }}>{coopError}</p>}
+                </div>
               </div>
             </div>
           </div>
@@ -13373,138 +13375,138 @@ function MainApp() {
             <div className="setup-col">
               <div className="setup-card setup-card-challenges">
                 <h2 className="setup-card-title"><span className="setup-step">3</span> {t('setup.challenges')} <span className="muted" style={{ fontSize: '0.6rem', fontWeight: 'normal' }}>{t('setup.challengesOptional')}</span></h2>
-          {(() => {
-            // En Cooperativo y COLISEUM los desafíos están siempre disponibles.
-            // En Infinite NO se permiten (siempre bloqueados). En el resto
-            // siguen el desbloqueo normal (completar la generación en Intermedio).
-            const challengesUnlocked = coopMode || difficulty === 'coliseum'
-              ? true
-              : (difficulty === 'infinite'
-                ? false
-                : (generation === 0
-                  ? generations.every((g) => progression.completedMedium.includes(g))
-                  : progression.completedMedium.includes(generation)))
+                {(() => {
+                  // En Cooperativo y COLISEUM los desafíos están siempre disponibles.
+                  // En Infinite NO se permiten (siempre bloqueados). En el resto
+                  // siguen el desbloqueo normal (completar la generación en Intermedio).
+                  const challengesUnlocked = coopMode || difficulty === 'coliseum'
+                    ? true
+                    : (difficulty === 'infinite'
+                      ? false
+                      : (generation === 0
+                        ? generations.every((g) => progression.completedMedium.includes(g))
+                        : progression.completedMedium.includes(generation)))
 
-            const challengeCategories = [
-              {
-                title: t('challenge.cat.route'),
-                items: [
-                  { key: 'noShops' as const, label: t('ch.noShops'), desc: t('ch.noShops.desc') },
-                  { key: 'noRests' as const, label: t('ch.noRests'), desc: t('ch.noRests.desc') },
-                  { key: 'allTeamRocket' as const, label: t('ch.allTeamRocket'), desc: t('ch.allTeamRocket.desc') },
-                  { key: 'bossRush' as const, label: t('ch.bossRush'), desc: t('ch.bossRush.desc') },
-                  { key: 'blindRoute' as const, label: t('ch.blindRoute'), desc: t('ch.blindRoute.desc') },
-                ]
-              },
-              {
-                title: t('challenge.cat.visual'),
-                items: [
-                  { key: 'allShiny' as const, label: t('ch.allShiny'), desc: t('ch.allShiny.desc') },
-                ]
-              },
-              {
-                title: t('challenge.cat.combat'),
-                items: [
-                  { key: 'noItems' as const, label: t('ch.noItems'), desc: t('ch.noItems.desc') },
-                  { key: 'restrictedMoves' as const, label: t('ch.restrictedMoves'), desc: t('ch.restrictedMoves.desc') },
-                  { key: 'firstStrike' as const, label: t('ch.firstStrike'), desc: t('ch.firstStrike.desc') },
-                  { key: 'noCrits' as const, label: t('ch.noCrits'), desc: t('ch.noCrits.desc') },
-                  { key: 'typeRandomizer' as const, label: t('ch.typeRandomizer'), desc: t('ch.typeRandomizer.desc') },
-                  { key: 'fixedLevel' as const, label: t('ch.fixedLevel'), desc: t('ch.fixedLevel.desc') },
-                ]
-              },
-              {
-                title: t('challenge.cat.team'),
-                items: [
-                  { key: 'soloStarter' as const, label: t('ch.soloStarter'), desc: t('ch.soloStarter.desc') },
-                  { key: 'fixedTeam' as const, label: t('ch.fixedTeam'), desc: t('ch.fixedTeam.desc') },
-                  { key: 'noEvolution' as const, label: t('ch.noEvolution'), desc: t('ch.noEvolution.desc') },
-                  { key: 'egglocke' as const, label: t('ch.egglocke'), desc: t('ch.egglocke.desc') },
-                ]
-              },
-              {
-                title: t('challenge.cat.economy'),
-                items: [
-                  { key: 'noPurchasing' as const, label: t('ch.noPurchasing'), desc: t('ch.noPurchasing.desc') },
-                  { key: 'noMoney' as const, label: t('ch.noMoney'), desc: t('ch.noMoney.desc') },
-                ]
-              },
-              {
-                title: t('challenge.cat.difficulty'),
-                items: [
-                  { key: 'scalingEnemies' as const, label: t('ch.scalingEnemies'), desc: t('ch.scalingEnemies.desc') },
-                  { key: 'noHealing' as const, label: t('ch.noHealing'), desc: t('ch.noHealing.desc') },
-                  { key: 'doubleModifiers' as const, label: t('ch.doubleModifiers'), desc: t('ch.doubleModifiers.desc') },
-                  { key: 'speedrun' as const, label: t('ch.speedrun'), desc: t('ch.speedrun.desc') },
-                  { key: 'totalRandomizer' as const, label: t('ch.totalRandomizer'), desc: t('ch.totalRandomizer.desc') },
-                ]
-              },
-              {
-                title: t('challenge.cat.extreme'),
-                items: [
-                  { key: 'nuzlocke' as const, label: t('ch.nuzlocke'), desc: t('ch.nuzlocke.desc') },
-                  { key: 'ironman' as const, label: t('ch.ironman'), desc: t('ch.ironman.desc') },
-                  { key: 'nuzlockeHardcore' as const, label: t('ch.nuzlockeHardcore'), desc: t('ch.nuzlockeHardcore.desc') },
-                  { key: 'challengeGauntlet' as const, label: t('ch.challengeGauntlet'), desc: t('ch.challengeGauntlet.desc') },
-                ]
-              },
-            ]
+                  const challengeCategories = [
+                    {
+                      title: t('challenge.cat.route'),
+                      items: [
+                        { key: 'noShops' as const, label: t('ch.noShops'), desc: t('ch.noShops.desc') },
+                        { key: 'noRests' as const, label: t('ch.noRests'), desc: t('ch.noRests.desc') },
+                        { key: 'allTeamRocket' as const, label: t('ch.allTeamRocket'), desc: t('ch.allTeamRocket.desc') },
+                        { key: 'bossRush' as const, label: t('ch.bossRush'), desc: t('ch.bossRush.desc') },
+                        { key: 'blindRoute' as const, label: t('ch.blindRoute'), desc: t('ch.blindRoute.desc') },
+                      ]
+                    },
+                    {
+                      title: t('challenge.cat.visual'),
+                      items: [
+                        { key: 'allShiny' as const, label: t('ch.allShiny'), desc: t('ch.allShiny.desc') },
+                      ]
+                    },
+                    {
+                      title: t('challenge.cat.combat'),
+                      items: [
+                        { key: 'noItems' as const, label: t('ch.noItems'), desc: t('ch.noItems.desc') },
+                        { key: 'restrictedMoves' as const, label: t('ch.restrictedMoves'), desc: t('ch.restrictedMoves.desc') },
+                        { key: 'firstStrike' as const, label: t('ch.firstStrike'), desc: t('ch.firstStrike.desc') },
+                        { key: 'noCrits' as const, label: t('ch.noCrits'), desc: t('ch.noCrits.desc') },
+                        { key: 'typeRandomizer' as const, label: t('ch.typeRandomizer'), desc: t('ch.typeRandomizer.desc') },
+                        { key: 'fixedLevel' as const, label: t('ch.fixedLevel'), desc: t('ch.fixedLevel.desc') },
+                      ]
+                    },
+                    {
+                      title: t('challenge.cat.team'),
+                      items: [
+                        { key: 'soloStarter' as const, label: t('ch.soloStarter'), desc: t('ch.soloStarter.desc') },
+                        { key: 'fixedTeam' as const, label: t('ch.fixedTeam'), desc: t('ch.fixedTeam.desc') },
+                        { key: 'noEvolution' as const, label: t('ch.noEvolution'), desc: t('ch.noEvolution.desc') },
+                        { key: 'egglocke' as const, label: t('ch.egglocke'), desc: t('ch.egglocke.desc') },
+                      ]
+                    },
+                    {
+                      title: t('challenge.cat.economy'),
+                      items: [
+                        { key: 'noPurchasing' as const, label: t('ch.noPurchasing'), desc: t('ch.noPurchasing.desc') },
+                        { key: 'noMoney' as const, label: t('ch.noMoney'), desc: t('ch.noMoney.desc') },
+                      ]
+                    },
+                    {
+                      title: t('challenge.cat.difficulty'),
+                      items: [
+                        { key: 'scalingEnemies' as const, label: t('ch.scalingEnemies'), desc: t('ch.scalingEnemies.desc') },
+                        { key: 'noHealing' as const, label: t('ch.noHealing'), desc: t('ch.noHealing.desc') },
+                        { key: 'doubleModifiers' as const, label: t('ch.doubleModifiers'), desc: t('ch.doubleModifiers.desc') },
+                        { key: 'speedrun' as const, label: t('ch.speedrun'), desc: t('ch.speedrun.desc') },
+                        { key: 'totalRandomizer' as const, label: t('ch.totalRandomizer'), desc: t('ch.totalRandomizer.desc') },
+                      ]
+                    },
+                    {
+                      title: t('challenge.cat.extreme'),
+                      items: [
+                        { key: 'nuzlocke' as const, label: t('ch.nuzlocke'), desc: t('ch.nuzlocke.desc') },
+                        { key: 'ironman' as const, label: t('ch.ironman'), desc: t('ch.ironman.desc') },
+                        { key: 'nuzlockeHardcore' as const, label: t('ch.nuzlockeHardcore'), desc: t('ch.nuzlockeHardcore.desc') },
+                        { key: 'challengeGauntlet' as const, label: t('ch.challengeGauntlet'), desc: t('ch.challengeGauntlet.desc') },
+                      ]
+                    },
+                  ]
 
-            return (
-              <div className="challenge-section" style={!challengesUnlocked ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
-                {!challengesUnlocked && (
-                  <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem', color: '#fbbf24' }}>
-                    {difficulty === 'infinite'
-                      ? t('ch.locked')
-                      : t('ch.lockedGens', { region: generation === 0 ? 'todas las generaciones' : `Gen ${generation} (${generationRegions[generation]})` })}
-                  </p>
-                )}
-                {challengeCategories.map((cat) => (
-                  <div key={cat.title} style={{ marginBottom: '0.75rem' }}>
-                    <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '0.85rem', color: '#9b98cf', fontWeight: 'normal', textAlign: 'center' }}>{cat.title}</h3>
-                    <div className="challenge-toggles">
-                      {cat.items.map((item) => (
-                        <button
-                          key={item.key}
-                          className={`challenge-toggle ${runChallenges[item.key] ? 'is-active' : ''}`}
-                          onClick={() => {
-                            playClick()
-                            if (item.key === 'challengeGauntlet' && runChallenges.challengeGauntlet && gauntletKeys.length > 0) {
-                              setRunChallenges((c) => {
-                                const next = { ...c, challengeGauntlet: false }
-                                for (const key of gauntletKeys) {
-                                  next[key] = false
-                                }
-                                return next
-                              })
-                              setGauntletKeys([])
-                              return
-                            }
-                            setRunChallenges((c) => {
-                              const next = !c[item.key]
-                              if (item.key === 'ironman') {
-                                return { ...c, ironman: next, noEvolution: next, fixedTeam: next, noHealing: next }
-                              }
-                              if (item.key === 'nuzlockeHardcore') {
-                                return { ...c, nuzlockeHardcore: next, nuzlocke: next, noItems: next, noRests: next }
-                              }
-                              return { ...c, [item.key]: next }
-                            })
-                          }}
-                          onMouseEnter={playHover}
-                          type="button"
-                          disabled={!challengesUnlocked}
-                          title={item.desc}
-                        >
-                          {item.label}
-                        </button>
+                  return (
+                    <div className="challenge-section" style={!challengesUnlocked ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
+                      {!challengesUnlocked && (
+                        <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem', color: '#fbbf24' }}>
+                          {difficulty === 'infinite'
+                            ? t('ch.locked')
+                            : t('ch.lockedGens', { region: generation === 0 ? 'todas las generaciones' : `Gen ${generation} (${generationRegions[generation]})` })}
+                        </p>
+                      )}
+                      {challengeCategories.map((cat) => (
+                        <div key={cat.title} style={{ marginBottom: '0.75rem' }}>
+                          <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '0.85rem', color: '#9b98cf', fontWeight: 'normal', textAlign: 'center' }}>{cat.title}</h3>
+                          <div className="challenge-toggles">
+                            {cat.items.map((item) => (
+                              <button
+                                key={item.key}
+                                className={`challenge-toggle ${runChallenges[item.key] ? 'is-active' : ''}`}
+                                onClick={() => {
+                                  playClick()
+                                  if (item.key === 'challengeGauntlet' && runChallenges.challengeGauntlet && gauntletKeys.length > 0) {
+                                    setRunChallenges((c) => {
+                                      const next = { ...c, challengeGauntlet: false }
+                                      for (const key of gauntletKeys) {
+                                        next[key] = false
+                                      }
+                                      return next
+                                    })
+                                    setGauntletKeys([])
+                                    return
+                                  }
+                                  setRunChallenges((c) => {
+                                    const next = !c[item.key]
+                                    if (item.key === 'ironman') {
+                                      return { ...c, ironman: next, noEvolution: next, fixedTeam: next, noHealing: next }
+                                    }
+                                    if (item.key === 'nuzlockeHardcore') {
+                                      return { ...c, nuzlockeHardcore: next, nuzlocke: next, noItems: next, noRests: next }
+                                    }
+                                    return { ...c, [item.key]: next }
+                                  })
+                                }}
+                                onMouseEnter={playHover}
+                                type="button"
+                                disabled={!challengesUnlocked}
+                                title={item.desc}
+                              >
+                                {item.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       ))}
                     </div>
-                  </div>
-                ))}
-              </div>
-            )
-          })()}
+                  )
+                })()}
               </div>
             </div>
           </div>
@@ -14073,7 +14075,7 @@ function MainApp() {
                         const qty = Math.min(sellQty[entry.name] ?? 1, entry.count)
                         const totalSell = sellPrice * qty
 
-                    const stepperBtnStyle: CSSProperties = {
+                        const stepperBtnStyle: CSSProperties = {
                           background: '#4a2a2a',
                           color: '#fff',
                           border: 'none',
@@ -14639,7 +14641,7 @@ function MainApp() {
                 </div>
                 <div className="evolve-section" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
                   <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>{t('rest.healPrompt')}</p>
-                  <button className="cta" onClick={() => { if (runChallenges.noHealing) { setBattleLog(prev => [t('b.challengeNoHealRest'), ...prev].slice(0, 15)); completeCurrentNode(); return } setTeam(prev => prev.map(p => p.hp <= 0 ? { ...p, hp: Math.max(1, Math.floor(p.maxHp * 0.5)), status: undefined } : { ...p, hp: p.maxHp, status: undefined })); setBattleLog(prev => [t('b.restHealed'), ...prev].slice(0, 15)); completeCurrentNode() }} type="button"                     style={{ background: '#ee3b2f', width: '100%' }}>
+                  <button className="cta" onClick={() => { if (runChallenges.noHealing) { setBattleLog(prev => [t('b.challengeNoHealRest'), ...prev].slice(0, 15)); completeCurrentNode(); return } setTeam(prev => prev.map(p => p.hp <= 0 ? { ...p, hp: Math.max(1, Math.floor(p.maxHp * 0.5)), status: undefined } : { ...p, hp: p.maxHp, status: undefined })); setBattleLog(prev => [t('b.restHealed'), ...prev].slice(0, 15)); completeCurrentNode() }} type="button" style={{ background: '#ee3b2f', width: '100%' }}>
                     {t('rest.healTeam')}
                   </button>
                 </div>
@@ -14950,37 +14952,37 @@ function MainApp() {
                       </div>
                     </div>
                   ) : (
-                  <>
-                  {(runChallenges.restrictedMoves ? activePokemon.moves.slice(0, 2) : activePokemon.moves).map((move) => {
-                    const isDisabled = activePokemon.disabled?.move === move.name
-                    const moveHoldable = activePokemon.holdItem ? HOLDABLE_ITEMS[activePokemon.holdItem] : null
-                    const isStatusMove = !move.power || move.power <= 0
-                    const assaultVestBlocked = !!moveHoldable?.assaultVest && isStatusMove
-                    const choiceBlocked = !!moveHoldable?.choiceLock && !!activePokemon.choiceLockedMove && activePokemon.choiceLockedMove !== move.name
-                    const moveDisabled = isLoading || isDisabled || (runChallenges.speedrun && speedrunSeconds <= 0) || assaultVestBlocked || choiceBlocked
-                    const blockTitle = choiceBlocked
-                      ? `🔒 Solo puedes usar ${moveName({ name: activePokemon.choiceLockedMove ?? '' })}`
-                      : assaultVestBlocked
-                        ? '🦺 Chaleco Asalto: no puedes usar movimientos de estado'
-                        : isDisabled
-                          ? '🚫 Anulado por Anulación'
-                          : moveTooltip(move)
-                    return (
-                    <ThemedTooltip key={move.name} content={blockTitle}>
-                      <button
-                        className="move-btn"
-                        onClick={() => onPlayerMove(move)}
-                        type="button"
-                        disabled={moveDisabled}
-                        style={isDisabled || choiceBlocked || assaultVestBlocked ? { borderColor: '#ff8a80', opacity: 0.5, textDecoration: 'line-through' } : undefined}
-                      >
-                        <span className="move-btn-line">{isDisabled || choiceBlocked || assaultVestBlocked ? '🚫 ' : ''}{moveName(move)} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''}){move.minHits ? ` x${move.minHits}-${move.maxHits}` : ''}</span>
-                        {moveEffectSummary(move) && <span className="move-btn-effect">{moveEffectSummary(move)}</span>}
-                      </button>
-                    </ThemedTooltip>
-                    )
-                  })}
-                  </>
+                    <>
+                      {(runChallenges.restrictedMoves ? activePokemon.moves.slice(0, 2) : activePokemon.moves).map((move) => {
+                        const isDisabled = activePokemon.disabled?.move === move.name
+                        const moveHoldable = activePokemon.holdItem ? HOLDABLE_ITEMS[activePokemon.holdItem] : null
+                        const isStatusMove = !move.power || move.power <= 0
+                        const assaultVestBlocked = !!moveHoldable?.assaultVest && isStatusMove
+                        const choiceBlocked = !!moveHoldable?.choiceLock && !!activePokemon.choiceLockedMove && activePokemon.choiceLockedMove !== move.name
+                        const moveDisabled = isLoading || isDisabled || (runChallenges.speedrun && speedrunSeconds <= 0) || assaultVestBlocked || choiceBlocked
+                        const blockTitle = choiceBlocked
+                          ? `🔒 Solo puedes usar ${moveName({ name: activePokemon.choiceLockedMove ?? '' })}`
+                          : assaultVestBlocked
+                            ? '🦺 Chaleco Asalto: no puedes usar movimientos de estado'
+                            : isDisabled
+                              ? '🚫 Anulado por Anulación'
+                              : moveTooltip(move)
+                        return (
+                          <ThemedTooltip key={move.name} content={blockTitle}>
+                            <button
+                              className="move-btn"
+                              onClick={() => onPlayerMove(move)}
+                              type="button"
+                              disabled={moveDisabled}
+                              style={isDisabled || choiceBlocked || assaultVestBlocked ? { borderColor: '#ff8a80', opacity: 0.5, textDecoration: 'line-through' } : undefined}
+                            >
+                              <span className="move-btn-line">{isDisabled || choiceBlocked || assaultVestBlocked ? '🚫 ' : ''}{moveName(move)} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''}){move.minHits ? ` x${move.minHits}-${move.maxHits}` : ''}</span>
+                              {moveEffectSummary(move) && <span className="move-btn-effect">{moveEffectSummary(move)}</span>}
+                            </button>
+                          </ThemedTooltip>
+                        )
+                      })}
+                    </>
                   )}
                 </div>
                 {!isTrainerBattle && currentNode?.type !== 'gmax' && (
@@ -15319,17 +15321,17 @@ function MainApp() {
       {/* Achievement Popup */}
       {newAchievement && (
         <div style={{ position: 'fixed', top: '20px', right: '20px', left: '20px', zIndex: 9999, background: '#1c1c3a', border: '3px solid #ffcb05', borderRadius: '6px', padding: '1rem 1.5rem', boxShadow: '4px 4px 0 0 rgba(0,0,0,0.6)', animation: 'slideInRight 0.5s ease', maxWidth: '300px', marginLeft: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{ fontSize: '2rem' }}>{newAchievement.icon}</span>
-          <div>
-            <div style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>¡Logro Desbloqueado!</div>
-            <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '1rem' }}>{newAchievement.name}</div>
-            <div style={{ color: '#9b98cf', fontSize: '0.8rem' }}>{newAchievement.desc}</div>
-            <div style={{ color: '#ffcb05', fontSize: '0.8rem', fontWeight: 'bold', marginTop: '0.25rem' }}>🪙 +{newAchievement.reward} — reclama en la pestaña de Logros</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '2rem' }}>{newAchievement.icon}</span>
+            <div>
+              <div style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>¡Logro Desbloqueado!</div>
+              <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '1rem' }}>{newAchievement.name}</div>
+              <div style={{ color: '#9b98cf', fontSize: '0.8rem' }}>{newAchievement.desc}</div>
+              <div style={{ color: '#ffcb05', fontSize: '0.8rem', fontWeight: 'bold', marginTop: '0.25rem' }}>🪙 +{newAchievement.reward} — reclama en la pestaña de Logros</div>
+            </div>
           </div>
+          <button onClick={handleAchievementDismiss} style={{ position: 'absolute', top: '4px', right: '8px', background: 'none', border: 'none', color: '#7d7ab5', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
         </div>
-        <button onClick={handleAchievementDismiss} style={{ position: 'absolute', top: '4px', right: '8px', background: 'none', border: 'none', color: '#7d7ab5', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
-      </div>
       )}
 
       {dexToast && (
@@ -15480,73 +15482,73 @@ function MainApp() {
         ]
         const selectedKeys = new Set(tempLeagueTeam)
         return (
-        <div className="modal-backdrop" onClick={() => setLeagueTeamSelection(false)}>
-          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
-            <h3 style={{ color: '#4d9bff', margin: '0 0 0.5rem' }}>🏆 Equipo para la Liga</h3>
-            <p style={{ color: '#9b98cf', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-              Selecciona entre 1 y 6 Pokémon de tu equipo y PC ({tempLeagueTeam.length}/6)
-            </p>
-            <p style={{ color: '#fbbf24', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
-              ⚠️ Los Pokémon que NO selecciones se eliminarán al comenzar la Calle Victoria.
-            </p>
-            {tempLeagueTeam.length >= 1 && (
-              <button className="cta" onClick={() => {
-                setLeagueTeamSelection(false)
-                // Los elegidos forman el equipo de la Liga. El resto de Pokémon
-                // que tenías antes de la Liga se ELIMINAN: el PC de la Liga queda
-                // vacío, así lo que captures después (p. ej. el legendario) nunca
-                // se pierde en un PC al que no se pueda acceder.
-                const healed = leaguePool
-                  .filter(({ key }) => selectedKeys.has(key))
-                  .map(({ pkmn }) => ({ ...pkmn, hp: pkmn.maxHp, status: undefined }))
-                const unselectedCount = leaguePool.filter(({ key }) => !selectedKeys.has(key)).length
-                const maxLvl = Math.max(...healed.map(p => p.level)) + 2
-                // Calle Victoria: 4 entrenadores → tienda → 4 entrenadores → tienda.
-                const victoryRoute: RouteNode[] = []
-                for (let i = 0; i < 4; i++) victoryRoute.push({ id: 2000 + i, type: 'elite', label: `Calle Victoria #${i + 1}`, done: false })
-                victoryRoute.push({ id: 2010, type: 'shop', label: `Tienda`, done: false })
-                for (let i = 0; i < 4; i++) victoryRoute.push({ id: 2020 + i, type: 'elite', label: `Calle Victoria #${5 + i}`, done: false })
-                victoryRoute.push({ id: 2030, type: 'shop', label: `Tienda`, done: false })
-                setTeam(healed)
-                setPcStorage([])
-                setRoute(victoryRoute)
-                setRouteIndex(0)
-                setScreen('route')
-                if (unselectedCount > 0) {
-                  setBattleLog(prev => [t('b.leagueUnselectedReleased', { n: unselectedCount }), ...prev].slice(0, 15))
-                }
-                setBattleLog(prev => [t('b.victoryRoadWelcome', { lvl: maxLvl }), ...prev].slice(0, 15))
-              }} style={{ background: '#4d9bff', color: '#000', width: '100%', marginBottom: '1rem' }}>
-                🗻 ¡Comenzar la Calle Victoria!
-              </button>
-            )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '6px' }}>
-              {leaguePool.map(({ key, pkmn, isTeam }) => {
-                const selected = selectedKeys.has(key)
-                return (
-                  <div key={key}
-                    onClick={() => {
-                      if (selected) {
-                        setTempLeagueTeam(prev => prev.filter(k => k !== key))
-                      } else if (tempLeagueTeam.length < 6) {
-                        setTempLeagueTeam(prev => [...prev, key])
-                      }
-                    }}
-                    style={{
-                      padding: '6px', borderRadius: '8px', textAlign: 'center', cursor: 'pointer',
-                      background: selected ? 'rgba(56,189,248,0.2)' : 'rgba(30,41,59,0.6)',
-                      border: selected ? '2px solid #4d9bff' : '1px solid #3f3f6e', opacity: !selected && tempLeagueTeam.length >= 6 ? 0.4 : 1
-                    }}
-                  >
-                    <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
-                    <div style={{ fontSize: '0.7rem', textTransform: 'capitalize', color: selected ? '#4d9bff' : '#f3f1ff' }}>{pkmn.name}</div>
-                    <div style={{ fontSize: '0.6rem', color: isTeam ? '#7ceb95' : '#9b98cf' }}>Nv.{pkmn.level}</div>
-                  </div>
-                )
-              })}
+          <div className="modal-backdrop" onClick={() => setLeagueTeamSelection(false)}>
+            <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
+              <h3 style={{ color: '#4d9bff', margin: '0 0 0.5rem' }}>🏆 Equipo para la Liga</h3>
+              <p style={{ color: '#9b98cf', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                Selecciona entre 1 y 6 Pokémon de tu equipo y PC ({tempLeagueTeam.length}/6)
+              </p>
+              <p style={{ color: '#fbbf24', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+                ⚠️ Los Pokémon que NO selecciones se eliminarán al comenzar la Calle Victoria.
+              </p>
+              {tempLeagueTeam.length >= 1 && (
+                <button className="cta" onClick={() => {
+                  setLeagueTeamSelection(false)
+                  // Los elegidos forman el equipo de la Liga. El resto de Pokémon
+                  // que tenías antes de la Liga se ELIMINAN: el PC de la Liga queda
+                  // vacío, así lo que captures después (p. ej. el legendario) nunca
+                  // se pierde en un PC al que no se pueda acceder.
+                  const healed = leaguePool
+                    .filter(({ key }) => selectedKeys.has(key))
+                    .map(({ pkmn }) => ({ ...pkmn, hp: pkmn.maxHp, status: undefined }))
+                  const unselectedCount = leaguePool.filter(({ key }) => !selectedKeys.has(key)).length
+                  const maxLvl = Math.max(...healed.map(p => p.level)) + 2
+                  // Calle Victoria: 4 entrenadores → tienda → 4 entrenadores → tienda.
+                  const victoryRoute: RouteNode[] = []
+                  for (let i = 0; i < 4; i++) victoryRoute.push({ id: 2000 + i, type: 'elite', label: `Calle Victoria #${i + 1}`, done: false })
+                  victoryRoute.push({ id: 2010, type: 'shop', label: `Tienda`, done: false })
+                  for (let i = 0; i < 4; i++) victoryRoute.push({ id: 2020 + i, type: 'elite', label: `Calle Victoria #${5 + i}`, done: false })
+                  victoryRoute.push({ id: 2030, type: 'shop', label: `Tienda`, done: false })
+                  setTeam(healed)
+                  setPcStorage([])
+                  setRoute(victoryRoute)
+                  setRouteIndex(0)
+                  setScreen('route')
+                  if (unselectedCount > 0) {
+                    setBattleLog(prev => [t('b.leagueUnselectedReleased', { n: unselectedCount }), ...prev].slice(0, 15))
+                  }
+                  setBattleLog(prev => [t('b.victoryRoadWelcome', { lvl: maxLvl }), ...prev].slice(0, 15))
+                }} style={{ background: '#4d9bff', color: '#000', width: '100%', marginBottom: '1rem' }}>
+                  🗻 ¡Comenzar la Calle Victoria!
+                </button>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '6px' }}>
+                {leaguePool.map(({ key, pkmn, isTeam }) => {
+                  const selected = selectedKeys.has(key)
+                  return (
+                    <div key={key}
+                      onClick={() => {
+                        if (selected) {
+                          setTempLeagueTeam(prev => prev.filter(k => k !== key))
+                        } else if (tempLeagueTeam.length < 6) {
+                          setTempLeagueTeam(prev => [...prev, key])
+                        }
+                      }}
+                      style={{
+                        padding: '6px', borderRadius: '8px', textAlign: 'center', cursor: 'pointer',
+                        background: selected ? 'rgba(56,189,248,0.2)' : 'rgba(30,41,59,0.6)',
+                        border: selected ? '2px solid #4d9bff' : '1px solid #3f3f6e', opacity: !selected && tempLeagueTeam.length >= 6 ? 0.4 : 1
+                      }}
+                    >
+                      <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
+                      <div style={{ fontSize: '0.7rem', textTransform: 'capitalize', color: selected ? '#4d9bff' : '#f3f1ff' }}>{pkmn.name}</div>
+                      <div style={{ fontSize: '0.6rem', color: isTeam ? '#7ceb95' : '#9b98cf' }}>Nv.{pkmn.level}</div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
-        </div>
         )
       })()}
 
@@ -16111,7 +16113,7 @@ function MainApp() {
 
       {/* Leaderboard Modal */}
       {showLeaderboard && (
-          <div className="modal-backdrop" onClick={() => setShowLeaderboard(false)}>
+        <div className="modal-backdrop" onClick={() => setShowLeaderboard(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
             <h2 style={{ color: '#cba3ff', textAlign: 'center', margin: '0 0 0.75rem' }}>
               {leaderboardTab === 'infinite' ? `🌍 ${t('lb.title2')} — ♾️ Infinite` : '⚔️ Elo PvP Ranking'}
@@ -16251,99 +16253,99 @@ function MainApp() {
                 </div>
               )
             ) : (
-            <>
-            {!isLeaderboardEnabled() ? (
-              <div style={{ textAlign: 'center', padding: '1.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px dashed #3f3f6e' }}>
-                <p style={{ color: '#9b98cf', fontSize: '0.9rem', marginBottom: '0.5rem' }}>{t('lb.notConfigured')}</p>
-                <p style={{ color: '#7d7ab5', fontSize: '0.8rem', margin: 0 }}>
-                  {t('lb.copyEnv')}
-                </p>
-              </div>
-            ) : leaderboardLoading && Object.keys(leaderboardByGen).length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#9b98cf' }}>Cargando ranking...</p>
-            ) : (
               <>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', marginBottom: '1rem' }}>
-                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((g) => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => { playClick(); setLeaderboardGen(g) }}
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        cursor: 'pointer',
-                        background: leaderboardGen === g ? 'rgba(168,85,247,0.25)' : 'transparent',
-                        border: `1px solid ${leaderboardGen === g ? '#a855f7' : '#3f3f6e'}`,
-                        color: leaderboardGen === g ? '#cba3ff' : '#9b98cf'
-                      }}
-                    >
-                      {g === 0 ? 'Todos' : `Gen ${g}`}
-                    </button>
-                  ))}
-                </div>
-
-                {leaderboardActiveEntries.length === 0 ? (
-                  <p style={{ textAlign: 'center', color: '#9b98cf' }}>
-                    {leaderboardGen === 0 ? t('lb.emptyInfinite') : t('lb.emptyGen', { gen: leaderboardGen })}
-                  </p>
+                {!isLeaderboardEnabled() ? (
+                  <div style={{ textAlign: 'center', padding: '1.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px dashed #3f3f6e' }}>
+                    <p style={{ color: '#9b98cf', fontSize: '0.9rem', marginBottom: '0.5rem' }}>{t('lb.notConfigured')}</p>
+                    <p style={{ color: '#7d7ab5', fontSize: '0.8rem', margin: 0 }}>
+                      {t('lb.copyEnv')}
+                    </p>
+                  </div>
+                ) : leaderboardLoading && Object.keys(leaderboardByGen).length === 0 ? (
+                  <p style={{ textAlign: 'center', color: '#9b98cf' }}>Cargando ranking...</p>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {leaderboardActiveEntries.map((entry, idx) => {
-                      const isMe = authUser !== null && entry.user_id === authUser.id
-                      const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}º`
-                      return (
-                        <div
-                          key={entry.id ?? idx}
+                  <>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', marginBottom: '1rem' }}>
+                      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((g) => (
+                        <button
+                          key={g}
+                          type="button"
+                          onClick={() => { playClick(); setLeaderboardGen(g) }}
                           style={{
-                            display: 'grid',
-                            gridTemplateColumns: '44px 1fr auto',
-                            gap: '0.75rem',
-                            alignItems: 'center',
-                            padding: '0.6rem 0.75rem',
-                            borderRadius: '8px',
-                            background: isMe ? 'rgba(168,85,247,0.15)' : 'rgba(15,23,42,0.5)',
-                            border: `1px solid ${isMe ? '#a855f7' : '#3f3f6e'}`
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            cursor: 'pointer',
+                            background: leaderboardGen === g ? 'rgba(168,85,247,0.25)' : 'transparent',
+                            border: `1px solid ${leaderboardGen === g ? '#a855f7' : '#3f3f6e'}`,
+                            color: leaderboardGen === g ? '#cba3ff' : '#9b98cf'
                           }}
                         >
-                          <div style={{ textAlign: 'center', fontWeight: 'bold', color: idx < 3 ? '#ffcb05' : '#9b98cf' }}>{medal}</div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                              <strong style={{ color: '#f3f1ff', fontSize: '0.9rem' }}>{entry.player_name}</strong>
-                              {isMe && <span style={{ color: '#cba3ff', fontSize: '0.7rem' }}>(tú)</span>}
-                              <span style={{ color: '#7d7ab5', fontSize: '0.75rem' }}>
-                                {entry.is_random ? `🎲 Random · Gen ${entry.generation}` : `Gen ${entry.generation}`}
-                              </span>
-                              {entry.challenges && entry.challenges.length > 0 && (
-                                <span style={{ color: '#fb923c', fontSize: '0.7rem' }}>🎲 {entry.challenges.join(', ')}</span>
-                              )}
+                          {g === 0 ? 'Todos' : `Gen ${g}`}
+                        </button>
+                      ))}
+                    </div>
+
+                    {leaderboardActiveEntries.length === 0 ? (
+                      <p style={{ textAlign: 'center', color: '#9b98cf' }}>
+                        {leaderboardGen === 0 ? t('lb.emptyInfinite') : t('lb.emptyGen', { gen: leaderboardGen })}
+                      </p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {leaderboardActiveEntries.map((entry, idx) => {
+                          const isMe = authUser !== null && entry.user_id === authUser.id
+                          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}º`
+                          return (
+                            <div
+                              key={entry.id ?? idx}
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: '44px 1fr auto',
+                                gap: '0.75rem',
+                                alignItems: 'center',
+                                padding: '0.6rem 0.75rem',
+                                borderRadius: '8px',
+                                background: isMe ? 'rgba(168,85,247,0.15)' : 'rgba(15,23,42,0.5)',
+                                border: `1px solid ${isMe ? '#a855f7' : '#3f3f6e'}`
+                              }}
+                            >
+                              <div style={{ textAlign: 'center', fontWeight: 'bold', color: idx < 3 ? '#ffcb05' : '#9b98cf' }}>{medal}</div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                  <strong style={{ color: '#f3f1ff', fontSize: '0.9rem' }}>{entry.player_name}</strong>
+                                  {isMe && <span style={{ color: '#cba3ff', fontSize: '0.7rem' }}>(tú)</span>}
+                                  <span style={{ color: '#7d7ab5', fontSize: '0.75rem' }}>
+                                    {entry.is_random ? `🎲 Random · Gen ${entry.generation}` : `Gen ${entry.generation}`}
+                                  </span>
+                                  {entry.challenges && entry.challenges.length > 0 && (
+                                    <span style={{ color: '#fb923c', fontSize: '0.7rem' }}>🎲 {entry.challenges.join(', ')}</span>
+                                  )}
+                                </div>
+                                <div style={{ display: 'flex', gap: '2px', marginTop: '4px', alignItems: 'flex-end' }}>
+                                  {(entry.team ?? []).map((member, mi) => (
+                                    <img
+                                      key={`${entry.id}-${mi}`}
+                                      src={member.sprite}
+                                      alt={member.name}
+                                      title={`${member.name} Nv.${member.level}`}
+                                      onError={fallbackSprite}
+                                      style={{ width: '28px', height: '28px', imageRendering: 'pixelated' }}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ color: '#cba3ff', fontWeight: 'bold', fontSize: '1.05rem' }}>Nodo #{entry.node}</div>
+                                <div style={{ color: '#9b98cf', fontSize: '0.75rem' }}>⏱️ {formatDuration(entry.duration_seconds)}</div>
+                              </div>
                             </div>
-                            <div style={{ display: 'flex', gap: '2px', marginTop: '4px', alignItems: 'flex-end' }}>
-                              {(entry.team ?? []).map((member, mi) => (
-                                <img
-                                  key={`${entry.id}-${mi}`}
-                                  src={member.sprite}
-                                  alt={member.name}
-                                  title={`${member.name} Nv.${member.level}`}
-                                  onError={fallbackSprite}
-                                  style={{ width: '28px', height: '28px', imageRendering: 'pixelated' }}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ color: '#cba3ff', fontWeight: 'bold', fontSize: '1.05rem' }}>Nodo #{entry.node}</div>
-                            <div style={{ color: '#9b98cf', fontSize: '0.75rem' }}>⏱️ {formatDuration(entry.duration_seconds)}</div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </>
                 )}
               </>
-            )}
-            </>
             )}
 
             <button className="cta" onClick={() => setShowLeaderboard(false)} style={{ marginTop: '1.25rem', background: '#7d7ab5', width: '100%' }}>{t('common.close')}</button>
