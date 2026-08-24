@@ -105,6 +105,14 @@ export interface RouteNode {
   done: boolean
 }
 
+// Nodo del mapa ramificado del Modo Ruta: además de los datos de RouteNode
+// guarda su columna y fila dentro del mapa (el jugador elige qué nodo tomar
+// de cada columna hasta llegar al jefe final).
+export interface BranchNode extends RouteNode {
+  col: number
+  row: number
+}
+
 export interface RunModifier {
   id?: string
   name: string
@@ -232,4 +240,5 @@ export interface MetaProgression {
   coopWins: number
   coopTrades: number
   completedGenDex?: number[]
+  disabledItems: string[]
 }

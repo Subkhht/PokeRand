@@ -761,7 +761,9 @@ function performPvpHit(
   }
 
   return {
-    updatedDefender: { ...currentDefender, defense: defender.defense },
+    // No persistir las stats efectivas (ya multiplicadas): si se guardaran,
+    // cada turno se volverían a multiplicar y crecerían exponencialmente.
+    updatedDefender: { ...currentDefender, defense: defender.defense, spDefense: defender.spDefense },
     updatedAttacker,
     lines,
   }

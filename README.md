@@ -7,7 +7,7 @@
 ## 🚀 Empezar a jugar
 
 1. **Elige generación**: Kanto (1) a Paldea (9), o el modo **🎲 RANDOM** (mezcla todas las generaciones). Cada generación se desbloquea pasando la anterior en Intermedio.
-2. **Elige dificultad**: Fácil, Intermedia, Difícil, Infinite o COLISEUM.
+2. **Elige dificultad**: Fácil, Intermedia, Difícil, Infinite, Original, **Ruta** o COLISEUM.
 3. **Elige desafíos** (opcional): Nuzlocke, Solo Starter, etc.
 4. Pulsa **Iniciar Aventura** y recorre la ruta nodo a nodo.
 
@@ -127,6 +127,19 @@ Con las **PokéCoins** ganadas por victorias y logros puedes desbloquear conteni
 ## ♾️ Modo Infinite
 
 Rutas **infinitas** sin etapas: cada vez que completas 5 nodos se generan 5 más. Escala contigo sin fin y registra tu progreso en el **ranking mundial**. La dificultad usa la media entre el nivel máximo y el promedio de tu equipo, con pools de Pokémon y multiplicadores propios.
+
+---
+
+## 🗺️ Modo Ruta (Path)
+
+Un mapa de nodos **ramificado** al estilo *pokelike*: en cada etapa eliges entre varios nodos qué camino tomar hasta llegar **siempre** al jefe final.
+
+- Cada etapa tiene **7 filas** de nodos con anchuras `2-3-4-3-4-3-2` y el mapa fluye **de arriba a abajo**: cuantos más nodos, más caminos posibles.
+- **Cada nodo solo puede avanzar a los 2 nodos más próximos** de la fila siguiente: eliges tu ruta entre las opciones rojas alcanzables. Las opciones que no elijas (o no sean alcanzables) quedan en **tono grisáceo**. Al entrar, el mapa se **oculta** para que veas el juego con claridad y vuelve a mostrarse al completar el nodo.
+- El jefe del final de cada etapa otorga una **medalla** 🏅. Con **8 medallas** completas el modo.
+- Los nodos disponibles incluyen Combate, Tienda, Descanso, TeamR, Spin, Rival, Mercado Negro y Combate Doble, además de **Mega, G-MAX y Primal** (y Casino) si los tienes desbloqueados en la Tienda Meta.
+- Los jefes del Modo Ruta también pueden **mega-evolucionar**, pero solo a partir del **stage 7** (7ª y 8ª medalla); antes no sacan megas.
+- Se desbloquea al **completar Intermedio** en la generación. El botón del modo es **rojo** 🔴 y, al completarlo, la **tarjeta de generación** muestra el emoji 🗺️.
 
 ---
 

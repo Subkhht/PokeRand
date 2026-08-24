@@ -95,13 +95,6 @@ const DICT: Record<string, Entry> = {
   'setup.coliseum': { es: '👑 COLISEUM', en: '👑 COLISEUM' },
   'setup.coliseum8': { es: '— 8 jefes a nivel 50', en: '— 8 bosses at level 50' },
   'setup.unlockColiseum': { es: '🔒 Completa todas las generaciones en Intermedio', en: '🔒 Beat all generations on Medium' },
-  'setup.aventura': { es: '🗺️ AVENTURA', en: '🗺️ ADVENTURE' },
-  'setup.aventuraWins': { es: '🏆 Completado {n} veces', en: '🏆 Completed {n} times' },
-  'setup.aventuraPick': { es: 'Elige UN Pokémon de entre los 1025 para comenzar la aventura. Al principio solo los iniciales están disponibles: captura Pokémon para desbloquearlos en futuras partidas.', en: 'Pick ONE Pokémon from all 1025 to start the adventure. Only starters are available at first: catch Pokémon to unlock them in future runs.' },
-  'setup.aventuraProgressInfo': { es: 'Gen {gen} · nivel {level} · {wins} victorias · {items} objetos guardados', en: 'Gen {gen} · level {level} · {wins} wins · {items} carried items' },
-  'setup.aventuraNormal': { es: '⭐ Normales', en: '⭐ Normal' },
-  'setup.aventuraShiny': { es: '✨ Shinys', en: '✨ Shiny' },
-  'setup.aventuraStart': { es: '🚀 ¡Comenzar Aventura!', en: '🚀 Start Adventure!' },
   'setup.infiniteTitle': { es: 'Infinite', en: 'Infinite' },
   'setup.infiniteDesc': { es: 'Rutas infinitas', en: 'Endless routes' },
   'setup.stagesNote': { es: 'rutas por etapa', en: 'routes per stage' },
@@ -182,6 +175,7 @@ const DICT: Record<string, Entry> = {
   'shop.yourCoins': { es: 'Tus PokéCoins', en: 'Your PokéCoins' },
   'shop.themes': { es: 'Temas Visuales', en: 'Visual Themes' },
   'shop.sections': { es: 'Secciones', en: 'Sections' },
+  'shop.toggleHint': { es: 'Marca para que aparezca en la partida; desmarca para ocultarlo.', en: 'Check to have it appear in the run; uncheck to hide it.' },
   'shop.backgrounds': { es: 'Fondos Animados', en: 'Animated Backgrounds' },
   'shop.consumables': { es: 'Items Curativos', en: 'Healing Items' },
   'shop.pokeballs': { es: 'Poké Balls', en: 'Poké Balls' },
@@ -605,7 +599,7 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v2.3', en: 'v2.3' },
+  'help.version': { es: 'v2.4', en: 'v2.4' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
   'changelog.button': { es: 'Ver cambios', en: 'See changes' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
@@ -648,6 +642,7 @@ const DICT: Record<string, Entry> = {
   'help.modes2': { es: 'COLISEUM: 8 jefes a nivel 50 con tu Pokédex.', en: 'COLISEUM: 8 bosses at level 50 using your Pokédex.' },
   'help.modes3': { es: 'PvP 1vs1 online, Co-op con amigos y Desafío Diario.', en: 'Online 1vs1 PvP, Co-op with friends and the Daily Challenge.' },
   'help.modes4': { es: 'Original: eliges tu inicial y superas 8 etapas (10 nodos con Tienda/Combate/Descanso/Rival y un jefe con medalla cada una). Con 8 medallas entras en la Calle Victoria y la Liga, obligatorias. Al completarlo desbloqueas una insignia especial.', en: 'Original: pick your starter and beat 8 stages (10 nodes with Shop/Battle/Rest/Rival and a medal-giving boss each). With 8 medals you enter Victory Road and the League, mandatory. Completing it unlocks a special badge.' },
+  'help.modes5': { es: 'Ruta (botón rojo, se desbloquea al completar Intermedio): un mapa de nodos ramificado al estilo pokelike. Cada etapa tiene 7 filas de anchura 2-3-4-3-4-3-2 y fluye de arriba a abajo. Elige UN nodo por fila (los alcanzables son rojos; cada nodo solo puede avanzar a los 2 más próximos; los que no elijas quedan en gris). Al entrar en un nodo el mapa se oculta para que veas el juego y vuelve al completarlo. Siempre llegarás al jefe final: derrótalo para ganar una medalla y pasa a la siguiente etapa. Con 8 medallas completas el modo y tu tarjeta de generación mostrará el emoji 🗺️.', en: 'Path (red button, unlocks after completing Medium): a pokelike-style branching node map. Each stage has 7 rows of width 2-3-4-3-4-3-2 and flows top to bottom. Pick ONE node per row (reachable ones are red; each node can only advance to its 2 nearest neighbors; the ones you skip stay gray). Entering a node hides the map so you can see the game, and it returns when you finish it. You will always reach the final boss: beat it to earn a medal and move to the next stage. With 8 medals you complete the mode and your generation card will show the 🗺️ emoji.' },
   'help.chalTitle': { es: '🎯 Desafíos', en: '🎯 Challenges' },
   'help.chal1': { es: 'Activa desafíos (Nuzlocke, Solo Starter, Speedrun...) para más recompensas.', en: 'Enable challenges (Nuzlocke, Solo Starter, Speedrun...) for more rewards.' },
   // ---------- Minigames ----------
@@ -947,8 +942,6 @@ const DICT: Record<string, Entry> = {
   'b.leagueUnselectedReleased': { es: '🗑️ {n} Pokémon no seleccionados para la Liga fueron liberados. Tu PC quedó vacío: lo que captures ahora no se pierde.', en: '🗑️ {n} Pokémon not picked for the League were released. Your PC is now empty: what you catch from here on won\'t be lost.' },
   'b.victoryRoadWelcome': { es: '🗻 ¡Calle Victoria! Supera 8 entrenadores y 2 tiendas antes de la Liga (Nv.{lvl}).', en: '🗻 Victory Road! Beat 8 trainers and 2 shops before the League (Lv.{lvl}).' },
   'b.originalMedal': { es: '🏅 ¡Jefe derrotado! Medalla {n}/{total} del Modo Original.', en: '🏅 Boss defeated! Medal {n}/{total} of Original Mode.' },
-  'b.aventuraIntro': { es: '🗺️ ¡Bienvenido a la Aventura ({gen})! 8 etapas de 15 nodos aleatorios. Derrota a los 8 jefes para ganar.', en: '🗺️ Welcome to Adventure ({gen})! 8 stages of 15 random nodes. Defeat all 8 bosses to win.' },
-  'b.aventuraStage': { es: '🏅 ¡Jefe derrotado! Etapa {n}/8. Modificador de etapa: {modifier}', en: '🏅 Boss defeated! Stage {n}/8. Stage modifier: {modifier}' },
   'b.megaEvolved': { es: '💥 ¡{name} ha mega-evolucionado! Stats aumentados un 15%.', en: '💥 {name} Mega Evolved! Stats increased by 15%.' },
   'b.abilityBlocked': { es: 'lo bloqueó {ability}', en: 'was blocked by {ability}' },
   'b.abilitySturdy': { es: '🛡️ ¡{name} aguantó con 1 HP gracias a {ability}!', en: '🛡️ {name} endured the hit with 1 HP thanks to {ability}!' },
@@ -1150,7 +1143,7 @@ const ACHIEVEMENT_TEXT: Record<string, { name: { es: string; en: string }; desc:
   'double_win': { name: { es: 'Dúo Perfecto', en: 'Perfect Duo' }, desc: { es: 'Gana un Combate Doble sin perder ningún Pokémon', en: 'Win a Double Battle without losing any Pokémon' } },
   'level_100': { name: { es: 'Nivel Máximo', en: 'Max Level' }, desc: { es: 'Alcanza el nivel 100 con un Pokémon', en: 'Reach level 100 with a Pokémon' } },
   'original_win': { name: { es: 'Leyenda Original', en: 'Original Legend' }, desc: { es: 'Gana el Modo Original', en: 'Win the Original Mode' } },
-  'aventura_win': { name: { es: 'Explorador de Aventura', en: 'Adventure Explorer' }, desc: { es: 'Gana el Modo Aventura', en: 'Win Adventure Mode' } },
+  'branch_win': { name: { es: 'Maestro de Rutas', en: 'Path Master' }, desc: { es: 'Gana el Modo Ruta', en: 'Win the Path Mode' } },
 }
 
 export function achName(id: string): string {
@@ -1879,6 +1872,20 @@ export function metaItemDesc(id: string): string {
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
   {
+    version: 'v2.4',
+    items: [
+      { es: '🗺️ Nuevo modo RUTA (botón rojo a ancho completo, igual que Infinite y Coliseum): un mapa de nodos ramificado al estilo pokelike. Cada etapa tiene 7 filas de anchura 2-3-4-3-4-3-2 y eliges un nodo por fila; cada nodo solo puede avanzar a los 2 más próximos. Siempre llegas al jefe final, que otorga una medalla, y con 8 medallas completas el modo. Se desbloquea al completar Intermedio en la generación y, al completarlo, la tarjeta de generación muestra el emoji 🗺️. Nodos disponibles: Combate, Tienda, Descanso, TeamR, Spin, Rival, Mercado Negro y Combate Doble. Nuevo logro "Maestro de Rutas".', en: '🗺️ New PATH mode (red full-width button, just like Infinite and Colosseum): a pokelike-style branching node map. Each stage has 7 rows of width 2-3-4-3-4-3-2 and you pick one node per row; each node can only move forward to its 2 nearest neighbors. You always reach the final boss, which grants a medal, and with 8 medals you complete the mode. It unlocks after completing Medium on the generation and, once completed, the generation card shows the 🗺️ emoji. Available nodes: Battle, Shop, Rest, TeamR, Spin, Rival, Black Market and Double Battle. New "Path Master" achievement.' },
+      { es: '🗺️ El mapa de nodos del Modo Ruta es vertical (de arriba a abajo), más grande y espaciado. Las opciones que no eliges (o que no son alcanzables) se muestran en tono grisáceo y el camino elegido se resalta en rojo. El mapa se oculta al entrar en un nodo para que veas el juego con claridad y el mensaje de "elige un nodo rojo" desaparece mientras estás dentro.', en: '🗺️ The Path Mode node map is now vertical (top to bottom), bigger and more spaced out. Options you do not pick (or that are unreachable) show in a grayish tone and the chosen path is highlighted in red. The map hides when you enter a node so you can see the game clearly, and the "pick a red node" message disappears while you are inside.' },
+      { es: '⚡ Precarga de la generación en segundo plano: las especies y legendarios se cargan mientras miras el mapa, así que entrar en un nodo (especialmente el primer combate) es casi instantáneo.', en: '⚡ Background generation preloading: species and legendaries load while you look at the map, so entering a node (especially the first battle) is nearly instant.' },
+      { es: '❤️ Las barras de vida ahora cambian de color suavemente según el HP (verde >50%, amarillo >25%, rojo <25%) con transición fluida, y los sliders de sonido se rediseñaron con relleno en degradado y thumb personalizado para un arrastre más fluido.', en: '❤️ HP bars now smoothly change color based on HP (green >50%, yellow >25%, red <25%) with a fluid transition, and the sound sliders were redesigned with a gradient fill and a custom thumb for smoother dragging.' },
+      { es: '👁️ Los nombres y los PS del inventario del equipo se ven más claros aunque el Pokémon no esté seleccionado (nombre en blanco con sombra y PS en verde/rojo).', en: '👁️ Team inventory names and HP are clearer even when the Pokémon is not selected (white name with shadow and HP in green/red).' },
+      { es: '🐛 Fix de la Defensa Especial disparada: tras cada golpe ya no se guardan las stats efectivas (ya multiplicadas por ítem, etapas y habilidades), solo HP/estado/cambios de batalla. Antes la Defensa y la Def. Esp. se volvían a multiplicar turno a turno y crecían exponencialmente (la Defensa se había arreglado antes, pero la Def. Esp. quedó pendiente). Corregido también en el PvP.', en: '🐛 Fixed the skyrocketing Special Defense: after each hit, effective stats (already multiplied by item, stages and abilities) are no longer stored, only HP/status/battle changes. Previously Defense and Sp. Def were multiplied again each turn and grew exponentially (Defense had been fixed before, but Sp. Def was left behind). Also fixed in PvP.' },
+      { es: '🗑️ Se elimina el Modo Aventura (botón rojo debajo del Coliseum). Se retiran su pantalla de selección de inicial, la progresión incremental por generación (nivel, objetos guardados y victorias), el sistema de 8 etapas con insignias y modificadores de etapa, el logro "Explorador de Aventura" y el ajuste de dificultad propio de ese modo.', en: '🗑️ Adventure Mode (the red button below the Colosseum) has been removed. Its starter selection screen, per-generation incremental progression (level, carried items and wins), the 8-stage badge/stage-modifier system, the "Adventure Explorer" achievement and that mode\'s own difficulty tuning were all taken out.' },
+      { es: '🖼️ 18 fondos temáticos nuevos en la Tienda Meta, uno por tipo Pokémon (Normal, Fuego, Agua, Eléctrico, Planta, Hielo, Lucha, Veneno, Tierra, Volador, Psíquico, Bicho, Roca, Fantasma, Dragón, Siniestro, Acero y Hada): el icono oficial del tipo flota suavemente por toda la pantalla con el color de fondo de ese tipo.', en: '🖼️ 18 new themed backgrounds in the Meta Shop, one per Pokémon type (Normal, Fire, Water, Electric, Grass, Ice, Fighting, Poison, Ground, Flying, Psychic, Bug, Rock, Ghost, Dragon, Dark, Steel and Fairy): the official type icon floats gently across the whole screen over a background tinted with that type\'s color.' },
+      { es: '✅ En la Tienda Meta, cada objeto desbloqueado muestra una casilla en la esquina superior derecha de su tarjeta para elegir si aparece en la partida o no (marcada por defecto). Al desmarcarla, el objeto deja de salir en tiendas, drops, descansos, Spin y mercader, y sus mejoras (objetos de inicio, slots/stock/rerolls de tienda, Detector de Objetos, nodos Mega/G-MAX/Primal/Casino e Historial) quedan desactivadas.', en: '✅ In the Meta Shop, every unlocked item now shows a checkbox in the top-right corner of its card to choose whether it appears in the run (checked by default). Unchecking it stops the item from showing up in shops, drops, rests, Spin and the merchant, and disables its upgrades (starting items, shop slots/stock/rerolls, Itemfinder, Mega/G-MAX/Primal/Casino nodes and Match History).' },
+    ],
+  },
+  {
     version: 'v2.3',
     items: [
       { es: '🗺️ Nuevo modo AVENTURA (botón rojo debajo del Coliseum, muestra las veces completadas por generación): 8 etapas de 15 nodos aleatorios con sistema de insignias y un modificador distinto por etapa. Al empezar eliges UN Pokémon de entre los 1025; al principio solo hay iniciales, y capturando Pokémon los desbloqueas para futuras partidas (con pestañas de normales y shinys, los iniciales shiny no están disponibles al inicio). La progresión incremental (nivel, objetos guardados y victorias) es POR GENERACIÓN: al ganar conservas los objetos y la próxima Aventura en esa gen es más difícil; al perder se reinicia la progresión de esa gen. Al completar una generación se marca con el emoji 🗺️. Los eventos aleatorios pueden repetirse como en Infinite. La selección usa iconos de Gen VIII en rejilla compacta con animación constante.', en: '🗺️ New ADVENTURE mode (red button below the Colosseum, shows completions per generation): 8 stages of 15 random nodes with a badge system and a different modifier per stage. You pick ONE Pokémon from all 1025 at the start; only starters are available at first, and catching Pokémon unlocks them for future runs (with Normal and Shiny tabs; shiny starters are not available at the start). The incremental progression (level, carried items and wins) is PER GENERATION: winning carries your inventory over and makes the next Adventure in that gen harder; losing resets that gen\'s progression. Completing a generation marks it with the 🗺️ emoji. Random events can repeat like in Infinite. Selection uses Gen VIII icons in a compact grid with a constant animation.' },
@@ -2272,6 +2279,24 @@ const BG_TEXT: Record<string, { name: { es: string; en: string }; desc: { es: st
   fireflies: { name: { es: 'Luciérnagas', en: 'Fireflies' }, desc: { es: 'Puntos de luz que parpadean y flotan.', en: 'Glowing lights blinking and drifting.' } },
   thunder: { name: { es: 'Tormenta', en: 'Thunderstorm' }, desc: { es: 'Lluvia intensa con relámpagos.', en: 'Heavy rain with lightning flashes.' } },
   galaxy: { name: { es: 'Galaxia', en: 'Galaxy' }, desc: { es: 'Espiral giratoria de estrellas.', en: 'Spinning spiral of stars.' } },
+  type_normal: { name: { es: 'Tipo Normal', en: 'Normal Type' }, desc: { es: 'Iconos del tipo Normal flotando por la pantalla.', en: 'Normal type icons floating across the screen.' } },
+  type_fire: { name: { es: 'Tipo Fuego', en: 'Fire Type' }, desc: { es: 'Iconos del tipo Fuego flotando por la pantalla.', en: 'Fire type icons floating across the screen.' } },
+  type_water: { name: { es: 'Tipo Agua', en: 'Water Type' }, desc: { es: 'Iconos del tipo Agua flotando por la pantalla.', en: 'Water type icons floating across the screen.' } },
+  type_electric: { name: { es: 'Tipo Eléctrico', en: 'Electric Type' }, desc: { es: 'Iconos del tipo Eléctrico flotando por la pantalla.', en: 'Electric type icons floating across the screen.' } },
+  type_grass: { name: { es: 'Tipo Planta', en: 'Grass Type' }, desc: { es: 'Iconos del tipo Planta flotando por la pantalla.', en: 'Grass type icons floating across the screen.' } },
+  type_ice: { name: { es: 'Tipo Hielo', en: 'Ice Type' }, desc: { es: 'Iconos del tipo Hielo flotando por la pantalla.', en: 'Ice type icons floating across the screen.' } },
+  type_fighting: { name: { es: 'Tipo Lucha', en: 'Fighting Type' }, desc: { es: 'Iconos del tipo Lucha flotando por la pantalla.', en: 'Fighting type icons floating across the screen.' } },
+  type_poison: { name: { es: 'Tipo Veneno', en: 'Poison Type' }, desc: { es: 'Iconos del tipo Veneno flotando por la pantalla.', en: 'Poison type icons floating across the screen.' } },
+  type_ground: { name: { es: 'Tipo Tierra', en: 'Ground Type' }, desc: { es: 'Iconos del tipo Tierra flotando por la pantalla.', en: 'Ground type icons floating across the screen.' } },
+  type_flying: { name: { es: 'Tipo Volador', en: 'Flying Type' }, desc: { es: 'Iconos del tipo Volador flotando por la pantalla.', en: 'Flying type icons floating across the screen.' } },
+  type_psychic: { name: { es: 'Tipo Psíquico', en: 'Psychic Type' }, desc: { es: 'Iconos del tipo Psíquico flotando por la pantalla.', en: 'Psychic type icons floating across the screen.' } },
+  type_bug: { name: { es: 'Tipo Bicho', en: 'Bug Type' }, desc: { es: 'Iconos del tipo Bicho flotando por la pantalla.', en: 'Bug type icons floating across the screen.' } },
+  type_rock: { name: { es: 'Tipo Roca', en: 'Rock Type' }, desc: { es: 'Iconos del tipo Roca flotando por la pantalla.', en: 'Rock type icons floating across the screen.' } },
+  type_ghost: { name: { es: 'Tipo Fantasma', en: 'Ghost Type' }, desc: { es: 'Iconos del tipo Fantasma flotando por la pantalla.', en: 'Ghost type icons floating across the screen.' } },
+  type_dragon: { name: { es: 'Tipo Dragón', en: 'Dragon Type' }, desc: { es: 'Iconos del tipo Dragón flotando por la pantalla.', en: 'Dragon type icons floating across the screen.' } },
+  type_dark: { name: { es: 'Tipo Siniestro', en: 'Dark Type' }, desc: { es: 'Iconos del tipo Siniestro flotando por la pantalla.', en: 'Dark type icons floating across the screen.' } },
+  type_steel: { name: { es: 'Tipo Acero', en: 'Steel Type' }, desc: { es: 'Iconos del tipo Acero flotando por la pantalla.', en: 'Steel type icons floating across the screen.' } },
+  type_fairy: { name: { es: 'Tipo Hada', en: 'Fairy Type' }, desc: { es: 'Iconos del tipo Hada flotando por la pantalla.', en: 'Fairy type icons floating across the screen.' } },
 }
 
 export function bgName(id: string): string {

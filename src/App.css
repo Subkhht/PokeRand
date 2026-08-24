@@ -524,11 +524,67 @@ button {
 .meter>div {
   height: 100%;
   background: var(--accent-green);
-  transition: width 220ms ease;
+  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .enemy-meter>div {
   background: var(--accent-red);
+}
+
+/* Slider de volumen con relleno suave y thumb redondeado */
+input[type='range'].range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 999px;
+  outline: none;
+  border: none;
+}
+
+input[type='range'].range-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+input[type='range'].range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 2px solid #94a3b8;
+  margin-top: -6px;
+  cursor: pointer;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type='range'].range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+}
+
+input[type='range'].range-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+input[type='range'].range-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 2px solid #94a3b8;
+  cursor: pointer;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
+}
+
+input[type='range'].range-slider::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: #10b981;
 }
 
 .sprite {
@@ -719,6 +775,23 @@ button {
 
   50% {
     opacity: 0.55;
+  }
+}
+
+/* Anillo pulsante de los nodos elegibles del Modo Ruta (rojo) */
+.route-map .branch-pulse {
+  animation: branchPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes branchPulse {
+
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+
+  50% {
+    opacity: 0.35;
   }
 }
 
@@ -3051,7 +3124,8 @@ button {
 /* ---- Barras de vida con transición suave ---- */
 .meter>div,
 .enemy-meter>div {
-  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.15);
 }
 
 @keyframes pvpSpriteBob {
@@ -3232,123 +3306,4 @@ html[data-gameboy] ::-webkit-scrollbar-thumb {
 
 html[data-gameboy] * {
   scrollbar-color: #306230 #0f380f;
-}
-
-/* ---------------------------------------------------------------------------
-   Modo Aventura: rejilla de selección de Pokémon (iconos Gen VIII compactos)
---------------------------------------------------------------------------- */
-.aventura-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
-  gap: 6px;
-  max-height: 420px;
-  overflow-y: auto;
-  padding: 4px;
-  border: 1px solid rgba(52, 211, 153, 0.25);
-  border-radius: 10px;
-  background: rgba(15, 23, 42, 0.35);
-}
-
-.aventura-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  padding: 6px 2px;
-  border-radius: 10px;
-  border: 1px solid #3f3f6e;
-  background: rgba(30, 41, 59, 0.5);
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
-}
-
-.aventura-tile:hover {
-  border-color: rgba(52, 211, 153, 0.7);
-  background: rgba(52, 211, 153, 0.1);
-}
-
-.aventura-tile.is-selected {
-  border-color: #34d399;
-  border-width: 2px;
-  background: rgba(52, 211, 153, 0.2);
-}
-
-.aventura-sprite-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-}
-
-.aventura-poke-icon {
-  width: 44px;
-  height: 44px;
-  image-rendering: pixelated;
-  /* Animación constante (flotando suavemente) en lugar de un solo salto. */
-  animation: aventuraFloat 1.8s ease-in-out infinite;
-  will-change: transform;
-}
-
-/* Al pasar el cursor, el salto es más marcado y también constante. */
-.aventura-tile:hover .aventura-poke-icon {
-  animation: aventuraHop 0.55s ease-in-out infinite;
-}
-
-@keyframes aventuraFloat {
-
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-
-  50% {
-    transform: translateY(-3px) scale(1.03);
-  }
-}
-
-@keyframes aventuraHop {
-
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-
-  50% {
-    transform: translateY(-8px) scale(1.12);
-  }
-}
-
-.aventura-tile.is-selected .aventura-poke-icon {
-  animation: aventuraFloat 1.8s ease-in-out infinite;
-}
-
-.aventura-poke-icon.is-shiny {
-  filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.7));
-}
-
-.aventura-lock {
-  position: absolute;
-  top: -2px;
-  right: -4px;
-  font-size: 0.6rem;
-  background: rgba(15, 23, 42, 0.85);
-  border-radius: 50%;
-  padding: 1px 3px;
-}
-
-.aventura-name {
-  font-size: 0.58rem;
-  color: #c9c6e8;
-  text-transform: capitalize;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.aventura-tile.is-selected .aventura-name {
-  color: #34d399;
-  font-weight: bold;
 }

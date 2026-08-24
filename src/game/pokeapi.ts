@@ -1129,6 +1129,26 @@ export async function getSpeciesIdsByGeneration(generation: number): Promise<num
   return ids
 }
 
+// Precarga en segundo plano los datos de una generación (lista de especies y,
+// sobre todo, qué especies son legendarias/míticas). El primer combate de una
+// run se ralentizaba porque getLegendaryIdsByGeneration escanea cientos de
+// especies de golpe; calentando esa caché mientras el jugador mira el mapa, el
+// enemigo aparece casi al instante. Es fire-and-forget: nunca se espera por él.
+export function preloadGeneration(generation: number): void {
+  void (async () => {
+    try {
+      const ids = await getSpeciesIdsByGeneration(generation)
+      await getLegendaryIdsByGeneration(generation)
+      // Calentar también los detalles de algunas especies iniciales reduce la
+      // latencia de los primeros encuentros salvajes.
+      const earlyBatch = ids.slice(0, 14)
+      await Promise.all(earlyBatch.map(id => fetchPokemonDetails(id).catch(() => null)))
+    } catch {
+      // Si falla (sin conexión, rate limit...), se reintentará inline al entrar.
+    }
+  })()
+}
+
 async function getLegendaryIdsByGeneration(generation: number): Promise<Set<number>> {
   const cached = legendaryIdsCache.get(generation)
   if (cached) return cached
@@ -1697,18 +1717,11 @@ export async function getBalancedPokemonByGeneration(
 
   // Progreso efectivo: combina la etapa actual con la posición dentro de la ruta.
   // Infinite no tiene etapas, así que usa el progreso de la ruta directamente.
-  // El Modo Original tiene 8 etapas (medallas), el resto 3 (insignias).
-  // El Modo Aventura también tiene 8 etapas (insignias).
-  const stageDivisor = difficulty === 'original' || difficulty.startsWith('aventura') ? 8 : 3
+  // El Modo Original y el Modo Ruta tienen 8 etapas (medallas), el resto 3 (insignias).
+  const stageDivisor = (difficulty === 'original' || difficulty === 'branch') ? 8 : 3
   const progressRatio = difficulty === 'infinite'
     ? routeProgress
     : (stageIndex + routeProgress) / stageDivisor
-
-  // Nivel de la Aventura (incremental): cada victoria sube el nivel y hace la
-  // próxima partida más difícil. La dificultad llega como "aventura_<nivel>".
-  const aventuraLevel = difficulty.startsWith('aventura_')
-    ? parseInt(difficulty.split('_')[1] ?? '0', 10) || 0
-    : 0
 
   const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss, bossStage, legendaryIds)
 
@@ -1723,9 +1736,7 @@ export async function getBalancedPokemonByGeneration(
   // objetivo del rival) para que la especie, sus evoluciones y sus movimientos
   // sean coherentes con ese nivel y no aparezcan formas evolucionadas a niveles
   // bajos (p. ej. un Venusaur nivel 16).
-  // En Aventura se añade siempre el nivel incremental (+2 por victoria), tanto
-  // con forcedLevel como sin él, para que cada partida sea más difícil.
-  const scaledLevel = (forcedLevel ?? (10 + Math.floor((stageIndex * totalNodes + stepIndex) * levelMult) + (isBoss ? 2 : 0))) + aventuraLevel * 2
+  const scaledLevel = forcedLevel ?? (10 + Math.floor((stageIndex * totalNodes + stepIndex) * levelMult) + (isBoss ? 2 : 0))
 
   let minBst = 150
   let maxBst = 999
@@ -1794,23 +1805,6 @@ export async function getBalancedPokemonByGeneration(
     } else {
       minBst = 340
       maxBst = 540
-    }
-  } else if (difficulty.startsWith('aventura')) {
-    // Aventura: como Intermedia, pero con un rango de BST que sube con el
-    // nivel incremental (cada victoria hace la próxima partida más difícil).
-    const bstBoost = aventuraLevel * 45
-    if (isBoss) {
-      minBst = 500 + bstBoost
-      maxBst = 999
-    } else if (progressRatio < 0.35) {
-      minBst = 160 + bstBoost
-      maxBst = 420 + bstBoost
-    } else if (progressRatio < 0.70) {
-      minBst = 330 + bstBoost
-      maxBst = 540 + bstBoost
-    } else {
-      minBst = 430 + bstBoost
-      maxBst = 680 + bstBoost
     }
   } else {
     if (isBoss) {

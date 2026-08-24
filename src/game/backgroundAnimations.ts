@@ -1,3 +1,5 @@
+import { TYPE_COLORS, TYPE_ICON_IDS } from './backgrounds'
+
 export interface BgState {
   [key: string]: unknown
 }
@@ -730,6 +732,75 @@ function stepThunder(ctx: CanvasRenderingContext2D, s: BgState, dt: number, w: n
   }
 }
 
+// ---------------------------------------------------------------- type icons
+interface TypeIcon {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  rot: number
+  vr: number
+  size: number
+  phase: number
+}
+
+const typeIconCache: Record<string, HTMLImageElement | null> = {}
+function getTypeIcon(type: string): HTMLImageElement | null {
+  if (type in typeIconCache) return typeIconCache[type]
+  const id = TYPE_ICON_IDS[type]
+  if (!id) {
+    typeIconCache[type] = null
+    return null
+  }
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+  img.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/types/generation-ix/scarlet-violet/small/${id}.png`
+  typeIconCache[type] = img
+  return img
+}
+
+function stepTypeIcons(ctx: CanvasRenderingContext2D, s: BgState, dt: number, w: number, h: number, t: number, type: string): void {
+  const icons = getState<TypeIcon[]>(s, `type_${type}`, () =>
+    Array.from({ length: Math.max(12, Math.floor((w * h) / 14000)) }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vx: rand(-12, 12),
+      vy: rand(-9, 9),
+      rot: Math.random() * Math.PI * 2,
+      vr: rand(-0.4, 0.4),
+      size: rand(22, 46),
+      phase: Math.random() * Math.PI * 2,
+    }))
+  )
+  const img = getTypeIcon(type)
+  const color = TYPE_COLORS[type] ?? '#ffffff'
+  const margin = 60
+  for (const ic of icons) {
+    ic.x += (ic.vx + Math.sin(t * 0.6 + ic.phase) * 8) * dt
+    ic.y += (ic.vy + Math.cos(t * 0.5 + ic.phase) * 6) * dt
+    ic.rot += ic.vr * dt
+    if (ic.x < -margin) ic.x = w + margin
+    if (ic.x > w + margin) ic.x = -margin
+    if (ic.y < -margin) ic.y = h + margin
+    if (ic.y > h + margin) ic.y = -margin
+    ctx.save()
+    ctx.translate(ic.x, ic.y)
+    ctx.rotate(ic.rot)
+    ctx.globalAlpha = 0.45 + 0.3 * Math.abs(Math.sin(t * 1.2 + ic.phase))
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, -ic.size / 2, -ic.size / 2, ic.size, ic.size)
+    } else {
+      // Fallback mientras carga el icono: un círculo del color del tipo.
+      ctx.fillStyle = color
+      ctx.beginPath()
+      ctx.arc(0, 0, ic.size / 2.4, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.restore()
+  }
+  ctx.globalAlpha = 1
+}
+
 // ---------------------------------------------------------------- galaxy
 interface GalaxyStar {
   angle: number
@@ -778,6 +849,11 @@ export function drawBackground(
   mouse: { x: number; y: number } | null,
   opts?: BgDrawOpts
 ): void {
+  // Fondos temáticos de tipo: "type_<tipo>".
+  if (id.startsWith('type_')) {
+    stepTypeIcons(ctx, s, dt, w, h, t, id.slice('type_'.length))
+    return
+  }
   switch (id) {
     case 'stars': stepStars(ctx, s, dt, w, h, t); break
     case 'shooting': stepShooting(ctx, s, dt, w, h, t); break

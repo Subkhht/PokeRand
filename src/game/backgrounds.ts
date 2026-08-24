@@ -8,6 +8,110 @@ export interface BackgroundDef {
   opacity: number
 }
 
+// Color representativo de cada tipo (usado para los fondos temáticos).
+export const TYPE_COLORS: Record<string, string> = {
+  normal: '#A8A878',
+  fire: '#F08030',
+  water: '#6890F0',
+  electric: '#F8D030',
+  grass: '#78C850',
+  ice: '#98D8D8',
+  fighting: '#C03028',
+  poison: '#A040A0',
+  ground: '#E0C068',
+  flying: '#A890F0',
+  psychic: '#F85888',
+  bug: '#A8B820',
+  rock: '#B8A038',
+  ghost: '#705898',
+  dragon: '#7038F8',
+  dark: '#705848',
+  steel: '#B8B8D0',
+  fairy: '#EE99AC',
+}
+
+// Id numérico del icono de tipo en PokeAPI (generation-viii): 1=Normal ... 18=Fairy.
+export const TYPE_ICON_IDS: Record<string, number> = {
+  normal: 1,
+  fighting: 2,
+  flying: 3,
+  poison: 4,
+  ground: 5,
+  rock: 6,
+  bug: 7,
+  ghost: 8,
+  steel: 9,
+  fire: 10,
+  water: 11,
+  grass: 12,
+  electric: 13,
+  psychic: 14,
+  ice: 15,
+  dragon: 16,
+  dark: 17,
+  fairy: 18,
+}
+
+const TYPE_ICONS_EMOJI: Record<string, string> = {
+  normal: '⚪',
+  fire: '🔥',
+  water: '💧',
+  electric: '⚡',
+  grass: '🍃',
+  ice: '❄️',
+  fighting: '🥊',
+  poison: '☠️',
+  ground: '🏜️',
+  flying: '🕊️',
+  psychic: '🔮',
+  bug: '🐛',
+  rock: '🪨',
+  ghost: '👻',
+  dragon: '🐉',
+  dark: '🌑',
+  steel: '⚙️',
+  fairy: '🧚',
+}
+
+const TYPE_NAMES: Record<string, string> = {
+  normal: 'Normal',
+  fire: 'Fuego',
+  water: 'Agua',
+  electric: 'Eléctrico',
+  grass: 'Planta',
+  ice: 'Hielo',
+  fighting: 'Lucha',
+  poison: 'Veneno',
+  ground: 'Tierra',
+  flying: 'Volador',
+  psychic: 'Psíquico',
+  bug: 'Bicho',
+  rock: 'Roca',
+  ghost: 'Fantasma',
+  dragon: 'Dragón',
+  dark: 'Siniestro',
+  steel: 'Acero',
+  fairy: 'Hada',
+}
+
+function typeGradient(type: string): string {
+  const c = TYPE_COLORS[type] ?? '#ffffff'
+  const r = parseInt(c.slice(1, 3), 16)
+  const g = parseInt(c.slice(3, 5), 16)
+  const b = parseInt(c.slice(5, 7), 16)
+  return `linear-gradient(160deg, #0b1120 0%, rgb(${Math.round(r * 0.28)}, ${Math.round(g * 0.28)}, ${Math.round(b * 0.28)}) 60%, #0b1120 100%)`
+}
+
+export const TYPE_BACKGROUNDS: BackgroundDef[] = Object.keys(TYPE_COLORS).map((type) => ({
+  id: `type_${type}`,
+  name: `Tipo ${TYPE_NAMES[type]}`,
+  desc: `Iconos de ${TYPE_NAMES[type].toLowerCase()} flotando por la pantalla.`,
+  price: 60,
+  icon: TYPE_ICONS_EMOJI[type] ?? '✨',
+  preview: typeGradient(type),
+  opacity: 0.5,
+}))
+
 export const BACKGROUNDS: BackgroundDef[] = [
   { id: 'none', name: 'Ninguno', desc: 'Fondo clásico, sin animación.', price: 0, icon: '⬛', preview: 'linear-gradient(135deg, #12122b 0%, #1c1c3a 100%)', opacity: 0 },
   { id: 'stars', name: 'Cielo Estrellado', desc: 'Estrellas que parpadean suavemente.', price: 30, icon: '✨', preview: 'radial-gradient(circle at 20% 20%, #2a3a6b 0%, #0b1026 100%)', opacity: 0.55 },
@@ -29,4 +133,5 @@ export const BACKGROUNDS: BackgroundDef[] = [
   { id: 'fireflies', name: 'Luciérnagas', desc: 'Puntos de luz que parpadean y flotan.', price: 45, icon: '🪲', preview: 'linear-gradient(180deg, #061a12 0%, #0a2a1a 100%)', opacity: 0.55 },
   { id: 'thunder', name: 'Tormenta', desc: 'Lluvia intensa con relámpagos.', price: 50, icon: '⛈️', preview: 'linear-gradient(180deg, #0a0f1a 0%, #18263f 100%)', opacity: 0.55 },
   { id: 'galaxy', name: 'Galaxia', desc: 'Espiral giratoria de estrellas.', price: 50, icon: '🌌', preview: 'radial-gradient(circle at 50% 50%, #2a1450 0%, #0a0620 100%)', opacity: 0.55 },
+  ...TYPE_BACKGROUNDS,
 ]

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, useCallback, Component, Fragment, type ReactNode, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { useMemo, useState, useEffect, useRef, useCallback, startTransition, Component, Fragment, type ReactNode, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
@@ -15,10 +15,10 @@ import {
   getAllSpeciesList,
   fetchPokemonTypes,
   buildPokemonFromApi,
+  preloadGeneration,
   startersByGen,
   makeShinySprite,
   pokemonSpriteUrl,
-  pokemonIconUrl,
   canEvolveWithStone,
   stripRegional,
   setRunSeed,
@@ -37,11 +37,11 @@ import BackgroundLayer from './BackgroundLayer'
 import BackgroundPreview from './BackgroundPreview'
 import { BACKGROUNDS } from './game/backgrounds'
 import type { User } from '@supabase/supabase-js'
-import type { Move, Pokemon, PokemonIVs, RouteNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
+import type { Move, Pokemon, PokemonIVs, RouteNode, BranchNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, itemLocalizedName, metaItemDesc, moveName, statusLabel, statusAppliedLine, themeName, themeDesc, bgName, bgDesc, type Language, getChangelog } from './game/i18n'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'aventura_select' | 'pvp'
-type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum' | 'original' | 'aventura'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
+type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum' | 'original' | 'branch'
 
 // Historial local de partidas finalizadas (victorias/derrotas). Solo se
 // registran runs que terminan de verdad: no se cuentan reinicios ni abandonos.
@@ -83,6 +83,14 @@ const STATUS_COLORS: Record<StatusType, string> = {
   sleep: '#9b98cf',
   confusion: '#ec4899',
   flinch: '#ffcb05',
+}
+
+// Color de la barra de vida según el porcentaje de HP restante: verde > 50%,
+// amarillo > 25%, rojo por debajo. La transición de color la hace el CSS.
+function hpBarColor(ratio: number): string {
+  if (ratio > 0.5) return '#37d16b'
+  if (ratio > 0.25) return '#facc15'
+  return '#ee3b2f'
 }
 
 function StatusBadge({ status, compact = false }: { status?: Pokemon['status']; compact?: boolean }) {
@@ -575,7 +583,7 @@ const difficultyNodeCounts: Record<Difficulty, number> = {
   infinite: 0,
   coliseum: 8,
   original: 10,
-  aventura: 15
+  branch: 22,
 }
 
 const authInputStyle: CSSProperties = {
@@ -596,7 +604,7 @@ const difficultyLabels: Record<Difficulty, { title: string; desc: string }> = {
   infinite: { title: 'Infinite', desc: 'Sin límite (Aventura infinita)' },
   coliseum: { title: 'COLISEUM', desc: '8 jefes a nivel 50' },
   original: { title: 'Original', desc: '10 nodos · 8 etapas (Tienda/Combate/Descanso/Rival)' },
-  aventura: { title: 'Aventura', desc: '15 nodos aleatorios · 8 etapas · incremental' },
+  branch: { title: 'Ruta', desc: 'Mapa de nodos · 8 medallas (2-3-4-3-4-3-2)' },
 }
 
 function difficultyLabel(lang: Language, d: Difficulty): { title: string; desc: string } {
@@ -608,7 +616,7 @@ function difficultyLabel(lang: Language, d: Difficulty): { title: string; desc: 
       infinite: { title: 'Infinite', desc: 'No limit (endless adventure)' },
       coliseum: { title: 'COLISEUM', desc: '8 bosses at level 50' },
       original: { title: 'Original', desc: '10 nodes · 8 stages (Shop/Battle/Rest/Rival)' },
-      aventura: { title: 'Adventure', desc: '15 random nodes · 8 stages · incremental' },
+      branch: { title: 'Path', desc: 'Branching node map · 8 medals (2-3-4-3-4-3-2)' },
     }
     return map[d]
   }
@@ -1539,7 +1547,7 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: 'double_win', name: 'Dúo Perfecto', desc: 'Gana un Combate Doble sin perder ningún Pokémon', icon: '🥊', hidden: false, reward: 25 },
   { id: 'level_100', name: 'Nivel Máximo', desc: 'Alcanza el nivel 100 con un Pokémon', icon: '📈', hidden: false, reward: 60 },
   { id: 'original_win', name: 'Leyenda Original', desc: 'Gana el Modo Original', icon: '🏛️', hidden: false, reward: 40 },
-  { id: 'aventura_win', name: 'Explorador de Aventura', desc: 'Gana el Modo Aventura', icon: '🗺️', hidden: false, reward: 40 },
+  { id: 'branch_win', name: 'Maestro de Rutas', desc: 'Gana el Modo Ruta', icon: '🗺️', hidden: false, reward: 40 },
   { id: 'streak_15', name: 'Racha Imparable', desc: 'Gana 15 partidas seguidas', icon: '🔥', hidden: false, reward: 100 },
   { id: 'streak_20', name: 'Leyenda de Racha', desc: 'Gana 20 partidas seguidas', icon: '🔥', hidden: false, reward: 200 },
   { id: 'streak_25', name: 'Dios de la Racha', desc: 'Gana 25 partidas seguidas', icon: '🔥', hidden: false, reward: 250 },
@@ -1838,6 +1846,25 @@ interface MetaShopItem {
 function metaShopItemMatches(item: { name: string; desc: string }, term: string): boolean {
   if (!term) return true
   return item.name.toLowerCase().includes(term) || item.desc.toLowerCase().includes(term)
+}
+
+// Checkbox de la Tienda Meta: activa/desactiva si un objeto aparece en la partida.
+function ShopItemToggle({ id, disabled, onToggle }: { id: string; disabled: boolean; onToggle: (id: string) => void }): ReactNode {
+  const [checked, setChecked] = useState(!disabled)
+  return (
+    <label style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 2, display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '2px', borderRadius: '4px', background: 'rgba(15,23,42,0.7)', lineHeight: 1 }} title={t('shop.toggleHint')}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={() => {
+          // Estado local: la casilla cambia al instante sin esperar el re-render.
+          setChecked(c => !c)
+          onToggle(id)
+        }}
+        style={{ accentColor: '#37d16b', cursor: 'pointer', width: '15px', height: '15px', margin: 0 }}
+      />
+    </label>
+  )
 }
 
 const META_SHOP_ITEMS: MetaShopItem[] = [
@@ -2301,6 +2328,42 @@ function getNodeMapLayout(nodeCount: number): { positions: Array<{ x: number; y:
   return { positions, width, height }
 }
 
+// Posición horizontal normalizada (0..1) de un nodo dentro de su fila.
+function branchRowX(row: number, rowSize: number): number {
+  return (row + 1) / (rowSize + 1)
+}
+
+// Devuelve los 2 nodos más próximos de la siguiente fila a un nodo dado. Regla
+// del Modo Ruta: cada nodo solo puede avanzar a los 2 nodos más cercanos.
+function nearestBranchNodes(prev: BranchNode, prevRowSize: number, nextRow: BranchNode[]): BranchNode[] {
+  if (nextRow.length <= 2) return [...nextRow]
+  const prevX = branchRowX(prev.row, prevRowSize)
+  return [...nextRow]
+    .sort((a, b) => Math.abs(branchRowX(a.row, nextRow.length) - prevX) - Math.abs(branchRowX(b.row, nextRow.length) - prevX))
+    .slice(0, 2)
+}
+
+// Diseño del mapa ramificado del Modo Ruta: cada columna se muestra como una
+// fila horizontal y el avance fluye hacia abajo (de arriba a abajo), dejando
+// más espacio entre nodos. Los nodos de cada fila se reparten en horizontal
+// (2-3-4-3-4-3-2 + jefe final en la última fila).
+function getBranchMapLayout(columns: BranchNode[][]): { positions: Map<number, { x: number; y: number }>; width: number; height: number } {
+  const spacingY = 180
+  const marginY = 80
+  const width = 660
+  const height = marginY * 2 + (columns.length - 1) * spacingY + 70
+  const positions = new Map<number, { x: number; y: number }>()
+  for (let c = 0; c < columns.length; c++) {
+    const n = columns[c].length
+    const y = marginY + c * spacingY
+    for (let r = 0; r < n; r++) {
+      const x = (width * (r + 1)) / (n + 1)
+      positions.set(columns[c][r].id, { x, y })
+    }
+  }
+  return { positions, width, height }
+}
+
 // Tooltip del Pokémon (al pasar el cursor por encima en combate): muestra la
 // habilidad, la naturaleza y los IVs del ejemplar en tarjetas de colores.
 function PokemonMetaTooltip({ p, showHeader = true }: { p: Pokemon; showHeader?: boolean }): ReactNode {
@@ -2557,30 +2620,8 @@ interface ProgressionData {
   completedColiseum: number[]
   completedLeague: number[]
   completedOriginal: number[]
-  completedAventura: number[]
+  completedBranch: number[]
 }
-
-// Progresión persistente del Modo Aventura (incremental), por generación: cada
-// victoria en una generación sube su nivel (la próxima partida en ESA generación
-// es más difícil) y guarda los objetos del inventario para esa generación.
-interface AventuraGenProgress {
-  level: number
-  totalWins: number
-  carriedItems: string[]
-}
-// Clave = generación (1-9). La generación 0 (Random) usa la generación que se
-// elija al azar para esa run.
-type AventuraProgress = Record<number, AventuraGenProgress>
-
-const AVENTURA_KEY = 'pokerand_aventura'
-
-function emptyAventuraGen(): AventuraGenProgress {
-  return { level: 0, totalWins: 0, carriedItems: [] }
-}
-
-// Todos los iniciales de todas las generaciones: son los únicos seleccionables
-// al empezar la Aventura (el resto se desbloquea capturándolos).
-const allStarterIds = new Set(Object.values(startersByGen).flat())
 
 interface VictoryUnlocks {
   genName: string
@@ -2622,44 +2663,11 @@ function MainApp() {
   const chosenStarterIdRef = useRef<number | null>(null)
   // Medallas del Modo Original: cada una es una insignia distinta (no se repiten).
   const [originalMedals, setOriginalMedals] = useState<Array<{ id: string; name: string; sprite: string }>>([])
-
-  // Progresión persistente del Modo Aventura (incremental), por generación.
-  const [aventuraProgress, setAventuraProgress] = useState<AventuraProgress>(() => {
-    try {
-      const saved = localStorage.getItem(AVENTURA_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        // Formato por generación: { "1": {...}, "2": {...}, ... }
-        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-          const hasFlatLevel = typeof parsed.level === 'number'
-          if (!hasFlatLevel) {
-            const result: AventuraProgress = {}
-            for (const [k, v] of Object.entries(parsed)) {
-              const gen = Number(k)
-              if (!Number.isFinite(gen) || gen < 1) continue
-              result[gen] = {
-                level: typeof (v as any)?.level === 'number' ? (v as any).level : 0,
-                totalWins: typeof (v as any)?.totalWins === 'number' ? (v as any).totalWins : 0,
-                carriedItems: Array.isArray((v as any)?.carriedItems) ? (v as any).carriedItems : [],
-              }
-            }
-            return result
-          }
-        }
-        // Formato antiguo (global): se ignora al pasar a progresión por generación.
-      }
-    } catch {
-      // fallback
-    }
-    return {}
-  })
-  // Un modificador por etapa del Modo Aventura (8 en total, cambian cada etapa).
-  const [aventuraStageModifiers, setAventuraStageModifiers] = useState<RunModifier[]>([])
-  const [aventuraSpecies, setAventuraSpecies] = useState<Array<{ id: number; name: string }>>([])
-  const [aventuraTab, setAventuraTab] = useState<'normal' | 'shiny'>('normal')
-  const [aventuraSearch, setAventuraSearch] = useState('')
-  const [aventuraSelectedId, setAventuraSelectedId] = useState<number | null>(null)
-  const chosenAventuraStarterRef = useRef<Pokemon | null>(null)
+  // Modo Ruta: mapa de nodos ramificado. branchMap[col] = nodos de esa columna;
+  // la última columna siempre contiene el jefe de la etapa.
+  const [branchMap, setBranchMap] = useState<BranchNode[][] | null>(null)
+  const [branchCol, setBranchCol] = useState<number>(0)
+  const [branchMedals, setBranchMedals] = useState<Array<{ id: string; name: string; sprite: string }>>([])
 
   const [progression, setProgression] = useState<ProgressionData>(() => {
     try {
@@ -2673,13 +2681,13 @@ function MainApp() {
           completedColiseum: Array.isArray(parsed.completedColiseum) ? parsed.completedColiseum : [],
           completedLeague: Array.isArray(parsed.completedLeague) ? parsed.completedLeague : [],
           completedOriginal: Array.isArray(parsed.completedOriginal) ? parsed.completedOriginal : [],
-          completedAventura: Array.isArray(parsed.completedAventura) ? parsed.completedAventura : []
+          completedBranch: Array.isArray(parsed.completedBranch) ? parsed.completedBranch : [],
         }
       }
     } catch {
       // fallback
     }
-    return { completedMedium: [], completedAny: [], completedHard: [], completedColiseum: [], completedLeague: [], completedOriginal: [], completedAventura: [] }
+    return { completedMedium: [], completedAny: [], completedHard: [], completedColiseum: [], completedLeague: [], completedOriginal: [], completedBranch: [] }
   })
 
   const [team, setTeam] = useState<Pokemon[]>([])
@@ -3017,10 +3025,11 @@ function MainApp() {
         if (!Array.isArray(data.ownedBackgrounds)) data.ownedBackgrounds = ['none']
         if (!data.activeBackground) data.activeBackground = 'none'
         if (typeof data.gameboyMode !== 'boolean') data.gameboyMode = false
+        if (!Array.isArray(data.disabledItems)) data.disabledItems = []
         return data
       }
     } catch { }
-    return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark', ownedBackgrounds: ['none'], activeBackground: 'none', ownedMusic: [], activeMenuMusic: 'default', activeBattleMusic: 'default', gameboyMode: false, totalMegas: 0, totalGmax: 0, coopRuns: 0, coopWins: 0, coopTrades: 0 }
+    return { pokeCoins: 0, totalRuns: 0, totalWins: 0, bestStreak: 0, unlockedStarters: [], permanentlyUnlockedItems: [], ownedThemes: ['dark'], activeTheme: 'dark', ownedBackgrounds: ['none'], activeBackground: 'none', ownedMusic: [], activeMenuMusic: 'default', activeBattleMusic: 'default', gameboyMode: false, totalMegas: 0, totalGmax: 0, coopRuns: 0, coopWins: 0, coopTrades: 0, disabledItems: [] }
   })
 
   const [secretModalOpen, setSecretModalOpen] = useState(false)
@@ -3193,6 +3202,15 @@ function MainApp() {
   const routeRandRef = useRef<() => number>(() => Math.random())
   const teamRef = useRef<Pokemon[]>([])
   useEffect(() => { teamRef.current = team }, [team])
+
+  // Al mostrar el mapa de rutas, precargar la generación en segundo plano para
+  // que entrar en un nodo sea casi instantáneo (las llamadas son idempotentes
+  // gracias a la caché en memoria, así que repetirlas es gratuito).
+  useEffect(() => {
+    if (screen === 'route' && currentRunGen > 0) {
+      preloadGeneration(currentRunGen)
+    }
+  }, [screen, currentRunGen])
   const [traderModal, setTraderModal] = useState<boolean>(false)
   const [merchantItems, setMerchantItems] = useState<Array<{ name: string; price: number }> | null>(null)
   const [randomEventUsed, setRandomEventUsed] = useState<Set<string>>(new Set())
@@ -3478,6 +3496,20 @@ function MainApp() {
     setTimeout(() => setUnlockPopup(null), 3000)
   }
 
+  // Marca/desmarca un objeto desbloqueado para que aparezca (o no) en la partida.
+  // Se envuelve en startTransition para que la casilla responda al instante y el
+  // re-render pesado de la app no bloquee la interfaz.
+  const toggleItemEnabled = (id: string): void => {
+    startTransition(() => {
+      setMetaProgression(prev => {
+        const disabled = prev.disabledItems ?? []
+        const updated = { ...prev, disabledItems: disabled.includes(id) ? disabled.filter(d => d !== id) : [...disabled, id] }
+        localStorage.setItem('pokerand_meta', JSON.stringify(updated))
+        return updated
+      })
+    })
+  }
+
   function setTheme(themeId: string): void {
     if (!metaProgression.ownedThemes.includes(themeId)) return
     const updated = { ...metaProgression, activeTheme: themeId }
@@ -3625,21 +3657,34 @@ function MainApp() {
     unlock_baya_rindo: 'Baya Rindo',
     unlock_baya_chilan: 'Baya Chilan',
   }
-  const LOCKED_POKEBALL_MAP: Record<string, string> = {}
-  for (const [ballName, unlockId] of Object.entries(POKEBALL_UNLOCK_IDS)) {
-    LOCKED_POKEBALL_MAP[unlockId] = ballName
-  }
-  const LOCKED_EVOLUTION_STONE_MAP: Record<string, string> = {}
-  for (const [stoneName, unlockId] of Object.entries(EVOLUTION_STONE_UNLOCK_IDS)) {
-    LOCKED_EVOLUTION_STONE_MAP[unlockId] = stoneName
-  }
 
-  const isConsumableUnlocked = (name: string) => !Object.values(LOCKED_CONSUMABLE_MAP).includes(name) || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_CONSUMABLE_MAP[k] === name)
-  const isHoldableUnlocked = (name: string) => !Object.values(LOCKED_HOLDABLE_MAP).includes(name) || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_HOLDABLE_MAP[k] === name)
-  const isPokeballUnlocked = (name: string) => name === 'Poké Ball' || !POKEBALL_UNLOCK_IDS[name] || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_POKEBALL_MAP[k] === name)
-  const isEvolutionStoneUnlocked = (name: string) => !EVOLUTION_STONE_UNLOCK_IDS[name] || metaProgression.permanentlyUnlockedItems.some(k => LOCKED_EVOLUTION_STONE_MAP[k] === name)
   // Una baya está desbloqueada según el mapa al que pertenezca (consumible o
   // equipable). Las que no están en ningún mapa (Oran/Lum) siempre están libres.
+  // "isItemEnabled": el jugador puede desmarcar un objeto desbloqueado en la
+  // Tienda Meta para que no aparezca en la partida (por defecto todos activos).
+  const isItemEnabled = (id: string) => !metaProgression.disabledItems.includes(id)
+  const isActive = (id: string) => metaProgression.permanentlyUnlockedItems.includes(id) && isItemEnabled(id)
+  const isConsumableUnlocked = (name: string) => {
+    const key = Object.keys(LOCKED_CONSUMABLE_MAP).find(k => LOCKED_CONSUMABLE_MAP[k] === name)
+    if (!key) return true
+    return metaProgression.permanentlyUnlockedItems.includes(key) && isItemEnabled(key)
+  }
+  const isHoldableUnlocked = (name: string) => {
+    const key = Object.keys(LOCKED_HOLDABLE_MAP).find(k => LOCKED_HOLDABLE_MAP[k] === name)
+    if (!key) return true
+    return metaProgression.permanentlyUnlockedItems.includes(key) && isItemEnabled(key)
+  }
+  const isPokeballUnlocked = (name: string) => {
+    if (name === 'Poké Ball') return true
+    const unlockId = POKEBALL_UNLOCK_IDS[name]
+    if (!unlockId) return true
+    return metaProgression.permanentlyUnlockedItems.includes(unlockId) && isItemEnabled(unlockId)
+  }
+  const isEvolutionStoneUnlocked = (name: string) => {
+    const unlockId = EVOLUTION_STONE_UNLOCK_IDS[name]
+    if (!unlockId) return true
+    return metaProgression.permanentlyUnlockedItems.includes(unlockId) && isItemEnabled(unlockId)
+  }
   const isBerryUnlocked = (name: string) => {
     if (Object.values(LOCKED_CONSUMABLE_MAP).includes(name)) return isConsumableUnlocked(name)
     if (Object.values(LOCKED_HOLDABLE_MAP).includes(name)) return isHoldableUnlocked(name)
@@ -3665,6 +3710,14 @@ function MainApp() {
     return progression.completedHard.includes(gen)
   }
 
+  // Modo Ruta: se desbloquea completando Intermedio en la generación.
+  function isBranchUnlocked(gen: number): boolean {
+    if (gen === 0) {
+      return isGenUnlocked(0) && generations.some(g => progression.completedMedium.includes(g))
+    }
+    return progression.completedMedium.includes(gen)
+  }
+
   function isColiseumUnlocked(): boolean {
     return generations.every(g => progression.completedMedium.includes(g))
   }
@@ -3676,6 +3729,9 @@ function MainApp() {
       setDifficulty('medium')
     }
     if (difficulty === 'infinite' && !isInfiniteUnlocked(gen)) {
+      setDifficulty('medium')
+    }
+    if (difficulty === 'branch' && !isBranchUnlocked(gen)) {
       setDifficulty('medium')
     }
     const challengesLocked = gen === 0
@@ -3693,6 +3749,7 @@ function MainApp() {
     if (diff === 'hard' && !isHardUnlocked(generation)) return
     if (diff === 'infinite' && !isInfiniteUnlocked(generation)) return
     if (diff === 'coliseum' && !isColiseumUnlocked()) return
+    if (diff === 'branch' && !isBranchUnlocked(generation)) return
     setDifficulty(diff)
     // Infinite no permite desafíos: al seleccionarlo se limpian los que hubiera.
     if (diff === 'infinite' && !coopMode) {
@@ -3715,26 +3772,11 @@ function MainApp() {
   // según el avance). El Modo Original no da insignias sino medallas, así que
   // usa las medallas ganadas como progreso entre etapas.
   function getStageProgression(): number {
-    return difficulty === 'original' ? originalMedals.length : badges.length
+    return difficulty === 'original' ? originalMedals.length : difficulty === 'branch' ? branchMedals.length : badges.length
   }
 
-  // Dificultad para las funciones de balanceo. El Modo Aventura codifica su
-  // nivel incremental de ESA generación ("aventura_<nivel>") para que los
-  // enemigos sean más fuertes con cada victoria acumulada en esa generación.
   function balDiff(d: Difficulty): string {
-    return d === 'aventura' ? `aventura_${getAventuraGen(currentRunGen).level}` : d
-  }
-
-  function getAventuraGen(gen: number): AventuraGenProgress {
-    return aventuraProgress[gen] ?? emptyAventuraGen()
-  }
-
-  function saveAventuraProgress(gen: number, p: AventuraGenProgress): void {
-    setAventuraProgress(prev => {
-      const updated = { ...prev, [gen]: p }
-      localStorage.setItem(AVENTURA_KEY, JSON.stringify(updated))
-      return updated
-    })
+    return d
   }
 
   function getMaxTeamLevel(): number {
@@ -4140,9 +4182,9 @@ function MainApp() {
     let eligible = onlyMerchant
       ? RANDOM_EVENTS.filter(e => e.id === 'evolution_merchant' && routeProgress >= e.minRouteProgress)
       : RANDOM_EVENTS.filter(e => routeProgress >= e.minRouteProgress && !randomEventUsed.has(e.id))
-    // En modo Infinite y Aventura la run es larga/infinita: si ya se usaron
-    // todos los eventos, se reinicia el conjunto para que sigan apareciendo.
-    if (!onlyMerchant && eligible.length === 0 && (difficulty === 'infinite' || difficulty === 'aventura') && randomEventUsed.size > 0) {
+    // En modo Infinite la run es larga: si ya se usaron todos los eventos,
+    // se reinicia el conjunto para que sigan apareciendo.
+    if (!onlyMerchant && eligible.length === 0 && difficulty === 'infinite' && randomEventUsed.size > 0) {
       setRandomEventUsed(new Set())
       eligible = RANDOM_EVENTS.filter(e => routeProgress >= e.minRouteProgress)
     }
@@ -4193,7 +4235,7 @@ function MainApp() {
         break
       }
       case 'evolution_merchant': {
-        const unlockedItems = Object.keys(EVOLUTION_ITEM_UNLOCK_IDS).filter(n => metaProgression.permanentlyUnlockedItems.includes(EVOLUTION_ITEM_UNLOCK_IDS[n]))
+        const unlockedItems = Object.keys(EVOLUTION_ITEM_UNLOCK_IDS).filter(n => isActive(EVOLUTION_ITEM_UNLOCK_IDS[n]))
         if (unlockedItems.length > 0) {
           const shuffled = [...unlockedItems].sort(() => 0.5 - Math.random())
           const selected = shuffled.slice(0, 5).map(name => ({ name, price: 60 + Math.floor(Math.random() * 60) }))
@@ -4275,7 +4317,7 @@ function MainApp() {
     setNewAchievement(null)
   }
 
-  function generateRandomNodeType(id: number, rng: () => number = Math.random): RouteNode {
+  function generateRandomNodeType(id: number, rng: () => number = Math.random, branchStage: number = 1): RouteNode {
     let type: RouteNode['type'] = 'battle'
     if (runChallenges.bossRush) {
       type = 'battle'
@@ -4296,16 +4338,16 @@ function MainApp() {
           type = 'pokeRand'
         } else if (rand < 0.48) {
           type = 'move'
-        } else if (rand < 0.54 && metaProgression.permanentlyUnlockedItems.includes('unlock_mega_node')) {
+        } else if (rand < 0.54 && isActive('unlock_mega_node')) {
           type = 'mega'
-        } else if (rand < 0.60 && metaProgression.permanentlyUnlockedItems.includes('unlock_gmax_node')) {
+        } else if (rand < 0.60 && isActive('unlock_gmax_node')) {
           type = 'gmax'
-        } else if (rand < 0.63 && metaProgression.permanentlyUnlockedItems.includes('unlock_primal_node')) {
+        } else if (rand < 0.63 && isActive('unlock_primal_node')) {
           type = 'primal'
-        } else if (rand < 0.69 && metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node')) {
+        } else if (rand < 0.69 && isActive('unlock_casino_node')) {
           type = 'casino'
         }
-      } else if (difficulty === 'medium') {
+      } else if (difficulty === 'medium' || difficulty === 'branch') {
         if (rand < 0.15 && !runChallenges.noShops) {
           type = 'shop'
         } else if (rand < 0.35 && !runChallenges.noRests) {
@@ -4314,6 +4356,19 @@ function MainApp() {
           type = 'teamRocket'
         } else if (rand < 0.57) {
           type = 'spin'
+        }
+        // Modo Ruta: nodos especiales Mega/G-MAX/Primal (y Casino) solo si están
+        // desbloqueados en la Tienda Meta Y a partir del stage 7, con probabilidad baja.
+        if (difficulty === 'branch' && branchStage >= 7) {
+          if (rand < 0.61 && isActive('unlock_mega_node')) {
+            type = 'mega'
+          } else if (rand < 0.65 && isActive('unlock_gmax_node')) {
+            type = 'gmax'
+          } else if (rand < 0.67 && isActive('unlock_primal_node')) {
+            type = 'primal'
+          } else if (rand < 0.70 && isActive('unlock_casino_node')) {
+            type = 'casino'
+          }
         }
       } else {
         if (rand < 0.15 && !runChallenges.noShops) {
@@ -4347,17 +4402,48 @@ function MainApp() {
     }
   }
 
-  // Ruta de una etapa del Modo Aventura: 15 nodos aleatorios + 1 jefe que otorga
-  // una insignia al final. Los ids empiezan en 6000 para no chocar con la Liga
-  // (1000-1999) ni la Calle Victoria (2000-2999).
-  function buildAventuraStageRoute(stageNum: number, rr: () => number): RouteNode[] {
-    const nodes: RouteNode[] = []
-    const startId = 6000 + stageNum * 100
-    for (let i = 0; i < 15; i++) {
-      nodes.push(generateRandomNodeType(startId + i, rr))
+  // Anchura de cada columna del mapa del Modo Ruta (nº de nodos a elegir en
+  // cada paso). La última columna es siempre el jefe de la etapa.
+  const BRANCH_COLUMN_SIZES = [2, 3, 4, 3, 4, 3, 2]
+
+  // Genera una etapa del Modo Ruta: un mapa ramificado de 7 columnas
+  // (2-3-4-3-4-3-2 nodos cada una) más el jefe final. Devuelve tanto las
+  // columnas agrupadas (para el mapa) como la lista aplanada (para `route`).
+  function generateBranchStage(stageNum: number, rng: () => number = Math.random): { columns: BranchNode[][]; flat: RouteNode[] } {
+    const columns: BranchNode[][] = []
+    const flat: RouteNode[] = []
+    let id = 5000 + stageNum * 100
+    for (let c = 0; c < BRANCH_COLUMN_SIZES.length; c++) {
+      const col: BranchNode[] = []
+      for (let r = 0; r < BRANCH_COLUMN_SIZES[c]; r++) {
+        const base = generateRandomNodeType(id, rng, stageNum)
+        const branch: BranchNode = { ...base, col: c, row: r }
+        col.push(branch)
+        // `flat` alimenta `route`: se guarda el nodo ramificado (con col/row)
+        // para poder calcular la conectividad "2 nodos más próximos" más tarde.
+        flat.push(branch)
+        id++
+      }
+      columns.push(col)
     }
-    nodes.push({ id: startId + 15, type: 'boss', label: `Jefe #${stageNum}`, done: false })
-    return nodes
+    const boss: BranchNode = {
+      id,
+      type: 'boss',
+      label: `Jefe #${stageNum}`,
+      done: false,
+      col: BRANCH_COLUMN_SIZES.length,
+      row: 0,
+    }
+    columns.push([boss])
+    flat.push(boss)
+    return { columns, flat }
+  }
+
+  // Índice del primer nodo de una columna dentro de la lista aplanada `route`.
+  function branchColumnStartIndex(columns: BranchNode[][], col: number): number {
+    let idx = 0
+    for (let c = 0; c < col; c++) idx += columns[c].length
+    return idx
   }
 
   function handleStartRunClick(): void {
@@ -4370,170 +4456,7 @@ function MainApp() {
       void openStarterSelect()
       return
     }
-    if (difficulty === 'aventura') {
-      void openAventuraSelect()
-      return
-    }
     startNewRun()
-  }
-
-  // Modo Aventura: abre la pantalla de selección de Pokémon de inicio. Al
-  // principio solo se pueden elegir iniciales; el resto se desbloquea al
-  // capturarlos (normales y shinies por separado).
-  async function openAventuraSelect(): Promise<void> {
-    setIsLoading(true)
-    setApiError('')
-    try {
-      const species = await getAllSpeciesList()
-      // Fija la generación de esta Aventura (la progresión incremental, los
-      // objetos guardados y las victorias son por generación).
-      setCurrentRunGen(getEffectiveGen())
-      setAventuraSpecies(species)
-      setAventuraTab('normal')
-      setAventuraSearch('')
-      setAventuraSelectedId(null)
-      setScreen('aventura_select')
-    } catch {
-      setApiError('No se pudieron cargar los Pokémon.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  function isAventuraUnlocked(id: number, shiny: boolean): boolean {
-    if (shiny) return !!pokedex[id]?.shinyCaught
-    return allStarterIds.has(id) || !!pokedex[id]?.caught
-  }
-
-  async function confirmAventuraStarter(): Promise<void> {
-    if (aventuraSelectedId === null) return
-    setIsLoading(true)
-    setApiError('')
-    try {
-      const starter = await buildPokemonFromApi(aventuraSelectedId, 1, 10, aventuraTab === 'shiny', 'aventura')
-      chosenAventuraStarterRef.current = starter
-      startAventuraRun(starter)
-    } catch {
-      setApiError('No se pudo iniciar la Aventura.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  function startAventuraRun(starter: Pokemon): void {
-    setRunSeed(Math.random())
-    const targetGen = currentRunGen || getEffectiveGen()
-    setCurrentRunGen(targetGen)
-    const routeSeed = String(Math.random()).slice(2, 12)
-    routeSeedRef.current = routeSeed
-    // Un único RNG con semilla para toda la run: crear uno nuevo en cada llamada
-    // devolvía siempre el mismo número y hacía que los 15 nodos fueran iguales.
-    const rng = createSeededRandom(routeSeed)
-    const rr = () => rng()
-    routeRandRef.current = rr
-
-    // Un modificador aleatorio por etapa (8 en total), cambian en cada etapa.
-    const stageMods = Array.from({ length: 8 }, () => randomFrom(RUN_MODIFIERS.filter(m => m.id && m.id !== 'none')))
-    setAventuraStageModifiers(stageMods)
-    setModifier(stageMods[0] ?? null)
-    setModifier2(null)
-    setBadges([])
-    setCurrentStage(1)
-    setOriginalMedals([])
-    const hpBonus = stageMods[0]?.playerMaxHpBonus ?? 0
-    let starterWithBonus = {
-      ...starter,
-      maxHp: starter.maxHp + hpBonus,
-      hp: starter.hp + hpBonus,
-    }
-    if (runChallenges.noEvolution) {
-      starterWithBonus = applyNoEvolutionBuff(starterWithBonus)
-    }
-    if (runChallenges.fixedLevel) {
-      starterWithBonus = { ...starterWithBonus, level: 50 }
-    }
-    setTeam([starterWithBonus])
-    setActiveIndex(0)
-    setEnemy(null)
-    setIsTrainerBattle(false)
-    setTrainerTeam([])
-    setTrainerPokemonIndex(0)
-    setTrainerName('')
-    setTrainerSprite('')
-    setTrainerBadge('')
-    setRestEncounter(null)
-    setDefeatSummary(null)
-    setVictoryUnlocks(null)
-    setPcStorage([])
-    setEggInventory([])
-    setRandomEventUsed(new Set())
-    setShinyNextEncounter(false)
-    setLegendaryNextEncounter(false)
-    setActiveRandomEvent(null)
-    if (speedrunTimerRef.current) {
-      clearInterval(speedrunTimerRef.current)
-      speedrunTimerRef.current = null
-    }
-    setSpeedrunSeconds(0)
-
-    // Dinero e inventario: se conservan los objetos guardados de la victoria
-    // anterior + los objetos de inicio habituales.
-    const startItems = metaProgression.permanentlyUnlockedItems
-    const extraBalls = startItems.includes('start_pokeballs_5') ? 5 : 0
-    const extraPotions =
-      (startItems.includes('start_potion_1') ? 1 : 0) +
-      (startItems.includes('start_potion_2') ? 1 : 0)
-    const extraMoney =
-      ((startItems.includes('start_money_1') ? 1 : 0) +
-        (startItems.includes('start_money_2') ? 1 : 0)) * 100
-    setMoney(runChallenges.noMoney ? 0 : 100 + extraMoney)
-    // Objetos guardados de la última victoria en ESTA generación + los de inicio.
-    const carriedItems = getAventuraGen(targetGen).carriedItems
-    const startingItems: string[] = runChallenges.noItems ? [] : [...carriedItems]
-    if (!runChallenges.noItems) {
-      startingItems.push('Potion')
-      for (let i = 0; i < 5 + extraBalls; i++) startingItems.push('Poké Ball')
-      for (let i = 0; i < extraPotions; i++) startingItems.push('Potion')
-      if (startItems.includes('start_revive_1')) startingItems.push('Revive')
-      if (startItems.includes('unlock_caja_bonguri')) {
-        startingItems.push('Poké Ball', 'Poké Ball')
-        const apricornBalls = ['Level Ball', 'Friend Ball', 'Love Ball', 'Heavy Ball', 'Fast Ball'].filter(isPokeballUnlocked)
-        startingItems.push(apricornBalls.length > 0 ? apricornBalls[Math.floor(Math.random() * apricornBalls.length)] : 'Poké Ball')
-      }
-      if (startItems.includes('unlock_estuche_mt')) startingItems.push('Disco MT')
-      if (startItems.includes('unlock_saco_bayas')) {
-        const unlockedBerries = BERRY_DROPS.filter(isBerryUnlocked)
-        if (unlockedBerries.length > 0) startingItems.push(unlockedBerries[Math.floor(Math.random() * unlockedBerries.length)])
-      }
-    }
-    setInventory(startingItems)
-
-    registerInPokedex(starter)
-    setRoute(buildAventuraStageRoute(1, rr))
-    setRouteIndex(0)
-
-    const activeChallengeNames: string[] = []
-    if (runChallenges.nuzlocke) activeChallengeNames.push('Nuzlocke')
-    if (runChallenges.soloStarter) activeChallengeNames.push('Solo Starter')
-    if (runChallenges.noItems) activeChallengeNames.push('Sin Items')
-    if (runChallenges.noHealing) activeChallengeNames.push('Sin Curación')
-    setRunStats({
-      battlesWon: 0, battlesLost: 0, totalDamageDealt: 0, totalDamageTaken: 0,
-      critsLanded: 0, superEffectiveHits: 0, koFirstTurn: 0, captures: 0,
-      itemsUsed: 0, moneySpent: 0, moneyEarned: 0, nodesCleared: 0, evolutions: 0,
-      teamSizeMax: 1, lowestHPEver: starter.hp, totalTurns: 0,
-      pokemonUsed: [starter.name], challengesActive: activeChallengeNames,
-    })
-    setBattleLog([
-      t('b.starter', { name: `${starter.name}${starter.shiny ? ' ✨' : ''}` }),
-      t('b.aventuraIntro', { gen: currentRunGen === 0 ? 'Random' : `Gen ${currentRunGen}` }),
-    ])
-    runStartTimeRef.current = Date.now()
-    setScoreSubmitState('idle')
-    setVoluntaryRunEnd(false)
-    setShowEndRunModal(false)
-    setScreen('route')
-    startBattleMusic()
   }
 
   async function openStarterSelect(): Promise<void> {
@@ -4562,12 +4485,6 @@ function MainApp() {
     const dailyCfg = isDailyRunRef.current ? getDailyConfig(dailySeed, [1, 2, 3, 4, 5, 6, 7, 8, 9]) : null
     const effectiveGen = coopModeRef.current ? (coopGenRef.current || generation) : (dailyCfg ? dailyCfg.generation : generation)
     const effectiveDifficulty = coopModeRef.current ? (coopDiffRef.current || 'medium') : (dailyCfg ? dailyCfg.difficulty : difficulty)
-    // El Modo Aventura no pasa por startNewRun: usa su propia pantalla de
-    // selección de inicial y su propio arranque (startAventuraRun).
-    if (effectiveDifficulty === 'aventura') {
-      void openAventuraSelect()
-      return
-    }
     // El Desafío Diario tiene su propia dificultad (no la del menú): se aplica
     // durante la run y se restaura al volver al menú.
     if (isDailyRunRef.current && dailyCfg) {
@@ -4595,6 +4512,10 @@ function MainApp() {
       }
       if (effectiveDifficulty === 'infinite' && !isInfiniteUnlocked(effectiveGen)) {
         setApiError('El modo Infinite se desbloquea completando Difícil en esta generación.')
+        return
+      }
+      if (effectiveDifficulty === 'branch' && !isBranchUnlocked(effectiveGen)) {
+        setApiError('El modo Ruta se desbloquea completando Intermedio en esta generación.')
         return
       }
       if (effectiveDifficulty === 'infinite' && !authUser) {
@@ -4625,6 +4546,9 @@ function MainApp() {
     try {
       const targetGen = coopModeRef.current ? (coopGenRef.current || getEffectiveGen()) : (dailyCfg ? effectiveGen : getEffectiveGen())
       setCurrentRunGen(targetGen)
+      // Precarga en segundo plano las especies y legendarios de la generación:
+      // así el primer enemigo no tarda en aparecer al entrar en un nodo.
+      preloadGeneration(targetGen)
 
       // Handle challengeGauntlet: randomly pick 3 challenges
       let activeChallenges = { ...runChallenges }
@@ -4738,6 +4662,14 @@ function MainApp() {
         // Los encuentros, tiendas y descansos siguen siendo aleatorios por jugador.
         const coopNodes = difficultyNodeCounts[coopDiffRef.current || 'medium'] || 10
         customRoute = generateCoopRouteSegment(1, coopNodes, rr, activeChallenges, coopDiffRef.current || 'medium')
+      } else if (effectiveDifficulty === 'branch') {
+        // Modo Ruta: mapa ramificado de nodos (2-3-4-3-4-3-2) + jefe por etapa.
+        // Tiene prioridad sobre desafíos de forma de ruta (p. ej. Boss Rush).
+        setBranchMedals([])
+        const stage = generateBranchStage(1, rr)
+        setBranchMap(stage.columns)
+        setBranchCol(0)
+        customRoute = stage.flat
       } else if (activeChallenges.bossRush) {
         customRoute = generateBossRushRoute(totalNodes)
       } else if (effectiveDifficulty === 'original') {
@@ -4774,23 +4706,23 @@ function MainApp() {
               movePositions.push(available[idx])
               available.splice(idx, 1)
             }
-            if (available.length > 0 && metaProgression.permanentlyUnlockedItems.includes('unlock_mega_node')) {
+            if (available.length > 0 && isActive('unlock_mega_node')) {
               const idx = Math.floor(rr() * available.length)
               megaPosition = available[idx]
               available.splice(idx, 1)
               megaNodeSpawnedRef.current = true
             }
-            if (available.length > 0 && metaProgression.permanentlyUnlockedItems.includes('unlock_gmax_node')) {
+            if (available.length > 0 && isActive('unlock_gmax_node')) {
               const idx = Math.floor(rr() * available.length)
               gmaxPosition = available[idx]
               available.splice(idx, 1)
             }
-            if (available.length > 0 && metaProgression.permanentlyUnlockedItems.includes('unlock_primal_node')) {
+            if (available.length > 0 && isActive('unlock_primal_node')) {
               const idx = Math.floor(rr() * available.length)
               primalPosition = available[idx]
               available.splice(idx, 1)
             }
-            if (metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node')) {
+            if (isActive('unlock_casino_node')) {
               while (casinoPositions.length < 2 && available.length > 0) {
                 const idx = Math.floor(rr() * available.length)
                 casinoPositions.push(available[idx])
@@ -4894,29 +4826,28 @@ function MainApp() {
       setTeam([starterWithBonus])
       setActiveIndex(0)
       // Mejoras de inicio de la Tienda Meta: bolas, pociones y dinero extra.
-      const startItems = metaProgression.permanentlyUnlockedItems
-      const extraBalls = startItems.includes('start_pokeballs_5') ? 5 : 0
+      const extraBalls = isActive('start_pokeballs_5') ? 5 : 0
       const extraPotions =
-        (startItems.includes('start_potion_1') ? 1 : 0) +
-        (startItems.includes('start_potion_2') ? 1 : 0)
+        (isActive('start_potion_1') ? 1 : 0) +
+        (isActive('start_potion_2') ? 1 : 0)
       const extraMoney =
-        ((startItems.includes('start_money_1') ? 1 : 0) +
-          (startItems.includes('start_money_2') ? 1 : 0)) * 100
+        ((isActive('start_money_1') ? 1 : 0) +
+          (isActive('start_money_2') ? 1 : 0)) * 100
       setMoney(activeChallenges.noMoney ? 0 : 100 + extraMoney)
       const startingItems: string[] = [run.item]
       for (let i = 0; i < 5 + extraBalls; i++) startingItems.push('Poké Ball')
       for (let i = 0; i < extraPotions; i++) startingItems.push('Potion')
-      if (startItems.includes('start_revive_1')) startingItems.push('Revive')
+      if (isActive('start_revive_1')) startingItems.push('Revive')
       // Caja Bonguri: 2 Poké Balls + 1 ball de bonguri aleatoria.
-      if (startItems.includes('unlock_caja_bonguri')) {
+      if (isActive('unlock_caja_bonguri')) {
         startingItems.push('Poké Ball', 'Poké Ball')
         const apricornBalls = ['Level Ball', 'Friend Ball', 'Love Ball', 'Heavy Ball', 'Fast Ball'].filter(isPokeballUnlocked)
         startingItems.push(apricornBalls.length > 0 ? apricornBalls[Math.floor(Math.random() * apricornBalls.length)] : 'Poké Ball')
       }
       // Estuche de MT: empiezas con un Disco MT en el inventario.
-      if (startItems.includes('unlock_estuche_mt')) startingItems.push('Disco MT')
+      if (isActive('unlock_estuche_mt')) startingItems.push('Disco MT')
       // Saco bayas: 1 baya extra aleatoria de las desbloqueadas.
-      if (startItems.includes('unlock_saco_bayas')) {
+      if (isActive('unlock_saco_bayas')) {
         const unlockedBerries = BERRY_DROPS.filter(isBerryUnlocked)
         if (unlockedBerries.length > 0) startingItems.push(unlockedBerries[Math.floor(Math.random() * unlockedBerries.length)])
       }
@@ -4926,6 +4857,11 @@ function MainApp() {
       setRouteIndex(0)
       setBadges([])
       setCurrentStage(1)
+      if (effectiveDifficulty !== 'branch') {
+        setBranchMap(null)
+        setBranchCol(0)
+        setBranchMedals([])
+      }
       setEnemy(null)
       setIsTrainerBattle(false)
       setTrainerTeam([])
@@ -4977,7 +4913,7 @@ function MainApp() {
       setBattleLog([
         t('b.starter', { name: `${starter.name}${starter.shiny ? ' ✨' : ''}` }),
         `Modo: ${effectiveGen === 0 ? 'Random All-Stars' : `Gen ${effectiveGen}`}.`,
-        `${t('common.difficulty')}: ${difficultyLabel(language, effectiveDifficulty).title}${effectiveDifficulty === 'infinite' ? t('b.noLimit') : t('b.threeStages', { n: totalNodes })}.`,
+        `${t('common.difficulty')}: ${difficultyLabel(language, effectiveDifficulty).title}${effectiveDifficulty === 'infinite' ? t('b.noLimit') : effectiveDifficulty === 'branch' ? (language === 'en' ? ' · Branching map · 8 medals' : ' · Mapa de rutas · 8 medallas') : t('b.threeStages', { n: totalNodes })}.`,
         t('b.receiveStart', { money: activeChallenges.noMoney ? '0' : '100', item: run.item }),
         ...challengeDescriptions,
       ])
@@ -5071,15 +5007,15 @@ function MainApp() {
       completedMedium: nextCompletedMedium,
       completedHard: nextCompletedHard,
       completedColiseum: progression.completedColiseum,
-      completedLeague: currentNode && currentNode.id >= 1000
+      completedLeague: currentNode && currentNode.id >= 1000 && currentNode.id < 2000
         ? Array.from(new Set([...progression.completedLeague, genPlayed]))
         : progression.completedLeague,
       completedOriginal: difficulty === 'original'
         ? Array.from(new Set([...progression.completedOriginal, genPlayed]))
         : progression.completedOriginal,
-      completedAventura: difficulty === 'aventura'
-        ? Array.from(new Set([...progression.completedAventura, genPlayed]))
-        : progression.completedAventura
+      completedBranch: difficulty === 'branch'
+        ? Array.from(new Set([...progression.completedBranch, genPlayed]))
+        : progression.completedBranch
     }
 
     localStorage.setItem('pokerand_progression', JSON.stringify(updatedProgression))
@@ -5153,7 +5089,7 @@ function MainApp() {
       return updated
     })
     awardPokeCoins(baseCoins, `¡Victoria! (${difficulty === 'easy' ? 'Fácil' : difficulty === 'hard' ? 'Difícil' : 'Medio'})`)
-    if (currentNode && currentNode.id >= 1000 && difficulty !== 'aventura') {
+    if (currentNode && currentNode.id >= 1000 && currentNode.id < 2000) {
       awardPokeCoins(15, '🏆 Victoria en la Liga Pokémon')
     }
     if (hasActiveChallenge) awardPokeCoins(15, 'Bonus Desafío Activo')
@@ -5202,6 +5138,50 @@ function MainApp() {
       previous.map((node, index) => (index === routeIndex ? { ...node, done: true } : node))
     )
 
+    // --- Modo Ruta: el mapa ramificado avanza columna a columna hasta el jefe ---
+    if (difficulty === 'branch') {
+      if (currentNode?.type === 'boss') {
+        // Derrotar al jefe de la etapa → una medalla nueva.
+        const available = GYM_BADGES.filter(b => !branchMedals.some(m => m.id === b.id))
+        const medal = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : null
+        if (!medal) return
+        const newMedals = [...branchMedals, medal]
+        setBranchMedals(newMedals)
+        awardPokeCoins(5, '🎖️ Bonus por derrotar a un jefe del Modo Ruta')
+        if (newMedals.length >= 8) {
+          // 8 medallas → modo completado.
+          unlockAchievement('branch_win')
+          setBattleLog((prev) => [t('b.originalMedal', { n: newMedals.length, total: 8 }), ...prev].slice(0, 15))
+          finalizeRunVictory()
+          return
+        }
+        const nextStage = newMedals.length + 1
+        const stage = generateBranchStage(nextStage, routeRandRef.current)
+        setBranchMap(stage.columns)
+        setBranchCol(0)
+        setRoute(stage.flat)
+        setRouteIndex(0)
+        setScreen('route')
+        setBattleLog((prev) => [
+          t('b.originalMedal', { n: newMedals.length, total: 8 }),
+          `🗺️ ${language === 'en' ? 'Stage' : 'Etapa'} ${nextStage} — ${language === 'en' ? 'choose your path' : 'elige tu camino'}`,
+          ...prev
+        ].slice(0, 15))
+        return
+      }
+      // Nodo normal completado → avanzar a la siguiente columna del mapa.
+      const columns = branchMap
+      if (!columns) return
+      const nextCol = branchCol + 1
+      if (nextCol < columns.length) {
+        setBranchCol(nextCol)
+        setRouteIndex(branchColumnStartIndex(columns, nextCol))
+        setScreen('route')
+        return
+      }
+      return
+    }
+
     // --- Gate de ritmo cooperativo: esperar a que el compañero complete el nodo ---
     if (coopModeRef.current && coopSessionCodeRef.current && currentNode) {
       // Usamos currentNode.id (único en toda la run) y no routeIndex: el índice
@@ -5216,44 +5196,6 @@ function MainApp() {
     }
 
     if (routeIndex >= route.length - 1) {
-      // Modo Aventura: 8 etapas de 15 nodos aleatorios. Al derrotar el jefe de
-      // una etapa se gana una insignia, se cambia el modificador y se pasa a la
-      // siguiente etapa. Tras la 8ª insignia, victoria (se guardan los objetos).
-      if (difficulty === 'aventura') {
-        if (currentNode?.type === 'boss') {
-          const available = GYM_BADGES.filter(b => !badges.some(h => h.id === b.id))
-          const badge = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : null
-          if (!badge) return
-          const newBadges = [...badges, badge]
-          setBadges(newBadges)
-          setCurrentStage(newBadges.length + 1)
-          awardPokeCoins(10, '🎖️ Bonus por derrotar a un jefe del Modo Aventura')
-          if (newBadges.length >= 8) {
-            // Victoria: se guarda el inventario y sube el nivel incremental de
-            // ESTA generación (la próxima Aventura en esa gen será más difícil).
-            const genProgress = getAventuraGen(currentRunGen)
-            saveAventuraProgress(currentRunGen, {
-              level: genProgress.level + 1,
-              totalWins: genProgress.totalWins + 1,
-              carriedItems: [...inventory],
-            })
-            unlockAchievement('aventura_win')
-            setModifier(null)
-            finalizeRunVictory()
-            return
-          }
-          // Siguiente etapa: nuevo modificador y 15 nodos aleatorios nuevos.
-          const nextModifier = aventuraStageModifiers[newBadges.length] ?? null
-          setModifier(nextModifier)
-          setRoute(buildAventuraStageRoute(newBadges.length + 1, routeRandRef.current))
-          setRouteIndex(0)
-          setScreen('route')
-          setBattleLog((prev) => [t('b.aventuraStage', { n: newBadges.length + 1, modifier: nextModifier ? runModName(nextModifier.id ?? '') : '—' }), ...prev].slice(0, 15))
-          return
-        }
-        finalizeRunVictory()
-        return
-      }
       // Modo Original: al derrotar el jefe de una etapa se gana una medalla.
       // Con 8 medallas, la Calle Victoria y la Liga son obligatorias.
       if (currentNode && currentNode.id >= 4000 && difficulty === 'original') {
@@ -5368,7 +5310,7 @@ function MainApp() {
               if (
                 difficulty === 'hard' &&
                 !runChallenges.allTeamRocket &&
-                metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node') &&
+                isActive('unlock_casino_node') &&
                 nr.length > 2
               ) {
                 const candidates = nr.map((_, idx) => idx).filter(idx => idx < nr.length - 1 && nr[idx].type !== 'boss')
@@ -5591,12 +5533,6 @@ function MainApp() {
   }
 
   async function restartRun(): Promise<void> {
-    if (difficulty === 'aventura') {
-      setVoluntaryRunEnd(false)
-      setDefeatSummary(null)
-      void openAventuraSelect()
-      return
-    }
     if (coopModeRef.current && coopSessionCodeRef.current) {
       coopRestartInitiatedRef.current = true
       const reset = await resetCoopSession(coopSessionCodeRef.current)
@@ -7210,8 +7146,8 @@ function MainApp() {
     const shuffledConsumables = [...allConsumableKeys].sort(() => 0.5 - Math.random())
     const shuffledHoldables = [...allHoldableKeys].sort(() => 0.5 - Math.random())
     // Mejoras de Espacio de Tienda: +1 objeto por cada versión desbloqueada.
-    const extraSlots = (metaProgression.permanentlyUnlockedItems.includes('unlock_shop_slot') ? 1 : 0) +
-      (metaProgression.permanentlyUnlockedItems.includes('unlock_shop_slot_2') ? 1 : 0)
+    const extraSlots = (isActive('unlock_shop_slot') ? 1 : 0) +
+      (isActive('unlock_shop_slot_2') ? 1 : 0)
     const selectedConsumables = shuffledConsumables.slice(0, 2 + extraSlots)
     const selectedHoldables = shuffledHoldables.slice(0, 1)
     const unlockedNonBasicBalls = POKEBALL_NAMES.filter(b => b !== 'Poké Ball' && isPokeballUnlocked(b))
@@ -7234,18 +7170,18 @@ function MainApp() {
 
   const maxShopRerolls = () => {
     let n = 0
-    if (metaProgression.permanentlyUnlockedItems.includes('unlock_reroll')) n += 1
-    if (metaProgression.permanentlyUnlockedItems.includes('unlock_reroll_2')) n += 1
+    if (isActive('unlock_reroll')) n += 1
+    if (isActive('unlock_reroll_2')) n += 1
     return n
   }
 
   // Compras permitidas por objeto en cada tienda: 1 por defecto + 1 por cada
   // mejora de Stock de Tienda (I a IV).
   const shopBuyAllowance = 1 +
-    (metaProgression.permanentlyUnlockedItems.includes('unlock_shop_stock_1') ? 1 : 0) +
-    (metaProgression.permanentlyUnlockedItems.includes('unlock_shop_stock_2') ? 1 : 0) +
-    (metaProgression.permanentlyUnlockedItems.includes('unlock_shop_stock_3') ? 1 : 0) +
-    (metaProgression.permanentlyUnlockedItems.includes('unlock_shop_stock_4') ? 1 : 0)
+    (isActive('unlock_shop_stock_1') ? 1 : 0) +
+    (isActive('unlock_shop_stock_2') ? 1 : 0) +
+    (isActive('unlock_shop_stock_3') ? 1 : 0) +
+    (isActive('unlock_shop_stock_4') ? 1 : 0)
 
   function rerollShop(): void {
     if (shopRerollsUsed >= maxShopRerolls()) return
@@ -7257,7 +7193,11 @@ function MainApp() {
     setBattleLog((prev) => [t('b.rerolled', { used: shopRerollsUsed + 1, max: maxShopRerolls() }), ...prev].slice(0, 15))
   }
 
-  async function enterNode(): Promise<void> {
+  async function enterNode(overrideNode?: RouteNode): Promise<void> {
+    // En el Modo Ruta el jugador elige un nodo del mapa: se le pasa explícitamente
+    // para no depender del `currentNode` del render actual (routeIndex aún no se
+    // ha actualizado). En el resto de modos se usa el nodo actual de la ruta.
+    const currentNode = overrideNode ?? route[routeIndex] ?? null
     if (!activePokemon || !currentNode) return
 
     // Red de seguridad: las etapas de stats SIEMPRE se eliminan al entrar a un
@@ -7631,7 +7571,7 @@ function MainApp() {
           const rewardItem = ballReward ?? (runChallenges.noHealing
             ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
             : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]))
-          const dowsingExtraEgg = (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing') ? 1 : 0) + (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing_2') ? 1 : 0)
+          const dowsingExtraEgg = (isActive('unlock_dowsing') ? 1 : 0) + (isActive('unlock_dowsing_2') ? 1 : 0)
           const restExtraPoolEgg = runChallenges.noHealing
             ? ['X Attack', 'X Defense', 'X Speed']
             : ['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked), ...unlockedBalls]
@@ -7675,7 +7615,7 @@ function MainApp() {
         const rewardItem = ballReward ?? (runChallenges.noHealing
           ? randomFrom(['X Attack', 'X Defense', 'X Speed'])
           : randomFrom(['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked)]))
-        const dowsingExtra = (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing') ? 1 : 0) + (metaProgression.permanentlyUnlockedItems.includes('unlock_dowsing_2') ? 1 : 0)
+        const dowsingExtra = (isActive('unlock_dowsing') ? 1 : 0) + (isActive('unlock_dowsing_2') ? 1 : 0)
         const restExtraPool = runChallenges.noHealing
           ? ['X Attack', 'X Defense', 'X Speed']
           : ['Potion', 'Super Potion', 'X Attack', ...BERRY_DROPS.filter(isBerryUnlocked), ...TREASURE_DROPS.filter(isConsumableUnlocked), ...unlockedBalls]
@@ -7869,8 +7809,11 @@ function MainApp() {
           }
 
           setIsTrainerBattle(true)
+          // Los jefes pueden sacar Megas en Difícil/Infinite siempre, y en el
+          // Modo Ruta solo a partir del stage 7 (7ª y 8ª medalla).
+          const bossCanMega = (difficulty === 'hard' || difficulty === 'infinite') || (difficulty === 'branch' && getStageProgression() >= 6)
           const megaTeam = newTrainerTeam.map(p => {
-            if (isBoss && (difficulty === 'hard' || difficulty === 'infinite') && Math.random() < 0.15 && MEGA_CAPABLE_IDS.has(p.id)) {
+            if (isBoss && bossCanMega && Math.random() < 0.15 && MEGA_CAPABLE_IDS.has(p.id)) {
               const formId = MEGA_FORM_IDS[p.id]
               if (formId) {
                 const megaFormId = Array.isArray(formId) ? formId[Math.floor(Math.random() * formId.length)] : formId
@@ -8006,6 +7949,30 @@ function MainApp() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Modo Ruta: el jugador elige uno de los nodos de la columna actual del mapa.
+  // Se marca routeIndex hacia ese nodo y se entra en él (el mapa se oculta al
+  // cambiar a la pantalla del nodo, dejando todo el espacio al juego).
+  function enterBranchNode(nodeId: number): void {
+    if (difficulty !== 'branch' || !branchMap || screen !== 'route' || isLoading) return
+    const column = branchMap[branchCol]
+    if (!column) return
+    const chosen = column.find(n => n.id === nodeId)
+    if (!chosen || chosen.done) return
+    // Regla del Modo Ruta: desde la fila actual solo se puede avanzar a los
+    // 2 nodos más próximos al elegido en la fila anterior (o a cualquiera en
+    // la primera fila).
+    if (branchCol > 0) {
+      const doneNodes = route.filter(n => n.done) as BranchNode[]
+      const lastDone = doneNodes[doneNodes.length - 1]
+      if (!lastDone) return
+      const reachable = nearestBranchNodes(lastDone, branchMap[branchCol - 1].length, column)
+      if (!reachable.some(n => n.id === nodeId)) return
+    }
+    playClick()
+    setRouteIndex(route.findIndex(n => n.id === nodeId))
+    void enterNode(chosen)
   }
 
   function spinRoulette(): void {
@@ -9089,7 +9056,11 @@ function MainApp() {
     }
 
     return {
-      updatedDefender: { ...currentDefender, defense: defender.defense },
+      // Importante: NO persistir las stats efectivas (ya multiplicadas por ítem,
+      // etapas y habilidades). Solo se guardan HP/estado/cambios de la batalla;
+      // si se guardara la Defensa/Def. Esp. efectiva, cada turno se volvería a
+      // multiplicar y se dispararía exponencialmente (bug histórico de la Def.S.).
+      updatedDefender: { ...currentDefender, defense: defender.defense, spDefense: defender.spDefense },
       updatedAttacker,
       lines,
       attackerHeal,
@@ -10662,11 +10633,6 @@ function MainApp() {
   }
 
   function handleInfiniteRunDefeat(finalTeam: Pokemon[]): void {
-    // En el Modo Aventura, perder (o terminar sin ganar) reinicia la progresión
-    // incremental de ESTA generación: nivel, victorias y objetos guardados.
-    if (difficulty === 'aventura') {
-      saveAventuraProgress(currentRunGen, emptyAventuraGen())
-    }
     if (difficulty !== 'infinite') {
       setScoreSubmitState('idle')
       return
@@ -10835,6 +10801,9 @@ function MainApp() {
     setEnemy(null)
     setRoute([])
     setRouteIndex(0)
+    setBranchMap(null)
+    setBranchCol(0)
+    setBranchMedals([])
     setInventory([])
     setMoney(100)
     setShopStock([])
@@ -10999,8 +10968,8 @@ function MainApp() {
     return pkmn.name.toLowerCase().includes(term) || String(pkmn.id).includes(term) || formattedId.includes(term)
   })
 
-  const startMoneyBonus = ((metaProgression.permanentlyUnlockedItems.includes('start_money_1') ? 1 : 0) +
-    (metaProgression.permanentlyUnlockedItems.includes('start_money_2') ? 1 : 0)) * 100
+  const startMoneyBonus = ((isActive('start_money_1') ? 1 : 0) +
+    (isActive('start_money_2') ? 1 : 0)) * 100
 
   const toggleMusicMuted = (): void => {
     playClick()
@@ -11059,7 +11028,7 @@ function MainApp() {
           <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowAchievements(!showAchievements) }}>
             {t('topbar.achievements')}
           </button>
-          {metaProgression.permanentlyUnlockedItems.includes('unlock_casino_node') && (
+          {isActive('unlock_casino_node') && (
             <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowMinigamePractice(true) }}>
               🎮 {t('topbar.minigames')}
             </button>
@@ -11121,19 +11090,19 @@ function MainApp() {
             type="button"
             onClick={() => {
               playClick()
-              if (metaProgression.permanentlyUnlockedItems.includes('unlock_history')) {
+              if (isActive('unlock_history')) {
                 setShowMatchHistory(true)
               } else {
                 setShowMetaShop(true)
               }
             }}
-            title={metaProgression.permanentlyUnlockedItems.includes('unlock_history')
+            title={isActive('unlock_history')
               ? (language === 'en' ? 'Match history' : 'Historial de partidas')
               : (language === 'en' ? 'Buy the Match History in the meta shop' : 'Compra el Historial en la tienda meta')}
-            style={{ color: '#4d9bff', borderColor: metaProgression.permanentlyUnlockedItems.includes('unlock_history') ? 'rgba(77,155,255,0.5)' : 'rgba(155,152,207,0.4)' }}
+            style={{ color: '#4d9bff', borderColor: isActive('unlock_history') ? 'rgba(77,155,255,0.5)' : 'rgba(155,152,207,0.4)' }}
           >
             {language === 'en' ? 'History' : 'Historial'}
-            {!metaProgression.permanentlyUnlockedItems.includes('unlock_history') && ' 🔒'}
+            {!isActive('unlock_history') && ' 🔒'}
           </button>
         </div>
       </header>
@@ -11538,7 +11507,7 @@ function MainApp() {
               {POKEBALLS.map(b => {
                 const count = inventory.filter(i => i === b.name).length
                 const unlockId = POKEBALL_UNLOCK_IDS[b.name]
-                const isUnlocked = b.name === 'Poké Ball' || !unlockId || metaProgression.permanentlyUnlockedItems.includes(unlockId)
+                const isUnlocked = b.name === 'Poké Ball' || !unlockId || isActive(unlockId)
                 if (count <= 0) return null
                 if (!isUnlocked) return null
                 const ballRate = getPokeBallRate(b.name, enemy, battleTurns, !!pokedex[enemy.id]?.caught, activePokemon?.level ?? 50)
@@ -12070,7 +12039,8 @@ function MainApp() {
                           setMusicMutedState(false)
                         }
                       }}
-                      style={{ flex: 1, accentColor: '#10b981', height: '6px', cursor: 'pointer' }}
+                      className="range-slider"
+                      style={{ flex: 1, height: '6px', cursor: 'pointer', background: `linear-gradient(to right, #10b981 ${volume}%, rgba(255,255,255,0.12) ${volume}%)` }}
                     />
                     <span style={{ fontSize: '0.8rem', color: '#9b98cf', minWidth: '32px', textAlign: 'right' }}>{volume}%</span>
                   </div>
@@ -12092,7 +12062,8 @@ function MainApp() {
                         setSfxVolState(v)
                         setSfxVolume(v / 100)
                       }}
-                      style={{ flex: 1, accentColor: '#f59e0b', height: '6px', cursor: 'pointer' }}
+                      className="range-slider"
+                      style={{ flex: 1, height: '6px', cursor: 'pointer', background: `linear-gradient(to right, #f59e0b ${sfxVol}%, rgba(255,255,255,0.12) ${sfxVol}%)` }}
                     />
                     <span style={{ fontSize: '0.8rem', color: '#9b98cf', minWidth: '32px', textAlign: 'right' }}>{sfxVol}%</span>
                   </div>
@@ -12760,104 +12731,6 @@ function MainApp() {
         </section>
       )}
 
-      {screen === 'aventura_select' && (
-        <section className="panel setup-panel" style={{ maxWidth: '820px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <h2 style={{ margin: 0, color: '#34d399' }}>{t('setup.aventura')}</h2>
-            <button className="tiny-btn" onClick={() => { playClick(); setScreen('setup'); startMenuMusic() }} type="button" style={{ color: '#ff8a80' }}>
-              {t('common.close')}
-            </button>
-          </div>
-          <p style={{ textAlign: 'center', color: '#9b98cf', marginBottom: '0.5rem' }}>
-            {t('setup.aventuraPick')}
-          </p>
-          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#7d7ab5', marginBottom: '0.5rem' }}>
-            {(() => {
-              const gen = currentRunGen || getEffectiveGen()
-              const gp = getAventuraGen(gen)
-              return t('setup.aventuraProgressInfo', { gen: generationRegions[gen] ?? `Gen ${gen}`, level: gp.level, wins: gp.totalWins, items: gp.carriedItems.length })
-            })()}
-          </p>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '0.75rem', justifyContent: 'center' }}>
-            <button
-              type="button"
-              className="cta"
-              onClick={() => { playClick(); setAventuraTab('normal'); setAventuraSelectedId(null) }}
-              style={{ background: aventuraTab === 'normal' ? '#34d399' : '#475569', color: '#000', padding: '6px 18px', fontSize: '0.85rem' }}
-            >
-              {t('setup.aventuraNormal')}
-            </button>
-            <button
-              type="button"
-              className="cta"
-              onClick={() => { playClick(); setAventuraTab('shiny'); setAventuraSelectedId(null) }}
-              style={{ background: aventuraTab === 'shiny' ? '#fbbf24' : '#475569', color: '#000', padding: '6px 18px', fontSize: '0.85rem' }}
-            >
-              {t('setup.aventuraShiny')}
-            </button>
-          </div>
-          <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
-            <input
-              type="text"
-              placeholder="🔍 Buscar Pokémon..."
-              value={aventuraSearch}
-              onChange={(e) => setAventuraSearch(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(52,211,153,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }}
-            />
-            {aventuraSearch && (
-              <button type="button" onClick={() => setAventuraSearch('')}
-                style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#9b98cf', cursor: 'pointer', fontSize: '0.9rem' }}>✖</button>
-            )}
-          </div>
-          <div className="aventura-grid">
-            {aventuraSpecies
-              .filter(p => {
-                const term = aventuraSearch.toLowerCase().trim()
-                return !term || p.name.toLowerCase().includes(term) || String(p.id).includes(term)
-              })
-              .sort((a, b) => a.id - b.id)
-              .map(p => {
-                const unlocked = isAventuraUnlocked(p.id, aventuraTab === 'shiny')
-                const isSelected = aventuraSelectedId === p.id
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={`aventura-tile ${isSelected ? 'is-selected' : ''}`}
-                    onClick={() => { if (unlocked) { playClick(); setAventuraSelectedId(p.id) } }}
-                    style={{ opacity: unlocked ? 1 : 0.4, cursor: unlocked ? 'pointer' : 'not-allowed' }}
-                    title={`#${p.id} ${p.name}`}
-                  >
-                    <div className="aventura-sprite-wrap">
-                      <img
-                        src={pokemonIconUrl(p.id, aventuraTab === 'shiny')}
-                        alt={p.name}
-                        onError={fallbackSprite}
-                        className={`aventura-poke-icon${aventuraTab === 'shiny' ? ' is-shiny' : ''}`}
-                        loading="lazy"
-                        style={{ animationDelay: `${(p.id % 12) * 0.12}s` }}
-                      />
-                      {!unlocked && <span className="aventura-lock">🔒</span>}
-                    </div>
-                    <span className="aventura-name">{p.name.replace(/-/g, ' ')}</span>
-                  </button>
-                )
-              })}
-          </div>
-          <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-            <button
-              className="cta"
-              onClick={() => { if (aventuraSelectedId !== null) void confirmAventuraStarter() }}
-              disabled={aventuraSelectedId === null || isLoading}
-              style={{ background: '#34d399', color: '#000', fontSize: '1rem' }}
-            >
-              {isLoading ? t('setup.loading') : t('setup.aventuraStart')}
-            </button>
-            {apiError && <p className="error-line">{apiError}</p>}
-          </div>
-        </section>
-      )}
-
       {screen === 'setup' && (
         <section className="panel setup-panel">
           <div className="setup-hero">
@@ -12893,7 +12766,7 @@ function MainApp() {
                     const completedColiseum = progression.completedColiseum.includes(gen)
                     const completedLeague = progression.completedLeague.includes(gen)
                     const completedOriginal = progression.completedOriginal.includes(gen)
-                    const completedAventura = progression.completedAventura.includes(gen)
+                    const completedBranch = progression.completedBranch.includes(gen)
 
                     return (
                       <button
@@ -12923,8 +12796,8 @@ function MainApp() {
                             {completedOriginal && (
                               <span className="badge-medium" title={language === 'en' ? 'Completed on Original' : 'Completado en Modo Original'}>🕹️</span>
                             )}
-                            {completedAventura && (
-                              <span className="badge-medium" title={language === 'en' ? 'Completed on Adventure' : 'Completado en Modo Aventura'}>🗺️</span>
+                            {completedBranch && (
+                              <span className="badge-medium" title={language === 'en' ? 'Completed on Path Mode' : 'Completado en Modo Ruta'}>🗺️</span>
                             )}
                           </span>
                         </div>
@@ -12952,7 +12825,7 @@ function MainApp() {
                     const randomCompletedAny = progression.completedAny.length > 0
                     const randomCompletedColiseum = generations.every((g) => progression.completedColiseum.includes(g))
                     const randomCompletedLeague = generations.every((g) => progression.completedLeague.includes(g))
-                    const randomCompletedAventura = generations.every((g) => progression.completedAventura.includes(g))
+                    const randomCompletedBranch = generations.every((g) => progression.completedBranch.includes(g))
                     return (
                       <button
                         key={0}
@@ -12997,8 +12870,8 @@ function MainApp() {
                             {randomCompletedLeague && (
                               <span className="badge-medium" title={language === 'en' ? 'Completed on the League' : 'Completado en Liga'}>🏅</span>
                             )}
-                            {randomCompletedAventura && (
-                              <span className="badge-medium" title={language === 'en' ? 'Completed on Adventure' : 'Completado en Modo Aventura'}>🗺️</span>
+                            {randomCompletedBranch && (
+                              <span className="badge-medium" title={language === 'en' ? 'Completed on Path Mode' : 'Completado en Modo Ruta'}>🗺️</span>
                             )}
                           </span>
                           <strong style={{ fontSize: '1rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5', whiteSpace: 'nowrap' }}>
@@ -13085,6 +12958,43 @@ function MainApp() {
                     <span style={{ fontSize: '1rem', color: '#4d9bff', whiteSpace: 'nowrap' }}>🕹️ {language === 'en' ? 'Original' : 'Original'}</span>
                     <strong style={{ fontSize: '1.1rem', color: '#9b98cf' }}>{language === 'en' ? 'Pick starter' : 'Elige inicial'}</strong>
                   </button>
+                </div>
+
+                <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
+                  {(() => {
+                    const branchUnlocked = isBranchUnlocked(generation)
+                    return (
+                      <button
+                        className={`gen-tile ${difficulty === 'branch' ? 'is-active' : ''} ${!branchUnlocked ? 'is-locked' : ''}`}
+                        onClick={() => { playClick(); handleSelectDifficulty('branch') }}
+                        onMouseEnter={playHover}
+                        type="button"
+                        disabled={isLoading || !branchUnlocked}
+                        style={{
+                          borderColor: difficulty === 'branch' ? '#ee3b2f' : branchUnlocked ? 'rgba(238, 59, 47, 0.6)' : '#475569',
+                          background: difficulty === 'branch' ? 'rgba(238, 59, 47, 0.28)' : branchUnlocked ? 'rgba(238, 59, 47, 0.08)' : 'rgba(15, 23, 42, 0.6)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          padding: '12px',
+                          opacity: branchUnlocked ? 1 : 0.65,
+                          cursor: (!isLoading && branchUnlocked) ? 'pointer' : 'not-allowed'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '1.2rem', color: branchUnlocked ? '#ff5c52' : '#7d7ab5' }}>🗺️ {language === 'en' ? 'PATH' : 'RUTA'} {branchUnlocked ? '' : '🔒'}</span>
+                          <strong style={{ fontSize: '1rem', color: branchUnlocked ? '#ff5c52' : '#7d7ab5' }}>— {language === 'en' ? 'Choose your route' : 'Elige tu ruta'}</strong>
+                        </div>
+                        {!branchUnlocked && (
+                          <span className="lock-text">
+                            {language === 'en' ? 'Complete Medium to unlock' : 'Completa Intermedio para desbloquear'}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })()}
                 </div>
 
                 <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
@@ -13199,37 +13109,6 @@ function MainApp() {
                       </button>
                     )
                   })()}
-                </div>
-
-                <div className="generation-grid" style={{ gridTemplateColumns: '1fr', marginTop: '0.5rem' }}>
-                  <button
-                    className={`gen-tile ${difficulty === 'aventura' ? 'is-active' : ''}`}
-                    onClick={() => { playClick(); handleSelectDifficulty('aventura') }}
-                    onMouseEnter={playHover}
-                    type="button"
-                    disabled={isLoading}
-                    style={{
-                      borderColor: difficulty === 'aventura' ? '#ef4444' : '#7f1d1d',
-                      background: difficulty === 'aventura' ? 'rgba(239,68,68,0.18)' : 'rgba(127,29,29,0.08)',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                      gap: '4px', padding: '12px', cursor: isLoading ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '1.2rem', color: '#f87171' }}>{t('setup.aventura')}</span>
-                    </div>
-                    {(() => {
-                      // Victorias de la generación seleccionada (en Random, el total).
-                      const wins = generation === 0
-                        ? Object.values(aventuraProgress).reduce((s, p) => s + p.totalWins, 0)
-                        : getAventuraGen(generation).totalWins
-                      return wins > 0 && (
-                        <span style={{ fontSize: '0.78rem', color: '#fca5a5' }}>
-                          {t('setup.aventuraWins', { n: wins })}
-                        </span>
-                      )
-                    })()}
-                  </button>
                 </div>
 
                 <h2 style={{ marginTop: '1.5rem', fontSize: '0.85rem' }}>🎲 {t('setup.daily')}</h2>
@@ -13549,7 +13428,7 @@ function MainApp() {
               <strong>{activePokemon.hp}/{activePokemon.maxHp}</strong>
             </div>
             <div className="meter">
-              <div style={{ width: `${(activePokemon.hp / activePokemon.maxHp) * 100}%` }}></div>
+              <div style={{ width: `${(activePokemon.hp / activePokemon.maxHp) * 100}%`, background: hpBarColor(activePokemon.hp / activePokemon.maxHp) }}></div>
             </div>
 
             <p className="label">{t('route.team')} {team.length}/{maxTeamSize}</p>
@@ -13594,9 +13473,10 @@ function MainApp() {
                         />
                       </ThemedTooltip>
                     )}
-                    <strong>{pokemon.name}{pokemon.shiny ? ' ✨' : ''}{pokemon.leechSeed && <LeechSeedBadge compact />}</strong>
-                    <span>
-                      {pokemon.hp}/{pokemon.maxHp}
+                    <strong style={{ color: '#f8fafc', fontSize: '0.82rem', lineHeight: 1.2, textAlign: 'center', textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>{pokemon.name}{pokemon.shiny ? ' ✨' : ''}{pokemon.leechSeed && <LeechSeedBadge compact />}</strong>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.78rem', fontWeight: 'bold' }}>
+                      <strong style={{ color: pokemon.hp <= 0 ? '#f87171' : '#7ceb95', textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>{pokemon.hp}</strong>
+                      <span style={{ color: '#a9a7d6' }}>/{pokemon.maxHp}</span>
                       <StatusBadge status={pokemon.status} compact />
                     </span>
                   </button>
@@ -13840,27 +13720,27 @@ function MainApp() {
                 </div>
               </div>
             )}
-            {difficulty === 'aventura' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', padding: '6px 10px', background: 'rgba(52,211,153,0.1)', borderRadius: '8px', border: '1px solid rgba(52,211,153,0.35)' }}>
-                <span style={{ fontSize: '0.85rem', color: '#34d399', fontWeight: 'bold' }}>🏅 {language === 'en' ? 'Badges' : 'Insignias'}: {badges.length}/8</span>
-                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+            {difficulty === 'branch' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', padding: '6px 10px', background: 'rgba(238,59,47,0.1)', borderRadius: '8px', border: '1px solid rgba(238,59,47,0.4)' }}>
+                <span style={{ fontSize: '0.85rem', color: '#ff5c52', fontWeight: 'bold' }}>🗺️ {language === 'en' ? 'Path medals' : 'Medallas de ruta'}: {branchMedals.length}/8</span>
+                <div style={{ display: 'flex', gap: '3px' }}>
                   {Array.from({ length: 8 }, (_, i) => {
-                    const badge = badges[i]
+                    const medal = branchMedals[i]
                     return (
                       <div key={i} style={{
                         width: '18px', height: '18px', borderRadius: '50%',
-                        background: badge ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.05)',
-                        border: badge ? '2px solid #34d399' : '2px dashed #475569',
+                        background: medal ? 'rgba(238,59,47,0.3)' : 'rgba(255,255,255,0.05)',
+                        border: medal ? '2px solid #ee3b2f' : '2px dashed #475569',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
                       }}>
-                        {badge ? <img src={badge.sprite} alt={badge.name} style={{ width: '13px', height: '13px', imageRendering: 'pixelated' }} /> : <span style={{ fontSize: '0.55rem', color: '#475569' }}>?</span>}
+                        {medal ? <img src={medal.sprite} alt={medal.name} style={{ width: '13px', height: '13px', imageRendering: 'pixelated' }} /> : <span style={{ fontSize: '0.55rem', color: '#475569' }}>?</span>}
                       </div>
                     )
                   })}
                 </div>
               </div>
             )}
-            {difficulty !== 'infinite' && difficulty !== 'coliseum' && difficulty !== 'original' && difficulty !== 'aventura' && (
+            {difficulty !== 'infinite' && difficulty !== 'coliseum' && difficulty !== 'original' && difficulty !== 'branch' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', padding: '6px 10px', background: 'rgba(250,204,21,0.08)', borderRadius: '8px', border: '1px solid rgba(250,204,21,0.2)' }}>
                 <span style={{ fontSize: '0.85rem', color: '#ffcb05', fontWeight: 'bold' }}>{t('route.stage')} {currentStage}/3</span>
                 <div style={{ display: 'flex', gap: '4px' }}>
@@ -13901,9 +13781,133 @@ function MainApp() {
               ref={difficulty === 'infinite' ? routeMapRef : undefined}
               style={difficulty === 'infinite'
                 ? { paddingRight: '4px', maxHeight: '340px', overflowY: 'auto', overflowX: 'auto' }
-                : { paddingRight: '4px' }}
+                : difficulty === 'branch'
+                  ? { paddingRight: '4px', maxHeight: '620px', overflowY: 'auto', overflowX: 'hidden' }
+                  : { paddingRight: '4px' }}
             >
-              {(() => {
+              {difficulty === 'branch' ? (
+                // Mapa ramificado del Modo Ruta: se muestra solo en la pantalla de
+                // ruta y cuando no hay ningún nodo en curso (al entrar en un nodo
+                // se oculta para dejar espacio al juego).
+                screen === 'route' && branchMap && !restEncounter ? (
+                  (() => {
+                    const { positions, width, height } = getBranchMapLayout(branchMap)
+                    const doneNodes: BranchNode[] = []
+                    const doneIds = new Set<number>()
+                    route.forEach(n => { if (n.done) { doneNodes.push(n as BranchNode); doneIds.add(n.id) } })
+                    // Nodo elegido en la fila anterior (el último completado).
+                    const lastDone = doneNodes.length > 0 ? doneNodes[doneNodes.length - 1] : null
+                    const currentRow = branchMap[branchCol] ?? []
+                    // En la primera fila se puede elegir cualquiera; después solo los
+                    // 2 nodos más próximos al nodo elegido en la fila anterior.
+                    const reachableNodes = branchCol === 0 || !lastDone
+                      ? currentRow
+                      : nearestBranchNodes(lastDone, branchMap[branchCol - 1].length, currentRow)
+                    const currentColumnNodes = reachableNodes
+                    // Líneas del camino elegido: nodos completados en orden + nodo actual.
+                    const pathEdges: Array<[number, number]> = []
+                    for (let i = 0; i < doneNodes.length - 1; i++) {
+                      pathEdges.push([doneNodes[i].id, doneNodes[i + 1].id])
+                    }
+                    // Nodo que se está jugando ahora mismo (mapa oculto pero el trazo
+                    // del camino queda para cuando se vuelva a mostrar).
+                    const firstChoiceId = branchMap[branchCol]?.[0]?.id
+                    if (doneNodes.length > 0 && currentNode && currentNode.id !== doneNodes[doneNodes.length - 1].id && currentNode.id !== firstChoiceId) {
+                      pathEdges.push([doneNodes[doneNodes.length - 1].id, currentNode.id])
+                    }
+                    return (
+                      <svg
+                        viewBox={`0 0 ${width} ${height}`}
+                        style={{ width: 'min(780px, 100%)', height: 'auto', display: 'block', maxWidth: '100%', margin: '0 auto' }}
+                        role="img"
+                        aria-label={t('route.ariaMap')}
+                      >
+                        {/* Conexiones entre filas: cada nodo solo avanza a los 2 más próximos */}
+                        {branchMap.slice(0, -1).map((col, c) => {
+                          const next = branchMap[c + 1]
+                          return col.map((node) => {
+                            const reach = next.length <= 2 ? next : nearestBranchNodes(node, col.length, next)
+                            return (
+                              <g key={`e-${node.id}`}>
+                                {reach.map((nn) => (
+                                  <line key={`e-${node.id}-${nn.id}`} x1={positions.get(node.id)?.x} y1={positions.get(node.id)?.y} x2={positions.get(nn.id)?.x} y2={positions.get(nn.id)?.y} stroke="#3f3f6e" strokeWidth="2" strokeLinecap="round" />
+                                ))}
+                              </g>
+                            )
+                          })
+                        })}
+                        {/* Camino elegido resaltado */}
+                        {pathEdges.map(([a, b]) => {
+                          const pa = positions.get(a); const pb = positions.get(b)
+                          if (!pa || !pb) return null
+                          return <line key={`p-${a}-${b}`} x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y} stroke="#ee3b2f" strokeWidth="5" strokeLinecap="round" />
+                        })}
+                        {/* Opciones actuales: aristas desde el nodo elegido anterior */}
+                        {lastDone && branchCol > 0 && currentColumnNodes.length > 0 && currentColumnNodes.map(nn => {
+                          const pa = positions.get(lastDone.id); const pb = positions.get(nn.id)
+                          if (!pa || !pb) return null
+                          return <line key={`f-${lastDone.id}-${nn.id}`} x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y} stroke="#ee3b2f" strokeWidth="3" strokeLinecap="round" strokeDasharray="6 5" opacity="0.75" />
+                        })}
+                        {branchMap.flat().map((node) => {
+                          const pos = positions.get(node.id)
+                          if (!pos) return null
+                          const isCurrentChoice = currentColumnNodes.some(n => n.id === node.id)
+                          // El estado "completado" vive en la lista `route`, no en los
+                          // nodos de branchMap (que son copias), así que se consulta por id.
+                          const isDone = doneIds.has(node.id)
+                          const isCurrentNode = currentNode?.id === node.id && screen !== 'route'
+                          const clickable = isCurrentChoice && !isDone && !isLoading && screen === 'route'
+                          // Opciones descartadas de filas ya pasadas o nodos de la fila
+                          // actual que NO son alcanzables: tono grisáceo.
+                          const isUnchosen = !isDone && !isCurrentChoice && node.col <= branchCol
+                          const isBoss = node.type === 'boss'
+                          const color = NODE_TYPE_COLORS[node.type] ?? '#7d7ab5'
+                          const radius = isBoss ? 52 : 46
+                          return (
+                            <g key={node.id} transform={`translate(${pos.x},${pos.y})`}
+                              className={isCurrentChoice ? 'map-node map-node-current' : 'map-node'}
+                              style={{
+                                opacity: isUnchosen ? 0.5 : 1,
+                                cursor: clickable ? 'pointer' : 'default',
+                                filter: isUnchosen ? 'grayscale(0.9)' : undefined,
+                              }}
+                              onClick={clickable ? () => enterBranchNode(node.id) : undefined}
+                            >
+                              {/* Anillo rojo en los nodos elegibles */}
+                              {clickable && (
+                                <>
+                                  <circle r={radius + 6} fill="none" stroke="#ee3b2f" strokeWidth="3" className="branch-pulse" />
+                                  <circle r={radius + 12} fill="none" stroke="rgba(238,59,47,0.25)" strokeWidth="2" />
+                                </>
+                              )}
+                              {/* Camino elegido en rojo, opciones descartadas en gris */}
+                              <circle r={radius}
+                                fill={clickable ? '#ee3b2f' : isDone ? '#ee3b2f' : color}
+                                fillOpacity={clickable ? 0.30 : isDone ? 0.35 : isUnchosen ? 0.10 : 0.14}
+                                stroke={clickable ? '#ff5c52' : isCurrentNode ? '#ffcb05' : isDone ? '#ee3b2f' : isUnchosen ? '#6b7280' : color}
+                                strokeWidth={clickable ? 4 : isDone ? 4 : isCurrentNode ? 4 : 2.5}
+                              />
+                              <text y="0" textAnchor="middle" dominantBaseline="central" fontSize={isBoss ? '50' : '42'} style={{ pointerEvents: 'none' }}>{NODE_EMOJIS[node.type] ?? '•'}</text>
+                              {isBoss ? (
+                                <text y={radius + 20} textAnchor="middle" fontSize="17" fill={isCurrentNode ? '#ffcb05' : '#f87171'} fontWeight="bold">{node.label}</text>
+                              ) : (
+                                <text y={radius + 18} textAnchor="middle" fontSize="14" fill={clickable ? '#ff8a80' : isCurrentNode ? '#ffcb05' : isDone ? '#ff8a80' : isUnchosen ? '#9ca3af' : '#d9d6f2'} fontWeight={clickable || isDone || isCurrentNode ? 'bold' : 'normal'}>
+                                  {nodeTypeLabel(node)}
+                                </text>
+                              )}
+                            </g>
+                          )
+                        })}
+                      </svg>
+                    )
+                  })()
+                ) : branchMap ? (
+                  <p className="muted" style={{ textAlign: 'center', fontSize: '0.8rem', padding: '0.5rem 0' }}>
+                    🗺️ {language === 'en' ? 'Node map hidden during the node...' : 'Mapa de nodos oculto durante el nodo...'}
+                  </p>
+                ) : null
+              ) : (
+              (() => {
                 const { positions, width, height } = getNodeMapLayout(route.length)
                 const points = positions.map((p) => `${p.x},${p.y}`).join(' ')
                 const isInfiniteMap = difficulty === 'infinite'
@@ -13950,7 +13954,8 @@ function MainApp() {
                     })}
                   </svg>
                 )
-              })()}
+              })()
+              )}
             </div>
 
             {screen === 'shop' && (
@@ -14606,14 +14611,24 @@ function MainApp() {
               </div>
             )}
 
-            {screen === 'route' && currentNode && currentNode.type !== 'rest' && !legendaryEncounter && (
+            {screen === 'route' && currentNode && currentNode.type !== 'rest' && !legendaryEncounter && difficulty !== 'branch' && (
               <div className="action-block">
                 <p>
                   {t('route.nextNode', { name: `${nodeTypeLabel(currentNode)} #${currentNode.id}` })}
                 </p>
-                <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={enterNode} type="button" disabled={isLoading}>
+                <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={() => enterNode()} type="button" disabled={isLoading}>
                   {isLoading ? t('node.searching') : currentNode.type === 'teamRocket' ? t('node.teamRocket') : currentNode.type === 'spin' ? t('node.spin') : currentNode.type === 'pokeRand' ? t('node.pokeRand') : currentNode.type === 'mega' ? t('node.mega') : currentNode.type === 'gmax' ? t('node.gmax') : currentNode.type === 'primal' ? t('node.primal') : currentNode.type === 'trade' ? t('node.trade') : currentNode.type === 'rival' ? t('node.rival') : currentNode.type === 'blackmarket' ? t('node.blackmarket') : currentNode.type === 'double' ? t('node.double') : currentNode.type === 'casino' ? t('node.casino') : currentNode.type === 'legendary' ? t('node.legendary') : t('node.enter')}
                 </button>
+              </div>
+            )}
+
+            {screen === 'route' && difficulty === 'branch' && !restEncounter && (
+              <div className="action-block" style={{ border: '1px solid rgba(238,59,47,0.4)' }}>
+                <p style={{ color: '#ff8a80', fontWeight: 'bold' }}>
+                  {branchMap && branchMap[branchCol] && branchMap[branchCol][0]?.type === 'boss'
+                    ? (language === 'en' ? '👑 The boss awaits! Enter the final node.' : '👑 ¡El jefe te espera! Entra en el nodo final.')
+                    : (language === 'en' ? '🛣️ Choose a red node to continue your path.' : '🛣️ Elige un nodo rojo del mapa para continuar tu camino.')}
+                </p>
               </div>
             )}
 
@@ -14648,12 +14663,12 @@ function MainApp() {
               </div>
             )}
 
-            {screen === 'route' && currentNode && currentNode.type === 'rest' && !restEncounter && !legendaryEncounter && (
+            {screen === 'route' && currentNode && currentNode.type === 'rest' && !restEncounter && !legendaryEncounter && difficulty !== 'branch' && (
               <div className="action-block">
                 <p>
                   {t('b.restStop', { name: `${nodeTypeLabel(currentNode)} #${currentNode.id}` })}
                 </p>
-                <button className="cta" onClick={enterNode} type="button" disabled={isLoading}>
+                <button className="cta" onClick={() => enterNode()} type="button" disabled={isLoading}>
                   {isLoading ? t('rest.searching') : t('rest.enter')}
                 </button>
               </div>
@@ -14928,7 +14943,7 @@ function MainApp() {
                   <strong>{enemy.hp}/{enemy.maxHp}</strong>
                 </div>
                 <div className="meter enemy-meter">
-                  <div style={{ width: `${(enemy.hp / enemy.maxHp) * 100}%` }}></div>
+                  <div style={{ width: `${(enemy.hp / enemy.maxHp) * 100}%`, background: hpBarColor(enemy.hp / enemy.maxHp) }}></div>
                 </div>
 
                 <div className="moves-grid">
@@ -15137,7 +15152,9 @@ function MainApp() {
           <p>
             {coopMode
               ? t('victory.completedCoop', { n: difficultyNodeCounts[coopDiff] || 10 })
-              : t('victory.completedMedium', { n: difficultyNodeCounts[difficulty] })}
+              : difficulty === 'branch'
+                ? (language === 'en' ? 'You conquered 8 branching paths and got all 8 medals!' : '¡Conquistaste 8 mapas de rutas y conseguiste las 8 medallas!')
+                : t('victory.completedMedium', { n: difficultyNodeCounts[difficulty] })}
           </p>
 
           {victoryUnlocks && (
@@ -16435,6 +16452,7 @@ function MainApp() {
                 <li>{t('help.modes2')}</li>
                 <li>{t('help.modes3')}</li>
                 <li>{t('help.modes4')}</li>
+                <li style={{ color: '#ff8a80' }}>{t('help.modes5')}</li>
               </ul>
             </div>
 
@@ -16676,8 +16694,9 @@ function MainApp() {
               {META_SHOP_ITEMS.filter(item => item.category === 'consumable' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 const locked = item.requires ? !metaProgression.permanentlyUnlockedItems.includes(item.requires) : false
+                const disabled = !isItemEnabled(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem', opacity: locked ? 0.5 : 1 }}>
+                  <div key={item.id} style={{ position: 'relative', background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem', opacity: locked ? 0.5 : 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
@@ -16690,7 +16709,10 @@ function MainApp() {
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                      <div>
+                        <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                        <ShopItemToggle id={item.id} disabled={disabled} onToggle={toggleItemEnabled} />
+                      </div>
                     ) : locked ? (
                       <div style={{ color: '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.requires', { name: META_SHOP_ITEMS.find(i => i.id === item.requires)?.name ?? (language === 'en' ? 'the previous upgrade' : 'la mejora anterior') })}</div>
                     ) : (
@@ -16710,8 +16732,9 @@ function MainApp() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'treasure' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                const disabled = !isItemEnabled(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ position: 'relative', background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
@@ -16724,7 +16747,10 @@ function MainApp() {
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                      <div>
+                        <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                        <ShopItemToggle id={item.id} disabled={disabled} onToggle={toggleItemEnabled} />
+                      </div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
@@ -16742,8 +16768,9 @@ function MainApp() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'berry' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                const disabled = !isItemEnabled(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ position: 'relative', background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
@@ -16756,7 +16783,10 @@ function MainApp() {
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                      <div>
+                        <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                        <ShopItemToggle id={item.id} disabled={disabled} onToggle={toggleItemEnabled} />
+                      </div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
@@ -16774,8 +16804,9 @@ function MainApp() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'disco_mt' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                const disabled = !isItemEnabled(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ position: 'relative', background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
@@ -16788,7 +16819,10 @@ function MainApp() {
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                      <div>
+                        <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                        <ShopItemToggle id={item.id} disabled={disabled} onToggle={toggleItemEnabled} />
+                      </div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
@@ -16806,8 +16840,9 @@ function MainApp() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'pokeball' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                const disabled = !isItemEnabled(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ position: 'relative', background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
@@ -16820,7 +16855,10 @@ function MainApp() {
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                      <div>
+                        <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                        <ShopItemToggle id={item.id} disabled={disabled} onToggle={toggleItemEnabled} />
+                      </div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
@@ -16838,8 +16876,9 @@ function MainApp() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'evolution_stone' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                const disabled = !isItemEnabled(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ position: 'relative', background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
@@ -16852,7 +16891,10 @@ function MainApp() {
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                      <div>
+                        <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                        <ShopItemToggle id={item.id} disabled={disabled} onToggle={toggleItemEnabled} />
+                      </div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
@@ -16870,8 +16912,9 @@ function MainApp() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {META_SHOP_ITEMS.filter(item => item.category === 'evolution_item' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
+                const disabled = !isItemEnabled(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
+                  <div key={item.id} style={{ position: 'relative', background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
@@ -16884,7 +16927,10 @@ function MainApp() {
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                      <div>
+                        <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                        <ShopItemToggle id={item.id} disabled={disabled} onToggle={toggleItemEnabled} />
+                      </div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}
                         disabled={metaProgression.pokeCoins < item.price}
@@ -16903,8 +16949,9 @@ function MainApp() {
               {META_SHOP_ITEMS.filter(item => item.category === 'upgrade' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 const locked = item.requires ? !metaProgression.permanentlyUnlockedItems.includes(item.requires) : false
+                const disabled = !isItemEnabled(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem', opacity: locked ? 0.5 : 1 }}>
+                  <div key={item.id} style={{ position: 'relative', background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem', opacity: locked ? 0.5 : 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       <span style={{ fontSize: '1.5rem' }}>
                         {ITEM_SPRITES[item.spriteKey]
@@ -16918,7 +16965,10 @@ function MainApp() {
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                      <div>
+                        <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                        <ShopItemToggle id={item.id} disabled={disabled} onToggle={toggleItemEnabled} />
+                      </div>
                     ) : locked ? (
                       <div style={{ color: '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.requires', { name: META_SHOP_ITEMS.find(i => i.id === item.requires)?.name ?? (language === 'en' ? 'the previous upgrade' : 'la mejora anterior') })}</div>
                     ) : (
@@ -16968,8 +17018,9 @@ function MainApp() {
               {META_SHOP_ITEMS.filter(item => item.category === 'holdable' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 const locked = item.requires ? !metaProgression.permanentlyUnlockedItems.includes(item.requires) : false
+                const disabled = !isItemEnabled(item.id)
                 return (
-                  <div key={item.id} style={{ background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem', opacity: locked ? 0.5 : 1 }}>
+                  <div key={item.id} style={{ position: 'relative', background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem', opacity: locked ? 0.5 : 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       {ITEM_SPRITES[item.spriteKey]
                         ? <img src={ITEM_SPRITES[item.spriteKey]} alt={item.name} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} onError={fallbackSprite} />
@@ -16982,7 +17033,10 @@ function MainApp() {
                     </div>
                     <div style={{ color: '#d9d6f2', fontSize: '1rem', lineHeight: '1.4', marginBottom: '0.6rem' }}>{metaItemDesc(item.id)}</div>
                     {owned ? (
-                      <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                      <div>
+                        <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
+                        <ShopItemToggle id={item.id} disabled={disabled} onToggle={toggleItemEnabled} />
+                      </div>
                     ) : locked ? (
                       <div style={{ color: '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.requires', { name: META_SHOP_ITEMS.find(i => i.id === item.requires)?.name ?? (language === 'en' ? 'the previous version' : 'la versión anterior') })}</div>
                     ) : (
