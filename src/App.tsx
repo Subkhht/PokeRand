@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef, useCallback, startTransition, Com
 import { createPortal } from 'react-dom'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
-import { playHover, playClick, playHit, playEvolution, playCoin, playAchievement, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
+import { playHover, playClick, playSelect, playHit, playEvolution, playCapture, playPerfectCapture, playEquip, playPurchase, playError, playCoin, playAchievement, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -3724,6 +3724,7 @@ function MainApp() {
 
   function handleSelectGeneration(gen: number) {
     if (!isGenUnlocked(gen)) return
+    playSelect()
     setGeneration(gen)
     if (difficulty === 'hard' && !isHardUnlocked(gen)) {
       setDifficulty('medium')
@@ -3750,6 +3751,7 @@ function MainApp() {
     if (diff === 'infinite' && !isInfiniteUnlocked(generation)) return
     if (diff === 'coliseum' && !isColiseumUnlocked()) return
     if (diff === 'branch' && !isBranchUnlocked(generation)) return
+    playSelect()
     setDifficulty(diff)
     // Infinite no permite desafíos: al seleccionarlo se limpian los que hubiera.
     if (diff === 'infinite' && !coopMode) {
@@ -6494,6 +6496,7 @@ function MainApp() {
       return
     }
     let captured: Pokemon = { ...pokemon, hp: Math.floor(pokemon.maxHp / 2), holdItem: (difficulty === 'hard' || difficulty === 'infinite') ? null : pokemon.holdItem }
+    playCapture()
     if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
     if (runChallenges.fixedLevel) captured = { ...captured, level: 50 }
     registerInPokedex(captured)
@@ -6564,15 +6567,15 @@ function MainApp() {
 
   function blackMarketBuyItem(itemName: string): void {
     const price = blackMarketItemPrice(itemName)
-    if (money < price) return
-    playClick()
+    if (money < price) { playError(); return }
+    playPurchase()
     setMoney((prev) => prev - price)
     setInventory((prev) => [...prev, itemName])
     setBattleLog((prev) => [t('b.boughtMarket', { item: itemLocalizedName(itemName), price }), ...prev].slice(0, 15))
   }
 
   function blackMarketSellItem(itemName: string): void {
-    playClick()
+    playPurchase()
     setInventory((prev) => {
       const idx = prev.indexOf(itemName)
       if (idx === -1) return prev
@@ -6594,8 +6597,8 @@ function MainApp() {
     const pokemon = blackMarketPokemon[idx]
     if (!pokemon) return
     const price = 100 + pokemon.level * 15
-    if (money < price) return
-    playClick()
+    if (money < price) { playError(); return }
+    playPurchase()
     setMoney((prev) => prev - price)
     const purchased = { ...pokemon, hp: pokemon.maxHp, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
     registerInPokedex(purchased)
@@ -8257,7 +8260,9 @@ function MainApp() {
     const stageMarkup = 1 + badges.length * 0.15
     const finalPrice = Math.floor(item.price * (1 - discount) * hardMarkup * stageMarkup)
     const total = finalPrice * qty
-    if (money < total) return
+    if (money < total) { playError(); return }
+
+    playPurchase()
 
     setMoney((prev) => prev - total)
     setInventory((prev) => [...prev, ...Array(qty).fill(itemName)])
@@ -8289,7 +8294,9 @@ function MainApp() {
     const hardMarkup = (difficulty === 'hard' || difficulty === 'infinite') ? 1.4 : 1
     const stageMarkup = 1 + badges.length * 0.15
     const finalPrice = Math.floor(item.price * (1 - discount) * hardMarkup * stageMarkup)
-    if (money < finalPrice) return
+    if (money < finalPrice) { playError(); return }
+
+    playPurchase()
 
     setMoney((prev) => prev - finalPrice)
     setInventory((prev) => [...prev, itemName])
@@ -8326,11 +8333,13 @@ function MainApp() {
 
   function equipItem(itemName: string, pokemonIndex: number) {
     const pokemon = team[pokemonIndex]
-    if (!pokemon || pokemon.hp <= 0) return
-    if (!HOLDABLE_ITEMS[itemName]) return
+    if (!pokemon || pokemon.hp <= 0) { playError(); return }
+    if (!HOLDABLE_ITEMS[itemName]) { playError(); return }
 
     const itemIdx = inventory.indexOf(itemName)
-    if (itemIdx === -1) return
+    if (itemIdx === -1) { playError(); return }
+
+    playEquip()
 
     setTeam((prev) =>
       prev.map((p, i) => {
@@ -9864,6 +9873,7 @@ function MainApp() {
 
     // Master Ball: captura automática
     if (def.isMaster) {
+      playPerfectCapture()
       setInventory(prev => prev.filter((_, i) => i !== ballIdx))
       const capturedPkmn = await buildCleanCaptured()
       registerInPokedex(capturedPkmn)
@@ -9900,6 +9910,7 @@ function MainApp() {
 
     if (Math.random() < catchProbability) {
       // Captura exitosa
+      playCapture()
       const capturedPkmn = await buildCleanCaptured()
       registerInPokedex(capturedPkmn)
       setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
@@ -9918,6 +9929,7 @@ function MainApp() {
       setCaptureSummary(capturedPkmn)
     } else {
       // Falló
+      playHit()
       setBattleLog(prev => [t('b.escapedBall', { name: enemy.name, ball: ballName, pct: Math.round(catchProbability * 100) }), ...prev].slice(0, 15))
       setCaptureMessage(`¡${enemy.name} escapó!`)
       setTimeout(() => setCaptureMessage(null), 2000)

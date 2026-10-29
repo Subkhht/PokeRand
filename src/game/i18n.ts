@@ -599,9 +599,9 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v2.4', en: 'v2.4' },
+  'help.version': { es: 'v2.5', en: 'v2.5' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
-  'changelog.button': { es: 'Ver cambios', en: 'See changes' },
+  'changelog.button': { es: 'Ver cambios v2.5', en: 'See changes v2.5' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -1871,6 +1871,14 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v2.5',
+    items: [
+      { es: '🦏 Rhydon evoluciona a Rhyperior al alcanzar el nivel 52 con el Protector equipado. La línea evolutiva de la Pokédex muestra el objeto y el nivel requeridos.', en: '🦏 Rhydon evolves into Rhyperior at level 52 while holding Protector. The Pokédex evolution line shows the required item and level.' },
+      { es: '🎨 Nuevo diseño del menú principal: una interfaz inspirada en los clubes de entrenadores Pokémon y los RPG estilizados, con fondo oscuro, colores de Poké Ball, tarjetas angulares y selección de generación/dificultad más clara.', en: '🎨 New main menu design: an interface inspired by Pokémon Trainer Clubs and stylized RPGs, with a dark background, Poké Ball colors, angled cards and clearer generation/difficulty selection.' },
+      { es: '🔊 Nuevos efectos de sonido para capturas normales y perfectas, Master Ball, selección de opciones, compras, ventas, equipamiento, errores y capturas especiales.', en: '🔊 New sound effects for regular and perfect catches, Master Ball, option selection, purchases, sales, item equipping, errors and special catches.' },
+    ],
+  },
   {
     version: 'v2.4',
     items: [

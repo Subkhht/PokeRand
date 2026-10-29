@@ -1,7 +1,7 @@
 :root {
   color: #212121;
   background: #f3f3f3;
-  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+  font-family: 'Space Grotesk', 'Trebuchet MS', sans-serif;
   line-height: 1.4;
   font-weight: 500;
   text-rendering: optimizeLegibility;
@@ -24,7 +24,7 @@ body {
 }
 
 #root {
-  max-width: 1120px;
+  max-width: 1440px;
   margin: 0 auto;
   min-height: 100vh;
   padding: 12px;

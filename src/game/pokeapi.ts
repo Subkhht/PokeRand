@@ -332,6 +332,16 @@ export async function fetchPokemonDetails(id: number): Promise<PokemonDetails> {
     ]
   }
 
+  // Familia Rhyhorn: en este juego Rhydon evoluciona a Rhyperior al nivel 52
+  // si lleva equipado el Protector.
+  if (dataPokemon.id === 111 || dataPokemon.id === 112 || dataPokemon.id === 464) {
+    evolutions = [
+      { id: 111, name: 'rhyhorn', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/111.png', level: null, trigger: 'level-up', item: null },
+      { id: 112, name: 'rhydon', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/112.png', level: 42, trigger: 'level-up', item: null },
+      { id: 464, name: 'rhyperior', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/464.png', level: 52, trigger: 'level-up', item: 'Protector' },
+    ]
+  }
+
   // Familia Zigzagoon/Linoone/Obstagoon: la cadena de PokeAPI pone Linoone →
   // Obstagoon, pero solo la línea de Galar (Zigzagoon-Galar → Linoone-Galar →
   // Obstagoon) evoluciona a Obstagoon. La forma normal de Linoone NO evoluciona.
@@ -2302,6 +2312,16 @@ export async function getEvolutionInfo(pokemonId: number): Promise<{ nextName: s
     // debajo del nivel 45.
     if (pokemonId === 118) {
       return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 45 }
+    }
+    // Rhydon → Rhyperior: en este juego evoluciona al nivel 52 con el
+    // Protector equipado.
+    if (pokemonId === 112) {
+      return { nextName: 'rhyperior', evolutionLevel: 52, heldItem: 'Protector', heldItemEvolutions: [{ item: 'Protector', target: 'rhyperior', level: 52 }], minAppearLevel: 42 }
+    }
+    // Rhyperior es la evolución de Rhydon con el Protector: no aparece por
+    // debajo del nivel 52.
+    if (pokemonId === 464) {
+      return { nextName: null, evolutionLevel: null, heldItem: null, heldItemEvolutions: [], minAppearLevel: 52 }
     }
     // Qwilfish normal NO evoluciona a Overqwil (solo lo hace la línea de Hisui).
     if (pokemonId === 211) {

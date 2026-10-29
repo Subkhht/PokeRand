@@ -2,6 +2,8 @@
    ESTILOS GENERALES Y TEMA POKÉDEX / CENTRO POKÉMON RETRO
    ============================================================ */
 
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 @font-face {
   font-family: 'Pokemon Solid';
   font-style: normal;
@@ -1334,6 +1336,330 @@ input[type='range'].range-slider::-moz-range-progress {
   .defeat-details-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ============================================================
+   REDISEÑO v4: CLUB DE ENTRENADORES
+   ============================================================ */
+
+html:not([data-gameboy]) {
+  --bg-dark: #f0eee7;
+  --panel-bg: #20263a;
+  --panel-bg2: #2a3148;
+  --panel-border: #6d7894;
+  --border-light: #9aa8c2;
+  --accent-red: #df3b2f;
+  --accent-red-dark: #a92324;
+  --accent-blue: #1c6e9e;
+  --accent-yellow: #f2bf2f;
+  --accent-green: #278c60;
+  --text-main: #f4f1e8;
+  --text-muted: #b6bfd1;
+  --shadow-hard: 7px 7px 0 #18213c;
+  --shadow-hard-sm: 4px 4px 0 rgba(24, 33, 60, 0.28);
+}
+
+html:not([data-gameboy]) body {
+  background-color: #f0eee7;
+  background-image:
+    linear-gradient(135deg, rgba(223, 59, 47, 0.07) 0 12%, transparent 12% 100%),
+    linear-gradient(315deg, rgba(28, 110, 158, 0.06) 0 9%, transparent 9% 100%);
+  background-size: 100% 100%, 100% 100%;
+  color: var(--text-main);
+}
+
+html:not([data-gameboy]) .app-shell {
+  max-width: 1460px;
+  gap: 1.15rem;
+  padding: 1.15rem clamp(0.75rem, 3vw, 3.5rem) 3rem;
+}
+
+html:not([data-gameboy]) .app-shell::before {
+  content: 'POKERAND / TRAINER CLUB';
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 4;
+  color: var(--accent-red);
+  font: 500 0.58rem/1 'DM Mono', monospace;
+  letter-spacing: 0.14em;
+  transform: rotate(-90deg) translateX(-100%);
+  transform-origin: left bottom;
+  pointer-events: none;
+}
+
+html:not([data-gameboy]) .topbar {
+  min-height: 70px;
+  padding: 0.8rem 1rem;
+  border: 0;
+  border-bottom: 4px solid var(--accent-red);
+  border-radius: 0 0 18px 18px;
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-hard-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html:not([data-gameboy]) .topbar::before {
+  content: 'TRAINER CLUB // EST. 1996';
+  position: absolute;
+  left: 0;
+  top: -0.5rem;
+  color: var(--accent-blue);
+  font: 500 0.56rem/1 'DM Mono', monospace;
+  letter-spacing: 0.15em;
+}
+
+html:not([data-gameboy]) .topbar::after {
+  content: '● LIVE';
+  right: 0;
+  bottom: -1rem;
+  color: var(--accent-green);
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+}
+
+html:not([data-gameboy]) .topbar h1 {
+  color: var(--text-main);
+  font: 700 clamp(1.7rem, 4vw, 3.35rem)/0.88 'Bebas Neue', 'Space Grotesk', sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+html:not([data-gameboy]) .topbar h1::before {
+  content: '◆';
+  margin-right: 0.45rem;
+  color: var(--accent-red);
+  font-size: 0.6em;
+}
+
+html:not([data-gameboy]) .topbar .tiny-btn,
+html:not([data-gameboy]) .tiny-btn {
+  border: 2px solid var(--panel-border);
+  border-radius: 7px;
+  background: var(--panel-bg);
+  color: var(--text-main);
+  font: 500 0.65rem/1.1 'DM Mono', monospace;
+  box-shadow: 2px 2px 0 rgba(24, 33, 60, 0.2);
+}
+
+html:not([data-gameboy]) .topbar .tiny-btn:hover,
+html:not([data-gameboy]) .tiny-btn:hover {
+  transform: translate(-2px, -2px) rotate(-1deg);
+  color: #fffdf6;
+  border-color: var(--accent-red);
+  background: var(--accent-red);
+}
+
+html:not([data-gameboy]) .record-box {
+  border: 2px solid var(--panel-border);
+  border-radius: 7px;
+  background: var(--accent-yellow);
+  color: var(--text-main);
+  padding: 7px 10px;
+  font: 500 0.66rem/1 'DM Mono', monospace;
+  box-shadow: 2px 2px 0 rgba(24, 33, 60, 0.2);
+}
+
+html:not([data-gameboy]) .panel,
+html:not([data-gameboy]) .setup-card,
+html:not([data-gameboy]) .setup-hero {
+  border: 2px solid var(--panel-border);
+  border-radius: 0;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+html:not([data-gameboy]) .panel {
+  background: var(--panel-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html:not([data-gameboy]) .setup-panel {
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html:not([data-gameboy]) .setup-hero {
+  min-height: 310px;
+  margin-bottom: 1.25rem;
+  border-color: var(--panel-border);
+  background: var(--accent-red);
+  clip-path: polygon(0 0, 94% 0, 100% 18%, 100% 100%, 5% 100%, 0 82%);
+}
+
+html:not([data-gameboy]) .setup-hero-canvas {
+  opacity: 0.38;
+  filter: saturate(1.2) contrast(1.05) sepia(0.15);
+  mix-blend-mode: multiply;
+}
+
+html:not([data-gameboy]) .setup-hero-overlay {
+  min-height: 310px;
+  align-items: flex-end;
+  padding: clamp(1.4rem, 5vw, 4rem);
+  background: linear-gradient(90deg, rgba(223, 59, 47, 0.98) 0 43%, rgba(223, 59, 47, 0.72) 67%, transparent);
+}
+
+html:not([data-gameboy]) .setup-hero-title {
+  max-width: 8ch;
+  color: #fffdf6;
+  font: 400 clamp(2.9rem, 9vw, 8rem)/0.78 'Bebas Neue', sans-serif;
+  letter-spacing: 0.015em;
+  text-transform: uppercase;
+  text-shadow: 5px 5px 0 var(--panel-border);
+}
+
+html:not([data-gameboy]) .setup-hero-title::after {
+  content: 'CHOOSE YOUR PARTNER';
+  display: block;
+  margin-top: 1rem;
+  color: var(--accent-yellow);
+  font: 500 0.62rem/1 'DM Mono', monospace;
+  letter-spacing: 0.16em;
+  text-shadow: none;
+}
+
+html:not([data-gameboy]) .setup-hero-sub {
+  max-width: 34ch;
+  color: #fffdf6;
+  font: 500 0.75rem/1.45 'DM Mono', monospace;
+}
+
+html:not([data-gameboy]) .setup-hero-actions {
+  align-items: flex-end;
+}
+
+html:not([data-gameboy]) .setup-grid {
+  gap: 1.25rem;
+}
+
+html:not([data-gameboy]) .setup-col {
+  gap: 1.25rem;
+}
+
+html:not([data-gameboy]) .setup-card {
+  position: relative;
+  background: var(--panel-bg);
+  padding: 1.3rem;
+  clip-path: polygon(0 0, 98% 0, 100% 5%, 100% 100%, 2% 100%, 0 95%);
+}
+
+html:not([data-gameboy]) .setup-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 58px;
+  height: 5px;
+  background: var(--accent-blue);
+}
+
+html:not([data-gameboy]) .setup-card-title {
+  color: var(--text-main);
+  font: 600 0.74rem/1 'DM Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+html:not([data-gameboy]) .setup-step {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  color: #fffdf6;
+  font: 700 0.7rem/1 'DM Mono', monospace;
+}
+
+html:not([data-gameboy]) .gen-tile,
+html:not([data-gameboy]) .challenge-toggle {
+  border: 2px solid #c5c7c9;
+  border-radius: 7px;
+  background: #e9ebeb;
+  color: var(--text-main);
+  box-shadow: 2px 2px 0 rgba(24, 33, 60, 0.18);
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+html:not([data-gameboy]) .gen-tile:hover,
+html:not([data-gameboy]) .challenge-toggle:hover {
+  transform: translate(-3px, -3px) rotate(-1deg);
+  border-color: var(--accent-blue);
+  background: #d7edf3;
+  box-shadow: 5px 5px 0 rgba(24, 33, 60, 0.22);
+}
+
+html:not([data-gameboy]) .gen-tile.is-active,
+html:not([data-gameboy]) .challenge-toggle.is-active {
+  border-color: var(--accent-red);
+  background: #ffe0d8;
+  box-shadow: inset 5px 0 0 var(--accent-red), 3px 3px 0 rgba(24, 33, 60, 0.18);
+}
+
+html:not([data-gameboy]) .cta {
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--accent-yellow);
+  color: var(--text-main);
+  font: 700 0.75rem/1 'DM Mono', monospace;
+  text-transform: uppercase;
+  box-shadow: 5px 5px 0 var(--panel-border);
+}
+
+html:not([data-gameboy]) .cta:hover:not(:disabled) {
+  background: #ffdd55;
+  box-shadow: 2px 2px 0 var(--panel-border);
+  transform: translate(3px, 3px) rotate(-1deg);
+}
+
+html:not([data-gameboy]) .setup-start {
+  padding: 17px 25px !important;
+  font-size: 0.8rem !important;
+}
+
+html:not([data-gameboy]) .chip,
+html:not([data-gameboy]) .move-btn,
+html:not([data-gameboy]) .secondary {
+  border: 2px solid var(--panel-border);
+  border-radius: 7px;
+  background: var(--panel-bg);
+  box-shadow: 2px 2px 0 rgba(24, 33, 60, 0.18);
+}
+
+html:not([data-gameboy]) .chip:hover,
+html:not([data-gameboy]) .move-btn:hover,
+html:not([data-gameboy]) .secondary:hover {
+  background: #d7edf3;
+  border-color: var(--accent-blue);
+}
+
+html:not([data-gameboy]) .setup-hero,
+html:not([data-gameboy]) .setup-card,
+html:not([data-gameboy]) .panel {
+  animation: trainerClubIn 0.42s ease both;
+}
+
+html:not([data-gameboy]) .setup-card:nth-child(2) { animation-delay: 0.07s; }
+html:not([data-gameboy]) .setup-card:nth-child(3) { animation-delay: 0.14s; }
+
+@keyframes trainerClubIn {
+  from { opacity: 0; transform: translateY(12px) rotate(0.4deg); }
+  to { opacity: 1; transform: translateY(0) rotate(0); }
+}
+
+@media (max-width: 768px) {
+  html:not([data-gameboy]) .app-shell { padding: 0.65rem 0.55rem 2rem; }
+  html:not([data-gameboy]) .app-shell::before { display: none; }
+  html:not([data-gameboy]) .topbar::before,
+  html:not([data-gameboy]) .topbar::after { display: none; }
+  html:not([data-gameboy]) .topbar h1 { font-size: 1.55rem; }
+  html:not([data-gameboy]) .setup-hero,
+  html:not([data-gameboy]) .setup-hero-overlay { min-height: 245px; }
+  html:not([data-gameboy]) .setup-hero-overlay { padding: 1.25rem; }
+  html:not([data-gameboy]) .setup-hero-title { font-size: clamp(2.9rem, 17vw, 5rem); }
 }
 
 .defeat-box {
@@ -3306,4 +3632,712 @@ html[data-gameboy] ::-webkit-scrollbar-thumb {
 
 html[data-gameboy] * {
   scrollbar-color: #306230 #0f380f;
+}
+
+/* ============================================================
+   REDISEÑO v2: TERMINAL DE EXPEDICION
+   ============================================================ */
+
+html:not([data-gameboy]) {
+  --bg-dark: #091211;
+  --panel-bg: #101b19;
+  --panel-bg2: #172622;
+  --panel-border: #2b4740;
+  --border-light: #42635a;
+  --accent-red: #ff7468;
+  --accent-red-dark: #c94d48;
+  --accent-blue: #79e1d0;
+  --accent-yellow: #f4c95d;
+  --accent-green: #7bdca5;
+  --text-main: #f3f0e5;
+  --text-muted: #9eb4ab;
+  --font-title: 'Space Grotesk', sans-serif;
+  --font-body: 'DM Mono', monospace;
+  --shadow-hard: 0 18px 45px rgba(0, 0, 0, 0.28);
+  --shadow-hard-sm: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+html:not([data-gameboy]) body {
+  background-color: #091211;
+  background-image:
+    linear-gradient(rgba(121, 225, 208, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(121, 225, 208, 0.035) 1px, transparent 1px),
+    radial-gradient(circle at 50% -20%, rgba(121, 225, 208, 0.12), transparent 42%);
+  background-size: 34px 34px, 34px 34px, 100% 100%;
+  font-family: 'DM Mono', monospace;
+}
+
+html:not([data-gameboy]) .app-shell {
+  max-width: 1380px;
+  gap: 18px;
+  padding: 1.25rem clamp(1rem, 3vw, 3rem) 3rem;
+}
+
+html:not([data-gameboy]) .topbar {
+  min-height: 74px;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(121, 225, 208, 0.24);
+  border-radius: 18px;
+  background: rgba(16, 27, 25, 0.88);
+  box-shadow: var(--shadow-hard);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+html:not([data-gameboy]) .topbar::after {
+  content: 'FIELD CONSOLE / LIVE RUN';
+  position: absolute;
+  right: 1rem;
+  bottom: 5px;
+  color: rgba(121, 225, 208, 0.48);
+  font: 500 0.55rem/1 'DM Mono', monospace;
+  letter-spacing: 0.14em;
+  pointer-events: none;
+}
+
+html:not([data-gameboy]) .topbar h1 {
+  margin: 0 auto;
+  transform: none;
+  color: var(--text-main);
+  background: none;
+  -webkit-text-fill-color: initial;
+  font: 700 clamp(1.45rem, 3vw, 2.3rem)/1 'Space Grotesk', sans-serif;
+  letter-spacing: -0.06em;
+  text-transform: none;
+  filter: none;
+}
+
+html:not([data-gameboy]) .topbar h1::before {
+  content: '◈';
+  margin-right: 0.55rem;
+  color: var(--accent-red);
+  font-size: 0.7em;
+  vertical-align: 0.12em;
+}
+
+html:not([data-gameboy]) .topbar .tiny-btn,
+html:not([data-gameboy]) .tiny-btn {
+  border: 1px solid rgba(121, 225, 208, 0.28);
+  border-radius: 9px;
+  background: rgba(9, 18, 17, 0.72);
+  color: var(--text-muted);
+  font: 500 0.7rem/1.1 'DM Mono', monospace;
+  letter-spacing: 0.02em;
+  box-shadow: none;
+  transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+html:not([data-gameboy]) .topbar .tiny-btn:hover,
+html:not([data-gameboy]) .tiny-btn:hover {
+  transform: translateY(-2px);
+  color: var(--text-main);
+  border-color: var(--accent-blue);
+  background: rgba(121, 225, 208, 0.1);
+}
+
+html:not([data-gameboy]) .record-box {
+  border: 1px solid rgba(244, 201, 93, 0.3);
+  border-radius: 10px;
+  background: rgba(9, 18, 17, 0.72);
+  padding: 7px 10px;
+  font: 500 0.72rem/1 'DM Mono', monospace;
+  box-shadow: none;
+}
+
+html:not([data-gameboy]) .panel,
+html:not([data-gameboy]) .setup-card,
+html:not([data-gameboy]) .setup-hero {
+  border: 1px solid rgba(121, 225, 208, 0.2);
+  border-radius: 18px;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+html:not([data-gameboy]) .panel {
+  background: rgba(16, 27, 25, 0.9);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+html:not([data-gameboy]) .setup-card {
+  background: rgba(23, 38, 34, 0.88);
+  padding: 1.3rem;
+}
+
+html:not([data-gameboy]) .setup-card-title {
+  color: var(--accent-blue);
+  font: 600 0.72rem/1 'DM Mono', monospace;
+  letter-spacing: 0.12em;
+}
+
+html:not([data-gameboy]) .setup-step {
+  width: 25px;
+  height: 25px;
+  border-radius: 8px;
+  background: var(--accent-red);
+  font: 700 0.72rem/1 'DM Mono', monospace;
+}
+
+html:not([data-gameboy]) .setup-hero {
+  min-height: 190px;
+  border-color: rgba(255, 116, 104, 0.42);
+  background: #121f1c;
+}
+
+html:not([data-gameboy]) .setup-hero-overlay {
+  min-height: 190px;
+  padding: 2rem clamp(1.25rem, 5vw, 4rem);
+  background: linear-gradient(90deg, rgba(9, 18, 17, 0.96), rgba(9, 18, 17, 0.64) 52%, transparent);
+}
+
+html:not([data-gameboy]) .setup-hero-title {
+  color: var(--text-main);
+  text-shadow: none;
+  font: 700 clamp(1.55rem, 4vw, 3.1rem)/0.95 'Space Grotesk', sans-serif;
+  letter-spacing: -0.06em;
+  animation: none;
+}
+
+html:not([data-gameboy]) .setup-hero-title::after {
+  content: ' / BUILD YOUR RUN';
+  display: block;
+  margin-top: 0.8rem;
+  color: var(--accent-red);
+  font: 500 0.65rem/1 'DM Mono', monospace;
+  letter-spacing: 0.16em;
+}
+
+html:not([data-gameboy]) .setup-hero-sub {
+  color: var(--text-muted);
+  font: 400 0.78rem/1.5 'DM Mono', monospace;
+}
+
+html:not([data-gameboy]) .gen-tile,
+html:not([data-gameboy]) .challenge-toggle {
+  border: 1px solid rgba(121, 225, 208, 0.2);
+  border-radius: 12px;
+  background: rgba(9, 18, 17, 0.62);
+  box-shadow: none;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+html:not([data-gameboy]) .gen-tile:hover,
+html:not([data-gameboy]) .challenge-toggle:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent-blue);
+  background: rgba(121, 225, 208, 0.1);
+  box-shadow: none;
+}
+
+html:not([data-gameboy]) .gen-tile.is-active,
+html:not([data-gameboy]) .challenge-toggle.is-active {
+  border-color: var(--accent-red);
+  background: rgba(255, 116, 104, 0.12);
+  box-shadow: inset 3px 0 0 var(--accent-red);
+}
+
+html:not([data-gameboy]) .cta {
+  border: 1px solid var(--accent-red);
+  border-radius: 11px;
+  background: var(--accent-red);
+  color: #1b1712;
+  font: 700 0.78rem/1 'DM Mono', monospace;
+  letter-spacing: 0.04em;
+  box-shadow: 0 8px 18px rgba(255, 116, 104, 0.2);
+}
+
+html:not([data-gameboy]) .cta:hover:not(:disabled) {
+  background: #ff9389;
+  box-shadow: 0 12px 24px rgba(255, 116, 104, 0.3);
+}
+
+html:not([data-gameboy]) .setup-start {
+  padding: 16px 24px !important;
+  font-size: 0.86rem !important;
+}
+
+html:not([data-gameboy]) .chip,
+html:not([data-gameboy]) .move-btn,
+html:not([data-gameboy]) .secondary {
+  border: 1px solid rgba(121, 225, 208, 0.2);
+  border-radius: 10px;
+  background: var(--panel-bg2);
+  box-shadow: none;
+}
+
+html:not([data-gameboy]) .chip:hover,
+html:not([data-gameboy]) .move-btn:hover,
+html:not([data-gameboy]) .secondary:hover {
+  background: rgba(121, 225, 208, 0.1);
+  border-color: var(--accent-blue);
+}
+
+html:not([data-gameboy]) .setup-hero,
+html:not([data-gameboy]) .setup-card,
+html:not([data-gameboy]) .panel {
+  animation: expeditionReveal 0.55s ease both;
+}
+
+html:not([data-gameboy]) .setup-card:nth-child(2) { animation-delay: 0.08s; }
+html:not([data-gameboy]) .setup-card:nth-child(3) { animation-delay: 0.16s; }
+
+@keyframes expeditionReveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  html:not([data-gameboy]) .app-shell { padding: 0.7rem 0.7rem 2rem; }
+  html:not([data-gameboy]) .topbar { border-radius: 14px; }
+  html:not([data-gameboy]) .topbar::after { display: none; }
+  html:not([data-gameboy]) .topbar h1 { font-size: 1.35rem; }
+  html:not([data-gameboy]) .setup-hero,
+  html:not([data-gameboy]) .setup-hero-overlay { min-height: 160px; }
+  html:not([data-gameboy]) .setup-hero-overlay { padding: 1.2rem; }
+}
+
+/* ============================================================
+   REDISEÑO v3: DOSSIER TACTICO
+   ============================================================ */
+
+html:not([data-gameboy]) {
+  --bg-dark: #111116;
+  --panel-bg: #1a1a20;
+  --panel-bg2: #23232a;
+  --panel-border: #454552;
+  --border-light: #696977;
+  --accent-red: #ff684d;
+  --accent-red-dark: #bd4032;
+  --accent-blue: #b7eeff;
+  --accent-yellow: #d7ff3f;
+  --accent-green: #8dff9f;
+  --text-main: #f3f0e8;
+  --text-muted: #a4a1ad;
+  --shadow-hard: 8px 8px 0 rgba(0, 0, 0, 0.32);
+  --shadow-hard-sm: 5px 5px 0 rgba(0, 0, 0, 0.28);
+}
+
+html:not([data-gameboy]) body {
+  background-color: #111116;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+html:not([data-gameboy]) .app-shell {
+  position: relative;
+  max-width: 1500px;
+  gap: 20px;
+  padding: 1rem clamp(1rem, 4vw, 4rem) 4rem;
+}
+
+html:not([data-gameboy]) .app-shell::before {
+  content: 'PR / 025';
+  position: fixed;
+  left: 1.2rem;
+  bottom: 1.2rem;
+  z-index: 4;
+  color: var(--accent-yellow);
+  font: 500 0.62rem/1 'DM Mono', monospace;
+  letter-spacing: 0.18em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+html:not([data-gameboy]) .topbar {
+  min-height: 62px;
+  border: 0;
+  border-bottom: 1px solid #454552;
+  border-radius: 0;
+  padding: 0.7rem 0;
+  background: #111116;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html:not([data-gameboy]) .topbar::before {
+  content: 'RUN CONTROL';
+  position: absolute;
+  left: 0;
+  top: -0.5rem;
+  color: var(--accent-red);
+  font: 500 0.55rem/1 'DM Mono', monospace;
+  letter-spacing: 0.2em;
+}
+
+html:not([data-gameboy]) .topbar::after {
+  content: 'STATUS: READY';
+  right: 0;
+  bottom: -0.95rem;
+  color: var(--accent-yellow);
+  font-size: 0.52rem;
+  letter-spacing: 0.16em;
+}
+
+html:not([data-gameboy]) .topbar h1 {
+  font-size: clamp(1.7rem, 4vw, 3.2rem);
+  font-weight: 700;
+  letter-spacing: -0.09em;
+  text-transform: uppercase;
+}
+
+html:not([data-gameboy]) .topbar h1::before {
+  content: '01';
+  margin-right: 0.7rem;
+  color: var(--accent-red);
+  font: 500 0.58em/1 'DM Mono', monospace;
+  letter-spacing: 0;
+}
+
+html:not([data-gameboy]) .topbar .tiny-btn,
+html:not([data-gameboy]) .tiny-btn {
+  border: 1px solid #454552;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.63rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+html:not([data-gameboy]) .topbar .tiny-btn:hover,
+html:not([data-gameboy]) .tiny-btn:hover {
+  transform: none;
+  color: #111116;
+  border-color: var(--accent-yellow);
+  background: var(--accent-yellow);
+}
+
+html:not([data-gameboy]) .record-box {
+  border: 1px solid #454552;
+  border-radius: 0;
+  background: #1a1a20;
+  font-size: 0.65rem;
+}
+
+html:not([data-gameboy]) .panel,
+html:not([data-gameboy]) .setup-card,
+html:not([data-gameboy]) .setup-hero {
+  border: 1px solid #454552;
+  border-radius: 0;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+html:not([data-gameboy]) .panel {
+  background: #1a1a20;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html:not([data-gameboy]) .setup-panel {
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html:not([data-gameboy]) .setup-hero {
+  min-height: 290px;
+  margin-bottom: 1.4rem;
+  border-color: var(--accent-red);
+  background: #27232a;
+  clip-path: polygon(0 0, 96% 0, 100% 20%, 100% 100%, 4% 100%, 0 84%);
+}
+
+html:not([data-gameboy]) .setup-hero-canvas {
+  opacity: 0.2;
+  filter: grayscale(1) contrast(1.25) sepia(0.35) hue-rotate(315deg);
+}
+
+html:not([data-gameboy]) .setup-hero-overlay {
+  min-height: 290px;
+  align-items: flex-end;
+  padding: clamp(1.5rem, 5vw, 4rem);
+  background: linear-gradient(0deg, rgba(17, 17, 22, 0.98), rgba(17, 17, 22, 0.2));
+}
+
+html:not([data-gameboy]) .setup-hero-title {
+  max-width: 9ch;
+  color: var(--text-main);
+  font: 700 clamp(2.4rem, 8vw, 7rem)/0.82 'Space Grotesk', sans-serif;
+  letter-spacing: -0.12em;
+  text-transform: uppercase;
+  text-shadow: 5px 5px 0 rgba(0, 0, 0, 0.35);
+}
+
+html:not([data-gameboy]) .setup-hero-title::after {
+  content: 'TACTICAL RANDOMIZER';
+  margin-top: 1.2rem;
+  color: var(--accent-yellow);
+  font: 500 0.62rem/1 'DM Mono', monospace;
+  letter-spacing: 0.22em;
+}
+
+html:not([data-gameboy]) .setup-hero-sub {
+  max-width: 34ch;
+  color: var(--accent-blue);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+html:not([data-gameboy]) .setup-hero-actions {
+  align-items: flex-end;
+}
+
+html:not([data-gameboy]) .setup-grid {
+  gap: 1.4rem;
+}
+
+html:not([data-gameboy]) .setup-col {
+  gap: 1.4rem;
+}
+
+html:not([data-gameboy]) .setup-card {
+  position: relative;
+  background: #1a1a20;
+  padding: 1.4rem;
+  clip-path: polygon(0 0, 99% 0, 100% 5%, 100% 100%, 1% 100%, 0 96%);
+}
+
+html:not([data-gameboy]) .setup-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 42px;
+  height: 3px;
+  background: var(--accent-red);
+}
+
+html:not([data-gameboy]) .setup-card-title {
+  color: var(--text-main);
+  font: 600 0.75rem/1 'DM Mono', monospace;
+  letter-spacing: 0.1em;
+}
+
+html:not([data-gameboy]) .setup-step {
+  width: 28px;
+  height: 28px;
+  border-radius: 0;
+  background: var(--accent-red);
+  color: #111116;
+  font: 700 0.7rem/1 'DM Mono', monospace;
+}
+
+html:not([data-gameboy]) .generation-grid {
+  gap: 8px;
+}
+
+html:not([data-gameboy]) .gen-tile,
+html:not([data-gameboy]) .challenge-toggle {
+  border: 1px solid #454552;
+  border-radius: 0;
+  background: #23232a;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+html:not([data-gameboy]) .gen-tile:hover,
+html:not([data-gameboy]) .challenge-toggle:hover {
+  transform: translateX(4px);
+  border-color: var(--accent-blue);
+  background: #2b3038;
+}
+
+html:not([data-gameboy]) .gen-tile.is-active,
+html:not([data-gameboy]) .challenge-toggle.is-active {
+  border-color: var(--accent-yellow);
+  background: #303323;
+  box-shadow: inset 4px 0 0 var(--accent-yellow);
+}
+
+html:not([data-gameboy]) .cta {
+  border: 1px solid var(--accent-yellow);
+  border-radius: 0;
+  background: var(--accent-yellow);
+  color: #111116;
+  font: 700 0.72rem/1 'DM Mono', monospace;
+  text-transform: uppercase;
+  box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.35);
+}
+
+html:not([data-gameboy]) .cta:hover:not(:disabled) {
+  background: #e8ff72;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+  transform: translate(3px, 3px);
+}
+
+html:not([data-gameboy]) .setup-start {
+  padding: 17px 25px !important;
+  font-size: 0.8rem !important;
+}
+
+html:not([data-gameboy]) .chip,
+html:not([data-gameboy]) .move-btn,
+html:not([data-gameboy]) .secondary {
+  border: 1px solid #454552;
+  border-radius: 0;
+  background: #23232a;
+  box-shadow: none;
+}
+
+html:not([data-gameboy]) .chip:hover,
+html:not([data-gameboy]) .move-btn:hover,
+html:not([data-gameboy]) .secondary:hover {
+  background: #2b3038;
+  border-color: var(--accent-blue);
+}
+
+html:not([data-gameboy]) .setup-hero,
+html:not([data-gameboy]) .setup-card,
+html:not([data-gameboy]) .panel {
+  animation: dossierIn 0.45s ease both;
+}
+
+html:not([data-gameboy]) .setup-card:nth-child(2) { animation-delay: 0.07s; }
+html:not([data-gameboy]) .setup-card:nth-child(3) { animation-delay: 0.14s; }
+
+@keyframes dossierIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  html:not([data-gameboy]) .app-shell { padding: 0.75rem 0.65rem 2rem; }
+  html:not([data-gameboy]) .app-shell::before { display: none; }
+  html:not([data-gameboy]) .topbar { border-bottom-width: 1px; }
+  html:not([data-gameboy]) .topbar::before,
+  html:not([data-gameboy]) .topbar::after { display: none; }
+  html:not([data-gameboy]) .topbar h1 { font-size: 1.45rem; }
+  html:not([data-gameboy]) .setup-hero,
+  html:not([data-gameboy]) .setup-hero-overlay { min-height: 235px; }
+  html:not([data-gameboy]) .setup-hero-overlay { padding: 1.4rem; }
+  html:not([data-gameboy]) .setup-hero-title { font-size: clamp(2.5rem, 15vw, 4.5rem); }
+}
+
+/* El club de entrenadores es la capa final: conserva las reglas del juego,
+   pero gana prioridad sobre los prototipos visuales anteriores. */
+html:not([data-gameboy]) {
+  --bg-dark: #f0eee7;
+  --panel-bg: #fffdf6;
+  --panel-bg2: #e4e6e7;
+  --panel-border: #18213c;
+  --border-light: #18213c;
+  --accent-red: #df3b2f;
+  --accent-blue: #1c6e9e;
+  --accent-yellow: #f2bf2f;
+  --accent-green: #278c60;
+  --text-main: #18213c;
+  --text-muted: #596173;
+  --shadow-hard: 7px 7px 0 #18213c;
+  --shadow-hard-sm: 4px 4px 0 rgba(24, 33, 60, 0.28);
+}
+
+html:not([data-gameboy]) body {
+  background-color: #11182a;
+  background-image:
+    linear-gradient(135deg, rgba(223, 59, 47, 0.12) 0 12%, transparent 12%),
+    linear-gradient(315deg, rgba(28, 110, 158, 0.1) 0 9%, transparent 9%),
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 28px 28px, 28px 28px;
+  color: #f3f0e8;
+}
+
+html:not([data-gameboy]) .app-shell { max-width: 1460px; gap: 1.15rem; padding: 1.15rem clamp(0.75rem, 3vw, 3.5rem) 3rem; }
+html:not([data-gameboy]) .topbar { min-height: 70px; padding: 0.8rem 1rem; border: 0; border-bottom: 4px solid #df3b2f; border-radius: 0 0 18px 18px; background: #171d30; box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.32); }
+html:not([data-gameboy]) .topbar::before { content: 'TRAINER CLUB // EST. 1996'; position: absolute; left: 0; top: -0.5rem; color: #1c6e9e; font: 500 0.56rem/1 'DM Mono', monospace; letter-spacing: 0.15em; }
+html:not([data-gameboy]) .topbar::after { content: '● LIVE'; right: 0; bottom: -1rem; color: #278c60; font-size: 0.52rem; letter-spacing: 0.12em; }
+html:not([data-gameboy]) .topbar h1 { color: #f4f1e8; font: 700 clamp(1.7rem, 4vw, 3.35rem)/0.88 'Bebas Neue', 'Space Grotesk', sans-serif; letter-spacing: 0.04em; text-transform: uppercase; }
+html:not([data-gameboy]) .topbar h1::before { content: '◆'; margin-right: 0.45rem; color: #df3b2f; font-size: 0.6em; }
+html:not([data-gameboy]) .topbar .tiny-btn, html:not([data-gameboy]) .tiny-btn { border: 2px solid #6d7894; border-radius: 7px; background: #20263a; color: #f4f1e8; font: 500 0.65rem/1.1 'DM Mono', monospace; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2); }
+html:not([data-gameboy]) .topbar .tiny-btn:hover, html:not([data-gameboy]) .tiny-btn:hover { transform: translate(-2px, -2px) rotate(-1deg); color: #fffdf6; border-color: #df3b2f; background: #df3b2f; }
+html:not([data-gameboy]) .record-box { border: 2px solid #6d7894; border-radius: 7px; background: #2a3148; color: #f2bf2f; padding: 7px 10px; font: 500 0.66rem/1 'DM Mono', monospace; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2); }
+html:not([data-gameboy]) .panel, html:not([data-gameboy]) .setup-card, html:not([data-gameboy]) .setup-hero { border: 2px solid #6d7894; border-radius: 0; box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.28); }
+html:not([data-gameboy]) .panel { background: #20263a; backdrop-filter: none; -webkit-backdrop-filter: none; }
+html:not([data-gameboy]) .setup-panel { max-width: none; padding: 0; border: 0; background: transparent; box-shadow: none; }
+html:not([data-gameboy]) .setup-hero { min-height: 310px; margin-bottom: 1.25rem; border-color: #18213c; background: #df3b2f; clip-path: polygon(0 0, 94% 0, 100% 18%, 100% 100%, 5% 100%, 0 82%); }
+html:not([data-gameboy]) .setup-hero-canvas { opacity: 0.38; filter: saturate(1.2) contrast(1.05) sepia(0.15); mix-blend-mode: multiply; }
+html:not([data-gameboy]) .setup-hero-overlay { min-height: 310px; align-items: flex-end; padding: clamp(1.4rem, 5vw, 4rem); background: linear-gradient(90deg, rgba(223, 59, 47, 0.98) 0 43%, rgba(223, 59, 47, 0.72) 67%, transparent); }
+html:not([data-gameboy]) .setup-hero-title { max-width: 8ch; color: #fffdf6; font: 400 clamp(2.9rem, 9vw, 8rem)/0.78 'Bebas Neue', sans-serif; letter-spacing: 0.015em; text-transform: uppercase; text-shadow: 5px 5px 0 #18213c; }
+html:not([data-gameboy]) .setup-hero-title::after { content: 'CHOOSE YOUR PARTNER'; display: block; margin-top: 1rem; color: #f2bf2f; font: 500 0.62rem/1 'DM Mono', monospace; letter-spacing: 0.16em; text-shadow: none; }
+html:not([data-gameboy]) .setup-hero-sub { max-width: 34ch; color: #fffdf6; font: 500 0.75rem/1.45 'DM Mono', monospace; }
+html:not([data-gameboy]) .setup-card { position: relative; background: #20263a; padding: 1.3rem; clip-path: polygon(0 0, 98% 0, 100% 5%, 100% 100%, 2% 100%, 0 95%); }
+html:not([data-gameboy]) .setup-card::before { content: ''; position: absolute; top: 0; right: 0; width: 58px; height: 5px; background: #1c6e9e; }
+html:not([data-gameboy]) .setup-card-title { color: #f4f1e8; font: 600 0.74rem/1 'DM Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; }
+html:not([data-gameboy]) .setup-step { width: 28px; height: 28px; border-radius: 50%; background: #1c6e9e; color: #fffdf6; font: 700 0.7rem/1 'DM Mono', monospace; }
+html:not([data-gameboy]) .gen-tile, html:not([data-gameboy]) .challenge-toggle { border: 2px solid #596681; border-radius: 7px; background: #2a3148; color: #f4f1e8; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.22); transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease; }
+html:not([data-gameboy]) .gen-tile:hover, html:not([data-gameboy]) .challenge-toggle:hover { transform: translateY(-3px); border-color: #79c7e8; background: #313b57; box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.28); }
+html:not([data-gameboy]) .gen-tile.is-active, html:not([data-gameboy]) .challenge-toggle.is-active {
+  position: relative;
+  transform: translateY(-4px) rotate(-0.5deg);
+  border-color: #f2bf2f;
+  background: #8f3540;
+  color: #fff8e7;
+  box-shadow: 0 0 0 2px rgba(242, 191, 47, 0.24), 0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+html:not([data-gameboy]) .gen-tile.is-active::after, html:not([data-gameboy]) .challenge-toggle.is-active::after {
+  content: '✓';
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border: 2px solid #f2bf2f;
+  border-radius: 50%;
+  background: #18213c;
+  color: #f2bf2f;
+  font: 700 1.1rem/1 'DM Mono', monospace;
+  animation: selectionMarkIn 0.2s ease both;
+}
+
+html:not([data-gameboy]) .setup-card-gen .gen-tile,
+html:not([data-gameboy]) .setup-card-diff .gen-tile,
+html:not([data-gameboy]) .setup-card-gen .gen-tile strong,
+html:not([data-gameboy]) .setup-card-diff .gen-tile strong,
+html:not([data-gameboy]) .setup-card-gen .gen-tile > div > span,
+html:not([data-gameboy]) .setup-card-diff .gen-tile > div > span {
+  color: #ffffff !important;
+}
+
+@keyframes selectionMarkIn {
+  from { opacity: 0; transform: scale(0.5) rotate(-12deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+html:not([data-gameboy]) .cta { border: 2px solid #18213c; border-radius: 8px; background: #f2bf2f; color: #18213c; font: 700 0.75rem/1 'DM Mono', monospace; text-transform: uppercase; box-shadow: 5px 5px 0 #18213c; }
+html:not([data-gameboy]) .cta:hover:not(:disabled) { background: #ffdd55; box-shadow: 2px 2px 0 #18213c; transform: translate(3px, 3px) rotate(-1deg); }
+html:not([data-gameboy]) .setup-start { padding: 17px 25px !important; font-size: 0.8rem !important; }
+html:not([data-gameboy]) .setup-hero-actions .setup-start {
+  min-width: 230px;
+  min-height: 58px;
+  padding: 19px 30px !important;
+  font-size: 0.92rem !important;
+}
+
+html:not([data-gameboy]) .setup-hero-actions > .tiny-btn {
+  min-width: 190px;
+  min-height: 50px;
+  padding: 14px 18px;
+  font-size: 0.74rem;
+  line-height: 1.25;
+}
+html:not([data-gameboy]) .chip, html:not([data-gameboy]) .move-btn, html:not([data-gameboy]) .secondary { border: 2px solid #6d7894; border-radius: 7px; background: #2a3148; color: #f4f1e8; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.18); }
+html:not([data-gameboy]) .chip:hover, html:not([data-gameboy]) .move-btn:hover, html:not([data-gameboy]) .secondary:hover { background: #d7edf3; border-color: #1c6e9e; }
+html:not([data-gameboy]) .setup-hero, html:not([data-gameboy]) .setup-card, html:not([data-gameboy]) .panel { animation: trainerClubIn 0.42s ease both; }
+@keyframes trainerClubIn { from { opacity: 0; transform: translateY(12px) rotate(0.4deg); } to { opacity: 1; transform: translateY(0) rotate(0); } }
+
+@media (max-width: 768px) {
+  html:not([data-gameboy]) .app-shell { padding: 0.65rem 0.55rem 2rem; }
+  html:not([data-gameboy]) .app-shell::before, html:not([data-gameboy]) .topbar::before, html:not([data-gameboy]) .topbar::after { display: none; }
+  html:not([data-gameboy]) .topbar h1 { font-size: 1.55rem; }
+  html:not([data-gameboy]) .setup-hero, html:not([data-gameboy]) .setup-hero-overlay { min-height: 245px; }
+  html:not([data-gameboy]) .setup-hero-overlay { padding: 1.25rem; }
+  html:not([data-gameboy]) .setup-hero-title { font-size: clamp(2.9rem, 17vw, 5rem); }
 }

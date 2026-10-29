@@ -107,6 +107,63 @@ export function playClick(): void {
   } catch { /* silent */ }
 }
 
+export function playSelect(): void {
+  try {
+    const ac = getCtx()
+    const now = ac.currentTime
+    note(ac, ac.destination, 660, now, 0.07, 'triangle', 0.12 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 990, now + 0.055, 0.09, 'triangle', 0.1 * sfxVolume * SFX_SOFTNESS)
+  } catch { /* silent */ }
+}
+
+export function playCapture(): void {
+  try {
+    const ac = getCtx()
+    const now = ac.currentTime
+    noise(ac, ac.destination, now, 0.12, 0.08 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 220, now + 0.08, 0.12, 'sine', 0.16 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 330, now + 0.18, 0.16, 'triangle', 0.18 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 494, now + 0.3, 0.28, 'triangle', 0.2 * sfxVolume * SFX_SOFTNESS)
+  } catch { /* silent */ }
+}
+
+export function playPerfectCapture(): void {
+  try {
+    const ac = getCtx()
+    const now = ac.currentTime
+    const notes = [523, 659, 784, 1047, 1318]
+    notes.forEach((freq, i) => note(ac, ac.destination, freq, now + i * 0.075, 0.2, 'square', 0.16 * sfxVolume * SFX_SOFTNESS))
+  } catch { /* silent */ }
+}
+
+export function playEquip(): void {
+  try {
+    const ac = getCtx()
+    const now = ac.currentTime
+    note(ac, ac.destination, 392, now, 0.08, 'square', 0.12 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 523, now + 0.08, 0.14, 'square', 0.14 * sfxVolume * SFX_SOFTNESS)
+  } catch { /* silent */ }
+}
+
+export function playPurchase(): void {
+  try {
+    const ac = getCtx()
+    const now = ac.currentTime
+    note(ac, ac.destination, 330, now, 0.08, 'triangle', 0.13 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 440, now + 0.08, 0.08, 'triangle', 0.13 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 660, now + 0.16, 0.18, 'triangle', 0.15 * sfxVolume * SFX_SOFTNESS)
+  } catch { /* silent */ }
+}
+
+export function playError(): void {
+  try {
+    const ac = getCtx()
+    const now = ac.currentTime
+    note(ac, ac.destination, 180, now, 0.12, 'sawtooth', 0.12 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 120, now + 0.1, 0.16, 'sawtooth', 0.1 * sfxVolume * SFX_SOFTNESS)
+  } catch { /* silent */ }
+}
+
 export function playHit(): void {
   try {
     const ac = getCtx()
