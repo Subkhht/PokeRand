@@ -208,7 +208,7 @@ button {
 }
 
 .record-box {
-  background: var(--bg-dark);
+  background: #12122b;
   border: 2px solid var(--panel-border);
   border-radius: 4px;
   padding: 6px 14px;
@@ -470,6 +470,8 @@ button {
 
 .move-btn-line {
   display: block;
+  font-size: 0.9rem;
+  color: #ffffff;
 }
 
 .move-btn-effect {
@@ -478,6 +480,12 @@ button {
   font-weight: bold;
   opacity: 1;
   color: var(--accent-blue);
+}
+
+button.move-btn:not(:disabled):hover,
+button.move-btn:not(:disabled):focus-visible {
+  background: rgba(44, 63, 112, 0.92) !important;
+  color: #ffffff !important;
 }
 
 .panel h2,
@@ -618,7 +626,7 @@ input[type='range'].range-slider::-moz-range-progress {
   bottom: calc(100% + 10px);
   left: 50%;
   transform: translateX(-50%);
-  background: var(--panel-bg);
+  background: rgba(18, 18, 43, 0.82);
   border: 2px solid var(--border-light);
   border-radius: 4px;
   padding: 10px 12px;
@@ -630,6 +638,8 @@ input[type='range'].range-slider::-moz-range-progress {
   pointer-events: none;
   text-align: left;
   box-shadow: var(--shadow-hard-sm);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .sprite-tooltip-wrapper:hover .sprite-tooltip {
@@ -650,7 +660,7 @@ input[type='range'].range-slider::-moz-range-progress {
 .tooltip-name {
   font-weight: 700;
   font-size: 1rem;
-  color: var(--text-main);
+  color: #ffffff;
   margin-bottom: 4px;
 }
 
@@ -678,7 +688,7 @@ input[type='range'].range-slider::-moz-range-progress {
 }
 
 .tooltip-stat strong {
-  color: var(--text-main);
+  color: #ffffff;
   font-size: 0.9rem;
 }
 
@@ -693,7 +703,7 @@ input[type='range'].range-slider::-moz-range-progress {
 .tooltip-moves .tooltip-move {
   display: inline-block;
   background: rgba(56, 189, 248, 0.15);
-  color: var(--accent-blue);
+  color: #ffffff;
   border-radius: 3px;
   padding: 1px 5px;
   margin: 1px 2px;
@@ -704,9 +714,9 @@ input[type='range'].range-slider::-moz-range-progress {
 .theme-tooltip {
   position: fixed;
   transform: translate(-50%, calc(-100% - 8px));
-  background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
+  background: color-mix(in srgb, #12122b 94%, transparent);
   border: 1px solid var(--border, #5a5a96);
-  color: var(--text-main);
+  color: #ffffff;
   border-radius: 6px;
   padding: 8px 12px;
   white-space: pre-line;
@@ -1164,7 +1174,7 @@ input[type='range'].range-slider::-moz-range-progress {
 .pokedex-card strong {
   font-size: 14px;
   margin: 4px 0;
-  color: var(--text-main);
+  color: #ffffff;
 }
 
 .pokedex-id {

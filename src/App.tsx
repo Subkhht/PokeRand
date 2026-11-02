@@ -15001,7 +15001,10 @@ function MainApp() {
                               onClick={() => onPlayerMove(move)}
                               type="button"
                               disabled={moveDisabled}
-                              style={isDisabled || choiceBlocked || assaultVestBlocked ? { borderColor: '#ff8a80', opacity: 0.5, textDecoration: 'line-through' } : undefined}
+                              style={{
+                                borderColor: isDisabled || choiceBlocked || assaultVestBlocked ? '#ff8a80' : (TYPE_COLORS[move.type] ?? '#475569'),
+                                ...(isDisabled || choiceBlocked || assaultVestBlocked ? { opacity: 0.5, textDecoration: 'line-through' } : {}),
+                              }}
                             >
                               <span className="move-btn-line">{isDisabled || choiceBlocked || assaultVestBlocked ? '🚫 ' : ''}{moveName(move)} ({move.type}{runChallenges.typeRandomizer ? ' *' : ''}){move.minHits ? ` x${move.minHits}-${move.maxHits}` : ''}</span>
                               {moveEffectSummary(move) && <span className="move-btn-effect">{moveEffectSummary(move)}</span>}
