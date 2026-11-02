@@ -394,7 +394,7 @@ button {
 .cta,
 .secondary {
   border-radius: 4px;
-  padding: 8px 12px;
+  padding: 7px 10px;
   font-size: 12px;
   font-family: var(--font-title);
 }
@@ -470,13 +470,13 @@ button {
 
 .move-btn-line {
   display: block;
-  font-size: 0.9rem;
+  font-size: 1.1rem;
   color: #ffffff;
 }
 
 .move-btn-effect {
   display: block;
-  font-size: 0.72em;
+  font-size: 0.9rem;
   font-weight: bold;
   opacity: 1;
   color: var(--accent-blue);
