@@ -220,6 +220,19 @@ export function playCoin(): void {
   } catch { /* silent */ }
 }
 
+// Secuencia breve de tragaperras para los nodos Spin y PokeRand.
+export function playSlotMachine(): void {
+  try {
+    const ac = getCtx()
+    const now = ac.currentTime
+    const notes = [330, 440, 554, 659, 988]
+    notes.forEach((freq, i) => {
+      const start = now + i * 0.075
+      note(ac, ac.destination, freq, start, i === notes.length - 1 ? 0.24 : 0.09, 'square', (i === notes.length - 1 ? 0.2 : 0.12) * sfxVolume * SFX_SOFTNESS)
+    })
+  } catch { /* silent */ }
+}
+
 // Fanfarria corta y alegre al desbloquear un logro: arpegio ascendente brillante.
 export function playAchievement(): void {
   try {

@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef, useCallback, startTransition, Com
 import { createPortal } from 'react-dom'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
-import { playHover, playClick, playSelect, playHit, playEvolution, playCapture, playPerfectCapture, playEquip, playPurchase, playError, playCoin, playAchievement, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
+import { playHover, playClick, playSelect, playHit, playEvolution, playCapture, playPerfectCapture, playEquip, playPurchase, playError, playCoin, playSlotMachine, playAchievement, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -26,7 +26,7 @@ import {
   type PokemonDetails
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
-import { abilityName, abilityDesc, weatherName, weatherTypeMultiplier, weatherSpeedMultiplier, weatherChipDmg, WEATHER_SETTERS, WEATHER_INFO, natureName, natureStatMods, natureMultiplier, randomNature, generateIVs, ivStatBonus, hasAbility, type WeatherKind, type MetaStatKey } from './game/pokemonMeta'
+import { abilityName, abilityDesc, weatherName, weatherDescription, weatherTypeMultiplier, weatherSpeedMultiplier, weatherChipDmg, WEATHER_SETTERS, WEATHER_INFO, natureName, natureStatMods, natureMultiplier, randomNature, generateIVs, ivStatBonus, hasAbility, type WeatherKind, type MetaStatKey } from './game/pokemonMeta'
 import { isLeaderboardEnabled, submitInfiniteScore, fetchInfiniteLeaderboard, formatDuration, getCurrentUser, onAuthChange, signUpWithUsername, signIn, signOut, getUsername, isUsernameTaken, type LeaderboardEntry, type InfiniteScoreInsert } from './game/leaderboard'
 import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, cancelExchangeOffer, sendCoopChat, getCoopChat, finishCoopSession, resetCoopSession, clearCoopRestart, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange, type CoopChatMessage } from './game/coop'
 import { isPvpEnabled, createPvpRoom, findPvpOpponent, joinPvpRoom, getPvpMatch, getPvpState, submitPvpAction, resolvePvpTurn as resolvePvpTurnRpc, forfeitPvpMatch, cancelPvpMatch, finishPvpMatch, clearPvpAction, startPvpTimer, expirePvpTimer, getPvpElo, getPvpEloLeaderboard, awardPvpElo, rematchPvpRoom, serializePvpPokemon, type PvpTurnSnapshot, type PvpRoomResult, type PvpState, type PvpEloEntry } from './game/pvp'
@@ -2537,6 +2537,26 @@ function ThemedTooltip({ content, children }: { content: ReactNode; children: Re
   )
 }
 
+function WeatherTooltip({ weather, style }: { weather: Exclude<WeatherKind, 'none'>; style?: CSSProperties }): ReactNode {
+  const lang = getLanguage()
+  return (
+    <ThemedTooltip
+      content={(
+        <div>
+          <strong style={{ display: 'block', marginBottom: '4px', color: '#cba3ff' }}>
+            {WEATHER_INFO[weather].icon} {weatherName(weather, lang)}
+          </strong>
+          <span>{weatherDescription(weather, lang)}</span>
+        </div>
+      )}
+    >
+      <div style={{ ...style, cursor: 'help' }}>
+        {WEATHER_INFO[weather].icon} {weatherName(weather, lang)}
+      </div>
+    </ThemedTooltip>
+  )
+}
+
 function getEffectiveStats(pokemon: Pokemon): { attack: number; defense: number; spAttack: number; spDefense: number; speed: number; maxHp: number } {
   const item = pokemon.holdItem ? HOLDABLE_ITEMS[pokemon.holdItem] : null
   const stages = pokemon.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
@@ -3223,6 +3243,23 @@ function MainApp() {
   const currentNode = useMemo(() => route[routeIndex] ?? null, [route, routeIndex])
   const activePokemon = useMemo(() => team[activeIndex] ?? null, [team, activeIndex])
   const inventoryEntries = useMemo(() => groupInventory(inventory), [inventory])
+  const inventoryOrderRef = useRef<string[]>([])
+  const inventorySlotEntries = useMemo(() => {
+    const entriesByName = new Map(inventoryEntries.map((entry) => [entry.name, entry]))
+    const activeNames = new Set(entriesByName.keys())
+    inventoryOrderRef.current = inventoryOrderRef.current.filter((name) => activeNames.has(name))
+    for (const entry of inventoryEntries) {
+      if (!inventoryOrderRef.current.includes(entry.name)) inventoryOrderRef.current.push(entry.name)
+    }
+    return inventoryOrderRef.current.flatMap((name) => {
+      const entry = entriesByName.get(name)
+      return entry ? [entry] : []
+    })
+  }, [inventoryEntries])
+
+  useEffect(() => {
+    if (screen === 'setup') inventoryOrderRef.current = []
+  }, [screen])
 
   // Habilidades de entrada: se aplican una vez al comenzar cada batalla y se
   // resetean al salir del combate (junto con el clima).
@@ -7980,6 +8017,7 @@ function MainApp() {
 
   function spinRoulette(): void {
     if (spinAnimating || spinRevealed) return
+    playSlotMachine()
     setSpinAnimating(true)
     setSpinWinnerIndex(null)
     setSpinRevealed(false)
@@ -8021,6 +8059,7 @@ function MainApp() {
 
   function pokeRandSpin(): void {
     if (pokeRandAnimating || pokeRandRevealed) return
+    playSlotMachine()
     setPokeRandAnimating(true)
     setPokeRandWinnerIndex(null)
     setPokeRandRevealed(false)
@@ -12535,9 +12574,10 @@ function MainApp() {
                 </div>
 
                 {st.weather && st.weather !== 'none' && (
-                  <div style={{ display: 'inline-block', alignSelf: 'center', padding: '2px 10px', borderRadius: '999px', background: 'rgba(154,152,207,0.18)', color: '#c4b5fd', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                    {WEATHER_INFO[st.weather].icon} {weatherName(st.weather, getLanguage())}
-                  </div>
+                  <WeatherTooltip
+                    weather={st.weather}
+                    style={{ display: 'inline-block', alignSelf: 'center', padding: '2px 10px', borderRadius: '999px', background: 'rgba(154,152,207,0.18)', color: '#c4b5fd', fontSize: '0.75rem', fontWeight: 'bold' }}
+                  />
                 )}
 
                 <div style={{ maxHeight: '220px', minHeight: '120px', overflowY: 'auto', padding: '0.5rem 0.6rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid #3f3f6e' }}>
@@ -14498,11 +14538,11 @@ function MainApp() {
                             onClick={() => setSelectedNewMove(move)}
                             style={{ borderColor: TYPE_COLORS[move.type] ?? '#475569' }}
                           >
-                            <strong>{moveName(move)}</strong>
+                            <strong className="move-btn-line">{moveName(move)}</strong>
                             <span className="muted" style={{ fontSize: '0.5rem' }}>
                               {move.type.toUpperCase()} · Pwr {move.power} · Acc {move.accuracy ?? '—'}
                             </span>
-                            {moveEffectSummary(move) && <span className="move-btn-effect" style={{ fontSize: '0.55rem' }}>{moveEffectSummary(move)}</span>}
+                            {moveEffectSummary(move) && <span className="move-btn-effect">{moveEffectSummary(move)}</span>}
                           </button>
                         </ThemedTooltip>
                       ))}
@@ -14528,11 +14568,11 @@ function MainApp() {
                             onClick={() => replaceTeamMove(idx)}
                             style={{ borderColor: TYPE_COLORS[move.type] ?? '#475569' }}
                           >
-                            <strong>{moveName(move)}</strong>
+                            <strong className="move-btn-line">{moveName(move)}</strong>
                             <span className="muted" style={{ fontSize: '0.5rem' }}>
                               {move.type.toUpperCase()} · Pwr {move.power}
                             </span>
-                            {moveEffectSummary(move) && <span className="move-btn-effect" style={{ fontSize: '0.55rem' }}>{moveEffectSummary(move)}</span>}
+                            {moveEffectSummary(move) && <span className="move-btn-effect">{moveEffectSummary(move)}</span>}
                           </button>
                         </ThemedTooltip>
                       ))}
@@ -14720,9 +14760,10 @@ function MainApp() {
                 </div>
 
                 {weather !== 'none' && (
-                  <div style={{ display: 'inline-block', margin: '0 auto 0.5rem', padding: '2px 10px', borderRadius: '999px', background: 'rgba(154,152,207,0.18)', color: '#c4b5fd', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                    {WEATHER_INFO[weather].icon} {weatherName(weather, getLanguage())}
-                  </div>
+                  <WeatherTooltip
+                    weather={weather}
+                    style={{ display: 'inline-block', margin: '0 auto 0.5rem', padding: '2px 10px', borderRadius: '999px', background: 'rgba(154,152,207,0.18)', color: '#c4b5fd', fontSize: '0.75rem', fontWeight: 'bold' }}
+                  />
                 )}
 
                 <div style={{ maxHeight: '110px', overflowY: 'auto', padding: '0.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid #3f3f6e', marginBottom: '0.75rem' }}>
@@ -14795,13 +14836,13 @@ function MainApp() {
                             {pokemon.moves.map((m, mi) => (
                               <ThemedTooltip key={mi} content={moveTooltip(m)}>
                                 <button
-                                  className="tiny-btn"
+                                  className="tiny-btn move-btn double-move-btn"
                                   type="button"
                                   onClick={() => doubleSelectMove(slot, mi)}
                                   style={{ width: '100%', background: sel?.moveIdx === mi ? '#a855f7' : '#2a2a55', color: '#fff', border: sel?.moveIdx === mi ? '2px solid #cba3ff' : '2px solid transparent' }}
                                 >
-                                  {moveName(m)} ({m.type})
-                                  {moveEffectSummary(m) && <div style={{ fontSize: '0.6rem', color: '#7dd3fc', marginTop: '2px' }}>{moveEffectSummary(m)}</div>}
+                                  <span className="move-btn-line">{moveName(m)} ({m.type})</span>
+                                  {moveEffectSummary(m) && <span className="move-btn-effect">{moveEffectSummary(m)}</span>}
                                 </button>
                               </ThemedTooltip>
                             ))}
@@ -14942,9 +14983,10 @@ function MainApp() {
                   {' · '}Nv. {enemy.level}
                 </p>
                 {weather !== 'none' && (
-                  <div style={{ display: 'inline-block', margin: '0 0 6px 0', padding: '2px 8px', borderRadius: '999px', background: 'rgba(154,152,207,0.18)', color: '#c4b5fd', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                    {WEATHER_INFO[weather].icon} {weatherName(weather, getLanguage())}
-                  </div>
+                  <WeatherTooltip
+                    weather={weather}
+                    style={{ display: 'inline-block', margin: '0 0 6px 0', padding: '2px 8px', borderRadius: '999px', background: 'rgba(154,152,207,0.18)', color: '#c4b5fd', fontSize: '0.75rem', fontWeight: 'bold' }}
+                  />
                 )}
                 <div style={{ position: 'relative', display: 'inline-block' }}>
                   <img className={`sprite enemy-sprite${enemy.gmaxEvolved ? ' gmax-active' : ''} ${statusSpriteClass(enemy.status, enemy.leechSeed)}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={enemyHitFlash ? { filter: 'brightness(1.5) sepia(1) hue-rotate(-40deg) saturate(5)', transition: 'filter 0.05s' } : { transition: 'filter 0.3s' }} />
@@ -15075,8 +15117,8 @@ function MainApp() {
           <article className="panel items-panel">
             <h2>{t('route.items')}</h2>
             <div className="items-grid">
-              {inventoryEntries.length > 0 ? (
-                inventoryEntries.map((entry) => {
+              {inventorySlotEntries.length > 0 ? (
+                inventorySlotEntries.map((entry) => {
                   const itemIcon = ITEM_SPRITES[entry.name]
                   const isHoldable = !!HOLDABLE_ITEMS[entry.name]
                   if (isHoldable) {

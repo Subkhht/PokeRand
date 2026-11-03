@@ -599,9 +599,9 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v2.5', en: 'v2.5' },
+  'help.version': { es: 'v2.5.1', en: 'v2.5.1' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
-  'changelog.button': { es: 'Ver cambios v2.5', en: 'See changes v2.5' },
+  'changelog.button': { es: 'Ver cambios v2.5.1', en: 'See changes v2.5.1' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -1871,6 +1871,15 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v2.5.1',
+    items: [
+      { es: '🔊 Nuevo sonido de máquina tragaperras al girar las ruletas de los nodos Spin y PokeRand.', en: '🔊 New slot-machine sound when spinning the Spin and PokeRand node wheels.' },
+      { es: '🎯 Los ataques tienen ahora el mismo tamaño de letra en el combate normal, el Combate Doble, Move Tutor y Disco MT, incluidos sus efectos en azul.', en: '🎯 Moves now use the same font size in regular battles, Double Battles, Move Tutor and TM Disc, including their blue effects.' },
+      { es: '🎒 Corregido el inventario: aumentar o disminuir la cantidad de un objeto ya no cambia su posición. Cuando llega a cero, desaparece y la cuadrícula se compacta sin dejar huecos; los objetos nuevos aparecen al final.', en: '🎒 Fixed the inventory: increasing or decreasing an item quantity no longer changes its position. When it reaches zero, it disappears and the grid compacts without empty slots; new items appear at the end.' },
+      { es: '🌦️ El estado de campo (Lluvia, Sol Abrasador, Tormenta de Arena y Granizo) ahora tiene un tooltip con blur que explica sus efectos, también en Combate Doble y PvP, con traducción al inglés.', en: '🌦️ Field weather (Rain, Harsh Sunlight, Sandstorm and Hail) now has a blurred tooltip explaining its effects, also in Double Battles and PvP, with English translation.' },
+    ],
+  },
   {
     version: 'v2.5',
     items: [

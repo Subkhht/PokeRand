@@ -200,6 +200,28 @@ export function weatherName(weather: WeatherKind, lang: 'es' | 'en'): string {
   return WEATHER_INFO[weather][lang]
 }
 
+export function weatherDescription(weather: WeatherKind, lang: 'es' | 'en'): string {
+  const descriptions: Record<Exclude<WeatherKind, 'none'>, { es: string; en: string }> = {
+    rain: {
+      es: 'Agua hace +50% de daño y Fuego -50%. Trueno siempre acierta.',
+      en: 'Water deals +50% damage and Fire -50%. Thunder never misses.',
+    },
+    sun: {
+      es: 'Fuego hace +50% de daño y Agua -50%. Trueno tiene 50% de precisión.',
+      en: 'Fire deals +50% damage and Water -50%. Thunder has 50% accuracy.',
+    },
+    sand: {
+      es: 'Los Pokémon que no sean de Tierra, Roca o Acero pierden 1/16 de PS por turno.',
+      en: 'Non-Ground, Rock, or Steel Pokemon lose 1/16 of their HP each turn.',
+    },
+    hail: {
+      es: 'Los Pokémon que no sean de Hielo pierden 1/16 de PS por turno.',
+      en: 'Non-Ice Pokemon lose 1/16 of their HP each turn.',
+    },
+  }
+  return weather === 'none' ? '' : descriptions[weather][lang]
+}
+
 // Multiplicador de daño por tipo según el clima (se aplica como un STAB más).
 export function weatherTypeMultiplier(weather: WeatherKind, moveType: string): number {
   if (weather === 'rain') {
