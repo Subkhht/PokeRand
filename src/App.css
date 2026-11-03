@@ -929,6 +929,10 @@ input[type='range'].range-slider::-moz-range-progress {
   display: block;
 }
 
+.item-button strong {
+  color: #ffffff !important;
+}
+
 .item-slot {
   border: 1px dashed var(--panel-border);
   border-radius: 6px;
@@ -4351,3 +4355,8 @@ html:not([data-gameboy]) .setup-hero, html:not([data-gameboy]) .setup-card, html
   html:not([data-gameboy]) .setup-hero-overlay { padding: 1.25rem; }
   html:not([data-gameboy]) .setup-hero-title { font-size: clamp(2.9rem, 17vw, 5rem); }
 }
+
+  /* Solo la barra superior conserva su movimiento al pasar el cursor. */
+  button:not(.topbar button):hover {
+    transform: none !important;
+  }
