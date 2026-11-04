@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef, useCallback, startTransition, Com
 import { createPortal } from 'react-dom'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
-import { playHover, playClick, playSelect, playHit, playEvolution, playCapture, playPerfectCapture, playEquip, playPurchase, playError, playCoin, playSlotMachine, playAchievement, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
+import { playHover, playClick, playSelect, playHit, playEvolution, playCapture, playPerfectCapture, playEquip, playPurchase, playError, playCoin, playSlotMachine, playAchievement, playBadgeFanfare, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -3239,9 +3239,17 @@ function MainApp() {
   const [unlockPopup, setUnlockPopup] = useState<{ name: string; spriteKey: string } | null>(null)
   const [badges, setBadges] = useState<Array<{ id: string; name: string; sprite: string }>>([])
   const [currentStage, setCurrentStage] = useState<number>(1)
+  const [stageNotice, setStageNotice] = useState<{ medal: { name: string; sprite: string }; stage: number } | null>(null)
 
   const currentNode = useMemo(() => route[routeIndex] ?? null, [route, routeIndex])
   const activePokemon = useMemo(() => team[activeIndex] ?? null, [team, activeIndex])
+
+  useEffect(() => {
+    if (!stageNotice) return
+    playBadgeFanfare()
+    const timer = window.setTimeout(() => setStageNotice(null), 3200)
+    return () => window.clearTimeout(timer)
+  }, [stageNotice])
   const inventoryEntries = useMemo(() => groupInventory(inventory), [inventory])
   const inventoryOrderRef = useRef<string[]>([])
   const inventorySlotEntries = useMemo(() => {
@@ -5186,6 +5194,7 @@ function MainApp() {
         if (!medal) return
         const newMedals = [...branchMedals, medal]
         setBranchMedals(newMedals)
+        setStageNotice({ medal, stage: newMedals.length + 1 })
         awardPokeCoins(5, '🎖️ Bonus por derrotar a un jefe del Modo Ruta')
         if (newMedals.length >= 8) {
           // 8 medallas → modo completado.
@@ -5244,6 +5253,7 @@ function MainApp() {
         if (!medal) return
         const newMedals = [...originalMedals, medal]
         setOriginalMedals(newMedals)
+        setStageNotice({ medal, stage: newMedals.length + 1 })
         awardPokeCoins(5, '🎖️ Bonus por derrotar a un jefe del Modo Original')
         if (newMedals.length >= 8) {
           setTempLeagueTeam([])
@@ -5326,6 +5336,7 @@ function MainApp() {
           const updatedBadges = [...badges, newBadge]
           setBadges(updatedBadges)
           setCurrentStage(updatedBadges.length + 1)
+          setStageNotice({ medal: newBadge, stage: updatedBadges.length + 1 })
           setBattleLog((prev) => [t('battle.obtainedBadge', { badge: newBadge.name, n: updatedBadges.length }), ...prev].slice(0, 15))
           const diffForCoins = coopModeRef.current ? (coopDiffRef.current || 'medium') : difficulty
           const stageCoins = Math.floor((diffForCoins === 'easy' ? 10 : diffForCoins === 'hard' ? 20 : 15) / 2)
@@ -12810,8 +12821,6 @@ function MainApp() {
                 <div className="generation-grid">
                   {generations.map((gen) => {
                     const unlocked = isGenUnlocked(gen)
-                    const hardUnlocked = isHardUnlocked(gen)
-                    const infUnlocked = isInfiniteUnlocked(gen)
                     const completedMed = progression.completedMedium.includes(gen)
                     const completedAny = progression.completedAny.includes(gen)
                     const completedHard = progression.completedHard.includes(gen)
@@ -12831,7 +12840,7 @@ function MainApp() {
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0 8px' }}>
                           <span style={{ whiteSpace: 'nowrap' }}>Gen {gen} {unlocked ? '' : '🔒'}</span>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <span className="gen-tile-badges" aria-label={language === 'en' ? 'Completion badges' : 'Insignias de finalización'}>
                             {completedHard ? (
                               <span className="badge-medium" title={language === 'en' ? 'Completed on Hard' : 'Completado en Difícil'}>🏆🏆</span>
                             ) : completedMed ? (
@@ -12859,12 +12868,6 @@ function MainApp() {
                           <span className="lock-text">
                             🔒 {t('setup.passGen', { gen: gen - 1 })}
                           </span>
-                        )}
-                        {unlocked && infUnlocked && (
-                          <span className="unlock-tag-infinite">{t('setup.infiniteUnlocked')}</span>
-                        )}
-                        {unlocked && !infUnlocked && hardUnlocked && (
-                          <span className="unlock-tag">{t('setup.hardAvailable')}</span>
                         )}
                       </button>
                     )
@@ -12908,7 +12911,7 @@ function MainApp() {
                           <span style={{ fontSize: '1.2rem', color: randomUnlocked ? '#ffcb05' : '#7d7ab5', whiteSpace: 'nowrap' }}>
                             {t('setup.randomAllStars')} {randomUnlocked ? '' : '🔒'}
                           </span>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                          <span className="gen-tile-badges" aria-label={language === 'en' ? 'Completion badges' : 'Insignias de finalización'}>
                             {randomCompletedHard ? (
                               <span className="badge-medium" title={language === 'en' ? 'Completed on Hard' : 'Completado en Difícil'}>🏆🏆</span>
                             ) : randomCompletedMed ? (
@@ -17189,6 +17192,20 @@ function MainApp() {
           <div style={{ color: '#ffcb05', fontWeight: 'bold', fontSize: '1.1rem', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.25rem' }}>¡Item Desbloqueado!</div>
           <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '1.4rem', marginBottom: '0.5rem' }}>{unlockPopup.name}</div>
           <div style={{ color: '#9b98cf', fontSize: '0.9rem' }}>Ahora puede aparecer en las aventuras</div>
+        </div>
+      )}
+
+      {stageNotice && (
+        <div className="stage-notice" role="status" aria-live="assertive">
+          <div className="stage-notice-card">
+            <div className="stage-notice-spark">✦</div>
+            <img src={stageNotice.medal.sprite} alt={stageNotice.medal.name} className="stage-notice-medal" />
+            <div className="stage-notice-kicker">{language === 'en' ? 'Badge obtained' : '¡Medalla conseguida!'}</div>
+            <div className="stage-notice-name">{stageNotice.medal.name}</div>
+            <div className="stage-notice-stage">
+              {language === 'en' ? `You passed to Stage ${stageNotice.stage}` : `Has pasado a la Etapa ${stageNotice.stage}`}
+            </div>
+          </div>
         </div>
       )}
 

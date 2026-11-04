@@ -200,6 +200,16 @@ export function playEvolution(): void {
   } catch { /* silent */ }
 }
 
+export function playBadgeFanfare(): void {
+  try {
+    const ac = getCtx()
+    const now = ac.currentTime
+    const notes = [523, 659, 784, 1047, 1318]
+    notes.forEach((freq, i) => note(ac, ac.destination, freq, now + i * 0.1, 0.22, 'triangle', 0.18 * sfxVolume * SFX_SOFTNESS))
+    note(ac, ac.destination, 262, now, 0.55, 'sine', 0.06 * sfxVolume * SFX_SOFTNESS)
+  } catch { /* silent */ }
+}
+
 // Sonido de moneda (dos notas agudas rápidas).
 export function playCoin(): void {
   try {

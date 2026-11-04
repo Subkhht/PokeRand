@@ -159,7 +159,7 @@ button {
    encima del canvas fijo (z-index 0) garantizando que se vea la animación.
    Se excluyen los overlays fijos (modales y banners) para no romper su
    posicionamiento. */
-.app-shell>*:not(.bg-layer):not(.modal-backdrop):not(.teamrocket-steal-banner) {
+.app-shell>*:not(.bg-layer):not(.modal-backdrop):not(.teamrocket-steal-banner):not(.stage-notice) {
   position: relative;
   z-index: 1;
 }
@@ -278,6 +278,7 @@ button {
 }
 
 .gen-tile {
+  position: relative;
   border: 2px solid var(--border-light);
   background: var(--bg-dark);
   border-radius: 4px;
@@ -289,6 +290,18 @@ button {
   color: var(--text-muted);
   box-shadow: var(--shadow-hard-sm);
   transition: all 0.12s ease;
+}
+
+.gen-tile-badges {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: calc(100% - 16px);
+  flex-wrap: wrap;
 }
 
 .gen-tile span {
@@ -4364,3 +4377,77 @@ html:not([data-gameboy]) .setup-hero, html:not([data-gameboy]) .setup-card, html
   button:not(.topbar button):hover {
     transform: none !important;
   }
+
+.stage-notice {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  pointer-events: none;
+  animation: stageNoticeBackdrop 0.25s ease both;
+}
+
+.stage-notice-card {
+  position: relative;
+  z-index: 1;
+  width: min(390px, calc(100vw - 2rem));
+  padding: 2rem 1.5rem 1.5rem;
+  border: 3px solid #ffcb05;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #292052, #15152f);
+  color: #fff;
+  text-align: center;
+  box-shadow: 0 0 0 5px rgba(255, 203, 5, 0.12), 8px 8px 0 rgba(0, 0, 0, 0.45);
+  animation: stageNoticeIn 0.45s cubic-bezier(0.2, 0.85, 0.3, 1.2) both;
+}
+
+.stage-notice-spark {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.7rem;
+  color: #ffec70;
+  font-size: 1.8rem;
+  animation: pulseGlow 1s infinite;
+}
+
+.stage-notice-medal {
+  display: block;
+  width: 112px;
+  height: 112px;
+  object-fit: contain;
+  margin: 0 auto 0.75rem;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 12px rgba(255, 203, 5, 0.7));
+  animation: stageNoticeMedal 1.4s ease-in-out infinite alternate;
+}
+
+.stage-notice-kicker {
+  color: #ffcb05;
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.stage-notice-name {
+  margin-top: 0.3rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.stage-notice-stage {
+  margin-top: 0.65rem;
+  color: #d9d6f2;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+@keyframes stageNoticeBackdrop { from { opacity: 0; } to { opacity: 1; } }
+@keyframes stageNoticeIn { from { opacity: 0; transform: scale(0.75) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes stageNoticeMedal { from { transform: rotate(-5deg) scale(0.96); } to { transform: rotate(5deg) scale(1.04); } }

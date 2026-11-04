@@ -599,9 +599,9 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v2.5.1', en: 'v2.5.1' },
+  'help.version': { es: 'v2.5.2', en: 'v2.5.2' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
-  'changelog.button': { es: 'Ver cambios v2.5.1', en: 'See changes v2.5.1' },
+  'changelog.button': { es: 'Ver cambios v2.5.2', en: 'See changes v2.5.2' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -1871,6 +1871,13 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v2.5.2',
+    items: [
+      { es: '🏅 Las insignias de las generaciones ahora aparecen en la esquina inferior derecha de cada tarjeta.', en: '🏅 Generation completion badges now appear in the bottom-right corner of each card.' },
+      { es: '🔔 Las notificaciones de medalla y cambio de etapa ahora se muestran centradas, oscureciendo el fondo, con animación y sonido.', en: '🔔 Medal and stage-change notifications now appear centered, darkening the background, with animation and sound.' },
+    ],
+  },
   {
     version: 'v2.5.1',
     items: [
