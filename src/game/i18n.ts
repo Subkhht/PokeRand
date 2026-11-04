@@ -601,9 +601,9 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v2.5.2', en: 'v2.5.2' },
+  'help.version': { es: 'v2.5.3', en: 'v2.5.3' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
-  'changelog.button': { es: 'Ver cambios v2.5.2', en: 'See changes v2.5.2' },
+  'changelog.button': { es: 'Ver cambios v2.5.3', en: 'See changes v2.5.3' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -1873,6 +1873,13 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v2.5.3',
+    items: [
+      { es: '🎨 Los temas visuales ahora se aplican de forma visible durante toda la partida, en paneles, botones, ruta y fondo, manteniendo el tema oscuro original como predeterminado.', en: '🎨 Visual themes now apply visibly throughout the game, including panels, buttons, the route and background, while keeping the original dark theme as the default.' },
+      { es: '🖥️ Los Pokémon debilitados ya no pueden depositarse en el PC, tampoco mediante intercambios o arrastrar y soltar.', en: '🖥️ Fainted Pokémon can no longer be deposited in the PC, including through swaps or drag and drop.' },
+    ],
+  },
   {
     version: 'v2.5.2',
     items: [

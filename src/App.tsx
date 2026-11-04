@@ -6619,6 +6619,10 @@ function MainApp() {
       setBattleLog((prev) => [t('b.withdrawnPC', { name: pokemon.name }), ...prev].slice(0, 15))
     } else {
       const swapOut = team[activeIndex]
+      if (swapOut.hp <= 0) {
+        setBattleLog((prev) => [t('b.noDepositFainted', { name: swapOut.name }), ...prev].slice(0, 15))
+        return
+      }
       const newTeam = team.map((p, i) => i === activeIndex ? pokemon : p)
       setTeam(newTeam)
       setPcStorage((prev) => prev.map((p, i) => i === pcIndex ? swapOut : p))
@@ -7204,6 +7208,10 @@ function MainApp() {
     } else {
       const target = toSlot !== undefined ? Math.min(toSlot, team.length - 1) : activeIndex
       const swapOut = team[target]
+      if (swapOut.hp <= 0) {
+        setBattleLog((prev) => [t('b.noDepositFainted', { name: swapOut.name }), ...prev].slice(0, 15))
+        return
+      }
       const newTeam = team.map((p, i) => i === target ? pokemon : p)
       setTeam(newTeam)
       setPcStorage(prev => prev.map((p, i) => i === pcIndex ? swapOut : p))

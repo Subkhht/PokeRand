@@ -4378,6 +4378,38 @@ html:not([data-gameboy]) .setup-hero, html:not([data-gameboy]) .setup-card, html
     transform: none !important;
   }
 
+/* El tema activo también colorea las superficies de la partida, no solo el
+   selector de opciones. */
+html[data-theme]:not([data-theme="dark"]) body {
+  background-image: radial-gradient(color-mix(in srgb, var(--accent) 18%, transparent) 1px, transparent 1px);
+  background-size: 18px 18px;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell .topbar,
+html[data-theme]:not([data-theme="dark"]) .app-shell .panel,
+html[data-theme]:not([data-theme="dark"]) .app-shell .setup-card {
+  background: linear-gradient(145deg, var(--surface, var(--panel-bg)), var(--bg-dark)) !important;
+  border-color: var(--border, var(--border-light)) !important;
+  color: var(--text, var(--text-main));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent), var(--shadow-hard);
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell .cta:not(:disabled),
+html[data-theme]:not([data-theme="dark"]) .app-shell .node.current,
+html[data-theme]:not([data-theme="dark"]) .app-shell .route-map .map-node-current circle {
+  border-color: var(--accent) !important;
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell .cta:not(:disabled) {
+  background: var(--accent) !important;
+  color: var(--bg-dark) !important;
+}
+
+html[data-theme]:not([data-theme="dark"]) .app-shell .node.current {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent), 0 0 18px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
 .stage-notice {
   position: fixed;
   inset: 0;
