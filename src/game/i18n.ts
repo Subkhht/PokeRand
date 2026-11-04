@@ -238,6 +238,8 @@ const DICT: Record<string, Entry> = {
   // ---------- Achievements ----------
   'ach.title': { es: '🏅 Logros', en: '🏅 Achievements' },
   'ach.reward': { es: 'Recompensa', en: 'Reward' },
+  'ach.collectAll': { es: '🎁 Reclamar todas', en: '🎁 Claim all' },
+  'b.claimAllRewardsAch': { es: 'Has reclamado {count} logros y recibido {coins} PokéCoins', en: 'You claimed {count} achievements and received {coins} PokéCoins' },
 
   'mg.spinning': { es: 'Girando...', en: 'Spinning...' },
   'mg.wheel.spin': { es: '🎡 ¡Girar!', en: '🎡 Spin!' },
@@ -1876,6 +1878,7 @@ const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }>
     items: [
       { es: '🏅 Las insignias de las generaciones ahora aparecen en la esquina inferior derecha de cada tarjeta.', en: '🏅 Generation completion badges now appear in the bottom-right corner of each card.' },
       { es: '🔔 Las notificaciones de medalla y cambio de etapa ahora se muestran centradas, oscureciendo el fondo, con animación y sonido.', en: '🔔 Medal and stage-change notifications now appear centered, darkening the background, with animation and sound.' },
+      { es: '🎁 Los logros ahora tienen un botón superior para reclamar de una vez todas las recompensas desbloqueadas pendientes.', en: '🎁 Achievements now have a top button to claim all pending unlocked rewards at once.' },
     ],
   },
   {

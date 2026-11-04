@@ -4052,6 +4052,26 @@ function MainApp() {
     setBattleLog(prev => [t('b.claimRewardAch', { name: achName(achievement.id), coins: achievement.reward }), ...prev].slice(0, 15))
   }
 
+  function claimAllAchievements(): void {
+    const claimable = ACHIEVEMENTS.filter(a => {
+      const entry = achievementsRef.current[a.id]
+      return entry?.unlocked && !entry.claimed
+    })
+    if (claimable.length === 0) return
+
+    const updated = { ...achievementsRef.current }
+    for (const achievement of claimable) {
+      updated[achievement.id] = { ...updated[achievement.id], claimed: true }
+    }
+    achievementsRef.current = updated
+    localStorage.setItem('pokerand_achievements', JSON.stringify(updated))
+    setAchievements(updated)
+
+    const totalReward = claimable.reduce((sum, achievement) => sum + achievement.reward, 0)
+    awardPokeCoins(totalReward, t('ach.collectAll'))
+    setBattleLog(prev => [t('b.claimAllRewardsAch', { count: claimable.length, coins: totalReward }), ...prev].slice(0, 15))
+  }
+
   useEffect(() => {
     if (runStats.captures >= 10) unlockAchievement('collector_10')
     if (runStats.captures >= 25) unlockAchievement('collector_25')
@@ -15634,6 +15654,14 @@ function MainApp() {
         <div className="modal-backdrop" onClick={() => setShowAchievements(false)}>
           <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
             <h2 style={{ color: '#4d9bff', textAlign: 'center', marginBottom: '0.25rem' }}>{t('ach.title')} ({Object.values(achievements).filter(a => a.unlocked).length}/{ACHIEVEMENTS.length})</h2>
+            <button
+              type="button"
+              onClick={() => { playClick(); claimAllAchievements() }}
+              disabled={!ACHIEVEMENTS.some(a => achievements[a.id]?.unlocked && !achievements[a.id]?.claimed)}
+              style={{ display: 'block', margin: '0 auto 0.75rem', background: '#ffcb05', color: '#000', border: 'none', borderRadius: '4px', padding: '0.4rem 0.75rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem', opacity: ACHIEVEMENTS.some(a => achievements[a.id]?.unlocked && !achievements[a.id]?.claimed) ? 1 : 0.5 }}
+            >
+              {t('ach.collectAll')}
+            </button>
             <div style={{ color: '#ffcb05', textAlign: 'center', marginBottom: '1rem', fontSize: '0.9rem' }}>
               🪙 {ACHIEVEMENTS.filter(a => achievements[a.id]?.unlocked && !achievements[a.id]?.claimed).reduce((sum, a) => sum + a.reward, 0)} PokéCoins por reclamar
             </div>
