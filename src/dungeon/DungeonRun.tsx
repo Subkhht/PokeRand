@@ -1,15 +1,20 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { playClick, playHover } from '../game/sound'
-import treeSheetUrl from '../assets/Dungeon/arboles.png'
-import specialTreeUrl from '../assets/Dungeon/arbol.png'
+import treeSheetUrl from '../assets/Dungeon/arboles.png?inline'
+import specialTreeUrl from '../assets/Dungeon/arbol.png?inline'
+import rockUrl from '../assets/Dungeon/roca.png?inline'
+import blackRockUrl from '../assets/Dungeon/roca-negra.png?inline'
 import { ACTIVE_BY_ID, DUNGEON_BY_ID } from './data'
-import { pmdPortraitUrl } from './pmdAssets'
+import { DungeonPortrait as Portrait } from './DungeonPortrait'
 import type { PortraitEmotion } from './pmdAssets'
 import {
+  buyDungeonOffer,
   canUseItem,
   clearDialogue,
+  closeDungeonShop,
   descendFloor,
   getLeader,
+  guildMissionProgress,
   moveLeader,
   playerAttack,
   selectMove,
@@ -17,7 +22,7 @@ import {
   useActiveItem as consumeActiveItem,
   waitTurn,
 } from './runEngine'
-import type { DungeonMonster, DungeonRun, PmdSprites } from './types'
+import type { DungeonMap, DungeonMonster, DungeonRun, MapRock, PmdSprites } from './types'
 
 const MIN_CELL = 40
 const MAX_CELL = 56
@@ -33,10 +38,35 @@ const FIREFLIES = Array.from({ length: 9 }, (_, index) => ({
   duration: 4.2 + (index % 4) * 0.8,
 }))
 
+const CAVE_MOTES = Array.from({ length: 14 }, (_, index) => ({
+  left: 5 + ((index * 43) % 90),
+  top: 7 + ((index * 61) % 84),
+  delay: (index * 0.57) % 6,
+  duration: 5.2 + (index % 5) * 0.9,
+}))
+
 function tileHash(x: number, y: number): number {
   let hash = Math.imul(x + 1, 374761393) ^ Math.imul(y + 1, 668265263)
   hash = Math.imul(hash ^ (hash >>> 13), 1274126177)
   return (hash ^ (hash >>> 16)) >>> 0
+}
+
+function fallbackCaveRocks(map: DungeonMap): MapRock[] {
+  const rocks: MapRock[] = []
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      if (map.tiles[y]?.[x] !== 0) continue
+      const hash = tileHash(x, y)
+      const border = x === 0 || y === 0 || x === map.width - 1 || y === map.height - 1
+      rocks.push({
+        x,
+        y,
+        flip: hash % 2 === 0,
+        scale: border ? 0.92 + (hash % 9) * 0.02 : 0.76 + (hash % 9) * 0.018,
+      })
+    }
+  }
+  return rocks
 }
 
 interface DungeonRunProps {
@@ -197,13 +227,14 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
   }, [run.map.width])
 
   const boss = run.enemies.find((enemy) => enemy.isBoss) ?? null
+  const viewRadius = run.floorModifier === 'darkness' ? 2 : run.floorModifier === 'fog' ? 3 : VIEW_RADIUS
 
   const visible = useMemo(() => {
     if (run.revealMap) return () => true
     if (!leader) return () => false
     return (x: number, y: number) =>
-      Math.max(Math.abs(x - leader.x), Math.abs(y - leader.y)) <= VIEW_RADIUS
-  }, [run.revealMap, leader])
+      Math.max(Math.abs(x - leader.x), Math.abs(y - leader.y)) <= viewRadius
+  }, [run.revealMap, leader, viewRadius])
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
@@ -254,6 +285,16 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
     act((current) => descendFloor(current))
   }
 
+  const buyOffer = (index: number) => {
+    playClick()
+    act((current) => buyDungeonOffer(current, index))
+  }
+
+  const closeShop = () => {
+    playClick()
+    act((current) => closeDungeonShop(current))
+  }
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
@@ -268,6 +309,13 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
         if (event.key === 'Enter') {
           event.preventDefault()
           descend()
+        }
+        return
+      }
+      if (run.shopOffers) {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          closeShop()
         }
         return
       }
@@ -304,6 +352,48 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
       .filter((tree) => !tree.broken)
       .map((tree) => `${tree.x},${tree.y}`),
   )
+  const rocks = run.map.rocks
+    ? run.map.rocks.filter((rock) => !rock.broken)
+    : run.dungeonId === 'cave'
+      ? fallbackCaveRocks(run.map)
+      : []
+  const visibleRocks = rocks
+    .filter((rock) => visible(rock.x, rock.y))
+    .sort((a, b) => Number(Boolean(a.special)) - Number(Boolean(b.special)))
+  const caveCrystals = run.dungeonId === 'cave'
+    ? run.map.tiles.flatMap((row, y) => row.flatMap((tile, x) => {
+      if (tile !== 0 || !visible(x, y)) return []
+      const hash = tileHash(x, y)
+      if (hash % 13 !== 0) return []
+      return [{ x, y, hash }]
+    }))
+    : []
+  const visibleEvents = (run.events ?? []).filter(
+    (event) => !event.triggered && visible(event.x, event.y),
+  )
+  const modifierInfo: Record<string, { icon: string; es: string; en: string }> = {
+    darkness: { icon: '🌑', es: 'Oscuridad', en: 'Darkness' },
+    fog: { icon: '🌫️', es: 'Niebla', en: 'Fog' },
+    sandstorm: { icon: '🌪️', es: 'Tormenta de arena', en: 'Sandstorm' },
+    lava: { icon: '🌋', es: 'Suelo volcánico', en: 'Volcanic floor' },
+    ice: { icon: '❄️', es: 'Hielo resbaladizo', en: 'Slippery ice' },
+  }
+  const modifier = run.floorModifier !== 'none' ? modifierInfo[run.floorModifier] : null
+  const mission = run.mission
+  const missionProgress = mission ? guildMissionProgress(run) : 0
+  const missionTitle = mission
+    ? mission.kind === 'reachFloor'
+      ? (en ? `Reach floor ${mission.target}` : `Alcanza el piso ${mission.target}`)
+      : mission.kind === 'defeatEnemies'
+        ? (en ? `Defeat ${mission.target} enemies` : `Derrota ${mission.target} enemigos`)
+        : mission.kind === 'recruit'
+          ? (en ? `Recruit ${mission.target} Pokémon` : `Recluta ${mission.target} Pokémon`)
+          : mission.kind === 'collectCrystals'
+            ? (en ? `Collect ${mission.target} crystals` : `Consigue ${mission.target} cristales`)
+            : mission.kind === 'defeatBoss'
+              ? (en ? 'Defeat the boss' : 'Derrota al jefe')
+              : (en ? `Reach floor ${mission.target} without fainting` : `Alcanza el piso ${mission.target} sin caídos`)
+    : ''
 
   const moveList = leader?.p.moves.slice(0, 4) ?? []
 
@@ -317,7 +407,7 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
           <div>
             <strong>{dungeon.icon} {en ? dungeon.nameEn : dungeon.name}</strong>
             <span className="dungeon-run-sub">
-              {en ? 'Floor' : 'Piso'} {run.floor}/{run.totalFloors} · {en ? 'Turn' : 'Turno'} {run.turn}
+              {en ? 'Floor' : 'Piso'} {run.floor}/{run.totalFloors >= 999 ? '∞' : run.totalFloors} · {en ? 'Turn' : 'Turno'} {run.turn}
             </span>
           </div>
         </div>
@@ -325,6 +415,11 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
           <span className="dungeon-crystal-pill">💠 {run.crystalsEarned}</span>
           <span className="dungeon-stat">☠️ {run.enemiesDefeated}</span>
           <span className="dungeon-stat">🤝 {run.recruits}</span>
+          {modifier && (
+            <span className="dungeon-stat dungeon-modifier-pill">
+              {modifier.icon} {en ? modifier.en : modifier.es}
+            </span>
+          )}
         </div>
       </header>
 
@@ -332,7 +427,7 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
         <section className="dungeon-map-panel">
           <div className="dungeon-board-slot" ref={boardSlotRef}>
             <div
-              className={`dungeon-board${run.dungeonId === 'forest' ? ' dungeon-board--forest' : ''}`}
+              className={`dungeon-board${run.dungeonId === 'forest' ? ' dungeon-board--forest' : ''}${run.dungeonId === 'cave' ? ' dungeon-board--cave' : ''}`}
               style={{ width: boardWidth, height: boardHeight }}
             >
                 {run.map.tiles.map((row, y) =>
@@ -349,8 +444,9 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
                 const isStairTile = tile === 2
                 const isWall = tile === 0
                 const isForest = run.dungeonId === 'forest'
+                const isCave = run.dungeonId === 'cave'
                 const hasTree = isWall && treeTiles.has(`${x},${y}`)
-                const groundLike = !isWall || isForest
+                const groundLike = !isWall || isForest || isCave
                 const hash = tileHash(x, y)
                 const decoRoll = hash % 100
                 const wallAbove = !isWall && y > 0 && run.map.tiles[y - 1]?.[x] === 0
@@ -441,6 +537,63 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
               )
             })}
 
+            {visibleRocks.map((rock) => {
+              const special = Boolean(rock.special)
+              const width = Math.round(cell * (special ? 1.08 : rock.scale))
+              const height = width
+              const left = Math.round(
+                Math.min(
+                  Math.max(0, rock.x * cell + (cell - width) / 2),
+                  run.map.width * cell - width,
+                ),
+              )
+              const top = Math.max(0, rock.y * cell + cell - height)
+              return (
+                <div
+                  key={`rock-${rock.x}-${rock.y}`}
+                  aria-hidden="true"
+                  className={`dungeon-rock${special ? ' dungeon-rock--special' : ''}`}
+                  title={special ? (en ? 'Breakable black rock — Fighting attack' : 'Roca negra rompible — ataque de Lucha') : undefined}
+                  style={{
+                    left,
+                    top,
+                    width,
+                    height,
+                    backgroundImage: `url(${special ? blackRockUrl : rockUrl})`,
+                    backgroundSize: '100% 100%',
+                    transform: rock.flip ? 'scaleX(-1)' : undefined,
+                  }}
+                />
+              )
+            })}
+
+            {run.dungeonId === 'cave' && caveCrystals.map((crystal) => {
+              const width = 7 + (crystal.hash % 6) * 2
+              const height = Math.round(width * 1.6)
+              const left = Math.round(
+                crystal.x * cell + (cell - width) / 2 + ((crystal.hash >>> 8) % 7) - 3,
+              )
+              const top = Math.max(
+                0,
+                Math.round(crystal.y * cell + cell - height - ((crystal.hash >>> 12) % 5)),
+              )
+              const violet = crystal.hash % 2 === 0
+              return (
+                <div
+                  key={`crystal-${crystal.x}-${crystal.y}`}
+                  aria-hidden="true"
+                  className={`dungeon-cave-crystal${violet ? ' dungeon-cave-crystal--violet' : ''}`}
+                  style={{
+                    left,
+                    top,
+                    width,
+                    height,
+                    animationDelay: `${(crystal.hash % 100) / 25}s`,
+                  }}
+                />
+              )
+            })}
+
             {currentRoom && (
               <div
                 className="dungeon-room-glow"
@@ -496,6 +649,37 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
                 ⚠️
               </div>
             ))}
+
+            {visibleEvents.map((event) => {
+              const icon = event.kind === 'monsterHouse'
+                ? '👹'
+                : event.kind === 'treasure'
+                  ? '💰'
+                  : event.kind === 'kecleonShop'
+                    ? '🛒'
+                    : event.kind === 'rest'
+                      ? '⛺'
+                      : '❓'
+              const label = event.kind === 'monsterHouse'
+                ? (en ? 'Monster house' : 'Casa de monstruos')
+                : event.kind === 'treasure'
+                  ? (en ? 'Treasure room' : 'Sala del tesoro')
+                  : event.kind === 'kecleonShop'
+                    ? (en ? 'Kecleon shop' : 'Tienda Kecleon')
+                    : event.kind === 'rest'
+                      ? (en ? 'Rest spot' : 'Lugar de descanso')
+                      : (en ? 'Mystery room' : 'Sala misteriosa')
+              return (
+                <div
+                  key={`event-${event.x}-${event.y}`}
+                  className="dungeon-ground-icon dungeon-event"
+                  style={{ left: event.x * cell, top: event.y * cell, width: cell, height: cell }}
+                  title={label}
+                >
+                  {icon}
+                </div>
+              )
+            })}
 
             {visibleEnemies.map((enemy) => (
               <div
@@ -553,6 +737,22 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
                 ))}
               </div>
             )}
+
+            {run.dungeonId === 'cave' && (
+              <div className="dungeon-cave-motes" aria-hidden="true">
+                {CAVE_MOTES.map((mote, index) => (
+                  <span
+                    key={index}
+                    style={{
+                      left: `${mote.left}%`,
+                      top: `${mote.top}%`,
+                      animationDelay: `${mote.delay}s`,
+                      animationDuration: `${mote.duration}s`,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
             </div>
           </div>
 
@@ -581,6 +781,25 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
         </section>
 
         <aside className="dungeon-side">
+          {mission && (
+            <section className="dungeon-panel dungeon-mission-panel">
+              <h3>📜 {en ? 'Guild mission' : 'Misión del Gremio'}</h3>
+              <strong>{missionTitle}</strong>
+              <div className="dungeon-mission-meta">
+                <span>{Math.min(missionProgress, mission.target)}/{mission.target}</span>
+                <span>+{mission.reward} 💠</span>
+              </div>
+              {mission.kind === 'noFaints' && run.fallen.length > 0 && (
+                <span className="dungeon-mission-failed">
+                  {en ? 'Mission failed: an ally has fallen.' : 'Misión fallida: un aliado ha caído.'}
+                </span>
+              )}
+              {run.missionComplete && (
+                <span className="dungeon-mission-done">✔ {en ? 'Completed' : 'Completada'}</span>
+              )}
+            </section>
+          )}
+
           {boss && (
             <section className="dungeon-panel dungeon-boss-panel">
               <h3>👑 {boss.p.name}</h3>
@@ -619,12 +838,7 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
                     }
                   }}
                 >
-                  <img
-                    src={pmdPortraitUrl(member.p.id)}
-                    alt=""
-                    className="dungeon-party-portrait"
-                    onError={(event) => { event.currentTarget.style.visibility = 'hidden' }}
-                  />
+                  <Portrait id={member.p.id} className="dungeon-party-portrait" />
                   <MonsterBadge monster={member} lang={lang} />
                 </div>
               ))}
@@ -713,11 +927,10 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
         <div className="dungeon-dialogue-backdrop" onClick={dismissDialogue}>
           <div className="dungeon-dialogue" onClick={(event) => event.stopPropagation()}>
             {run.dialogue[0].speakerId && (
-              <img
-                src={pmdPortraitUrl(run.dialogue[0].speakerId, (run.dialogue[0].emotion ?? 'Normal') as PortraitEmotion)}
-                alt=""
+              <Portrait
+                id={run.dialogue[0].speakerId}
+                emotion={(run.dialogue[0].emotion ?? 'Normal') as PortraitEmotion}
                 className="dungeon-dialogue-portrait"
-                onError={(event) => { event.currentTarget.style.visibility = 'hidden' }}
               />
             )}
             <div className="dungeon-dialogue-body">
@@ -754,6 +967,48 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {run.shopOffers && (
+        <div className="dungeon-shop-overlay" onClick={closeShop}>
+          <div className="dungeon-shop-modal" onClick={(event) => event.stopPropagation()}>
+            <h2>🛒 {en ? 'Kecleon Shop' : 'Tienda Kecleon'}</h2>
+            <p>{en ? 'Spend crystals earned in this expedition:' : 'Gasta los cristales obtenidos en esta expedición:'} <strong>💠 {run.crystalsEarned}</strong></p>
+            <div className="dungeon-shop-offers">
+              {run.shopOffers.map((offer, index) => {
+                const item = ACTIVE_BY_ID[offer.itemId]
+                if (!item) return null
+                const disabled = offer.sold || run.crystalsEarned < offer.price
+                return (
+                  <article key={`${offer.itemId}-${index}`} className="dungeon-shop-offer">
+                    <img
+                      className="dungeon-item-sprite"
+                      src={item.sprite}
+                      alt=""
+                      loading="lazy"
+                      onError={(event) => { event.currentTarget.style.visibility = 'hidden' }}
+                    />
+                    <div>
+                      <strong>{en ? item.nameEn : item.name}</strong>
+                      <span>{en ? item.descEn : item.desc}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="dungeon-buy-btn"
+                      disabled={disabled}
+                      onClick={() => buyOffer(index)}
+                    >
+                      {offer.sold ? (en ? 'Sold' : 'Vendido') : `💠 ${offer.price}`}
+                    </button>
+                  </article>
+                )
+              })}
+            </div>
+            <button type="button" className="dungeon-secondary-btn" onClick={closeShop}>
+              {en ? 'Leave shop' : 'Salir de la tienda'}
+            </button>
           </div>
         </div>
       )}

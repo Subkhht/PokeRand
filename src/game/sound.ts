@@ -192,6 +192,18 @@ export function playTreeBreak(): void {
   } catch { /* silent */ }
 }
 
+// Golpe seco y grave al romper una roca.
+export function playRockBreak(): void {
+  try {
+    const ac = getCtx()
+    const now = ac.currentTime
+    noise(ac, ac.destination, now, 0.12, 0.05 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 104, now, 0.12, 'square', 0.075 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 72, now + 0.06, 0.2, 'sine', 0.055 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 55, now + 0.13, 0.22, 'sine', 0.035 * sfxVolume * SFX_SOFTNESS)
+  } catch { /* silent */ }
+}
+
 // Campanilla breve al desbloquear un Pokémon reclutado.
 export function playRecruitUnlock(): void {
   try {

@@ -622,9 +622,9 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v3.0.0', en: 'v3.0.0' },
+  'help.version': { es: 'v3.0.1', en: 'v3.0.1' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
-  'changelog.button': { es: 'Ver cambios v3.0.0', en: 'See changes v3.0.0' },
+  'changelog.button': { es: 'Ver cambios v3.0.1', en: 'See changes v3.0.1' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -1894,6 +1894,26 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v3.0.1',
+    items: [
+      { es: '🌿 ¡Los 1025 Pokémon en la mazmorra! Cada especie se reparte por su tipo principal entre Bosque, Caverna y Torre, manteniendo hábitats coherentes. Cada expedición elige un roster variado de 18 especies y los minions de jefe también son temáticos.', en: '🌿 All 1025 Pokémon in the dungeon! Every species is distributed by primary type across Forest, Cavern and Tower, keeping coherent habitats. Each expedition picks a varied roster of 18 species, and boss minions are themed too.' },
+      { es: '👑 Jefes variados: cada mazmorra elige al azar entre un pool temático de evoluciones finales y legendarios (bosque, caverna de roca/cristal y torre eléctrica/psíquica). Los jefes quedan fuera de los encuentros normales para que sean especiales y entran en furia al bajar del 50% de PS.', en: '👑 Varied bosses: each dungeon randomly picks from a themed pool of final evolutions and legendaries (forest, rock/crystal cavern and electric/psychic tower). Bosses are excluded from normal encounters to keep them special, and they enter a fury below 50% HP.' },
+      { es: '🏚️ Eventos de piso: casas de monstruos, salas del tesoro, tienda Kecleon, zonas de descanso y salas misteriosas con efectos aleatorios.', en: '🏚️ Floor events: monster houses, treasure rooms, Kecleon shops, rest spots and mystery rooms with random effects.' },
+      { es: '📜 Misiones del Gremio y rangos: cada expedición asigna un objetivo (alcanzar un piso, derrotar enemigos, reclutar, conseguir cristales, vencer al jefe o no tener caídos), con recompensa en cristales y rango de Novato a Maestro. También hay una misión diaria acumulativa con recompensa extra.', en: '📜 Guild missions and ranks: each expedition assigns an objective (reach a floor, defeat enemies, recruit, collect crystals, beat the boss or avoid faints), with crystal rewards and ranks from Novice to Master. There is also an accumulative daily mission with an extra reward.' },
+      { es: '🎀 Objetos equipables: 18 objetos de tipo que potencian un 20% los movimientos de su tipo. Se compran en la tienda y se asignan a cada Pokémon del equipo.', en: '🎀 Held items: 18 type items that boost moves of their type by 20%. They are bought in the shop and assigned to each team Pokémon.' },
+      { es: '🌪️ Modificadores de piso: oscuridad, niebla, tormenta de arena, suelo volcánico e hielo resbaladizo, cada uno con su propio efecto.', en: '🌪️ Floor modifiers: darkness, fog, sandstorm, volcanic floor and slippery ice, each with its own effect.' },
+      { es: '🗺️ Nuevas dungeons: Desierto Espejismo, Abismo Distorsión y Mazmorra Infinita, además de récords por dungeon y música de batalla variable.', en: '🗺️ New dungeons: Mirage Desert, Distortion Abyss and Endless Dungeon, plus per-dungeon records and variable battle music.' },
+      { es: '🧪 Objetos activos ampliados y con funciones únicas: pociones de distintos alcances, Restauración Total, Revive y Max Revive, curas de veneno/sueño/parálisis, PP del líder y del equipo, Poké Doll para dormir enemigos, X Ataque/Defensa/Ataque Especial/Defensa Especial/Velocidad, Golpe Certero, Amuleto Moneda y Huevo Suerte. Ningún objeto activo comparte efecto con otro.', en: '🧪 Expanded active items with unique effects: potions with different scopes, Full Restore, Revive and Max Revive, poison/sleep/paralysis cures, leader and team PP restoration, Poké Doll to put enemies to sleep, X Attack/Defense/Sp. Atk/Sp. Def/Speed, Dire Hit, Amulet Coin and Lucky Egg. No active item shares an effect with another.' },
+      { es: '🛡️ Nuevos pasivos únicos: Piel Gruesa, Corazón Ígneo, Imán de Bolsa, Sabio Experto, Espejo Brumoso, Bastón Curativo, Ojo de Halcón y Brújula del Gremio, con combinaciones de efectos que no se repiten. El reflejo de daño de Espejo Brumoso ya funciona en combate.', en: '🛡️ New unique passives: Thick Fat, Flame Heart, Bag Magnet, Wise Expert, Misty Mirror, Healing Staff, Hawk Eye and Guild Compass, with non-repeating effect combinations. Misty Mirror\'s damage reflection now works in combat.' },
+      { es: '🧭 El Equipo de Expedición añade filtros compactos por generación y tipo, además de los filtros Todos, En equipo y Reclutados, manteniendo el orden por número de Pokédex.', en: '🧭 The Expedition Team adds compact generation and type filters alongside the All, On team and Recruited filters, while keeping the Pokédex number order.' },
+      { es: '🪨 Caverna Cristal: todos los muros tienen rocas decorativas con distintos tamaños y orientaciones, y el suelo bajo ellas usa el color de las casillas caminables. También aparecen en partidas de cueva ya empezadas.', en: '🪨 Crystal Cavern: every wall has decorative rocks with different sizes and orientations, and the ground beneath them matches walkable tiles. They also appear in already-started cave runs.' },
+      { es: '✨ Caverna Cristal más viva: brillo cian animado, motas de luz flotantes y cristales decorativos que pulsan en los muros.', en: '✨ Livelier Crystal Cavern: animated cyan glow, floating light motes and decorative crystals pulsing on the walls.' },
+      { es: '⚫ Roca negra especial: aparece con baja probabilidad, tiene un brillo púrpura y solo se rompe con ataques de tipo Lucha. Al romperla suena un golpe de roca, suelta un objeto aleatorio respetando el límite de la bolsa, deja la casilla transitable y avisa en el Diario si la bolsa está llena.', en: '⚫ Special black rock: appears with low probability, glows purple and can only be broken with Fighting-type attacks. Breaking it plays a rock hit, drops a random item respecting the bag limit, leaves the tile walkable and warns in the Journal if the bag is full.' },
+      { es: '🖼️ Retratos con respaldo: si el retrato de PMD no existe o falla, se usa automáticamente el sprite oficial de PokéAPI, evitando que Pokémon como Graveler se queden sin imagen.', en: '🖼️ Portrait fallback: if a PMD portrait is missing or fails, the official PokéAPI sprite is used automatically, preventing Pokémon such as Graveler from showing no image.' },
+      { es: '🌳 Los sprites de los árboles van incrustados en el bundle para evitar que desaparezcan por rutas de servidor, base distinta o caché de assets.', en: '🌳 Tree sprites are embedded in the bundle to prevent them from disappearing due to server paths, a different base or asset caching.' },
+    ],
+  },
   {
     version: 'v3.0.0',
     items: [

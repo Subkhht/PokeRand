@@ -1,5 +1,5 @@
 import { createSeededRandom } from '../game/engine'
-import type { DungeonId, DungeonMap, MapTree, Rect, TileKind } from './types'
+import type { DungeonId, DungeonMap, MapRock, MapTree, Rect, TileKind } from './types'
 
 const WALL: TileKind = 0
 const FLOOR: TileKind = 1
@@ -66,7 +66,20 @@ function carveCorridor(tiles: TileKind[][], from: { x: number; y: number }, to: 
   }
 }
 
-const SPECIAL_TREE_CHANCE = 0.035
+const SPECIAL_DECORATION_CHANCE = 0.035
+
+function nearWalkable(tiles: TileKind[][], x: number, y: number): boolean {
+  return (
+    tiles[y - 1]?.[x] === FLOOR ||
+    tiles[y + 1]?.[x] === FLOOR ||
+    tiles[y]?.[x - 1] === FLOOR ||
+    tiles[y]?.[x + 1] === FLOOR ||
+    tiles[y - 1]?.[x] === STAIRS ||
+    tiles[y + 1]?.[x] === STAIRS ||
+    tiles[y]?.[x - 1] === STAIRS ||
+    tiles[y]?.[x + 1] === STAIRS
+  )
+}
 
 function forestTrees(
   tiles: TileKind[][],
@@ -81,28 +94,44 @@ function forestTrees(
     for (let x = 0; x < width; x++) {
       if (tiles[y]?.[x] !== WALL) continue
       const border = x === 0 || y === 0 || x === width - 1 || y === height - 1
-      const nearFloor =
-        tiles[y - 1]?.[x] === FLOOR ||
-        tiles[y + 1]?.[x] === FLOOR ||
-        tiles[y]?.[x - 1] === FLOOR ||
-        tiles[y]?.[x + 1] === FLOOR ||
-        tiles[y - 1]?.[x] === STAIRS ||
-        tiles[y + 1]?.[x] === STAIRS ||
-        tiles[y]?.[x - 1] === STAIRS ||
-        tiles[y]?.[x + 1] === STAIRS
-
       trees.push({
         x,
         y,
         frame: Math.floor(rng() * TREE_FRAME_COUNT),
         flip: rng() < 0.5,
         scale: border ? 0.88 + rng() * 0.2 : 0.7 + rng() * 0.16,
-        special: nearFloor && rng() < SPECIAL_TREE_CHANCE,
+        special: nearWalkable(tiles, x, y) && rng() < SPECIAL_DECORATION_CHANCE,
         broken: false,
       })
     }
   }
   return trees
+}
+
+function caveRocks(
+  tiles: TileKind[][],
+  width: number,
+  height: number,
+  seed: string,
+): MapRock[] {
+  const rng = createSeededRandom(`${seed}-cave-rocks`)
+  const rocks: MapRock[] = []
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (tiles[y]?.[x] !== WALL) continue
+      const border = x === 0 || y === 0 || x === width - 1 || y === height - 1
+      rocks.push({
+        x,
+        y,
+        flip: rng() < 0.5,
+        scale: border ? 0.92 + rng() * 0.18 : 0.76 + rng() * 0.16,
+        special: nearWalkable(tiles, x, y) && rng() < SPECIAL_DECORATION_CHANCE,
+        broken: false,
+      })
+    }
+  }
+  return rocks
 }
 
 export function generateDungeonMap(
@@ -159,6 +188,7 @@ export function generateDungeonMap(
     start,
     stairs,
     trees: dungeonId === 'forest' ? forestTrees(tiles, width, height, seed) : [],
+    rocks: dungeonId === 'cave' ? caveRocks(tiles, width, height, seed) : [],
   }
 }
 

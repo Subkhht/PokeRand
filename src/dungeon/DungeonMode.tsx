@@ -7,6 +7,7 @@ import {
   playHover,
   playPurchase,
   playRecruitUnlock,
+  setBattleMusicTrack,
   startBattleMusic,
   startMenuMusic,
 } from '../game/sound'
@@ -15,6 +16,8 @@ import {
   ACTIVE_ITEMS,
   DUNGEONS,
   DUNGEON_BY_ID,
+  HELD_ITEM_BY_ID,
+  HELD_ITEMS,
   MAX_PASSIVE_SLOTS,
   PASSIVE_BY_ID,
   PASSIVE_ITEMS,
@@ -22,12 +25,14 @@ import {
   STARTER_BY_ID,
   UPGRADES,
   computeBonuses,
+  createDailyMission,
+  guildRank,
   isDungeonUnlocked,
   nextDungeonId,
   upgradeCost,
 } from './data'
 import { DungeonRunView } from './DungeonRun'
-import { pmdPortraitUrl } from './pmdAssets'
+import { DungeonPortrait as Portrait } from './DungeonPortrait'
 import { buildDungeonResult, prepareDungeonRun } from './runEngine'
 import { applyDungeonResult, loadDungeonSave, persistDungeonSave, resetDungeonSave } from './storage'
 import type { DungeonId, DungeonResult, DungeonRun, DungeonSave, DungeonView } from './types'
@@ -36,18 +41,6 @@ import './dungeon.css'
 interface DungeonModeProps {
   language: Language
   onExit: () => void
-}
-
-function Portrait({ id, className }: { id: number; className?: string }) {
-  return (
-    <img
-      src={pmdPortraitUrl(id)}
-      alt=""
-      className={className ?? 'dungeon-portrait'}
-      loading="lazy"
-      onError={(event) => { event.currentTarget.style.visibility = 'hidden' }}
-    />
-  )
 }
 
 function pct(n: number): string {
@@ -96,6 +89,22 @@ const TEAM_TYPE_INFO: Record<string, { es: string; en: string; color: string }> 
   fairy: { es: 'Hada', en: 'Fairy', color: '#ee99ac' },
 }
 
+const GENERATION_INFO = [
+  { id: 1, region: 'Kanto', min: 1, max: 151 },
+  { id: 2, region: 'Johto', min: 152, max: 251 },
+  { id: 3, region: 'Hoenn', min: 252, max: 386 },
+  { id: 4, region: 'Sinnoh', min: 387, max: 493 },
+  { id: 5, region: 'Unova', min: 494, max: 649 },
+  { id: 6, region: 'Kalos', min: 650, max: 721 },
+  { id: 7, region: 'Alola', min: 722, max: 809 },
+  { id: 8, region: 'Galar', min: 810, max: 905 },
+  { id: 9, region: 'Paldea', min: 906, max: 1025 },
+]
+
+function generationForId(id: number): number {
+  return GENERATION_INFO.find((generation) => id >= generation.min && id <= generation.max)?.id ?? 0
+}
+
 const UNLOCK_STAR_POSITIONS = [
   { left: 10, top: 12 },
   { left: 30, top: 4 },
@@ -124,8 +133,10 @@ export function DungeonMode({ language, onExit }: DungeonModeProps) {
   const [result, setResult] = useState<DungeonResult | null>(null)
   const [selectedDungeon, setSelectedDungeon] = useState<DungeonId>('forest')
   const [lastDungeon, setLastDungeon] = useState<DungeonId>('forest')
-  const [shopTab, setShopTab] = useState<'active' | 'passive' | 'upgrade'>('active')
-  const [teamFilter, setTeamFilter] = useState('all')
+  const [shopTab, setShopTab] = useState<'active' | 'passive' | 'held' | 'upgrade'>('active')
+  const [teamFilter, setTeamFilter] = useState<'all' | 'team' | 'recruited'>('all')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [generationFilter, setGenerationFilter] = useState<'all' | number>('all')
   const [unlockQueue, setUnlockQueue] = useState<UnlockCelebration[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -136,6 +147,19 @@ export function DungeonMode({ language, onExit }: DungeonModeProps) {
   const announcedRecruits = useRef<Set<number>>(new Set())
 
   const bonuses = computeBonuses(save)
+  const rank = guildRank(save.stats.missions ?? 0)
+  const daily = save.dailyMission ?? createDailyMission()
+  const ownedHeldItems = save.ownedHeldItems ?? []
+  const equippedHeldItems = save.equippedHeldItems ?? {}
+  const dailyTitle = daily.kind === 'defeatEnemies'
+    ? tx(`Derrota ${daily.target} enemigos`, `Defeat ${daily.target} enemies`)
+    : daily.kind === 'recruit'
+      ? tx(`Recluta ${daily.target} Pokémon`, `Recruit ${daily.target} Pokémon`)
+      : daily.kind === 'collectCrystals'
+        ? tx(`Consigue ${daily.target} cristales`, `Collect ${daily.target} crystals`)
+        : daily.kind === 'reachFloor'
+          ? tx(`Alcanza el piso ${daily.target}`, `Reach floor ${daily.target}`)
+          : tx('Completa una expedición', 'Complete an expedition')
   const celebration = unlockQueue[0] ?? null
 
   useEffect(() => {
@@ -271,6 +295,7 @@ export function DungeonMode({ language, onExit }: DungeonModeProps) {
       setRun(prepared)
       setResult(null)
       setView('run')
+      setBattleMusicTrack(dungeonId === 'forest' || dungeonId === 'desert' ? 'default' : 'epic')
       startBattleMusic()
     } catch {
       setError(tx('No se pudo preparar la expedición. Revisa tu conexión e inténtalo de nuevo.', 'Could not prepare the expedition. Check your connection and try again.'))
@@ -369,6 +394,42 @@ export function DungeonMode({ language, onExit }: DungeonModeProps) {
     })
   }
 
+  const buyHeldItem = (id: string) => {
+    playClick()
+    const item = HELD_ITEM_BY_ID[id]
+    if (!item) return
+    if ((save.ownedHeldItems ?? []).includes(id)) return
+    if (save.crystals < item.price) {
+      setError(tx('No tienes suficientes Cristales de Gremio.', 'You do not have enough Guild Crystals.'))
+      playError()
+      return
+    }
+    setError(null)
+    setSave((previous) => ({
+      ...previous,
+      crystals: previous.crystals - item.price,
+      ownedHeldItems: [...(previous.ownedHeldItems ?? []), id],
+    }))
+    playPurchase()
+  }
+
+  const equipHeldItem = (pokemonId: number, itemId: string) => {
+    playClick()
+    setSave((previous) => {
+      if (itemId && !(previous.ownedHeldItems ?? []).includes(itemId)) return previous
+      const equipped = { ...(previous.equippedHeldItems ?? {}) }
+      if (!itemId) {
+        delete equipped[pokemonId]
+      } else {
+        for (const key of Object.keys(equipped)) {
+          if (equipped[Number(key)] === itemId) delete equipped[Number(key)]
+        }
+        equipped[pokemonId] = itemId
+      }
+      return { ...previous, equippedHeldItems: equipped }
+    })
+  }
+
   const buyUpgrade = (id: string) => {
     playClick()
     const definition = UPGRADES.find((entry) => entry.id === id)
@@ -429,18 +490,15 @@ export function DungeonMode({ language, onExit }: DungeonModeProps) {
         ? (en ? shortDescription.en : shortDescription.es)
         : fallbackDescription(types, en)
     const color = starter?.color ?? typeColor(types[0])
-    return { id, name, desc, types, color, recruited: !starter, showRecruitBadge: !starter && !settled }
+    return { id, name, desc, types, color, recruited: !starter, showRecruitBadge: !starter && !settled, generation: generationForId(id) }
   })
   const teamRosterById = new Map(teamRoster.map((member) => [member.id, member]))
-  const teamTypeFilters = TEAM_TYPE_ORDER.filter((type) => teamRoster.some((member) => member.types.includes(type)))
-  const activeTeamFilter = teamFilter !== 'all' && teamFilter !== 'team' && teamFilter !== 'recruited' && !teamTypeFilters.includes(teamFilter)
-    ? 'all'
-    : teamFilter
   const filteredTeamRoster = teamRoster.filter((member) => {
-    if (activeTeamFilter === 'all') return true
-    if (activeTeamFilter === 'team') return save.selectedTeam.includes(member.id)
-    if (activeTeamFilter === 'recruited') return member.recruited
-    return member.types.includes(activeTeamFilter)
+    if (teamFilter === 'team' && !save.selectedTeam.includes(member.id)) return false
+    if (teamFilter === 'recruited' && !member.recruited) return false
+    if (typeFilter !== 'all' && !member.types.includes(typeFilter)) return false
+    if (generationFilter !== 'all' && member.generation !== generationFilter) return false
+    return true
   })
 
   const inRun = view === 'run' && run !== null
@@ -533,6 +591,20 @@ export function DungeonMode({ language, onExit }: DungeonModeProps) {
                 <div><span>{save.stats.enemiesDefeated}</span><small>{tx('Derrotados', 'Defeated')}</small></div>
                 <div><span>{save.stats.recruits}</span><small>{tx('Reclutados', 'Recruited')}</small></div>
               </div>
+              <div className="dungeon-guild-rank">
+                <span>🏅 {tx('Rango del Gremio', 'Guild Rank')}: <strong>{en ? rank.nameEn : rank.name}</strong></span>
+                <span>
+                  {rank.next === null
+                    ? tx('Rango máximo alcanzado', 'Maximum rank reached')
+                    : tx(`${save.stats.missions ?? 0} misiones · siguiente rango a las ${rank.next}`, `${save.stats.missions ?? 0} missions · next rank at ${rank.next}`)}
+                </span>
+              </div>
+              <div className="dungeon-daily-mission">
+                <strong>📅 {tx('Misión diaria', 'Daily mission')}</strong>
+                <span>{dailyTitle}</span>
+                <span>{Math.min(daily.progress ?? 0, daily.target ?? 0)}/{daily.target} · +{daily.reward} 💠</span>
+                {daily.completed && <span className="dungeon-mission-done">✔ {tx('Completada', 'Completed')}</span>}
+              </div>
             </div>
             <div className="dungeon-panel">
               <h3>💠 {tx('Ventajas permanentes', 'Permanent perks')}</h3>
@@ -576,6 +648,7 @@ export function DungeonMode({ language, onExit }: DungeonModeProps) {
               const unlocked = isDungeonUnlocked(save, dungeon.id)
               const cleared = save.clearedDungeons.includes(dungeon.id)
               const requirement = dungeon.unlockAfter ? DUNGEON_BY_ID[dungeon.unlockAfter] : null
+              const record = (save.dungeonRecords ?? {})[dungeon.id]
               return (
                 <article
                   key={dungeon.id}
@@ -588,7 +661,7 @@ export function DungeonMode({ language, onExit }: DungeonModeProps) {
                     <div>
                       <span className="dungeon-dex-no">No. {String(index + 1).padStart(3, '0')}</span>
                       <h3>{en ? dungeon.nameEn : dungeon.name}</h3>
-                      <span>{dungeon.floors} {tx('pisos', 'floors')} · Nv. {dungeon.levelStart}-{dungeon.levelEnd}</span>
+                      <span>{dungeon.id === 'endless' ? '∞' : dungeon.floors} {tx('pisos', 'floors')} · Nv. {dungeon.levelStart}-{dungeon.levelEnd}</span>
                     </div>
                     {cleared && <span className="dungeon-badge dungeon-badge--clear">✔ {tx('Completada', 'Cleared')}</span>}
                     {!unlocked && <span className="dungeon-badge dungeon-badge--lock">🔒</span>}
@@ -597,6 +670,9 @@ export function DungeonMode({ language, onExit }: DungeonModeProps) {
                   <div className="dungeon-dungeon-meta">
                     <span>💠 {tx('Recompensa', 'Reward')} {dungeon.reward}</span>
                     <span>👑 {tx('Jefe', 'Boss')} Nv.{dungeon.bossLevel}</span>
+                    {record && record.runs > 0 && (
+                      <span>🏆 {tx('Mejor piso', 'Best floor')} {record.bestFloor} · {record.wins} {tx('victorias', 'wins')}</span>
+                    )}
                   </div>
                   {unlocked ? (
                     <button
@@ -647,45 +723,55 @@ export function DungeonMode({ language, onExit }: DungeonModeProps) {
           <div className="dungeon-team-filters" role="toolbar" aria-label={tx('Filtros de Pokémon', 'Pokémon filters')}>
             <button
               type="button"
-              className={`dungeon-team-filter ${activeTeamFilter === 'all' ? 'is-active' : ''}`}
+              className={`dungeon-team-filter ${teamFilter === 'all' ? 'is-active' : ''}`}
               onClick={() => { playClick(); setTeamFilter('all') }}
             >
               🧭 {tx('Todos', 'All')}
             </button>
             <button
               type="button"
-              className={`dungeon-team-filter ${activeTeamFilter === 'team' ? 'is-active' : ''}`}
+              className={`dungeon-team-filter ${teamFilter === 'team' ? 'is-active' : ''}`}
               onClick={() => { playClick(); setTeamFilter('team') }}
             >
               ★ {tx('En equipo', 'On team')}
             </button>
             <button
               type="button"
-              className={`dungeon-team-filter ${activeTeamFilter === 'recruited' ? 'is-active' : ''}`}
+              className={`dungeon-team-filter ${teamFilter === 'recruited' ? 'is-active' : ''}`}
               onClick={() => { playClick(); setTeamFilter('recruited') }}
             >
               🤝 {tx('Reclutados', 'Recruited')}
             </button>
-            {teamTypeFilters.map((type) => {
-              const active = activeTeamFilter === type
-              const color = typeColor(type)
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  className={`dungeon-team-filter ${active ? 'is-active' : ''}`}
-                  style={{
-                    borderColor: active ? color : undefined,
-                    background: active ? `${color}33` : undefined,
-                    color: active ? '#fff' : undefined,
-                  }}
-                  onClick={() => { playClick(); setTeamFilter(type) }}
-                >
-                  <span className="dungeon-team-filter-dot" style={{ background: color }} />
-                  {typeLabel(type)}
-                </button>
-              )
-            })}
+            <select
+              className="dungeon-team-select"
+              aria-label={tx('Filtrar por generación', 'Filter by generation')}
+              title={tx('Filtrar por generación', 'Filter by generation')}
+              value={generationFilter === 'all' ? 'all' : String(generationFilter)}
+              onChange={(event) => {
+                playClick()
+                setGenerationFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))
+              }}
+            >
+              <option value="all">{tx('Todas las generaciones', 'All generations')}</option>
+              {GENERATION_INFO.map((generation) => (
+                <option key={generation.id} value={generation.id}>Gen {generation.id} · {generation.region}</option>
+              ))}
+            </select>
+            <select
+              className="dungeon-team-select"
+              aria-label={tx('Filtrar por tipo', 'Filter by type')}
+              title={tx('Filtrar por tipo', 'Filter by type')}
+              value={typeFilter}
+              onChange={(event) => {
+                playClick()
+                setTypeFilter(event.target.value)
+              }}
+            >
+              <option value="all">{tx('Todos los tipos', 'All types')}</option>
+              {TEAM_TYPE_ORDER.map((type) => (
+                <option key={type} value={type}>{typeLabel(type)}</option>
+              ))}
+            </select>
           </div>
           <div className="dungeon-starter-grid">
             {filteredTeamRoster.map((member) => {
@@ -745,6 +831,39 @@ export function DungeonMode({ language, onExit }: DungeonModeProps) {
             </button>
           </section>
 
+          <section className="dungeon-panel">
+            <h3>🎀 {tx('Objetos equipables', 'Held items')}</h3>
+            <div className="dungeon-held-list">
+              {save.selectedTeam.map((id) => {
+                const member = teamRosterById.get(id)
+                const equipped = equippedHeldItems[id] ?? ''
+                return (
+                  <label key={id} className="dungeon-held-row">
+                    <span>{member?.name ?? `Pokémon ${id}`}</span>
+                    <select
+                      className="dungeon-team-select dungeon-held-select"
+                      value={equipped}
+                      onChange={(event) => equipHeldItem(id, event.target.value)}
+                    >
+                      <option value="">{tx('Ninguno', 'None')}</option>
+                      {ownedHeldItems.map((heldId) => {
+                        const held = HELD_ITEM_BY_ID[heldId]
+                        if (!held) return null
+                        return <option key={heldId} value={heldId}>{en ? held.nameEn : held.name}</option>
+                      })}
+                    </select>
+                  </label>
+                )
+              })}
+            </div>
+            {ownedHeldItems.length === 0 && (
+              <p className="dungeon-muted">{tx('Compra objetos equipables en la tienda del gremio.', 'Buy held items in the guild shop.')}</p>
+            )}
+            <button type="button" className="dungeon-secondary-btn" onClick={() => go('shop')} onMouseEnter={playHover}>
+              {tx('Comprar equipables', 'Buy held items')} →
+            </button>
+          </section>
+
           <div className="dungeon-team-footer">
             <button type="button" className="dungeon-primary-btn dungeon-primary-btn--big" onClick={() => go('expedition')} onMouseEnter={playHover}>
               🗺️ {tx('Ir a elegir mazmorra', 'Choose a dungeon')}
@@ -770,6 +889,9 @@ export function DungeonMode({ language, onExit }: DungeonModeProps) {
             </button>
             <button type="button" className={`dungeon-tab ${shopTab === 'passive' ? 'is-active' : ''}`} onClick={() => { playClick(); setShopTab('passive') }}>
               ✨ {tx('Pasivos', 'Passives')}
+            </button>
+            <button type="button" className={`dungeon-tab ${shopTab === 'held' ? 'is-active' : ''}`} onClick={() => { playClick(); setShopTab('held') }}>
+              🎀 {tx('Equipables', 'Held items')}
             </button>
             <button type="button" className={`dungeon-tab ${shopTab === 'upgrade' ? 'is-active' : ''}`} onClick={() => { playClick(); setShopTab('upgrade') }}>
               ⬆️ {tx('Mejoras', 'Upgrades')}
@@ -853,6 +975,49 @@ export function DungeonMode({ language, onExit }: DungeonModeProps) {
                           onMouseEnter={playHover}
                         >
                           {equipped ? `✔ ${tx('Equipado', 'Equipped')}` : tx('Equipar', 'Equip')}
+                        </button>
+                      )}
+                    </article>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          {shopTab === 'held' && (
+            <>
+              <p className="dungeon-shop-note">
+                {tx('Los objetos equipables se asignan a cada Pokémon en el Equipo de Expedición. Solo puedes llevar uno por Pokémon y potencian los movimientos de su tipo.', 'Held items are assigned to each Pokémon in the Expedition Team. Each Pokémon can hold one, and they boost moves of their type.')}
+              </p>
+              <div className="dungeon-shop-grid">
+                {HELD_ITEMS.map((item) => {
+                  const owned = ownedHeldItems.includes(item.id)
+                  return (
+                    <article key={item.id} className={`dungeon-shop-card ${owned ? 'is-owned' : ''}`}>
+                      <span className="dungeon-shop-icon">
+                        <img
+                          className="dungeon-item-sprite"
+                          src={item.sprite}
+                          alt=""
+                          loading="lazy"
+                          onError={(event) => { event.currentTarget.style.visibility = 'hidden' }}
+                        />
+                      </span>
+                      <div className="dungeon-shop-copy">
+                        <strong>{en ? item.nameEn : item.name}</strong>
+                        <span>{en ? item.descEn : item.desc}</span>
+                      </div>
+                      {owned ? (
+                        <span className="dungeon-badge dungeon-badge--clear">✔ {tx('Desbloqueado', 'Unlocked')}</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="dungeon-buy-btn"
+                          onClick={() => buyHeldItem(item.id)}
+                          onMouseEnter={playHover}
+                          disabled={save.crystals < item.price}
+                        >
+                          💠 {item.price}
                         </button>
                       )}
                     </article>
@@ -1029,12 +1194,7 @@ export function DungeonMode({ language, onExit }: DungeonModeProps) {
             <span className="dungeon-unlock-kicker">
               ✨ {tx('¡Nuevo Pokémon desbloqueado!', 'New Pokémon unlocked!')} ✨
             </span>
-            <img
-              src={pmdPortraitUrl(celebration.id)}
-              alt=""
-              className="dungeon-unlock-portrait"
-              onError={(event) => { event.currentTarget.style.visibility = 'hidden' }}
-            />
+            <Portrait id={celebration.id} className="dungeon-unlock-portrait" />
             <strong className="dungeon-unlock-name">{celebration.name}</strong>
             <div className="dungeon-unlock-types">
               {celebration.types.map((type) => (

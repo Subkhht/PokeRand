@@ -1117,6 +1117,26 @@ export async function fetchPokemonTypes(id: number): Promise<string[]> {
   return data.types.map(t => t.type.name)
 }
 
+// Especies cuya primera coincidencia de tipo (slot 1) es la indicada. Sirve
+// para repartir las 1025 especies entre las mazmorras según su tipo principal.
+const primaryTypeSpeciesCache = new Map<string, Promise<number[]>>()
+
+export function getSpeciesIdsByPrimaryType(type: string): Promise<number[]> {
+  const cached = primaryTypeSpeciesCache.get(type)
+  if (cached) return cached
+  const promise = fetchJson<{ pokemon: Array<{ slot: number; pokemon: PokeApiNamedResource }> }>(`${API_BASE}/type/${type}`)
+    .then((data) => data.pokemon
+      .filter((entry) => entry.slot === 1)
+      .map((entry) => extractIdFromResourceUrl(entry.pokemon.url))
+      .filter((id) => id >= 1 && id <= 1025))
+    .catch(() => {
+      primaryTypeSpeciesCache.delete(type)
+      return []
+    })
+  primaryTypeSpeciesCache.set(type, promise)
+  return promise
+}
+
 // Devuelve las habilidades (no ocultas) de una especie, para la Cápsula de Habilidad.
 export async function getPokemonAbilities(identifier: string | number): Promise<string[]> {
   const data = await fetchJson<PokeApiPokemon>(`${API_BASE}/pokemon/${identifier}`)

@@ -1,9 +1,11 @@
 import type { Language } from '../game/i18n'
 import type { Pokemon } from '../game/types'
 
-export type DungeonId = 'forest' | 'cave' | 'tower'
+export type DungeonId = 'forest' | 'cave' | 'tower' | 'desert' | 'abyss' | 'endless'
 
 export type DungeonView = 'menu' | 'team' | 'shop' | 'expedition' | 'run' | 'result'
+
+export type FloorModifier = 'none' | 'darkness' | 'fog' | 'sandstorm' | 'lava' | 'ice'
 
 export interface DungeonDef {
   id: DungeonId
@@ -17,8 +19,10 @@ export interface DungeonDef {
   levelEnd: number
   enemyPool: number[]
   bossId: number
+  bossPool: number[]
   bossLevel: number
   minionPool: number[]
+  floorModifiers: FloorModifier[]
   reward: number
   unlockAfter?: DungeonId
   palette: {
@@ -35,15 +39,31 @@ export interface DungeonDef {
 
 export type ActiveEffect =
   | 'heal'
+  | 'healLeader'
+  | 'healTeam'
+  | 'healFullSingle'
+  | 'fullRestore'
   | 'revive'
+  | 'reviveFull'
   | 'escape'
   | 'cure'
+  | 'curePoison'
+  | 'cureSleep'
+  | 'cureParalyze'
   | 'attack'
   | 'defense'
+  | 'spAttack'
+  | 'spDefense'
+  | 'speed'
+  | 'crit'
+  | 'crystals'
+  | 'xp'
   | 'reveal'
   | 'warp'
   | 'paralyze'
+  | 'sleep'
   | 'pp'
+  | 'ppLeader'
   | 'damage'
 
 export interface ActiveItemDef {
@@ -56,6 +76,59 @@ export interface ActiveItemDef {
   price: number
   effect: ActiveEffect
   power: number
+}
+
+export interface HeldItemDef {
+  id: string
+  name: string
+  nameEn: string
+  sprite: string
+  desc: string
+  descEn: string
+  price: number
+  type: string
+  boost: number
+}
+
+export interface DungeonShopOffer {
+  itemId: string
+  price: number
+  sold: boolean
+}
+
+export type FloorEventKind = 'monsterHouse' | 'treasure' | 'kecleonShop' | 'rest' | 'mystery'
+
+export interface FloorEvent {
+  kind: FloorEventKind
+  x: number
+  y: number
+  triggered: boolean
+}
+
+export type GuildMissionKind = 'reachFloor' | 'defeatEnemies' | 'recruit' | 'collectCrystals' | 'defeatBoss' | 'noFaints'
+
+export interface GuildMission {
+  kind: GuildMissionKind
+  target: number
+  reward: number
+}
+
+export interface DailyMission extends GuildMission {
+  date: string
+  progress: number
+  completed: boolean
+}
+
+export interface MissionStart {
+  enemiesDefeated: number
+  recruits: number
+  crystalsEarned: number
+}
+
+export interface DungeonRecord {
+  bestFloor: number
+  runs: number
+  wins: number
 }
 
 export interface PassiveEffects {
@@ -115,6 +188,7 @@ export interface DungeonStats {
   totalCrystals: number
   enemiesDefeated: number
   recruits: number
+  missions: number
   bestRun: { dungeonId: DungeonId; floor: number; date: string } | null
 }
 
@@ -130,6 +204,8 @@ export interface DungeonSave {
   crystals: number
   ownedActives: string[]
   ownedPassives: string[]
+  ownedHeldItems: string[]
+  equippedHeldItems: Record<number, string>
   upgrades: Record<string, number>
   unlockedStarters: number[]
   pokemonMeta: Record<number, DungeonPokemonMeta>
@@ -138,6 +214,8 @@ export interface DungeonSave {
   equippedPassives: string[]
   unlockedDungeons: DungeonId[]
   clearedDungeons: DungeonId[]
+  dungeonRecords: Partial<Record<DungeonId, DungeonRecord>>
+  dailyMission: DailyMission
   stats: DungeonStats
 }
 
@@ -182,6 +260,16 @@ export interface MapTree {
   broken?: boolean
 }
 
+export interface MapRock {
+  x: number
+  y: number
+  flip: boolean
+  scale: number
+  /** Roca negra especial rompible (solo Caverna Cristal). */
+  special?: boolean
+  broken?: boolean
+}
+
 export interface DungeonMap {
   width: number
   height: number
@@ -190,6 +278,7 @@ export interface DungeonMap {
   start: { x: number; y: number }
   stairs: { x: number; y: number }
   trees?: MapTree[]
+  rocks?: MapRock[]
 }
 
 export interface PmdSprites {
@@ -214,6 +303,8 @@ export interface DungeonMonster {
   isPlayer: boolean
   isLeader: boolean
   isBoss?: boolean
+  bossEnraged?: boolean
+  heldItem?: string
   facing: number
   xp: number
   level: number
@@ -268,6 +359,14 @@ export interface DungeonRun {
   lang: Language
   floor: number
   totalFloors: number
+  encounterPool: number[]
+  bossId: number
+  floorModifier: FloorModifier
+  events: FloorEvent[]
+  shopOffers: DungeonShopOffer[] | null
+  mission: GuildMission
+  missionStart: MissionStart
+  missionComplete: boolean
   map: DungeonMap
   party: DungeonMonster[]
   fallen: DungeonMonster[]
@@ -304,5 +403,6 @@ export interface DungeonResult {
   crystalsEarned: number
   enemiesDefeated: number
   recruits: number
+  missionsCompleted: number
   isFirstClear: boolean
 }

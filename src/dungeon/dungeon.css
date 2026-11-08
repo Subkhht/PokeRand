@@ -627,6 +627,33 @@
   color: var(--dq-text);
 }
 
+.dungeon-team-select {
+  appearance: none;
+  min-height: 30px;
+  padding: 0.3rem 1.8rem 0.3rem 0.65rem;
+  border: 1px solid var(--dq-line);
+  border-radius: 999px;
+  color: var(--dq-text);
+  background:
+    linear-gradient(45deg, transparent 50%, var(--dq-muted) 50%) calc(100% - 13px) 50% / 5px 5px no-repeat,
+    linear-gradient(135deg, var(--dq-muted) 50%, transparent 50%) calc(100% - 8px) 50% / 5px 5px no-repeat,
+    rgba(20, 25, 44, 0.9);
+  font-family: inherit;
+  font-size: 0.66rem;
+  cursor: pointer;
+}
+
+.dungeon-team-select:hover,
+.dungeon-team-select:focus-visible {
+  border-color: var(--dq-line-bright);
+  outline: none;
+}
+
+.dungeon-team-select option {
+  color: var(--dq-text);
+  background: #14192c;
+}
+
 .dungeon-team-filter-dot {
   width: 8px;
   height: 8px;
@@ -1347,6 +1374,10 @@
   .dungeon-tree--special {
     animation: none;
   }
+
+  .dungeon-rock--special {
+    animation: none;
+  }
 }
 
 .dungeon-board-slot {
@@ -1448,6 +1479,25 @@
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45));
+}
+
+.dungeon-rock {
+  position: absolute;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
+}
+
+.dungeon-rock--special {
+  filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 8px rgba(192, 132, 252, 0.55));
+  animation: dq-special-rock 2.8s ease-in-out infinite;
+}
+
+@keyframes dq-special-rock {
+  0%, 100% { opacity: 0.94; }
+  50% { opacity: 1; }
 }
 
 .dungeon-tree--special {
@@ -3330,4 +3380,281 @@
   color: #1a1400;
   background: #f2bf2f;
   border-color: #ffe37a;
+}
+
+/* ===== Objetos equipables, misiones, eventos y modificadores ===== */
+.dungeon-held-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.8rem;
+}
+
+.dungeon-held-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 1.1fr);
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--dq-line);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.7rem;
+}
+
+.dungeon-held-select {
+  width: 100%;
+}
+
+.dungeon-guild-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.7rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--dq-line);
+  color: var(--dq-muted);
+  font-size: 0.68rem;
+}
+
+.dungeon-guild-rank strong {
+  color: var(--dq-gold);
+}
+
+.dungeon-mission-panel strong {
+  display: block;
+  color: var(--dq-text);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.dungeon-mission-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  color: var(--dq-crystal);
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+
+.dungeon-mission-done {
+  display: block;
+  margin-top: 0.45rem;
+  color: #7fe08a;
+  font-size: 0.68rem;
+  font-weight: bold;
+}
+
+.dungeon-mission-failed {
+  display: block;
+  margin-top: 0.45rem;
+  color: #ff9a9a;
+  font-size: 0.65rem;
+}
+
+.dungeon-event {
+  animation: dq-event-bob 2.2s ease-in-out infinite;
+  filter: drop-shadow(0 0 7px rgba(255, 209, 102, 0.65));
+}
+
+@keyframes dq-event-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.dungeon-modifier-pill {
+  border-color: rgba(192, 132, 252, 0.55);
+  color: #e6c7ff;
+}
+
+.dungeon-shop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(4, 6, 12, 0.78);
+  backdrop-filter: blur(4px);
+}
+
+.dungeon-shop-modal {
+  width: min(620px, 96vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 1.2rem;
+  border: 3px solid var(--dq-gold);
+  background: linear-gradient(160deg, #1c2340, #0e1222);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
+}
+
+.dungeon-shop-modal h2 {
+  margin: 0 0 0.4rem;
+  color: var(--dq-gold);
+  font-size: 1.2rem;
+}
+
+.dungeon-shop-modal > p {
+  margin: 0 0 0.8rem;
+  color: var(--dq-muted);
+  font-size: 0.72rem;
+}
+
+.dungeon-shop-offers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.dungeon-shop-offer {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem;
+  border: 1px solid var(--dq-line);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.dungeon-shop-offer > div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.dungeon-shop-offer strong {
+  font-size: 0.74rem;
+}
+
+.dungeon-shop-offer span {
+  color: var(--dq-muted);
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+
+.dungeon-shop-offer .dungeon-buy-btn {
+  flex: none;
+  min-width: 72px;
+}
+
+.dungeon-daily-mission {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--dq-line);
+  background: rgba(255, 209, 102, 0.04);
+  color: var(--dq-muted);
+  font-size: 0.66rem;
+}
+
+.dungeon-daily-mission strong {
+  color: var(--dq-gold);
+  font-size: 0.7rem;
+}
+
+/* ===== Ambiente vivo de Caverna Cristal ===== */
+.dungeon-board--cave::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 22% 28%, rgba(127, 216, 255, 0.1), transparent 26%),
+    radial-gradient(circle at 78% 70%, rgba(192, 132, 252, 0.08), transparent 30%),
+    repeating-linear-gradient(45deg, transparent 0 16px, rgba(127, 216, 255, 0.018) 16px 17px);
+  animation: dq-cave-light 8s ease-in-out infinite alternate;
+}
+
+@keyframes dq-cave-light {
+  from { opacity: 0.55; }
+  to { opacity: 1; }
+}
+
+.dungeon-cave-motes {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.dungeon-cave-motes span {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #b8f4ff;
+  box-shadow: 0 0 7px 2px rgba(127, 216, 255, 0.55);
+  opacity: 0;
+  animation-name: dq-cave-mote;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@keyframes dq-cave-mote {
+  0%, 100% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  20% { opacity: 0.9; }
+  50% { opacity: 0.45; transform: translate(-4px, -12px) scale(1); }
+  75% { opacity: 0.8; }
+}
+
+.dungeon-cave-crystal {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(180deg, #d9fbff, #62d9ff 45%, #2f8dc4);
+  clip-path: polygon(50% 0, 100% 30%, 78% 100%, 22% 100%, 0 30%);
+  filter: drop-shadow(0 0 6px rgba(127, 216, 255, 0.75));
+  animation: dq-crystal-pulse 2.6s ease-in-out infinite alternate;
+  opacity: 0.92;
+}
+
+.dungeon-cave-crystal::after {
+  content: '';
+  position: absolute;
+  left: -38%;
+  bottom: 0;
+  width: 48%;
+  height: 58%;
+  background: linear-gradient(180deg, #f0e6ff, #c084fc 50%, #7a4ab8);
+  clip-path: polygon(50% 0, 100% 35%, 75% 100%, 25% 100%, 0 35%);
+  filter: drop-shadow(0 0 4px rgba(192, 132, 252, 0.7));
+}
+
+.dungeon-cave-crystal--violet {
+  background: linear-gradient(180deg, #f0e6ff, #c084fc 45%, #7a4ab8);
+  filter: drop-shadow(0 0 7px rgba(192, 132, 252, 0.75));
+}
+
+.dungeon-cave-crystal--violet::after {
+  background: linear-gradient(180deg, #e6fbff, #62d9ff 50%, #2f8dc4);
+  filter: drop-shadow(0 0 4px rgba(127, 216, 255, 0.7));
+}
+
+@keyframes dq-crystal-pulse {
+  from {
+    opacity: 0.62;
+    filter: drop-shadow(0 0 4px rgba(127, 216, 255, 0.45));
+  }
+  to {
+    opacity: 1;
+    filter: drop-shadow(0 0 10px rgba(127, 216, 255, 0.9));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dungeon-board--cave::before,
+  .dungeon-cave-motes span,
+  .dungeon-cave-crystal {
+    animation: none;
+  }
+
+  .dungeon-cave-motes span {
+    opacity: 0.45;
+  }
 }
