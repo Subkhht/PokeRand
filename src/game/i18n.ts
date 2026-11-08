@@ -416,9 +416,30 @@ const DICT: Record<string, Entry> = {
   'evo.trigger.trade': { es: 'Intercambio', en: 'Trade' },
   'evo.trigger.happiness': { es: 'Amistad', en: 'Friendship' },
   'evo.trigger.other': { es: 'Especial', en: 'Special' },
-  'donate.title': { es: '☕ Donaciones', en: '☕ Donations' },
-  'donate.desc': { es: 'Si disfrutas de PokeRand, puedes apoyar su desarrollo con un café en Ko-fi. ¡Gracias!', en: 'If you enjoy PokeRand, you can support its development with a coffee on Ko-fi. Thanks!' },
-  'donate.button': { es: '☕ Invítame un café en Ko-fi', en: '☕ Buy me a coffee on Ko-fi' },
+  'credits.title': { es: 'Créditos de sprites', en: 'Sprite credits' },
+  'credits.intro': {
+    es: 'PokeRand usa sprites de la comunidad y de PokéAPI. Este proyecto no reclama su autoría: todo el reconocimiento es para sus creadores.',
+    en: 'PokeRand uses community and PokéAPI sprites. This project does not claim ownership: all credit goes to their creators.',
+  },
+  'credits.pokemon.title': { es: 'Pokémon y objetos', en: 'Pokémon and items' },
+  'credits.pokemon.desc': {
+    es: 'Los sprites de Pokémon y objetos proceden de PokéAPI/sprites. Pokémon, sus nombres y sus diseños son propiedad de Nintendo, Game Freak y Creatures Inc.',
+    en: 'Pokémon and item sprites come from PokéAPI/sprites. Pokémon, their names and designs are property of Nintendo, Game Freak and Creatures Inc.',
+  },
+  'credits.pmd.title': { es: 'Mazmorra Misteriosa', en: 'Mystery Dungeon' },
+  'credits.pmd.desc': {
+    es: 'Los retratos y animaciones de Pokémon Mystery Dungeon proceden de PMD SpriteCollab (PMDCollab), un proyecto comunitario. Gracias a cada artista que ha aportado sus sprites.',
+    en: 'Pokémon Mystery Dungeon portraits and animations come from PMD SpriteCollab (PMDCollab), a community project. Thanks to every artist who contributed sprites.',
+  },
+  'credits.legal.title': { es: 'Aviso legal', en: 'Legal notice' },
+  'credits.legal.desc': {
+    es: 'PokeRand es un proyecto fan sin ánimo de lucro y no está afiliado a Nintendo, Game Freak ni Creatures Inc. Si eres autor de un sprite y quieres que se te acredite o que se retire, abre un issue en el repositorio.',
+    en: 'PokeRand is a non-profit fan project and is not affiliated with Nintendo, Game Freak or Creatures Inc. If you are the author of a sprite and want credit or removal, open an issue in the repository.',
+  },
+  'credits.note': {
+    es: 'Gracias también a PokeAPI por mantener la API y los sprites, y a la comunidad de PokeRand por sus aportes.',
+    en: 'Thanks also to PokeAPI for maintaining the API and sprites, and to the PokeRand community for their contributions.',
+  },
   'options.data': { es: '💾 Datos', en: '💾 Data' },
   'options.exportData': { es: '📤 Exportar datos', en: '📤 Export data' },
   'options.importData': { es: '📥 Importar datos', en: '📥 Import data' },
@@ -601,9 +622,9 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v2.5.3', en: 'v2.5.3' },
+  'help.version': { es: 'v3.0.0', en: 'v3.0.0' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
-  'changelog.button': { es: 'Ver cambios v2.5.3', en: 'See changes v2.5.3' },
+  'changelog.button': { es: 'Ver cambios v3.0.0', en: 'See changes v3.0.0' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -1873,6 +1894,26 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v3.0.0',
+    items: [
+      { es: '🏰 ¡Nueva Mazmorra Misteriosa! Un modo por turnos y por pasos con tres mazmorras (Bosque Susurrante, Caverna Cristal y Torre Celeste), pisos generados, jefes, Cristales de Gremio, tienda, objetos activos y pasivos, y mejoras permanentes.', en: '🏰 New Mystery Dungeon! A turn-based, step-driven mode with three dungeons (Whispering Woods, Crystal Cavern and Celestial Tower), generated floors, bosses, Guild Crystals, a shop, active and passive items, and permanent upgrades.' },
+      { es: '🧭 Equipo de Expedición: elige hasta 4 Pokémon y fíltralos por tipo, en equipo o reclutados. Se muestran ordenados por número de Pokédex y hay acceso directo desde la pantalla principal.', en: '🧭 Expedition Team: choose up to 4 Pokémon and filter them by type, on team or recruited. They are sorted by Pokédex number and can be accessed directly from the main screen.' },
+      { es: '🤝 Reclutamiento: los Pokémon salvajes pueden unirse al equipo. Se desbloquean en el Equipo de Expedición al completar el piso donde se unieron, con una notificación central, estrellas animadas y un sonido de desbloqueo.', en: '🤝 Recruiting: wild Pokémon can join your team. They unlock in the Expedition Team after completing the floor where they joined, with a centered notification, animated stars and an unlock sound.' },
+      { es: '💾 Progreso persistente en LocalStorage: cristales, objetos, mejoras, equipo, Pokémon desbloqueados, tipos, descripciones breves y estado de los reclutas.', en: '💾 Persistent LocalStorage progress: crystals, items, upgrades, team, unlocked Pokémon, types, short descriptions and recruit status.' },
+      { es: '🌲 Bosque Susurrante renovado: todos los muros tienen árboles variados, el suelo bajo los árboles usa el color de las casillas caminables y aparecen árboles especiales rompibles con un brillo cálido.', en: '🌲 Revamped Whispering Woods: every wall has varied trees, the ground beneath trees matches walkable tiles and rare breakable trees appear with a warm glow.' },
+      { es: '🔥 Árboles rompibles: solo un ataque de tipo Fuego puede derribarlos. Sueltan un objeto aleatorio respetando el límite de la bolsa, el resultado aparece en el Diario, suenan al romperse y dejan la casilla transitable.', en: '🔥 Breakable trees: only a Fire-type attack can bring them down. They drop a random item respecting the bag limit, the result is shown in the Journal, they play a sound and leave the tile walkable.' },
+      { es: '🗺️ Mapa más grande y cercano: celdas de mayor tamaño, zoom adaptativo, sprites más grandes y visión reducida para explorar con más detalle.', en: '🗺️ Bigger, closer map: larger cells, adaptive zoom, bigger sprites and reduced vision for more detailed exploration.' },
+      { es: '🎨 Mapa más bonito: texturas de suelo y muro, sombras de profundidad, hierba, piedrecitas, flores, musgo, viñeta, luciérnagas y aura dorada del líder.', en: '🎨 Prettier map: floor and wall textures, depth shadows, grass, pebbles, flowers, moss, vignette, fireflies and a golden leader aura.' },
+      { es: '🖼️ Pixel art nítido: renderizado sin suavizado, tamaños enteros de celda y filtros pixelated/crisp-edges para que sprites y árboles se vean definidos.', en: '🖼️ Crisp pixel art: unsmoothed rendering, integer cell sizes and pixelated/crisp-edges filters so sprites and trees stay sharp.' },
+      { es: '🐾 Los sprites de los Pokémon se ajustan a su casilla y mantienen la misma escala al caminar y al estar quietos, sin cambiar de tamaño al moverse.', en: '🐾 Pokémon sprites fit their tile and keep the same scale while walking and idle, without changing size when moving.' },
+      { es: '📖 Fichas del equipo: descripciones breves para todos los Pokémon desbloqueados, al estilo de los iniciales. La etiqueta Reclutado desaparece al seleccionarlos por primera vez.', en: '📖 Team cards: short descriptions for every unlocked Pokémon, in the style of the starters. The Recruited tag disappears the first time they are selected.' },
+      { es: '👑 Cambio de líder en plena expedición haciendo clic en los Pokémon del panel derecho, sobre sus barras de vida, sin gastar turno.', en: '👑 Change leader mid-expedition by clicking the Pokémon in the right-hand panel, on their HP bars, without spending a turn.' },
+      { es: '🛒 Objetos activos con sprites y nombres de PokéAPI, tienda del gremio con activos, pasivos y mejoras, y créditos de PMD SpriteCollab y PokéAPI.', en: '🛒 Active items with PokéAPI sprites and names, a guild shop with actives, passives and upgrades, and credits for PMD SpriteCollab and PokéAPI.' },
+      { es: '🔊 Nuevos sonidos para romper árboles y desbloquear reclutas.', en: '🔊 New sounds for breaking trees and unlocking recruits.' },
+      { es: '🖥️ Interfaz: Cómo se juega pasa a la barra superior, accesos directos reorganizados en la pantalla principal y limpieza de tarjetas duplicadas.', en: '🖥️ UI: How to play moved to the top bar, main-screen shortcuts reorganized and duplicate cards cleaned up.' },
+    ],
+  },
   {
     version: 'v2.5.3',
     items: [

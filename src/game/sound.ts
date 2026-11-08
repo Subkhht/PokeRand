@@ -180,6 +180,32 @@ export function playHit(): void {
   } catch { /* silent */ }
 }
 
+// Crujido corto y suave al romper un árbol.
+export function playTreeBreak(): void {
+  try {
+    const ac = getCtx()
+    const now = ac.currentTime
+    noise(ac, ac.destination, now, 0.08, 0.035 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 196, now, 0.09, 'triangle', 0.09 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 130, now + 0.055, 0.13, 'sine', 0.06 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 98, now + 0.11, 0.16, 'sine', 0.035 * sfxVolume * SFX_SOFTNESS)
+  } catch { /* silent */ }
+}
+
+// Campanilla breve al desbloquear un Pokémon reclutado.
+export function playRecruitUnlock(): void {
+  try {
+    const ac = getCtx()
+    const now = ac.currentTime
+    const notes = [659, 880, 1175]
+    notes.forEach((freq, index) => {
+      note(ac, ac.destination, freq, now + index * 0.08, 0.18, 'triangle', 0.14 * sfxVolume * SFX_SOFTNESS)
+    })
+    note(ac, ac.destination, 1568, now + 0.26, 0.32, 'triangle', 0.17 * sfxVolume * SFX_SOFTNESS)
+    note(ac, ac.destination, 440, now, 0.42, 'sine', 0.05 * sfxVolume * SFX_SOFTNESS)
+  } catch { /* silent */ }
+}
+
 export function playEvolution(): void {
   try {
     const ac = getCtx()

@@ -4483,3 +4483,134 @@ html[data-theme]:not([data-theme="dark"]) .app-shell .node.current {
 @keyframes stageNoticeBackdrop { from { opacity: 0; } to { opacity: 1; } }
 @keyframes stageNoticeIn { from { opacity: 0; transform: scale(0.75) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 @keyframes stageNoticeMedal { from { transform: rotate(-5deg) scale(0.96); } to { transform: rotate(5deg) scale(1.04); } }
+/* ------------------------------------------------------------
+   CRÉDITOS DE SPRITES (pie de página)
+   ------------------------------------------------------------ */
+.site-footer {
+  margin-top: 0.85rem;
+  padding: 1.1rem 1.25rem 1rem;
+  border: 2px solid #6d7894;
+  border-top: 4px solid #df3b2f;
+  background: #20263a;
+  color: #f4f1e8;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.28);
+  font-family: 'DM Mono', monospace;
+}
+
+.site-footer-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.55rem;
+  margin-bottom: 0.7rem;
+  border-bottom: 2px solid #3a4360;
+}
+
+.site-footer-head h2 {
+  margin: 0;
+  color: #f2bf2f;
+  font: 400 clamp(1.35rem, 3vw, 1.95rem)/1 'Bebas Neue', 'Space Grotesk', sans-serif;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.site-footer-head>span {
+  color: #79c7e8;
+  font-size: 0.55rem;
+  letter-spacing: 0.16em;
+}
+
+.site-footer-intro {
+  max-width: 85ch;
+  margin: 0 0 0.8rem;
+  color: #c8cfe0;
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.site-footer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.7rem;
+}
+
+.site-footer-grid section {
+  padding: 0.7rem 0.75rem;
+  background: #171d30;
+  border: 1px solid #3a4360;
+}
+
+.site-footer-grid h3 {
+  margin: 0 0 0.35rem;
+  color: #ff8a7e;
+  font: 700 0.68rem/1.2 'DM Mono', monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.site-footer-grid p {
+  margin: 0 0 0.5rem;
+  color: #b9c2d6;
+  font-size: 0.66rem;
+  line-height: 1.55;
+}
+
+.site-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.site-footer-links a {
+  color: #79c7e8;
+  font-size: 0.63rem;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(121, 199, 232, 0.45);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.site-footer-links a:hover {
+  color: #f2bf2f;
+  border-color: #f2bf2f;
+}
+
+.site-footer-note {
+  margin: 0.8rem 0 0;
+  padding-top: 0.55rem;
+  border-top: 1px dashed #3a4360;
+  color: #8f9ab3;
+  font-size: 0.6rem;
+  line-height: 1.5;
+}
+
+html[data-gameboy] .site-footer {
+  border-color: #8bac0f;
+  border-top-color: #c4372f;
+  background: #1b4d1b;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.5);
+}
+
+html[data-gameboy] .site-footer-grid section {
+  background: #0f380f;
+  border-color: #306230;
+}
+
+html[data-gameboy] .site-footer-head {
+  border-color: #306230;
+}
+
+@media (max-width: 640px) {
+  .site-footer {
+    padding: 0.9rem;
+  }
+
+  .site-footer-head h2 {
+    font-size: 1.4rem;
+  }
+
+  .site-footer-grid {
+    grid-template-columns: 1fr;
+  }
+}

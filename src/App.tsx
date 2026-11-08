@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
 import { playHover, playClick, playSelect, playHit, playEvolution, playCapture, playPerfectCapture, playEquip, playPurchase, playError, playCoin, playSlotMachine, playAchievement, playBadgeFanfare, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
+import { DungeonMode } from './dungeon/DungeonMode'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -40,7 +41,7 @@ import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, PokemonIVs, RouteNode, BranchNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, itemLocalizedName, metaItemDesc, moveName, statusLabel, statusAppliedLine, themeName, themeDesc, bgName, bgDesc, type Language, getChangelog } from './game/i18n'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp' | 'dungeon'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum' | 'original' | 'branch'
 
 // Historial local de partidas finalizadas (victorias/derrotas). Solo se
@@ -11069,8 +11070,9 @@ function MainApp() {
   }
 
   return (
-    <main className="app-shell">
-      <BackgroundLayer backgroundId={metaProgression.activeBackground} />
+    <main className={`app-shell${screen === 'dungeon' ? ' app-shell--dungeon' : ''}`}>
+      {screen !== 'dungeon' && <BackgroundLayer backgroundId={metaProgression.activeBackground} />}
+      {screen !== 'dungeon' && (
       <header className="topbar">
         <TopbarCanvas />
         <div className="left-toolbar">
@@ -11196,6 +11198,11 @@ function MainApp() {
           </button>
         </div>
       </header>
+      )}
+
+      {screen === 'dungeon' && (
+        <DungeonMode language={language} onExit={() => setScreen('setup')} />
+      )}
 
       {/* Modal Revive: selección de objetivo */}
       {reviveModal && (
@@ -12333,31 +12340,6 @@ function MainApp() {
               </div>
             </div>
 
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem', marginTop: '0.75rem', padding: '0.85rem', background: 'rgba(255,154,214,0.08)', borderRadius: '10px', border: '1px solid rgba(255,154,214,0.35)' }}>
-              <strong style={{ fontSize: '1rem', color: '#ffd0ec', display: 'block', marginBottom: '0.5rem' }}>
-                {t('donate.title')}
-              </strong>
-              <p style={{ margin: '0 0 0.6rem', fontSize: '0.85rem', color: '#e6e2ff', lineHeight: '1.45' }}>
-                {t('donate.desc')}
-              </p>
-              <a
-                href="https://ko-fi.com/subkht"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '6px',
-                  padding: '9px 16px', borderRadius: '8px',
-                  background: '#ff5fa8', color: '#ffffff', fontWeight: 'bold', fontSize: '0.85rem',
-                  border: '2px solid #ffd0ec',
-                  textDecoration: 'none', cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-                }}
-                onClick={playClick}
-              >
-                {t('donate.button')}
-              </a>
-            </div>
-
             <div className="pokedex-controls">
               <div className="d-pad" title="D-Pad Options"></div>
               <button
@@ -12837,6 +12819,15 @@ function MainApp() {
                 </button>
                 <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowMetaShop(true) }}>
                   🪙 {t('setup.metaShop')} ({metaProgression.pokeCoins} 🪙)
+                </button>
+                <button
+                  className="tiny-btn setup-dungeon"
+                  type="button"
+                  onClick={() => { playClick(); setScreen('dungeon') }}
+                  onMouseEnter={playHover}
+                  style={{ borderColor: '#df3b2f', color: '#ff8a7e' }}
+                >
+                  🔷 {language === 'en' ? 'Mystery Dungeon' : 'Mazmorra Misteriosa'}
                 </button>
               </div>
             </div>
@@ -17299,6 +17290,42 @@ function MainApp() {
             💬
           </button>
         </>
+      )}
+
+      {screen !== 'dungeon' && (
+        <footer className="site-footer" aria-label={t('credits.title')}>
+          <div className="site-footer-head">
+            <h2>◈ {t('credits.title')}</h2>
+            <span>POKERAND // SPRITE CREDITS</span>
+          </div>
+          <p className="site-footer-intro">{t('credits.intro')}</p>
+          <div className="site-footer-grid">
+            <section>
+              <h3>{t('credits.pokemon.title')} · PokéAPI</h3>
+              <p>{t('credits.pokemon.desc')}</p>
+              <div className="site-footer-links">
+                <a href="https://pokeapi.co/" target="_blank" rel="noopener noreferrer">pokeapi.co</a>
+                <a href="https://github.com/PokeAPI/sprites" target="_blank" rel="noopener noreferrer">PokeAPI/sprites</a>
+              </div>
+            </section>
+            <section>
+              <h3>{t('credits.pmd.title')} · PMD SpriteCollab</h3>
+              <p>{t('credits.pmd.desc')}</p>
+              <div className="site-footer-links">
+                <a href="https://github.com/PMDCollab/SpriteCollab" target="_blank" rel="noopener noreferrer">GitHub</a>
+                <a href="https://sprites.pmdcollab.org/" target="_blank" rel="noopener noreferrer">sprites.pmdcollab.org</a>
+              </div>
+            </section>
+            <section>
+              <h3>{t('credits.legal.title')}</h3>
+              <p>{t('credits.legal.desc')}</p>
+              <div className="site-footer-links">
+                <a href="https://github.com/Subkhht/PokeRand" target="_blank" rel="noopener noreferrer">GitHub / PokeRand</a>
+              </div>
+            </section>
+          </div>
+          <p className="site-footer-note">{t('credits.note')}</p>
+        </footer>
       )}
 
     </main>
