@@ -3658,3 +3658,188 @@
     opacity: 0.45;
   }
 }
+
+
+/* ============================================================
+   NEXUS UI 2.0 — acabado holográfico de la Mazmorra
+   ============================================================ */
+
+.dungeon-app {
+  --dq-bg: #05070f;
+  --dq-bg-2: #0a1222;
+  --dq-panel: rgba(9, 16, 32, 0.90);
+  --dq-panel-2: rgba(16, 27, 50, 0.92);
+  --dq-line: rgba(99, 230, 255, 0.20);
+  --dq-line-bright: rgba(99, 230, 255, 0.55);
+  --dq-text: #eaf6ff;
+  --dq-muted: #8aa0c0;
+  --dq-crystal: #63e6ff;
+  --dq-gold: #ffd166;
+  --dq-green: #4ade80;
+  --dq-red: #ff6b6b;
+  --dq-purple: #a78bfa;
+  background:
+    radial-gradient(circle at 16% 0%, rgba(99, 230, 255, 0.14), transparent 40%),
+    radial-gradient(circle at 84% 8%, rgba(167, 139, 250, 0.16), transparent 44%),
+    radial-gradient(circle at 50% 115%, rgba(255, 209, 102, 0.08), transparent 50%),
+    linear-gradient(180deg, #05070f 0%, #0a1120 55%, #05070f 100%) !important;
+}
+
+.dungeon-app .dungeon-header {
+  border-bottom: 1px solid rgba(99, 230, 255, 0.18) !important;
+  background: linear-gradient(180deg, rgba(6, 11, 24, 0.94), rgba(6, 11, 24, 0.72)) !important;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(18px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
+}
+
+.dungeon-app .dungeon-logo strong {
+  background: linear-gradient(100deg, #ffffff 0 42%, #9beeff 70%, #ffd166 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 0 20px rgba(99, 230, 255, 0.28));
+}
+
+.dungeon-app .dungeon-panel,
+.dungeon-app .dungeon-map-panel,
+.dungeon-app .dungeon-shop-modal {
+  border: 1px solid rgba(99, 230, 255, 0.17) !important;
+  border-radius: 16px !important;
+  background: linear-gradient(155deg, rgba(12, 21, 42, 0.92), rgba(6, 11, 24, 0.95)) !important;
+  box-shadow:
+    0 22px 60px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+}
+
+.dungeon-app .dungeon-map-panel {
+  border-color: rgba(99, 230, 255, 0.28) !important;
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(99, 230, 255, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07) !important;
+}
+
+.dungeon-app .dungeon-run-header {
+  border-radius: 0 0 16px 16px !important;
+  border-bottom: 1px solid rgba(99, 230, 255, 0.16);
+  background: linear-gradient(180deg, rgba(8, 14, 30, 0.96), rgba(7, 12, 24, 0.82)) !important;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.dungeon-app .dungeon-primary-btn,
+.dungeon-app .dungeon-buy-btn {
+  border: 1px solid rgba(255, 209, 102, 0.9) !important;
+  border-radius: 11px !important;
+  background: linear-gradient(135deg, #ffe8a3, #ffd166 45%, #f0a92e) !important;
+  color: #1b1304 !important;
+  box-shadow: 0 12px 28px rgba(255, 175, 20, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+  text-shadow: none !important;
+  transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease;
+}
+
+.dungeon-app .dungeon-primary-btn:hover:not(:disabled),
+.dungeon-app .dungeon-buy-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.04);
+  box-shadow: 0 18px 38px rgba(255, 175, 20, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+
+.dungeon-app .dungeon-secondary-btn,
+.dungeon-app .dungeon-danger-btn,
+.dungeon-app .dungeon-action-btn,
+.dungeon-app .dungeon-pad-btn,
+.dungeon-app .dungeon-tab,
+.dungeon-app .dungeon-team-filter,
+.dungeon-app .dungeon-team-select,
+.dungeon-app .dungeon-ghost-btn {
+  border: 1px solid rgba(99, 230, 255, 0.18) !important;
+  border-radius: 10px !important;
+  background: linear-gradient(160deg, rgba(24, 37, 66, 0.92), rgba(10, 17, 34, 0.96)) !important;
+  color: #dff4ff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 7px 18px rgba(0, 0, 0, 0.22) !important;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.dungeon-app .dungeon-secondary-btn:hover,
+.dungeon-app .dungeon-action-btn:hover,
+.dungeon-app .dungeon-pad-btn:hover,
+.dungeon-app .dungeon-tab:hover,
+.dungeon-app .dungeon-team-filter:hover,
+.dungeon-app .dungeon-team-select:hover,
+.dungeon-app .dungeon-ghost-btn:hover {
+  border-color: rgba(99, 230, 255, 0.55) !important;
+  background: linear-gradient(160deg, rgba(33, 52, 90, 0.96), rgba(13, 22, 44, 0.98)) !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3), 0 0 26px rgba(99, 230, 255, 0.08) !important;
+}
+
+.dungeon-app .dungeon-danger-btn {
+  border-color: rgba(255, 107, 107, 0.35) !important;
+  color: #ffb3b3 !important;
+}
+
+.dungeon-app .dungeon-danger-btn:hover {
+  border-color: rgba(255, 107, 107, 0.68) !important;
+  background: rgba(255, 107, 107, 0.12) !important;
+  box-shadow: 0 0 26px rgba(255, 107, 107, 0.14) !important;
+}
+
+.dungeon-app .dungeon-party-card {
+  border: 1px solid rgba(99, 230, 255, 0.12) !important;
+  border-radius: 11px !important;
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dungeon-app .dungeon-party-card.is-leader {
+  border-color: rgba(255, 209, 102, 0.4) !important;
+  background: linear-gradient(155deg, rgba(255, 209, 102, 0.13), rgba(255, 209, 102, 0.035)) !important;
+  box-shadow: 0 0 26px rgba(255, 209, 102, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.dungeon-app .dungeon-mission-panel {
+  border-color: rgba(255, 209, 102, 0.32) !important;
+}
+
+.dungeon-app .dungeon-hero {
+  border: 1px solid rgba(99, 230, 255, 0.18) !important;
+  border-radius: 18px !important;
+  background:
+    radial-gradient(circle at 82% 30%, rgba(99, 230, 255, 0.14), transparent 42%),
+    linear-gradient(135deg, rgba(12, 22, 44, 0.96), rgba(6, 11, 24, 0.98)) !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+.dungeon-app .dungeon-dialogue,
+.dungeon-app .dungeon-modal {
+  border: 1px solid rgba(99, 230, 255, 0.2) !important;
+  border-radius: 16px !important;
+  background: linear-gradient(155deg, rgba(12, 21, 42, 0.98), rgba(6, 11, 24, 0.99)) !important;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(99, 230, 255, 0.08) !important;
+}
+
+.dungeon-app .dungeon-modal-backdrop,
+.dungeon-app .dungeon-shop-overlay {
+  background: radial-gradient(circle at 50% 35%, rgba(16, 28, 54, 0.76), rgba(2, 4, 10, 0.92)) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.dungeon-app button:focus-visible,
+.dungeon-app .dungeon-tile:focus-visible {
+  outline: 2px solid #63e6ff !important;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgba(99, 230, 255, 0.12) !important;
+}
+
+@media (max-width: 760px) {
+  .dungeon-app .dungeon-panel,
+  .dungeon-app .dungeon-map-panel {
+    border-radius: 13px !important;
+  }
+}

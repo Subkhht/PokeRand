@@ -4,6 +4,7 @@ import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
 import { playHover, playClick, playSelect, playHit, playEvolution, playCapture, playPerfectCapture, playEquip, playPurchase, playError, playCoin, playSlotMachine, playAchievement, playBadgeFanfare, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
 import { DungeonMode } from './dungeon/DungeonMode'
+import { DUNGEON_STORAGE_KEY } from './dungeon/data'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -2675,6 +2676,8 @@ function softenFirstBattleEnemy(enemy: Pokemon, team: Pokemon[]): Pokemon {
 
 function MainApp() {
   const [screen, setScreen] = useState<Screen>('setup')
+  const [showIntro, setShowIntro] = useState(true)
+  const [introLeaving, setIntroLeaving] = useState(false)
   const [generation, setGeneration] = useState<number>(1)
   const [difficulty, setDifficulty] = useState<Difficulty>('medium')
   const [currentRunGen, setCurrentRunGen] = useState<number>(1)
@@ -3281,6 +3284,13 @@ function MainApp() {
   }, [screen])
 
   useEffect(() => { startMenuMusic() }, [])
+
+  useEffect(() => {
+    if (!showIntro) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previous }
+  }, [showIntro])
 
   // Desbloquear el audio en la primera interacción (los navegadores bloquean el
   // autoplay con sonido hasta que el usuario hace clic/toca/teclea).
@@ -11069,8 +11079,50 @@ function MainApp() {
     setMusicMutedState(next)
   }
 
+  const enterSite = (): void => {
+    if (introLeaving) return
+    setIntroLeaving(true)
+    unlockAudio()
+    playClick()
+    window.setTimeout(() => {
+      setShowIntro(false)
+      setIntroLeaving(false)
+    }, 380)
+  }
+
   return (
     <main className={`app-shell${screen === 'dungeon' ? ' app-shell--dungeon' : ''}`}>
+      {showIntro && (
+        <div
+          className={`pokerand-intro${introLeaving ? ' is-leaving' : ''}`}
+          role="button"
+          tabIndex={0}
+          aria-label={language === 'en' ? 'Enter PokeRand' : 'Entrar en PokeRand'}
+          onClick={enterSite}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              enterSite()
+            }
+          }}
+        >
+          <div className="pokerand-intro-stars" aria-hidden="true" />
+          <div className="pokerand-intro-content">
+            <div className="pokerand-intro-ball" aria-hidden="true" />
+            <h1 className="pokerand-intro-title">POKERAND</h1>
+            <p className="pokerand-intro-sub">
+              {language === 'en' ? 'Pokémon Roguelike Adventure' : 'Aventura Roguelike Pokémon'}
+            </p>
+            <div className="pokerand-intro-hint">
+              {language === 'en' ? 'Click to enter' : 'Haz clic para entrar'}
+              <span className="pokerand-intro-blink">▸</span>
+            </div>
+            <span className="pokerand-intro-note">
+              {language === 'en' ? 'Click or press Enter' : 'Haz clic o pulsa Enter'}
+            </span>
+          </div>
+        </div>
+      )}
       {screen !== 'dungeon' && <BackgroundLayer backgroundId={metaProgression.activeBackground} />}
       {screen !== 'dungeon' && (
       <header className="topbar">
@@ -12309,7 +12361,7 @@ function MainApp() {
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button className="tiny-btn" type="button" onClick={() => {
                   const data: Record<string, string> = {}
-                  const keys = ['pokerand_progression', 'pokerand_pokedex', 'pokerand_wins', 'pokerand_losses', 'pokerand_streak', 'pokerand_best_streak', 'pokerand_achievements', 'pokerand_meta']
+                  const keys = ['pokerand_progression', 'pokerand_pokedex', 'pokerand_wins', 'pokerand_losses', 'pokerand_streak', 'pokerand_best_streak', 'pokerand_achievements', 'pokerand_meta', DUNGEON_STORAGE_KEY]
                   for (const k of keys) {
                     const v = localStorage.getItem(k)
                     if (v) data[k] = v
@@ -12808,8 +12860,14 @@ function MainApp() {
         <section className="panel setup-panel">
           <div className="setup-hero">
             <SetupBanner />
+            <div className="setup-hero-visuals" aria-hidden="true">
+              <span className="setup-hero-ring setup-hero-ring--a" />
+              <span className="setup-hero-ring setup-hero-ring--b" />
+              <span className="setup-hero-ring setup-hero-ring--c" />
+              <span className="setup-hero-core" />
+            </div>
             <div className="setup-hero-overlay">
-              <div>
+              <div className="setup-hero-copy">
                 <h1 className="setup-hero-title">{t('setup.welcome')}</h1>
                 <p className="setup-hero-sub">{t('setup.subtitle')}</p>
               </div>

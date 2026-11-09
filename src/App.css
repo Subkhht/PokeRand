@@ -4614,3 +4614,1067 @@ html[data-gameboy] .site-footer-head {
     grid-template-columns: 1fr;
   }
 }
+
+/* ================= INTRO DE ENTRADA ================= */
+.pokerand-intro {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 10000 !important;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  cursor: pointer;
+  color: #f8fafc;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(77, 155, 255, 0.34), transparent 34%),
+    radial-gradient(circle at 82% 76%, rgba(255, 203, 5, 0.16), transparent 32%),
+    linear-gradient(155deg, #04070f 0%, #0b1530 52%, #050912 100%);
+  font-family: var(--font-body, 'DM Mono', monospace);
+  transition: opacity 0.38s ease, visibility 0.38s ease;
+}
+
+.pokerand-intro.is-leaving {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.pokerand-intro::before {
+  content: '';
+  position: absolute;
+  inset: -30%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0%,
+    rgba(77, 155, 255, 0.3) 12%,
+    transparent 28%,
+    rgba(255, 203, 5, 0.16) 42%,
+    transparent 54%,
+    rgba(192, 132, 252, 0.24) 68%,
+    transparent 84%,
+    transparent 100%
+  );
+  filter: blur(55px);
+  opacity: 0.85;
+  animation: pokerand-intro-aurora 18s linear infinite;
+}
+
+.pokerand-intro::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 4px),
+    radial-gradient(circle at 50% 50%, transparent 30%, rgba(0, 0, 0, 0.48) 100%);
+}
+
+.pokerand-intro-stars {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.55;
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.85) 0 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(127, 216, 255, 0.75) 0 1px, transparent 1.6px),
+    radial-gradient(circle, rgba(255, 209, 102, 0.65) 0 1px, transparent 1.5px);
+  background-size: 90px 90px, 140px 140px, 210px 210px;
+  background-position: 0 0, 40px 60px, 80px 20px;
+  animation: pokerand-intro-stars 34s linear infinite;
+}
+
+.pokerand-intro-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  text-align: center;
+  animation: pokerand-intro-rise 0.8s ease-out both;
+}
+
+.pokerand-intro-ball {
+  position: relative;
+  width: min(190px, 32vw);
+  aspect-ratio: 1;
+  border: 10px solid #080b12;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ff5a5a 0 47%, #10131a 47% 53%, #f4f7ff 53% 100%);
+  box-shadow:
+    0 0 60px rgba(77, 155, 255, 0.35),
+    inset 0 0 26px rgba(0, 0, 0, 0.35);
+  animation: pokerand-intro-ball 4.5s ease-in-out infinite;
+}
+
+.pokerand-intro-ball::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 29%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 9px solid #080b12;
+  border-radius: 50%;
+  background: #f5f8ff;
+  box-shadow: 0 0 18px rgba(77, 155, 255, 0.35);
+}
+
+.pokerand-intro-ball::after {
+  content: '';
+  position: absolute;
+  left: 20%;
+  top: 16%;
+  width: 22%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  filter: blur(2px);
+}
+
+.pokerand-intro-title {
+  margin: 1.2rem 0 0;
+  color: #fff;
+  font: 400 clamp(3rem, 10vw, 7rem) / 0.9 'Bebas Neue', 'Space Grotesk', sans-serif;
+  letter-spacing: 0.12em;
+  text-shadow:
+    0 0 24px rgba(77, 155, 255, 0.75),
+    0 0 70px rgba(77, 155, 255, 0.35),
+    5px 5px 0 #07101f;
+}
+
+.pokerand-intro-sub {
+  margin: 0.7rem 0 0;
+  color: #b9cbf0;
+  font-size: clamp(0.7rem, 1.5vw, 0.95rem);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.pokerand-intro-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 2rem;
+  padding: 0.8rem 1.6rem;
+  border: 2px solid rgba(244, 248, 255, 0.75);
+  background: rgba(10, 20, 50, 0.6);
+  box-shadow: 0 0 0 3px rgba(7, 16, 31, 0.8), 0 0 24px rgba(77, 155, 255, 0.2);
+  color: #fff;
+  font-size: clamp(0.7rem, 1.4vw, 0.92rem);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  animation: pokerand-intro-pulse 1.6s ease-in-out infinite;
+}
+
+.pokerand-intro-blink {
+  display: inline-block;
+  animation: pokerand-intro-blink 1s steps(2) infinite;
+}
+
+.pokerand-intro-note {
+  margin-top: 0.7rem;
+  color: rgba(185, 203, 240, 0.7);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+}
+
+@keyframes pokerand-intro-aurora {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pokerand-intro-stars {
+  to { background-position: 90px 90px, -100px 200px, 290px 230px; }
+}
+
+@keyframes pokerand-intro-rise {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pokerand-intro-ball {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-10px) rotate(2deg); }
+}
+
+@keyframes pokerand-intro-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 3px rgba(7, 16, 31, 0.8), 0 0 18px rgba(77, 155, 255, 0.18); }
+  50% { transform: scale(1.03); box-shadow: 0 0 0 3px rgba(7, 16, 31, 0.8), 0 0 34px rgba(77, 155, 255, 0.42); }
+}
+
+@keyframes pokerand-intro-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.2; }
+}
+
+@media (max-width: 640px) {
+  .pokerand-intro-content { padding: 1.2rem; }
+  .pokerand-intro-hint { margin-top: 1.4rem; padding: 0.7rem 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pokerand-intro::before,
+  .pokerand-intro-stars,
+  .pokerand-intro-content,
+  .pokerand-intro-ball,
+  .pokerand-intro-hint,
+  .pokerand-intro-blink {
+    animation: none;
+  }
+}
+
+
+/* ============================================================
+   NEXUS UI 2.0 — interfaz holográfica de entrenador
+   Capa visual independiente: no modifica la lógica del juego.
+   ============================================================ */
+
+html:not([data-gameboy]) {
+  --nx-bg: #05070f;
+  --nx-ink: #eaf6ff;
+  --nx-muted: #8aa0c0;
+  --nx-cyan: #63e6ff;
+  --nx-blue: #4d8dff;
+  --nx-violet: #a78bfa;
+  --nx-amber: #ffd166;
+  --nx-coral: #ff6b6b;
+  --nx-green: #4ade80;
+  --nx-panel: rgba(10, 17, 34, 0.78);
+  --nx-panel-2: rgba(15, 25, 48, 0.92);
+  --nx-line: rgba(99, 230, 255, 0.22);
+}
+
+html:not([data-gameboy]) body {
+  background-color: var(--nx-bg) !important;
+  background-image: none !important;
+  color: var(--nx-ink) !important;
+  font-family: 'DM Mono', monospace !important;
+}
+
+html:not([data-gameboy]) body::before {
+  content: '';
+  position: fixed;
+  inset: -25%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 20% 24%, rgba(99, 230, 255, 0.22), transparent 26%),
+    radial-gradient(circle at 82% 18%, rgba(167, 139, 250, 0.20), transparent 25%),
+    radial-gradient(circle at 76% 80%, rgba(255, 209, 102, 0.12), transparent 24%),
+    radial-gradient(circle at 28% 86%, rgba(255, 107, 107, 0.10), transparent 26%),
+    conic-gradient(from 180deg at 50% 50%, transparent 0 20%, rgba(99, 230, 255, 0.07) 31%, transparent 43%, rgba(167, 139, 250, 0.06) 58%, transparent 70%);
+  filter: blur(16px);
+  animation: nxAurora 28s ease-in-out infinite alternate;
+}
+
+html:not([data-gameboy]) body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.78) 0 1px, transparent 1.6px),
+    radial-gradient(circle, rgba(99, 230, 255, 0.65) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 50% 45%, transparent 24%, rgba(2, 4, 10, 0.62) 100%);
+  background-size: 148px 148px, 232px 232px, 100% 100%;
+  background-position: 0 0, 74px 104px, 0 0;
+  opacity: 0.62;
+  animation: nxStarDrift 46s linear infinite;
+  mix-blend-mode: screen;
+}
+
+html:not([data-gameboy]) .app-shell {
+  position: relative;
+  max-width: 1420px;
+  gap: 1.1rem;
+  padding: 1.1rem clamp(0.9rem, 2.8vw, 3rem) 3rem;
+  z-index: 1;
+}
+
+html:not([data-gameboy]) .app-shell::before {
+  content: 'NEXUS // TRAINER OS';
+  position: fixed;
+  left: 1.2rem;
+  bottom: 1.1rem;
+  z-index: 4;
+  color: rgba(99, 230, 255, 0.62);
+  font: 500 0.56rem/1 'DM Mono', monospace;
+  letter-spacing: 0.22em;
+  transform: rotate(-90deg) translateX(-100%);
+  transform-origin: left bottom;
+  pointer-events: none;
+}
+
+html:not([data-gameboy]) .app-shell:not(.app-shell--dungeon)::after {
+  content: '';
+  position: fixed;
+  left: -25%;
+  right: -25%;
+  bottom: -10%;
+  height: 42vh;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(99, 230, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 230, 255, 0.14) 1px, transparent 1px);
+  background-size: 68px 68px;
+  transform: perspective(520px) rotateX(64deg);
+  transform-origin: center bottom;
+  -webkit-mask-image: linear-gradient(to top, #000 0 10%, transparent 88%);
+  mask-image: linear-gradient(to top, #000 0 10%, transparent 88%);
+  animation: nxGridDrift 22s linear infinite;
+}
+
+/* ---------- Barra superior ---------- */
+
+html:not([data-gameboy]) .topbar {
+  position: sticky !important;
+  top: 0.75rem !important;
+  z-index: 50 !important;
+  min-height: 66px !important;
+  padding: 0.6rem 0.85rem !important;
+  border: 1px solid rgba(99, 230, 255, 0.24) !important;
+  border-radius: 18px !important;
+  background: linear-gradient(135deg, rgba(9, 15, 32, 0.94), rgba(14, 24, 48, 0.88)) !important;
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.48),
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 0 44px rgba(99, 230, 255, 0.07) !important;
+  backdrop-filter: blur(22px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(150%) !important;
+}
+
+html:not([data-gameboy]) .topbar::before,
+html:not([data-gameboy]) .topbar::after {
+  display: none !important;
+}
+
+html:not([data-gameboy]) .topbar h1 {
+  margin: 0 !important;
+  color: var(--nx-ink) !important;
+  font: 400 clamp(1.6rem, 3.2vw, 2.9rem)/0.82 'Bebas Neue', 'Space Grotesk', sans-serif !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase;
+  text-shadow: 0 0 26px rgba(99, 230, 255, 0.28);
+}
+
+html:not([data-gameboy]) .topbar h1::before {
+  content: '◈';
+  color: var(--nx-cyan);
+  margin-right: 0.25em;
+  font-size: 0.7em;
+  text-shadow: 0 0 18px rgba(99, 230, 255, 0.8);
+}
+
+html:not([data-gameboy]) .topbar .tiny-btn,
+html:not([data-gameboy]) .topbar .left-toolbar .tiny-btn {
+  border: 1px solid rgba(99, 230, 255, 0.18) !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.035) !important;
+  color: #d7ecff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  font: 500 0.6rem/1 'DM Mono', monospace !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.72rem;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+html:not([data-gameboy]) .topbar .tiny-btn:hover,
+html:not([data-gameboy]) .topbar .left-toolbar .tiny-btn:hover {
+  border-color: var(--nx-cyan) !important;
+  background: linear-gradient(135deg, var(--nx-cyan), #2b9fc8) !important;
+  color: #031018 !important;
+  box-shadow: 0 0 24px rgba(99, 230, 255, 0.38) !important;
+  transform: translateY(-1px);
+}
+
+html:not([data-gameboy]) .record-box {
+  border: 1px solid rgba(255, 209, 102, 0.4) !important;
+  border-radius: 999px !important;
+  background: rgba(255, 209, 102, 0.08) !important;
+  color: var(--nx-amber) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 20px rgba(255, 209, 102, 0.08) !important;
+  padding: 0.42rem 0.7rem !important;
+  font: 600 0.68rem/1 'DM Mono', monospace !important;
+}
+
+/* ---------- Hero / cabecera holográfica ---------- */
+
+html:not([data-gameboy]) .setup-hero {
+  position: relative !important;
+  min-height: 400px !important;
+  margin-bottom: 1.35rem !important;
+  border: 1px solid rgba(99, 230, 255, 0.28) !important;
+  border-radius: 24px !important;
+  background: #07101f !important;
+  clip-path: none !important;
+  overflow: hidden !important;
+  box-shadow:
+    0 36px 90px rgba(0, 0, 0, 0.52),
+    0 0 0 1px rgba(99, 230, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
+  animation: nxHeroIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both !important;
+  isolation: isolate;
+}
+
+html:not([data-gameboy]) .setup-hero-canvas {
+  opacity: 0.46 !important;
+  filter: saturate(1.4) contrast(1.08) brightness(0.82) hue-rotate(8deg) !important;
+  mix-blend-mode: screen !important;
+}
+
+html:not([data-gameboy]) .setup-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, rgba(5, 10, 22, 0.15) 0 38%, rgba(5, 10, 22, 0.55) 100%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 4px),
+    radial-gradient(circle at 75% 45%, rgba(99, 230, 255, 0.16), transparent 38%);
+}
+
+html:not([data-gameboy]) .setup-hero::after {
+  content: '';
+  position: absolute;
+  inset: -20% -10%;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 38%, rgba(99, 230, 255, 0.13) 48%, transparent 58%);
+  transform: translateX(-70%);
+  animation: nxHeroScan 9s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+html:not([data-gameboy]) .setup-hero-overlay {
+  position: relative;
+  z-index: 3;
+  min-height: 400px !important;
+  align-items: center !important;
+  padding: clamp(1.4rem, 4.8vw, 4.2rem) !important;
+  background: linear-gradient(90deg, rgba(5, 10, 22, 0.94) 0 30%, rgba(5, 10, 22, 0.58) 56%, transparent 82%) !important;
+}
+
+html:not([data-gameboy]) .setup-hero-visuals {
+  position: absolute;
+  right: 4%;
+  top: 50%;
+  width: clamp(260px, 34vw, 480px);
+  aspect-ratio: 1;
+  transform: translateY(-50%);
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.65;
+}
+
+html:not([data-gameboy]) .setup-hero-ring {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(99, 230, 255, 0.32);
+  border-radius: 50%;
+  box-shadow: inset 0 0 60px rgba(99, 230, 255, 0.06), 0 0 40px rgba(99, 230, 255, 0.04);
+}
+
+html:not([data-gameboy]) .setup-hero-ring--a {
+  border-style: dashed;
+  animation: nxSpin 26s linear infinite;
+}
+
+html:not([data-gameboy]) .setup-hero-ring--b {
+  inset: 13%;
+  border-color: rgba(167, 139, 250, 0.35);
+  animation: nxSpin 18s linear infinite reverse;
+}
+
+html:not([data-gameboy]) .setup-hero-ring--c {
+  inset: 27%;
+  border-color: rgba(255, 209, 102, 0.28);
+  animation: nxSpin 12s linear infinite;
+}
+
+html:not([data-gameboy]) .setup-hero-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 4px solid #05070f;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255, 107, 107, 0.95) 0 46%, #05070f 46% 54%, rgba(234, 246, 255, 0.95) 54% 100%);
+  box-shadow: 0 0 70px rgba(99, 230, 255, 0.35), inset 0 0 24px rgba(0, 0, 0, 0.35);
+  animation: nxCorePulse 5s ease-in-out infinite;
+}
+
+html:not([data-gameboy]) .setup-hero-core::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 32%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 3px solid #05070f;
+  border-radius: 50%;
+  background: #eaf6ff;
+  box-shadow: 0 0 18px rgba(99, 230, 255, 0.4);
+}
+
+html:not([data-gameboy]) .setup-hero-core::after {
+  content: '';
+  position: absolute;
+  left: 22%;
+  top: 16%;
+  width: 20%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  filter: blur(2px);
+}
+
+html:not([data-gameboy]) .setup-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-width: min(62%, 680px);
+}
+
+html:not([data-gameboy]) .setup-hero-title {
+  max-width: none !important;
+  margin: 0.35rem 0 0 !important;
+  font: 400 clamp(3.4rem, 8vw, 8.8rem)/1.02 'Bebas Neue', sans-serif !important;
+  letter-spacing: 0.02em !important;
+  padding-top: 0.08em;
+  padding-bottom: 0.04em;
+  color: #f5fbff !important;
+  background: linear-gradient(100deg, #ffffff 0 42%, #9beeff 65%, #ffd166 100%);
+  background-origin: border-box;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none !important;
+  filter: drop-shadow(0 0 32px rgba(99, 230, 255, 0.22)) drop-shadow(0 12px 36px rgba(0, 0, 0, 0.55));
+  animation: nxTitleIn 0.9s 0.08s cubic-bezier(0.2, 0.8, 0.2, 1) both !important;
+}
+
+html:not([data-gameboy]) .setup-hero-title::after {
+  content: 'POKÉMON ROGUELIKE // TRAINER NEXUS';
+  display: block;
+  margin-top: 0.9rem;
+  color: rgba(99, 230, 255, 0.85) !important;
+  font: 500 0.58rem/1 'DM Mono', monospace !important;
+  letter-spacing: 0.22em !important;
+  -webkit-text-fill-color: currentColor;
+  background: none;
+  text-shadow: none;
+}
+
+html:not([data-gameboy]) .setup-hero-sub {
+  max-width: 48ch !important;
+  margin: 0.3rem 0 0 !important;
+  color: #a9c2df !important;
+  font: 400 0.8rem/1.65 'DM Mono', monospace !important;
+}
+
+html:not([data-gameboy]) .setup-hero-actions {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  gap: 0.55rem !important;
+  min-width: 270px;
+  width: min(30%, 310px);
+}
+
+html:not([data-gameboy]) .setup-hero-actions .cta,
+html:not([data-gameboy]) .setup-hero-actions > .tiny-btn {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 50px;
+  border-radius: 13px !important;
+}
+
+html:not([data-gameboy]) .setup-hero-actions > .tiny-btn {
+  background: rgba(7, 14, 28, 0.68) !important;
+  border: 1px solid rgba(99, 230, 255, 0.22) !important;
+  color: #cfeaff !important;
+  font: 600 0.66rem/1.3 'DM Mono', monospace !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.25) !important;
+}
+
+html:not([data-gameboy]) .setup-hero-actions > .tiny-btn:hover {
+  background: rgba(99, 230, 255, 0.12) !important;
+  border-color: rgba(99, 230, 255, 0.6) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 26px rgba(99, 230, 255, 0.16) !important;
+}
+
+html:not([data-gameboy]) .setup-hero-actions > .setup-dungeon {
+  border-color: rgba(255, 107, 107, 0.35) !important;
+  color: #ffb3b3 !important;
+}
+
+html:not([data-gameboy]) .setup-hero-actions > .setup-dungeon:hover {
+  background: rgba(255, 107, 107, 0.12) !important;
+  border-color: rgba(255, 107, 107, 0.68) !important;
+  color: #ffe0e0 !important;
+  box-shadow: 0 0 26px rgba(255, 107, 107, 0.16) !important;
+}
+
+/* ---------- Botones ---------- */
+
+html:not([data-gameboy]) .cta,
+html:not([data-gameboy]) .setup-start {
+  border: 1px solid rgba(255, 209, 102, 0.9) !important;
+  border-radius: 13px !important;
+  background: linear-gradient(135deg, #ffe8a3, #ffd166 45%, #f0a92e) !important;
+  color: #1b1304 !important;
+  box-shadow: 0 12px 30px rgba(255, 175, 20, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+  text-shadow: none !important;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease;
+}
+
+html:not([data-gameboy]) .setup-start::after {
+  content: '';
+  position: absolute;
+  top: -60%;
+  bottom: -60%;
+  width: 36%;
+  left: -70%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  transform: rotate(16deg);
+  animation: nxButtonShine 5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+html:not([data-gameboy]) .cta:hover:not(:disabled),
+html:not([data-gameboy]) .setup-start:hover:not(:disabled) {
+  transform: translateY(-2px) !important;
+  filter: brightness(1.04);
+  box-shadow: 0 18px 40px rgba(255, 175, 20, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+
+html:not([data-gameboy]) .tiny-btn {
+  border-radius: 10px !important;
+  border: 1px solid rgba(99, 230, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.035) !important;
+  color: #d7ecff !important;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+html:not([data-gameboy]) .tiny-btn:hover {
+  background: rgba(99, 230, 255, 0.12) !important;
+  border-color: rgba(99, 230, 255, 0.5) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 20px rgba(99, 230, 255, 0.12) !important;
+}
+
+/* ---------- Paneles y tarjetas ---------- */
+
+html:not([data-gameboy]) .setup-card,
+html:not([data-gameboy]) .panel {
+  position: relative;
+  border: 1px solid rgba(99, 230, 255, 0.16) !important;
+  border-radius: 20px !important;
+  background: linear-gradient(155deg, rgba(12, 20, 40, 0.90), rgba(7, 12, 24, 0.94)) !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  clip-path: none !important;
+}
+
+html:not([data-gameboy]) .setup-panel {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html:not([data-gameboy]) .setup-card {
+  overflow: hidden;
+  animation: nxCardIn 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) both !important;
+}
+
+html:not([data-gameboy]) .setup-card-gen {
+  animation-delay: 0.04s !important;
+}
+
+html:not([data-gameboy]) .setup-card-diff {
+  animation-delay: 0.12s !important;
+}
+
+html:not([data-gameboy]) .setup-card-pvp {
+  animation-delay: 0.2s !important;
+}
+
+html:not([data-gameboy]) .setup-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  width: auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(99, 230, 255, 0.7), rgba(167, 139, 250, 0.5), transparent);
+  opacity: 0.9;
+}
+
+html:not([data-gameboy]) .setup-card::after {
+  content: '';
+  position: absolute;
+  right: -80px;
+  top: -80px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99, 230, 255, 0.12), transparent 65%);
+  pointer-events: none;
+}
+
+html:not([data-gameboy]) .setup-card-title,
+html:not([data-gameboy]) .panel h2,
+html:not([data-gameboy]) .panel h3 {
+  color: #dff4ff !important;
+  font: 600 0.67rem/1.1 'DM Mono', monospace !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase;
+}
+
+html:not([data-gameboy]) .setup-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0 0 1rem;
+}
+
+html:not([data-gameboy]) .setup-step {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px !important;
+  background: linear-gradient(135deg, var(--nx-cyan), var(--nx-blue)) !important;
+  color: #031018 !important;
+  font: 700 0.68rem/1 'DM Mono', monospace !important;
+  box-shadow: 0 0 20px rgba(99, 230, 255, 0.3) !important;
+}
+
+/* ---------- Tarjetas de selección ---------- */
+
+html:not([data-gameboy]) .setup-card .generation-grid {
+  gap: 0.55rem !important;
+  margin-top: 0.85rem !important;
+}
+
+html:not([data-gameboy]) .setup-card .gen-tile {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(99, 230, 255, 0.15) !important;
+  border-radius: 13px !important;
+  background: linear-gradient(150deg, rgba(24, 37, 66, 0.92), rgba(10, 17, 34, 0.96)) !important;
+  color: #eaf6ff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 20px rgba(0, 0, 0, 0.24) !important;
+  padding: 0.8rem 0.75rem !important;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+html:not([data-gameboy]) .setup-card .gen-tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(99, 230, 255, 0.12) 50%, transparent 70%);
+  transform: translateX(-130%);
+  transition: transform 0.55s ease;
+  pointer-events: none;
+}
+
+html:not([data-gameboy]) .setup-card .gen-tile:hover::before {
+  transform: translateX(130%);
+}
+
+html:not([data-gameboy]) .setup-card .gen-tile:hover {
+  transform: translateY(-3px) !important;
+  border-color: rgba(99, 230, 255, 0.55) !important;
+  background: linear-gradient(150deg, rgba(33, 52, 90, 0.96), rgba(13, 22, 44, 0.98)) !important;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(99, 230, 255, 0.12), 0 0 30px rgba(99, 230, 255, 0.08) !important;
+}
+
+html:not([data-gameboy]) .setup-card .gen-tile,
+html:not([data-gameboy]) .setup-card .gen-tile strong,
+html:not([data-gameboy]) .setup-card .gen-tile > div > span,
+html:not([data-gameboy]) .setup-card .gen-tile span {
+  color: #eaf6ff !important;
+}
+
+html:not([data-gameboy]) .setup-card .lock-text {
+  color: #7f98b8 !important;
+}
+
+html:not([data-gameboy]) .setup-card .gen-tile.is-active {
+  border-color: rgba(255, 209, 102, 0.72) !important;
+  background: linear-gradient(145deg, rgba(255, 209, 102, 0.19), rgba(255, 209, 102, 0.035)) !important;
+  box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.18), 0 0 34px rgba(255, 209, 102, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  transform: translateY(-3px) !important;
+}
+
+html:not([data-gameboy]) .setup-card .gen-tile.is-active strong,
+html:not([data-gameboy]) .setup-card .gen-tile.is-active span {
+  color: #ffe6a3 !important;
+}
+
+html:not([data-gameboy]) .setup-card .gen-tile.is-active::after,
+html:not([data-gameboy]) .setup-card .challenge-toggle.is-active::after {
+  content: '✓' !important;
+  position: absolute !important;
+  top: 7px !important;
+  right: 7px !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 22px !important;
+  height: 22px !important;
+  border: 1px solid rgba(255, 209, 102, 0.55) !important;
+  border-radius: 7px !important;
+  background: rgba(255, 209, 102, 0.16) !important;
+  color: var(--nx-amber) !important;
+  font: 700 0.8rem/1 'DM Mono', monospace !important;
+  box-shadow: 0 0 14px rgba(255, 209, 102, 0.2) !important;
+  animation: nxCheckIn 0.2s ease both !important;
+}
+
+html:not([data-gameboy]) .setup-card .gen-tile.is-locked {
+  opacity: 0.55 !important;
+  filter: grayscale(0.35);
+}
+
+html:not([data-gameboy]) .setup-card-gen .generation-grid > .gen-tile:last-child {
+  border-color: rgba(255, 209, 102, 0.35) !important;
+  background: linear-gradient(145deg, rgba(255, 209, 102, 0.10), rgba(20, 20, 20, 0.5)) !important;
+}
+
+html:not([data-gameboy]) .setup-card-pvp .gen-tile {
+  border-color: rgba(167, 139, 250, 0.35) !important;
+  background: linear-gradient(145deg, rgba(167, 139, 250, 0.13), rgba(10, 17, 34, 0.95)) !important;
+}
+
+/* Pequeño código de color por dificultad. */
+html:not([data-gameboy]) .setup-card-diff .gen-tile {
+  border-top: 2px solid var(--mode, rgba(99, 230, 255, 0.35)) !important;
+}
+
+html:not([data-gameboy]) .setup-card-diff > .generation-grid:first-of-type > .gen-tile:nth-child(1) { --mode: #4ade80; }
+html:not([data-gameboy]) .setup-card-diff > .generation-grid:first-of-type > .gen-tile:nth-child(2) { --mode: #ffd166; }
+html:not([data-gameboy]) .setup-card-diff > .generation-grid:first-of-type > .gen-tile:nth-child(3) { --mode: #ff6b6b; }
+html:not([data-gameboy]) .setup-card-diff > .generation-grid:first-of-type > .gen-tile:nth-child(4) { --mode: #a78bfa; }
+
+html:not([data-gameboy]) .setup-card .gen-tile.is-locked {
+  cursor: not-allowed;
+}
+
+/* ---------- Modales y foco ---------- */
+
+html:not([data-gameboy]) .modal-backdrop {
+  background: radial-gradient(circle at 50% 35%, rgba(16, 28, 54, 0.78), rgba(2, 4, 10, 0.92)) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+html:not([data-gameboy]) .modal-backdrop .panel {
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(99, 230, 255, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+html:not([data-gameboy]) button:focus-visible,
+html:not([data-gameboy]) .gen-tile:focus-visible,
+html:not([data-gameboy]) a:focus-visible {
+  outline: 2px solid var(--nx-cyan) !important;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgba(99, 230, 255, 0.12) !important;
+}
+
+/* ---------- Animaciones ---------- */
+
+@keyframes nxAurora {
+  0% { transform: translate3d(-2%, -1%, 0) scale(1) rotate(0deg); }
+  100% { transform: translate3d(2%, 2%, 0) scale(1.08) rotate(8deg); }
+}
+
+@keyframes nxStarDrift {
+  to { background-position: 148px 148px, -158px 336px, 0 0; }
+}
+
+@keyframes nxGridDrift {
+  to { background-position: 0 68px, 68px 0; }
+}
+
+@keyframes nxHeroScan {
+  0%, 45% { transform: translateX(-70%); opacity: 0; }
+  55% { opacity: 1; }
+  100% { transform: translateX(70%); opacity: 0; }
+}
+
+@keyframes nxSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes nxCorePulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.85; }
+  50% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+}
+
+@keyframes nxHeroIn {
+  from { opacity: 0; transform: translateY(18px) scale(0.985); filter: blur(8px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+@keyframes nxCardIn {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes nxTitleIn {
+  from { opacity: 0; transform: translateY(20px) skewY(-2deg); filter: blur(10px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+@keyframes nxCheckIn {
+  from { opacity: 0; transform: scale(0.5) rotate(-10deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes nxButtonShine {
+  0%, 55% { left: -70%; }
+  75%, 100% { left: 140%; }
+}
+
+/* ---------- Adaptación a pantallas pequeñas ---------- */
+
+@media (max-width: 900px) {
+  html:not([data-gameboy]) .setup-hero {
+    min-height: 460px !important;
+  }
+
+  html:not([data-gameboy]) .setup-hero-overlay {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: flex-end !important;
+    gap: 1.4rem !important;
+    padding-bottom: 1.6rem !important;
+  }
+
+  html:not([data-gameboy]) .setup-hero-copy {
+    max-width: 100%;
+  }
+
+  html:not([data-gameboy]) .setup-hero-actions {
+    width: 100%;
+    min-width: 0;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  html:not([data-gameboy]) .setup-hero-actions .setup-start {
+    grid-column: 1 / -1;
+  }
+
+  html:not([data-gameboy]) .setup-hero-visuals {
+    width: 60vw;
+    right: -8%;
+    opacity: 0.4;
+  }
+}
+
+@media (max-width: 760px) {
+  html:not([data-gameboy]) .topbar {
+    top: 0.3rem !important;
+    padding: 0.45rem 0.5rem !important;
+    border-radius: 14px !important;
+  }
+
+  html:not([data-gameboy]) .topbar h1 {
+    font-size: 1.5rem !important;
+  }
+
+  html:not([data-gameboy]) .topbar .tiny-btn,
+  html:not([data-gameboy]) .topbar .left-toolbar .tiny-btn {
+    padding: 0.38rem 0.55rem !important;
+    font-size: 0.54rem !important;
+  }
+
+  html:not([data-gameboy]) .app-shell {
+    padding-top: 0.7rem !important;
+  }
+}
+
+@media (max-width: 560px) {
+  html:not([data-gameboy]) .setup-hero {
+    min-height: 500px !important;
+  }
+
+  html:not([data-gameboy]) .setup-hero-title {
+    font-size: clamp(3rem, 16vw, 5.4rem) !important;
+  }
+
+  html:not([data-gameboy]) .setup-hero-actions {
+    grid-template-columns: 1fr;
+  }
+
+  html:not([data-gameboy]) .setup-hero-actions .setup-start {
+    grid-column: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-gameboy]) body::before,
+  html:not([data-gameboy]) body::after,
+  html:not([data-gameboy]) .app-shell::after,
+  html:not([data-gameboy]) .setup-hero,
+  html:not([data-gameboy]) .setup-hero::after,
+  html:not([data-gameboy]) .setup-hero-ring,
+  html:not([data-gameboy]) .setup-hero-core,
+  html:not([data-gameboy]) .setup-hero-title,
+  html:not([data-gameboy]) .setup-card,
+  html:not([data-gameboy]) .setup-start::after {
+    animation: none !important;
+  }
+}
+
+/* ------------------------------------------------------------
+   TOOLTIPS POR ENCIMA DE LA BARRA SUPERIOR
+   La barra es sticky y crea su propio contexto de apilado; al
+   elevar el contenedor que tiene el tooltip activo, el globo puede
+   salir por encima de ella sin quedar recortado.
+   ------------------------------------------------------------ */
+html:not([data-gameboy]) .app-shell > *:has(.sprite-tooltip-wrapper:hover),
+html:not([data-gameboy]) .app-shell > *:has(.sprite-tooltip-wrapper:focus-within),
+html:not([data-gameboy]) .app-shell > *:has(.match-team-slot:hover) {
+  z-index: 60 !important;
+}
+
+@supports not selector(:has(*)) {
+  html:not([data-gameboy]) .team-grid .sprite-tooltip {
+    bottom: auto;
+    top: calc(100% + 10px);
+  }
+
+  html:not([data-gameboy]) .team-grid .sprite-tooltip::after {
+    top: auto;
+    bottom: 100%;
+    border-top-color: transparent;
+    border-bottom-color: var(--panel-border);
+  }
+}
