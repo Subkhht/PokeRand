@@ -622,9 +622,9 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v3.0.2', en: 'v3.0.2' },
+  'help.version': { es: 'v3.1.0', en: 'v3.1.0' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
-  'changelog.button': { es: 'Ver cambios v3.0.2', en: 'See changes v3.0.2' },
+  'changelog.button': { es: 'Ver cambios v3.1.0', en: 'See changes v3.1.0' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -1894,6 +1894,34 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v3.1.0',
+    items: [
+      { es: '⚔️ Nuevo modo Pokest Dungeon, inspirado en Darkest Dungeon y accesible desde el menú principal. Es un juego independiente dentro de PokeRand, con su propio guardado.', en: '⚔️ New Pokest Dungeon mode, inspired by Darkest Dungeon and accessible from the main menu. It is a standalone game inside PokeRand with its own save.' },
+      { es: '🏰 Pueblo y roster: recluta hasta 8 Pokémon, forma un equipo de 4 y ordena sus rangos. Descansa para recuperar PS, estrés y aflicciones.', en: '🏰 Town and roster: recruit up to 8 Pokémon, form a team of 4 and set their ranks. Rest to recover HP, stress and afflictions.' },
+      { es: '🎯 Combate 4v4 por rangos: habilidades con posición, orden de turno por velocidad, críticos, guardia, aturdimiento, sangrado, corrosión, debilidad y vulnerabilidad.', en: '🎯 4v4 rank-based combat: position-dependent skills, speed turn order, crits, guard, stun, bleed, blight, weak and vulnerable.' },
+      { es: '🧠 Estrés, aflicciones y virtudes: al llegar a 100 de estrés un Pokémon puede sucumbir a una aflicción o resistir con una virtud. La antorcha y la oscuridad afectan al daño y al estrés.', en: '🧠 Stress, afflictions and virtues: at 100 stress a Pokémon may succumb to an affliction or resist with a virtue. Torchlight and darkness affect damage and stress.' },
+      { es: '💀 Muerte permanente, puerta de la muerte y provisiones: los caídos no vuelven al pueblo. Gestiona comida, antorchas y vendas durante la expedición.', en: '💀 Permanent death, death’s door and provisions: the fallen do not return to town. Manage food, torches and bandages during the expedition.' },
+      { es: '🗺️ Dos dungeons, Cripta Umbría y Fosa Abisal, con nodos de combate, élite, evento, campamento, tesoro y jefe. Incluye eventos de decisión y botín.', en: '🗺️ Two dungeons, Gloom Crypt and Abyssal Pit, with battle, elite, event, camp, treasure and boss nodes. Includes decision events and loot.' },
+      { es: '💾 El progreso de Pokest Dungeon se guarda en LocalStorage y viaja en la exportación/importación de PokeRand.', en: '💾 Pokest Dungeon progress is saved in LocalStorage and travels with PokeRand’s export/import.' },
+      { es: '🖼️ Pokest Dungeon usa retratos y sprites animados de PMD SpriteCollab para héroes y enemigos, con respaldo automático a PokéAPI si falta un retrato.', en: '🖼️ Pokest Dungeon uses PMD SpriteCollab portraits and animated sprites for heroes and enemies, with an automatic PokéAPI fallback if a portrait is missing.' },
+      { es: '🧬 Quirks persistentes: cada Pokémon tiene una virtud y una secuela que modifican daño, defensa, crítico, curación o estrés. Se muestran en las tarjetas y pueden tratarse en el Sanatorio.', en: '🧬 Persistent quirks: each Pokémon has a positive and a negative trait that modifies damage, defense, crit, healing or stress. They are shown on cards and can be treated at the Sanatorium.' },
+      { es: '⚒️ Herrería: mejora el arma y la armadura de cada Pokémon con oro para aumentar su ataque y defensa. Cada pieza tiene 5 niveles.', en: '⚒️ Blacksmith: upgrade each Pokémon’s weapon and armor with gold to increase attack and defense. Each piece has 5 levels.' },
+      { es: '📜 Narrador: frases al estilo Darkest Dungeon al empezar un combate, sufrir una aflicción, perder a un héroe, vencer o fracasar.', en: '📜 Narrator: Darkest Dungeon-style lines when combat starts, an affliction strikes, a hero falls, or you win or fail.' },
+      { es: '🏛️ Pueblo más fiel: Abadía para descansar, Caravana para reclutar, Herrería para mejorar equipo y Sanatorio para retirar secuelas negativas.', en: '🏛️ More faithful town: Abbey to rest, Stagecoach to recruit, Blacksmith to upgrade gear and Sanatorium to remove negative quirks.' },
+      { es: '🩸 La interfaz de combate muestra rangos, turnos, estrés, aflicciones, virtudes, quirks y estados con más claridad.', en: '🩸 The combat UI shows ranks, turns, stress, afflictions, virtues, quirks and statuses more clearly.' },
+      { es: '🏰 Pantalla de combate inspirada en Darkest Dungeon: escena gótica con cripta, antorchas, árboles y niebla; héroes a la izquierda y enemigos a la derecha, con bocadillo del narrador y formación por rangos.', en: '🏰 Darkest Dungeon-inspired combat screen: gothic crypt, torches, trees and fog; heroes on the left and enemies on the right, with a narrator speech bubble and rank formation.' },
+      { es: '🎛️ HUD inferior fiel al original: barras de grupo, retrato y datos del héroe seleccionado, habilidades, stats, quirks, mapa de nodos, medidor vertical de antorcha y diario desplegable.', en: '🎛️ Faithful bottom HUD: party bars, selected hero portrait and data, skills, stats, quirks, node map, vertical torch meter and collapsible journal.' },
+      { es: '⚔️ Formación por rangos: los héroes se colocan de retaguardia a vanguardia y los enemigos de vanguardia a retaguardia, con brillo en el turno activo y resaltado de objetivos.', en: '⚔️ Rank formation: heroes are placed from back to front and enemies from front to back, with active-turn glow and target highlights.' },
+      { es: '🖥️ La partida ocupa todo el viewport, sin márgenes externos ni recortes. La cabecera general se oculta durante el combate y la escena se adapta al espacio disponible.', en: '🖥️ The game fills the whole viewport, with no outer margins or clipping. The main header is hidden during combat and the scene adapts to the available space.' },
+      { es: '📐 La HUD usa altura máxima con scroll interno y ajustes responsive para que barras, habilidades, mapa y antorcha no se corten en pantallas bajas, móvil o tablet.', en: '📐 The HUD uses a max height with internal scrolling and responsive adjustments so bars, skills, map and torch are not clipped on short screens, mobile or tablet.' },
+      { es: '❤️ Barras de vida individuales justo debajo de cada Pokémon: doradas para los aliados y rojas para los enemigos, con PS actuales/máximos.', en: '❤️ Individual HP bars right below each Pokémon: golden for allies and red for enemies, with current/max HP.' },
+      { es: '🔎 Tamaño de letra aumentado en todo Pokest Dungeon: pueblo, roster, herrería, sanatorio, diario, narrador y HUD de combate, con nombres, rangos y PS más legibles.', en: '🔎 Font size increased across Pokest Dungeon: town, roster, blacksmith, sanatorium, journal, narrator and combat HUD, with more readable names, ranks and HP.' },
+      { es: '↔️ Movimiento táctico en combate: durante su turno, un héroe puede avanzar o retroceder un rango e intercambiar posición con el aliado que ocupe ese rango. La acción consume el turno.', en: '↔️ Tactical combat movement: during their turn, a hero can advance or retreat one rank and swap positions with the ally occupying that rank. The action consumes the turn.' },
+      { es: '🏘️ Pueblo convertido en un hub estilo Darkest Dungeon: escena nocturna con luna, colinas, camino, niebla y edificios clicables para Abadía, Caravana, Expedición, Herrería, Sanatorio y Gremio. El grupo y el roster quedan visibles en la franja inferior.', en: '🏘️ Town turned into a Darkest Dungeon-style hub: night scene with moon, hills, road, fog and clickable buildings for Abbey, Stagecoach, Expedition, Blacksmith, Sanatorium and Guild. Party and roster remain visible in the bottom strip.' },
+      { es: '📜 Gremio: entrena a tus Pokémon con oro para darles experiencia y subir de nivel.', en: '📜 Guild: train your Pokémon with gold to grant experience and level up.' },
+    ],
+  },
   {
     version: 'v3.0.2',
     items: [

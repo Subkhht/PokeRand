@@ -5,6 +5,8 @@ import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemo
 import { playHover, playClick, playSelect, playHit, playEvolution, playCapture, playPerfectCapture, playEquip, playPurchase, playError, playCoin, playSlotMachine, playAchievement, playBadgeFanfare, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
 import { DungeonMode } from './dungeon/DungeonMode'
 import { DUNGEON_STORAGE_KEY } from './dungeon/data'
+import { PokestDungeon } from './pokest/PokestDungeon'
+import { POKEST_STORAGE_KEY } from './pokest/data'
 import {
   getBalancedPokemonByGeneration,
   getRandomStarterByGeneration,
@@ -42,7 +44,7 @@ import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, PokemonIVs, RouteNode, BranchNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, itemLocalizedName, metaItemDesc, moveName, statusLabel, statusAppliedLine, themeName, themeDesc, bgName, bgDesc, type Language, getChangelog } from './game/i18n'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp' | 'dungeon'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp' | 'dungeon' | 'pokest'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum' | 'original' | 'branch'
 
 // Historial local de partidas finalizadas (victorias/derrotas). Solo se
@@ -11091,7 +11093,7 @@ function MainApp() {
   }
 
   return (
-    <main className={`app-shell${screen === 'dungeon' ? ' app-shell--dungeon' : ''}`}>
+    <main className={`app-shell${screen === 'dungeon' ? ' app-shell--dungeon' : ''}${screen === 'pokest' ? ' app-shell--pokest' : ''}`}>
       {showIntro && (
         <div
           className={`pokerand-intro${introLeaving ? ' is-leaving' : ''}`}
@@ -11123,8 +11125,8 @@ function MainApp() {
           </div>
         </div>
       )}
-      {screen !== 'dungeon' && <BackgroundLayer backgroundId={metaProgression.activeBackground} />}
-      {screen !== 'dungeon' && (
+      {screen !== 'dungeon' && screen !== 'pokest' && <BackgroundLayer backgroundId={metaProgression.activeBackground} />}
+      {screen !== 'dungeon' && screen !== 'pokest' && (
       <header className="topbar">
         <TopbarCanvas />
         <div className="left-toolbar">
@@ -11254,6 +11256,11 @@ function MainApp() {
 
       {screen === 'dungeon' && (
         <DungeonMode language={language} onExit={() => setScreen('setup')} />
+      )}
+
+      {screen === 'pokest' && createPortal(
+        <PokestDungeon language={language} onExit={() => setScreen('setup')} />,
+        document.body,
       )}
 
       {/* Modal Revive: selección de objetivo */}
@@ -12361,7 +12368,7 @@ function MainApp() {
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button className="tiny-btn" type="button" onClick={() => {
                   const data: Record<string, string> = {}
-                  const keys = ['pokerand_progression', 'pokerand_pokedex', 'pokerand_wins', 'pokerand_losses', 'pokerand_streak', 'pokerand_best_streak', 'pokerand_achievements', 'pokerand_meta', DUNGEON_STORAGE_KEY]
+                  const keys = ['pokerand_progression', 'pokerand_pokedex', 'pokerand_wins', 'pokerand_losses', 'pokerand_streak', 'pokerand_best_streak', 'pokerand_achievements', 'pokerand_meta', DUNGEON_STORAGE_KEY, POKEST_STORAGE_KEY]
                   for (const k of keys) {
                     const v = localStorage.getItem(k)
                     if (v) data[k] = v
@@ -12886,6 +12893,14 @@ function MainApp() {
                   style={{ borderColor: '#df3b2f', color: '#ff8a7e' }}
                 >
                   🔷 {language === 'en' ? 'Mystery Dungeon' : 'Mazmorra Misteriosa'}
+                </button>
+                <button
+                  className="tiny-btn setup-pokest"
+                  type="button"
+                  onClick={() => { playClick(); setScreen('pokest') }}
+                  onMouseEnter={playHover}
+                >
+                  ⚔️ Pokest Dungeon
                 </button>
               </div>
             </div>
@@ -17350,7 +17365,7 @@ function MainApp() {
         </>
       )}
 
-      {screen !== 'dungeon' && (
+      {screen !== 'dungeon' && screen !== 'pokest' && (
         <footer className="site-footer" aria-label={t('credits.title')}>
           <div className="site-footer-head">
             <h2>◈ {t('credits.title')}</h2>

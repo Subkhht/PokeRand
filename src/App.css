@@ -5678,3 +5678,16 @@ html:not([data-gameboy]) .app-shell > *:has(.match-team-slot:hover) {
     border-bottom-color: var(--panel-border);
   }
 }
+
+/* Acceso a Pokest Dungeon desde el menú principal */
+html:not([data-gameboy]) .setup-hero-actions > .setup-pokest {
+  border-color: rgba(216, 180, 106, 0.42) !important;
+  color: #f3d48a !important;
+}
+
+html:not([data-gameboy]) .setup-hero-actions > .setup-pokest:hover {
+  background: rgba(216, 180, 106, 0.12) !important;
+  border-color: rgba(216, 180, 106, 0.78) !important;
+  color: #fff3cf !important;
+  box-shadow: 0 0 26px rgba(216, 180, 106, 0.16) !important;
+}
