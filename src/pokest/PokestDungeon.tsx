@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { Language } from '../game/i18n'
 import treeUrl from '../assets/Dungeon/arbol.png?inline'
 import { DungeonPortrait } from '../dungeon/DungeonPortrait'
@@ -35,6 +35,9 @@ import {
 } from './data'
 import * as engine from './engine'
 import { PokestPmdSprite } from './PokestPmdSprite'
+
+const PIXI_ENABLED = true
+const PokestPixiScene = lazy(() => import('./PokestPixiScene').then((module) => ({ default: module.PokestPixiScene })))
 import { loadPokestSave, persistPokestSave, settleRun, type PokestRunOutcome } from './storage'
 import type {
   PokestDungeonId,
@@ -309,6 +312,7 @@ export function PokestDungeon({ language, onExit }: PokestDungeonProps) {
   const [pendingSkillId, setPendingSkillId] = useState<string | null>(null)
   const [selectedHeroId, setSelectedHeroId] = useState<string | null>(null)
   const [showCombatLog, setShowCombatLog] = useState(false)
+  const [pixiPulse, setPixiPulse] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
   const logRef = useRef<HTMLDivElement | null>(null)
   const toastTimer = useRef<number | null>(null)
@@ -356,6 +360,7 @@ export function PokestDungeon({ language, onExit }: PokestDungeonProps) {
         engine.performEnemyTurn(next)
         return { ...prev, activeRun: next }
       })
+      setPixiPulse((value) => value + 1)
     }, 720)
     return () => window.clearTimeout(timer)
   }, [save.activeRun])
@@ -377,6 +382,10 @@ export function PokestDungeon({ language, onExit }: PokestDungeonProps) {
     const element = logRef.current
     if (element) element.scrollTop = element.scrollHeight
   }, [save.activeRun?.log.length, showCombatLog])
+
+  useEffect(() => {
+    if (save.activeRun?.phase === 'combat') setPixiPulse((value) => value + 1)
+  }, [save.activeRun?.phase])
 
   const updateRun = (mutator: (run: PokestRunState) => void): void => {
     setSave((prev) => {
@@ -605,6 +614,7 @@ export function PokestDungeon({ language, onExit }: PokestDungeonProps) {
       engine.useHeroSkill(run, currentUnit.instanceId, skillId, targetId)
     })
     setPendingSkillId(null)
+    setPixiPulse((value) => value + 1)
   }
 
   const selectSkill = (skill: PokestSkill): void => {
@@ -1050,6 +1060,11 @@ export function PokestDungeon({ language, onExit }: PokestDungeonProps) {
           </div>
           <div className="pokest-scene-floor" />
           <div className="pokest-scene-fog" />
+          {PIXI_ENABLED && (
+            <Suspense fallback={null}>
+              <PokestPixiScene pulse={pixiPulse} accent={dungeon.palette.accent} />
+            </Suspense>
+          )}
 
           <div className="pokest-battle-topbar">
             <span>{dungeon.icon} {language === 'en' ? dungeon.nameEn : dungeon.name} · {L(language, 'Ronda', 'Round')} {run.round}</span>

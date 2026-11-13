@@ -3207,3 +3207,18 @@
   .pokest-town-row-bars { order: 4; width: 100%; }
   .pokest-town-row-values { order: 5; }
 }
+
+/* ---------- Capa PixiJS del campo de batalla ---------- */
+
+.pokest-pixi-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.pokest-pixi-scene canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}

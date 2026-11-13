@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { playClick, playHover } from '../game/sound'
 import treeSheetUrl from '../assets/Dungeon/arboles.png?inline'
 import specialTreeUrl from '../assets/Dungeon/arbol.png?inline'
@@ -24,26 +24,15 @@ import {
 } from './runEngine'
 import type { DungeonMap, DungeonMonster, DungeonRun, MapRock, PmdSprites } from './types'
 
+const PIXI_MAP_ENABLED = true
+const DungeonPixiMap = lazy(() => import('./DungeonPixiMap').then((module) => ({ default: module.DungeonPixiMap })))
+
 const MIN_CELL = 40
 const MAX_CELL = 56
 const BOARD_BORDER = 4
 const VIEW_RADIUS = 4
 const TREE_SHEET_COLUMNS = 5
 const TREE_SHEET_ROWS = 3
-
-const FIREFLIES = Array.from({ length: 9 }, (_, index) => ({
-  left: 6 + ((index * 37) % 88),
-  top: 8 + ((index * 53) % 82),
-  delay: (index * 0.83) % 5,
-  duration: 4.2 + (index % 4) * 0.8,
-}))
-
-const CAVE_MOTES = Array.from({ length: 14 }, (_, index) => ({
-  left: 5 + ((index * 43) % 90),
-  top: 7 + ((index * 61) % 84),
-  delay: (index * 0.57) % 6,
-  duration: 5.2 + (index % 5) * 0.9,
-}))
 
 function tileHash(x: number, y: number): number {
   let hash = Math.imul(x + 1, 374761393) ^ Math.imul(y + 1, 668265263)
@@ -722,36 +711,16 @@ export function DungeonRunView({ run, onChange }: DungeonRunProps) {
               </div>
             ))}
 
-            {run.dungeonId === 'forest' && (
-              <div className="dungeon-fireflies" aria-hidden="true">
-                {FIREFLIES.map((fly, index) => (
-                  <span
-                    key={index}
-                    style={{
-                      left: `${fly.left}%`,
-                      top: `${fly.top}%`,
-                      animationDelay: `${fly.delay}s`,
-                      animationDuration: `${fly.duration}s`,
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-
-            {run.dungeonId === 'cave' && (
-              <div className="dungeon-cave-motes" aria-hidden="true">
-                {CAVE_MOTES.map((mote, index) => (
-                  <span
-                    key={index}
-                    style={{
-                      left: `${mote.left}%`,
-                      top: `${mote.top}%`,
-                      animationDelay: `${mote.delay}s`,
-                      animationDuration: `${mote.duration}s`,
-                    }}
-                  />
-                ))}
-              </div>
+            {PIXI_MAP_ENABLED && (
+              <Suspense fallback={null}>
+                <DungeonPixiMap
+                  dungeonId={run.dungeonId}
+                  accent={dungeon.palette.accent}
+                  leaderX={leader?.x ?? 0}
+                  leaderY={leader?.y ?? 0}
+                  cell={cell}
+                />
+              </Suspense>
             )}
             </div>
           </div>
