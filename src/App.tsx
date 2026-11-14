@@ -1887,6 +1887,8 @@ interface MetaShopItem {
   spriteKey: string
   category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' | 'pokeball' | 'evolution_stone' | 'evolution_item' | 'disco_mt' | 'treasure' | 'berry' | 'redesign'
   requires?: string
+  // Bloquea la compra hasta desbloquear el resto de Poké Balls (Master/Entebola).
+  requiresAllBalls?: boolean
 }
 
 function metaShopItemMatches(item: { name: string; desc: string }, term: string): boolean {
@@ -2020,7 +2022,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_heavy_ball', name: 'Heavy Ball', desc: 'Mejor contra Pokémon pesados. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Heavy Ball', category: 'pokeball' },
   { id: 'unlock_great_ball', name: 'Great Ball', desc: 'x1.5 de captura. Aparece en tiendas y descansos.', price: 25, spriteKey: 'Great Ball', category: 'pokeball' },
   { id: 'unlock_ultra_ball', name: 'Ultra Ball', desc: 'x2 de captura. Aparece en tiendas y descansos.', price: 50, spriteKey: 'Ultra Ball', category: 'pokeball' },
-  { id: 'unlock_master_ball', name: 'Master Ball', desc: 'Captura cualquier Pokémon sin fallo. Aparece raramente en tiendas.', price: 100, spriteKey: 'Master Ball', category: 'pokeball' },
+  { id: 'unlock_master_ball', name: 'Master Ball', desc: 'Captura cualquier Pokémon sin fallo. Aparece raramente en tiendas.', price: 100, spriteKey: 'Master Ball', category: 'pokeball', requiresAllBalls: true },
   { id: 'unlock_fire_stone', name: 'Fire Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Fire Stone', category: 'evolution_stone' },
   { id: 'unlock_water_stone', name: 'Water Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Water Stone', category: 'evolution_stone' },
   { id: 'unlock_thunder_stone', name: 'Thunder Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Thunder Stone', category: 'evolution_stone' },
@@ -2111,7 +2113,7 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_safari_ball', name: 'Safaribola', desc: 'Ratio base x1.5. Aparece en tiendas y descansos.', price: 30, spriteKey: 'Safaribola', category: 'pokeball' },
   { id: 'unlock_sueno_ball', name: 'Sueñobola', desc: 'x4 contra Pokémon dormidos. Aparece en tiendas y descansos.', price: 40, spriteKey: 'Sueñobola', category: 'pokeball' },
   { id: 'unlock_luna_ball', name: 'Ball Luna', desc: 'x4 contra Pokémon que evolucionan con Piedra Lunar. Aparece en tiendas y descansos.', price: 40, spriteKey: 'Ball Luna', category: 'pokeball' },
-  { id: 'unlock_ente_ball', name: 'Entebola', desc: 'x5 contra Pokémon legendarios. Aparece en tiendas y descansos.', price: 60, spriteKey: 'Entebola', category: 'pokeball' },
+  { id: 'unlock_ente_ball', name: 'Entebola', desc: 'x5 contra Pokémon legendarios. Aparece en tiendas y descansos.', price: 60, spriteKey: 'Entebola', category: 'pokeball', requiresAllBalls: true },
   { id: 'unlock_focus_sash_2', name: 'Focus Sash II', desc: 'Aguanta un golpe a plena vida. +30 HP máximos.', price: 70, spriteKey: 'Focus Sash II', category: 'holdable', requires: 'unlock_focus_sash' },
   { id: 'unlock_scope_lens_2', name: 'Scope Lens II', desc: 'Mayor probabilidad de crítico.', price: 70, spriteKey: 'Scope Lens II', category: 'holdable', requires: 'unlock_scope_lens' },
   { id: 'unlock_shell_bell_2', name: 'Shell Bell II', desc: 'Recupera 1/6 del daño infligido.', price: 90, spriteKey: 'Shell Bell II', category: 'holdable', requires: 'unlock_shell_bell' },
@@ -3580,7 +3582,7 @@ function MainApp() {
   }
 
   function buyMetaItem(item: MetaShopItem): void {
-    if (item.requires && !metaProgression.permanentlyUnlockedItems.includes(item.requires)) return
+    if (isMetaItemLocked(item)) return
     if (metaProgression.pokeCoins < item.price) return
     if (item.category === 'theme') {
       if (metaProgression.ownedThemes.includes(item.id)) return
@@ -3821,6 +3823,24 @@ function MainApp() {
     if (POKEBALL_NAMES.includes(name)) return isPokeballUnlocked(name)
     if ((EVOLUTION_STONES as readonly string[]).includes(name)) return isEvolutionStoneUnlocked(name)
     return isConsumableUnlocked(name)
+  }
+
+  // Master Ball y Entebola requieren el resto de Poké Balls. Se excluyen entre
+  // sí para no crear un requisito circular imposible de completar.
+  const missingRequiredBalls = (item: MetaShopItem): string[] => {
+    if (!item.requiresAllBalls) return []
+    return META_SHOP_ITEMS
+      .filter(other => other.category === 'pokeball'
+        && other.id !== 'unlock_master_ball'
+        && other.id !== 'unlock_ente_ball'
+        && !metaProgression.permanentlyUnlockedItems.includes(other.id))
+      .map(other => other.name)
+  }
+
+  const isMetaItemLocked = (item: MetaShopItem): boolean => {
+    if (item.requires && !metaProgression.permanentlyUnlockedItems.includes(item.requires)) return true
+    if (item.requiresAllBalls && missingRequiredBalls(item).length > 0) return true
+    return false
   }
 
   function isGenUnlocked(gen: number): boolean {
@@ -17456,6 +17476,8 @@ function MainApp() {
               {META_SHOP_ITEMS.filter(item => item.category === 'pokeball' && metaShopItemMatches(item, metaShopSearch.trim().toLowerCase())).map(item => {
                 const owned = metaProgression.permanentlyUnlockedItems.includes(item.id)
                 const disabled = !isItemEnabled(item.id)
+                const locked = isMetaItemLocked(item)
+                const missingBalls = missingRequiredBalls(item)
                 return (
                   <div key={item.id} style={{ position: 'relative', background: 'rgba(30,41,59,0.6)', border: `1px solid ${owned ? '#37d16b' : '#3f3f6e'}`, borderRadius: '6px', padding: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
@@ -17473,6 +17495,15 @@ function MainApp() {
                       <div>
                         <div style={{ color: '#37d16b', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('shop.unlocked')}</div>
                         <ShopItemToggle id={item.id} disabled={disabled} onToggle={toggleItemEnabled} />
+                      </div>
+                    ) : locked ? (
+                      <div
+                        title={missingBalls.length > 0 ? `${language === 'en' ? 'Missing' : 'Faltan'}: ${missingBalls.join(', ')}` : undefined}
+                        style={{ color: item.requiresAllBalls ? '#fb923c' : '#7d7ab5', fontSize: '0.8rem', fontWeight: 'bold', lineHeight: 1.35 }}
+                      >
+                        {item.requiresAllBalls
+                          ? t('shop.requiresAllBalls', { n: missingBalls.length })
+                          : t('shop.requires', { name: META_SHOP_ITEMS.find(i => i.id === item.requires)?.name ?? (language === 'en' ? 'the previous upgrade' : 'la mejora anterior') })}
                       </div>
                     ) : (
                       <button className="cta" onClick={() => buyMetaItem(item)}

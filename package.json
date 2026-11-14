@@ -1,7 +1,7 @@
 {
   "name": "pokerand",
   "private": true,
-  "version": "3.2.0",
+  "version": "3.2.1",
   "type": "module",
   "homepage": "https://Subkhht.github.io/PokeRand",
   "scripts": {

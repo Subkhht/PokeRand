@@ -218,6 +218,7 @@ const DICT: Record<string, Entry> = {
   'shop.search': { es: 'Buscar objetos por nombre o efecto...', en: 'Search items by name or effect...' },
   'shop.noResults': { es: 'Sin resultados para "{q}".', en: 'No results for "{q}".' },
   'shop.requires': { es: '🔒 Requiere {name}', en: '🔒 Requires {name}' },
+  'shop.requiresAllBalls': { es: '🔒 Desbloquea todas las demás Poké Balls primero ({n} restantes)', en: '🔒 Unlock all other Poké Balls first ({n} remaining)' },
   'shop.appearsInShops': { es: 'Aparece en tiendas.', en: 'Appears in shops.' },
 
   // ---------- Leaderboard ----------
@@ -622,9 +623,9 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v3.2.0', en: 'v3.2.0' },
+  'help.version': { es: 'v3.2.1', en: 'v3.2.1' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
-  'changelog.button': { es: 'Ver cambios v3.2.0', en: 'See changes v3.2.0' },
+  'changelog.button': { es: 'Ver cambios v3.2.1', en: 'See changes v3.2.1' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -1967,6 +1968,12 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v3.2.1',
+    items: [
+      { es: '🏐 La Master Ball y la Entebola ahora requieren desbloquear todas las demás Poké Balls en la Tienda Meta. Las dos bolas legendarias se excluyen entre sí del requisito para que no haya un bloqueo circular. La tarjeta muestra cuántas bolas faltan y un tooltip con sus nombres.', en: '🏐 Master Ball and Beast Ball now require unlocking all other Poké Balls in the Meta Shop. The two legendary balls are excluded from each other\'s requirement to avoid a circular lock. The card shows how many balls are missing and a tooltip with their names.' },
+    ],
+  },
   {
     version: 'v3.2.0',
     items: [
