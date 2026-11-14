@@ -1972,6 +1972,7 @@ const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }>
     version: 'v3.2.1',
     items: [
       { es: '🏐 La Master Ball y la Entebola ahora requieren desbloquear todas las demás Poké Balls en la Tienda Meta. Las dos bolas legendarias se excluyen entre sí del requisito para que no haya un bloqueo circular. La tarjeta muestra cuántas bolas faltan y un tooltip con sus nombres.', en: '🏐 Master Ball and Beast Ball now require unlocking all other Poké Balls in the Meta Shop. The two legendary balls are excluded from each other\'s requirement to avoid a circular lock. The card shows how many balls are missing and a tooltip with their names.' },
+      { es: '🖼️ Nueva imagen de vista previa social (1200×630) con el icono de PokeRand y etiquetas Open Graph/Twitter. Al compartir el enlace en Discord, Telegram, X, WhatsApp y otras apps ya se muestra la imagen además del título y la descripción.', en: '🖼️ New social preview image (1200×630) with the PokeRand icon and Open Graph/Twitter tags. Sharing the link on Discord, Telegram, X, WhatsApp and other apps now shows the image alongside the title and description.' },
     ],
   },
   {
