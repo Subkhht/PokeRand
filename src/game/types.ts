@@ -79,6 +79,8 @@ export interface Pokemon {
   holdItem?: string | null
   shiny?: boolean
   ability?: string
+  // Estado interno de habilidades (Disfraz, Impulso, Protean, etc.).
+  abilityState?: Record<string, number>
   nature?: string
   ivs?: PokemonIVs
   megaEvolved?: boolean

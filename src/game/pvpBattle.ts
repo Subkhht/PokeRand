@@ -3,7 +3,17 @@ import { applyDamage } from './engine'
 import { getTypeEffectiveness } from './typesChart'
 import type { PvpState, PvpPlayerState } from './pvp'
 import { t, moveName, statusAppliedLine, statusLabel, getLanguage } from './i18n'
-import { abilityName, weatherName, weatherTypeMultiplier, weatherSpeedMultiplier, weatherChipDmg, WEATHER_SETTERS, hasAbility, type WeatherKind } from './pokemonMeta'
+import { abilityName, weatherName, weatherTypeMultiplier, weatherChipDmg, WEATHER_SETTERS, hasAbility, type WeatherKind } from './pokemonMeta'
+import {
+  getAbilityMoveImmunity, absorbAbilityMove, getAbilityMoveType, getAbilityStabTypes,
+  adjustEffectivenessForAbilities, getAbilityAccuracyMultiplier, getAbilityCritInfo,
+  getAbilityPriorityBonus, blocksPriorityMove, getAbilitySpeedMultiplier,
+  getAbilityDamageMultiplier, getAbilityStatusImmune, getAbilityStatDropBlocked,
+  isIndirectDamageImmune, isWeatherSuppressed, getSleepTick, getBurnDamage,
+  applyAbilityOnHit, applyAbilityEntrySelf, applyAbilitySwitchOut,
+  applyAbilityEndTurn, isContactMove, isTrappedByAbility,
+  adjustAbilityStatChange, applyAbilityStatDropReaction,
+} from './abilities'
 
 export interface PvpAction {
   kind: 'move' | 'switch'
@@ -59,9 +69,17 @@ function applyPvpEntryAbilities(
   const ability = entering.ability
   if (hasAbility(entering, 'intimidate') && opp.hp > 0) {
     const stages = opp.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
-    if (stages.attack > -6) {
+    if (hasAbility(opp, 'guard-dog')) {
+      if (stages.attack < 6) {
+        opp = { ...opp, statStages: { ...stages, attack: Math.min(6, stages.attack + 1) } }
+        logs.push(t('b.abilityEntryStat', { name: opp.name, ability: abilityName('guard-dog', getLanguage()), stat: t('stat.attack') }))
+      }
+    } else if (stages.attack > -6 && !getAbilityStatDropBlocked(opp, 'attack')) {
       opp = { ...opp, statStages: { ...stages, attack: stages.attack - 1 } }
       logs.push(t('b.abilityIntimidate', { name: entering.name, target: opp.name, ability: abilityName(ability, getLanguage()) }))
+      const reaction = applyAbilityStatDropReaction(opp, -1, 'attack')
+      opp = reaction.pokemon
+      logs.push(...reaction.logs)
     }
   }
   const weatherToSet = ability ? WEATHER_SETTERS[ability] : undefined
@@ -69,13 +87,22 @@ function applyPvpEntryAbilities(
     setWeather(weatherToSet)
     logs.push(t('b.abilityWeather', { name: entering.name, weather: weatherName(weatherToSet, getLanguage()) }))
   }
+  if (hasAbility(entering, 'supersweet-syrup') && opp.hp > 0) {
+    const stages = opp.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+    if (stages.speed > -6) {
+      opp = { ...opp, statStages: { ...stages, speed: stages.speed - 1 } }
+      logs.push(t('b.abilityEntryDrop', { name: entering.name, target: opp.name, stat: t('stat.speed'), ability: abilityName(ability, getLanguage()) }))
+    }
+  }
   return { opponentUpdated: opp, logs }
 }
 
 // Efectos de habilidades y clima al final del turno.
-function applyPvpTurnAbilities(p: Pokemon, weather: WeatherKind, logs: string[]): Pokemon {
+function applyPvpTurnAbilities(p: Pokemon, weather: WeatherKind, logs: string[], opponent?: Pokemon): Pokemon {
   let updated = { ...p }
   if (updated.hp <= 0) return updated
+  const suppressed = isWeatherSuppressed(updated, opponent)
+  const turnWeather: WeatherKind = suppressed ? 'none' : weather
   if (hasAbility(updated, 'speed-boost')) {
     const stages = updated.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
     if (stages.speed < 6) {
@@ -83,24 +110,24 @@ function applyPvpTurnAbilities(p: Pokemon, weather: WeatherKind, logs: string[])
       logs.push(t('b.abilitySpeedBoost', { name: updated.name, ability: abilityName(updated.ability, getLanguage()) }))
     }
   }
-  const chip = weatherChipDmg(updated, weather)
+  const chip = weatherChipDmg(updated, turnWeather)
   if (chip > 0) {
     updated = { ...updated, hp: Math.max(0, updated.hp - chip) }
-    logs.push(t('b.weatherChip', { name: updated.name, dmg: chip, weather: weatherName(weather, getLanguage()) }))
+    logs.push(t('b.weatherChip', { name: updated.name, dmg: chip, weather: weatherName(turnWeather, getLanguage()) }))
   }
-  if (weather === 'rain' && (hasAbility(updated, 'rain-dish') || hasAbility(updated, 'dry-skin')) && updated.hp > 0) {
+  if (turnWeather === 'rain' && (hasAbility(updated, 'rain-dish') || hasAbility(updated, 'dry-skin')) && updated.hp > 0) {
     const heal = hasAbility(updated, 'rain-dish')
       ? Math.max(1, Math.floor(updated.maxHp / 16))
       : Math.max(1, Math.floor(updated.maxHp / 8))
     updated = { ...updated, hp: Math.min(updated.maxHp, updated.hp + heal) }
     logs.push(t('b.abilityWeatherHeal', { name: updated.name, hp: heal, ability: abilityName(updated.ability, getLanguage()) }))
   }
-  if (weather === 'sun' && hasAbility(updated, 'solar-power') && updated.hp > 1) {
+  if (turnWeather === 'sun' && hasAbility(updated, 'solar-power') && updated.hp > 1) {
     const loss = Math.max(1, Math.floor(updated.maxHp / 8))
     updated = { ...updated, hp: Math.max(1, updated.hp - loss) }
     logs.push(t('b.abilitySolarPower', { name: updated.name, dmg: loss, ability: abilityName(updated.ability, getLanguage()) }))
   }
-  if (weather === 'rain' && hasAbility(updated, 'hydration') && updated.status) {
+  if (turnWeather === 'rain' && hasAbility(updated, 'hydration') && updated.status) {
     updated = { ...updated, status: undefined }
     logs.push(t('b.abilityHydration', { name: updated.name, ability: abilityName(updated.ability, getLanguage()) }))
   }
@@ -108,19 +135,15 @@ function applyPvpTurnAbilities(p: Pokemon, weather: WeatherKind, logs: string[])
     updated = { ...updated, status: undefined }
     logs.push(t('b.abilityShedSkin', { name: updated.name, ability: abilityName(updated.ability, getLanguage()) }))
   }
+  const extra = applyAbilityEndTurn(updated, turnWeather, opponent, !suppressed)
+  updated = extra.pokemon
+  logs.push(...extra.logs)
   return updated
 }
 
 // Inmunidades de habilidad a estados.
-function isStatusImmune(p: Pokemon, ailment: StatusType): boolean {
-  return (
-    (ailment === 'poison' && hasAbility(p, 'immunity'))
-    || (ailment === 'burn' && hasAbility(p, 'water-veil'))
-    || (ailment === 'freeze' && hasAbility(p, 'magma-armor'))
-    || (ailment === 'paralysis' && hasAbility(p, 'limber'))
-    || (ailment === 'sleep' && (hasAbility(p, 'insomnia') || hasAbility(p, 'vital-spirit')))
-    || (ailment === 'confusion' && hasAbility(p, 'own-tempo'))
-  )
+function isStatusImmune(p: Pokemon, ailment: StatusType, weather: WeatherKind = 'none', weatherActive = true): boolean {
+  return getAbilityStatusImmune(p, ailment, weather, weatherActive)
 }
 
 // Determina ganador y siguiente fase tras aplicar golpes/cambios.
@@ -201,9 +224,13 @@ export function resolvePvpTurn(
     if (actA && actB) {
       const entryA = applyPvpEntryAbilities(actA, actB, meta.weather, (w) => { meta.weather = w })
       const entryB = applyPvpEntryAbilities(actB, actA, meta.weather, (w) => { meta.weather = w })
-      a.team[a.active] = entryB.opponentUpdated
-      b.team[b.active] = entryA.opponentUpdated
-      log.push(...entryA.logs, ...entryB.logs)
+      const aBase = entryB.opponentUpdated
+      const bBase = entryA.opponentUpdated
+      const aSelf = applyAbilityEntrySelf(aBase, bBase)
+      const bSelf = applyAbilityEntrySelf(bBase, aSelf.entering)
+      a.team[a.active] = aSelf.entering
+      b.team[b.active] = bSelf.entering
+      log.push(...entryA.logs, ...entryB.logs, ...aSelf.logs, ...bSelf.logs)
       meta.entryApplied = true
     }
   }
@@ -216,17 +243,18 @@ export function resolvePvpTurn(
   const applySwitchAbilities = (side: PvpPlayerState, oppSide: PvpPlayerState, outgoingIdx: number): void => {
     const outgoing = side.team[outgoingIdx]
     if (outgoing) {
-      let out = { ...outgoing }
-      if (hasAbility(out, 'natural-cure')) out = { ...out, status: undefined }
-      if (hasAbility(out, 'regenerator')) out = { ...out, hp: Math.min(out.maxHp, out.hp + Math.floor(out.maxHp / 3)) }
-      side.team[outgoingIdx] = out
+      const switched = applyAbilitySwitchOut(outgoing)
+      side.team[outgoingIdx] = switched.pokemon
+      log.push(...switched.logs)
     }
     const incoming = side.team[side.active]
     const oppActive = oppSide.team[oppSide.active]
     if (incoming && oppActive && oppActive.hp > 0) {
       const entry = applyPvpEntryAbilities(incoming, oppActive, meta.weather, (w) => { meta.weather = w })
       oppSide.team[oppSide.active] = entry.opponentUpdated
-      log.push(...entry.logs)
+      const selfEntry = applyAbilityEntrySelf(incoming, entry.opponentUpdated)
+      side.team[side.active] = selfEntry.entering
+      log.push(...entry.logs, ...selfEntry.logs)
     }
   }
 
@@ -239,6 +267,10 @@ export function resolvePvpTurn(
       if (!action || action.kind !== 'switch') continue
       const ps = side === 'a' ? a : b
       const oppSide = side === 'a' ? b : a
+      if (isTrappedByAbility(ps.team[ps.active], oppSide.team[oppSide.active])) {
+        log.push(t('b.abilityTrapped', { name: ps.team[ps.active].name, ability: abilityName(oppSide.team[oppSide.active].ability, getLanguage()) }))
+        continue
+      }
       const outgoingIdx = ps.active
       if (doSwitch(ps, action.index)) {
         applySwitchAbilities(ps, oppSide, outgoingIdx)
@@ -265,6 +297,10 @@ export function resolvePvpTurn(
   if (switchA || switchB) {
     let changed = false
     if (switchA) {
+      if (isTrappedByAbility(a.team[a.active], b.team[b.active])) {
+        log.push(t('b.abilityTrapped', { name: a.team[a.active].name, ability: abilityName(b.team[b.active].ability, getLanguage()) }))
+        return { state, changed: false }
+      }
       const outgoingIdx = a.active
       if (doSwitch(a, actionA.index)) {
         log.push(t('b.switchOut', { side: a.username ?? t('pvp.playerA'), name: a.team[a.active].name }))
@@ -273,6 +309,10 @@ export function resolvePvpTurn(
       }
     }
     if (switchB) {
+      if (isTrappedByAbility(b.team[b.active], a.team[a.active])) {
+        log.push(t('b.abilityTrapped', { name: b.team[b.active].name, ability: abilityName(a.team[a.active].ability, getLanguage()) }))
+        return { state, changed: false }
+      }
       const outgoingIdx = b.active
       if (doSwitch(b, actionB.index)) {
         log.push(t('b.switchOut', { side: b.username ?? t('pvp.playerB'), name: b.team[b.active].name }))
@@ -301,7 +341,7 @@ export function resolvePvpTurn(
         curMove = {
           ...hit.updatedAttacker,
           moves: hit.updatedAttacker.moves.map((m, i) =>
-            i === moveIdx ? { ...m, pp: Math.max(0, (m.pp ?? 1) - 1) } : m
+            i === moveIdx ? { ...m, pp: Math.max(0, (m.pp ?? 1) - (curDef.ability === 'pressure' ? 2 : 1)) } : m
           ),
         }
         curDef = hit.updatedDefender
@@ -309,8 +349,8 @@ export function resolvePvpTurn(
       }
       // Efectos de habilidad y clima por turno.
       const turnLog: string[] = []
-      curMove = applyPvpTurnAbilities(curMove, meta.weather, turnLog)
-      curDef = applyPvpTurnAbilities(curDef, meta.weather, turnLog)
+      curMove = applyPvpTurnAbilities(curMove, meta.weather, turnLog, curDef)
+      curDef = applyPvpTurnAbilities(curDef, meta.weather, turnLog, curMove)
       log.push(...turnLog)
       if (moveSide === 'a') a.team[a.active] = { ...curMove }
       else b.team[b.active] = { ...curMove }
@@ -333,8 +373,8 @@ export function resolvePvpTurn(
   let curB = tickB.updatedPokemon
   log.push(...tickA.log, ...tickB.log)
 
-  const prioA = moveA.priority ?? 0
-  const prioB = moveB.priority ?? 0
+  const prioA = (moveA.priority ?? 0) + getAbilityPriorityBonus(curA, moveA)
+  const prioB = (moveB.priority ?? 0) + getAbilityPriorityBonus(curB, moveB)
   let first: 'a' | 'b'
   let bothAct = false
 
@@ -351,7 +391,7 @@ export function resolvePvpTurn(
     bothAct = true
     first = prioA !== prioB
       ? (prioA > prioB ? 'a' : 'b')
-      : (effectiveSpeed(curA, meta.weather) >= effectiveSpeed(curB, meta.weather) ? 'a' : 'b')
+      : (effectiveSpeed(curA, meta.weather, curB) >= effectiveSpeed(curB, meta.weather, curA) ? 'a' : 'b')
   }
 
   const second: 'a' | 'b' | null = bothAct ? (first === 'a' ? 'b' : 'a') : null
@@ -361,12 +401,16 @@ export function resolvePvpTurn(
     const defender = defenderSide === 'a' ? curA : curB
     const move = attackerSide === 'a' ? moveA : moveB
     const moveIdx = attackerSide === 'a' ? idxA : idxB
+    if ((move.priority ?? 0) > 0 && blocksPriorityMove(defender)) {
+      log.push(t('b.abilityProtectPriority', { name: defender.name, ability: abilityName(defender.ability, getLanguage()) }))
+      return
+    }
     const hit = performPvpHit(attacker, defender, move, meta.weather)
     // Consume PP del movimiento usado.
     const withPp = {
       ...hit.updatedAttacker,
       moves: hit.updatedAttacker.moves.map((m, i) =>
-        i === moveIdx ? { ...m, pp: Math.max(0, (m.pp ?? 1) - 1) } : m
+        i === moveIdx ? { ...m, pp: Math.max(0, (m.pp ?? 1) - (defender.ability === 'pressure' ? 2 : 1)) } : m
       ),
     }
     if (attackerSide === 'a') curA = withPp
@@ -388,8 +432,15 @@ export function resolvePvpTurn(
 
   // Efectos de habilidad y clima por turno (ambos activos).
   const turnLog: string[] = []
-  curA = applyPvpTurnAbilities(curA, meta.weather, turnLog)
-  curB = applyPvpTurnAbilities(curB, meta.weather, turnLog)
+  curA = applyPvpTurnAbilities(curA, meta.weather, turnLog, curB)
+  curB = applyPvpTurnAbilities(curB, meta.weather, turnLog, curA)
+  // Mal Sueño (Bad Dreams) daña al rival dormido; el registro ya se añadió.
+  if (curA.ability === 'bad-dreams' && curB.status?.type === 'sleep' && curB.hp > 0 && !isIndirectDamageImmune(curB)) {
+    curB = { ...curB, hp: Math.max(1, curB.hp - Math.max(1, Math.floor(curB.maxHp / 8))) }
+  }
+  if (curB.ability === 'bad-dreams' && curA.status?.type === 'sleep' && curA.hp > 0 && !isIndirectDamageImmune(curA)) {
+    curA = { ...curA, hp: Math.max(1, curA.hp - Math.max(1, Math.floor(curA.maxHp / 8))) }
+  }
   log.push(...turnLog)
 
   a.team[a.active] = { ...curA }
@@ -399,6 +450,17 @@ export function resolvePvpTurn(
 }
 
 function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boolean; log: string[] } {
+  if (p.ability === 'truant') {
+    const active = (p.abilityState?.truant ?? 0) === 0
+    if (!active) {
+      return {
+        updatedPokemon: { ...p, abilityState: { ...(p.abilityState ?? {}), truant: 0 } },
+        skipTurn: true,
+        log: [t('b.abilityTruant', { name: p.name })],
+      }
+    }
+    p = { ...p, abilityState: { ...(p.abilityState ?? {}), truant: 1 } }
+  }
   if (!p.status) return { updatedPokemon: p, skipTurn: false, log: [] }
 
   const logs: string[] = []
@@ -407,12 +469,20 @@ function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boo
 
   switch (p.status.type) {
     case 'burn': {
-      const burnDmg = Math.max(1, Math.floor(p.maxHp / 16))
+      if (isIndirectDamageImmune(updated)) break
+      const burnDmg = getBurnDamage(updated, Math.max(1, Math.floor(p.maxHp / 16)))
       updated = { ...updated, hp: Math.max(0, updated.hp - burnDmg) }
       logs.push(t('b.burn', { name: updated.name, dmg: burnDmg }))
       break
     }
     case 'poison': {
+      if (updated.ability === 'poison-heal') {
+        const heal = Math.max(1, Math.floor(updated.maxHp / 8))
+        updated = { ...updated, hp: Math.min(updated.maxHp, updated.hp + heal) }
+        logs.push(t('b.abilityWeatherHeal', { name: updated.name, hp: heal, ability: abilityName('poison-heal', getLanguage()) }))
+        break
+      }
+      if (isIndirectDamageImmune(updated)) break
       const poisonDmg = Math.max(1, Math.floor(p.maxHp / 8))
       updated = { ...updated, hp: Math.max(0, updated.hp - poisonDmg) }
       logs.push(t('b.poison', { name: updated.name, dmg: poisonDmg }))
@@ -436,7 +506,7 @@ function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boo
       break
     }
     case 'sleep': {
-      const remaining = (p.status.turns ?? 2) - 1
+      const remaining = (p.status.turns ?? 2) - getSleepTick(p)
       if (remaining <= 0) {
         updated = { ...updated, status: undefined }
         logs.push(t('b.wokeUp', { name: updated.name }))
@@ -461,6 +531,13 @@ function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boo
       skipTurn = true
       updated = { ...updated, status: undefined }
       logs.push(t('b.flinch', { name: updated.name }))
+      if (updated.ability === 'steadfast') {
+        const stages = updated.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+        if (stages.speed < 6) {
+          updated = { ...updated, statStages: { ...stages, speed: stages.speed + 1 } }
+          logs.push(t('b.abilitySpeedBoost', { name: updated.name, ability: abilityName('steadfast', getLanguage()) }))
+        }
+      }
       break
     }
   }
@@ -473,11 +550,11 @@ function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boo
   return { updatedPokemon: updated, skipTurn, log: logs }
 }
 
-function effectiveSpeed(p: Pokemon, weather: WeatherKind = 'none'): number {
+function effectiveSpeed(p: Pokemon, weather: WeatherKind = 'none', opponent?: Pokemon): number {
   const stages = p.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
   const paralysisNerf = p.status?.type === 'paralysis' ? 0.75 : 1
-  const quickFeet = hasAbility(p, 'quick-feet') && p.status ? 1.5 : 1
-  return Math.round(p.speed * paralysisNerf * getStageMultiplier(stages.speed) * weatherSpeedMultiplier(p, weather) * quickFeet)
+  const active = !isWeatherSuppressed(p, opponent)
+  return Math.round(p.speed * paralysisNerf * getStageMultiplier(stages.speed) * getAbilitySpeedMultiplier(p, active ? weather : 'none', active))
 }
 
 // Resuelve un golpe individual (sin objetos ni modificadores de run). Incluye
@@ -488,14 +565,19 @@ function performPvpHit(
   move: Move,
   weather: WeatherKind = 'none'
 ): { updatedDefender: Pokemon; updatedAttacker: Pokemon; lines: string[] } {
-  // El defensor está protegido (Protección/Protect): se bloquea el ataque.
-  if (defender.protected) {
+  // El defensor está protegido (Protección/Protect): se bloquea el ataque,
+  // salvo que el atacante tenga Puño Invisible o Taladro Perforador.
+  if (defender.protected && !hasAbility(attacker, 'unseen-fist') && !hasAbility(attacker, 'piercing-drill')) {
     return {
       updatedDefender: { ...defender, protected: false },
       updatedAttacker: { ...attacker, protected: false },
       lines: [`🛡️ ¡${defender.name} se protegió del ataque de ${attacker.name}!`],
     }
   }
+  const abilityMoveType = getAbilityMoveType(attacker, move)
+  const effectiveMove = abilityMoveType !== move.type ? { ...move, type: abilityMoveType } : move
+  const battleWeatherActive = !isWeatherSuppressed(attacker, defender)
+  const battleWeather: WeatherKind = battleWeatherActive ? weather : 'none'
   const burnNerf = attacker.status?.type === 'burn' ? 0.5 : 1
   const paralysisSpdNerf = attacker.status?.type === 'paralysis' ? 0.75 : 1
   const atkStages = attacker.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
@@ -505,33 +587,34 @@ function performPvpHit(
   const attackerStatused = !!attacker.status
   const gutsMod = hasAbility(attacker, 'guts') && attackerStatused ? 1.5 : 1
   const hugePowerMod = hasAbility(attacker, 'huge-power') || hasAbility(attacker, 'pure-power') ? 2 : 1
-  const solarPowerMod = hasAbility(attacker, 'solar-power') && weather === 'sun' ? 1.5 : 1
-  const quickFeetMod = hasAbility(attacker, 'quick-feet') && attackerStatused ? 1.5 : 1
+  const solarPowerMod = hasAbility(attacker, 'solar-power') && battleWeather === 'sun' ? 1.5 : 1
   const marvelScaleMod = hasAbility(defender, 'marvel-scale') && !!defender.status ? 1.5 : 1
+  // Indefenso (Unaware): ignora las etapas del rival.
+  const attackStageMult = hasAbility(defender, 'unaware', attacker) ? 1 : getStageMultiplier(atkStages.attack)
+  const specialAttackStageMult = hasAbility(defender, 'unaware', attacker) ? 1 : getStageMultiplier(atkStages.spAttack ?? 0)
+  const defenseStageMult = hasAbility(attacker, 'unaware') ? 1 : getStageMultiplier(defStages.defense)
+  const specialDefenseStageMult = hasAbility(attacker, 'unaware') ? 1 : getStageMultiplier(defStages.spDefense ?? 0)
 
   const effectiveAttacker: Pokemon = {
     ...attacker,
-    attack: Math.round((Number.isFinite(attacker.attack) ? attacker.attack : 10) * burnNerf * getStageMultiplier(atkStages.attack) * gutsMod * hugePowerMod),
-    spAttack: Math.round((Number.isFinite(attacker.spAttack) ? attacker.spAttack : 10) * getStageMultiplier(atkStages.spAttack ?? 0) * solarPowerMod),
-    speed: Math.round((Number.isFinite(attacker.speed) ? attacker.speed : 10) * paralysisSpdNerf * getStageMultiplier(atkStages.speed) * quickFeetMod * weatherSpeedMultiplier(attacker, weather)),
+    attack: Math.round((Number.isFinite(attacker.attack) ? attacker.attack : 10) * burnNerf * attackStageMult * gutsMod * hugePowerMod),
+    spAttack: Math.round((Number.isFinite(attacker.spAttack) ? attacker.spAttack : 10) * specialAttackStageMult * solarPowerMod),
+    speed: Math.round((Number.isFinite(attacker.speed) ? attacker.speed : 10) * paralysisSpdNerf * getStageMultiplier(atkStages.speed) * getAbilitySpeedMultiplier(attacker, battleWeather, battleWeatherActive)),
   }
   const effectiveDefender: Pokemon = {
     ...defender,
-    defense: Math.round((Number.isFinite(defender.defense) ? defender.defense : 10) * getStageMultiplier(defStages.defense) * marvelScaleMod),
-    spDefense: Math.round((Number.isFinite(defender.spDefense) ? defender.spDefense : 10) * getStageMultiplier(defStages.spDefense ?? 0) * marvelScaleMod),
+    defense: Math.round((Number.isFinite(defender.defense) ? defender.defense : 10) * defenseStageMult * marvelScaleMod),
+    spDefense: Math.round((Number.isFinite(defender.spDefense) ? defender.spDefense : 10) * specialDefenseStageMult * marvelScaleMod),
   }
 
   const defTypes = (defender as any).types ?? []
-  let { effectiveness, message } = getTypeEffectiveness(move.type, defTypes[0] || 'normal', defTypes[1])
+  let { effectiveness, message } = getTypeEffectiveness(effectiveMove.type, defTypes[0] || 'normal', defTypes[1])
+  effectiveness = adjustEffectivenessForAbilities(attacker, effectiveMove.type, effectiveness)
 
-  // --- Habilidades de inmunidad del defensor ---
+  // --- Habilidades de inmunidad/absorción del defensor ---
   const defenderAbility = defender.ability
-  const abilityBlocked =
-    (move.type === 'ground' && hasAbility(defender, 'levitate'))
-    || (move.type === 'water' && (hasAbility(defender, 'water-absorb') || hasAbility(defender, 'dry-skin')))
-    || (move.type === 'electric' && (hasAbility(defender, 'volt-absorb') || hasAbility(defender, 'lightning-rod') || hasAbility(defender, 'motor-drive')))
-    || (move.type === 'fire' && hasAbility(defender, 'flash-fire'))
-    || (move.type === 'grass' && hasAbility(defender, 'sap-sipper'))
+  const abilityImmunity = getAbilityMoveImmunity(defender, effectiveMove, attacker, effectiveness)
+  const abilityBlocked = !!abilityImmunity
   let abilityBlockMsg: string | null = null
   if (abilityBlocked) {
     effectiveness = 0
@@ -539,7 +622,7 @@ function performPvpHit(
     abilityBlockMsg = t('b.abilityBlocked', { ability: abilityName(defenderAbility, getLanguage()) })
   }
 
-  const stabBonus = ((attacker as any).types ?? []).some((t: string) => t === move.type)
+  const stabBonus = getAbilityStabTypes(attacker, effectiveMove.type).some((t: string) => t === effectiveMove.type)
     ? (hasAbility(attacker, 'adaptability') ? 2 : 1.5)
     : 1
 
@@ -548,15 +631,16 @@ function performPvpHit(
   if (move.accuracy !== null && move.accuracy < 100 && !noGuardBoth) {
     let effectiveAccuracy = move.accuracy
     if (hasAbility(attacker, 'compound-eyes')) effectiveAccuracy = Math.min(100, effectiveAccuracy * 1.3)
-    if (move.type === 'electric' && (move.name === 'Trueno' || move.enName === 'Thunder')) {
-      if (weather === 'rain') effectiveAccuracy = 100
-      else if (weather === 'sun') effectiveAccuracy = Math.min(effectiveAccuracy, 50)
+    effectiveAccuracy = Math.min(100, effectiveAccuracy * getAbilityAccuracyMultiplier(attacker, defender, effectiveMove, battleWeather, battleWeatherActive))
+    if (effectiveMove.type === 'electric' && (effectiveMove.name === 'Trueno' || effectiveMove.enName === 'Thunder')) {
+      if (battleWeather === 'rain') effectiveAccuracy = 100
+      else if (battleWeather === 'sun') effectiveAccuracy = Math.min(effectiveAccuracy, 50)
     }
     if (Math.random() * 100 >= effectiveAccuracy) {
       return {
         updatedDefender: defender,
         updatedAttacker: attacker,
-        lines: [t('b.missed', { attacker: attacker.name, move: moveName(move) })],
+        lines: [t('b.missed', { attacker: attacker.name, move: moveName(effectiveMove) })],
       }
     }
   }
@@ -569,6 +653,7 @@ function performPvpHit(
   let currentDefender = effectiveDefender
   const lines: string[] = []
   let totalDamage = 0
+  let lastHitCrit = false
 
   // Movimiento sin efecto (p. ej. Eléctrico contra Tierra): no golpea ni
   // aplica efectos secundarios.
@@ -580,25 +665,37 @@ function performPvpHit(
     let finalDamage = Number.isFinite(result.damage) ? Math.floor(result.damage * effectiveness * stabBonus) : 3
 
     // --- Multiplicadores por habilidad y clima ---
-    finalDamage = Math.floor(finalDamage * weatherTypeMultiplier(weather, move.type))
+    finalDamage = Math.floor(finalDamage * weatherTypeMultiplier(battleWeather, effectiveMove.type))
     const lowHpAbility = attacker.hp / Math.max(1, attacker.maxHp) <= 1 / 3
     const pinchMult = (lowHpAbility
-      && ((hasAbility(attacker, 'blaze') && move.type === 'fire')
-        || (hasAbility(attacker, 'overgrow') && move.type === 'grass')
-        || (hasAbility(attacker, 'torrent') && move.type === 'water')
-        || (hasAbility(attacker, 'swarm') && move.type === 'bug')))
+      && ((hasAbility(attacker, 'blaze') && effectiveMove.type === 'fire')
+        || (hasAbility(attacker, 'overgrow') && effectiveMove.type === 'grass')
+        || (hasAbility(attacker, 'torrent') && effectiveMove.type === 'water')
+        || (hasAbility(attacker, 'swarm') && effectiveMove.type === 'bug')))
       ? 1.5 : 1
-    const technicianMult = hasAbility(attacker, 'technician') && (move.power ?? 0) <= 60 ? 1.5 : 1
+    const technicianMult = hasAbility(attacker, 'technician') && (effectiveMove.power ?? 0) <= 60 ? 1.5 : 1
     const tintedLensMult = hasAbility(attacker, 'tinted-lens') && effectiveness < 1 ? 2 : 1
-    const toughClawsMult = hasAbility(attacker, 'tough-claws') && move.damageClass !== 'special' ? 1.3 : 1
-    const thickFatMult = hasAbility(defender, 'thick-fat') && (move.type === 'fire' || move.type === 'ice') ? 0.5 : 1
-    finalDamage = Math.floor(finalDamage * pinchMult * technicianMult * tintedLensMult * toughClawsMult * thickFatMult)
-    if (hasAbility(defender, 'dry-skin') && move.type === 'fire') finalDamage = Math.floor(finalDamage * 1.25)
-    if (hasAbility(defender, 'multiscale') && defender.hp >= defender.maxHp) finalDamage = Math.floor(finalDamage * 0.5)
+    const toughClawsMult = hasAbility(attacker, 'tough-claws') && effectiveMove.damageClass !== 'special' ? 1.3 : 1
+    const thickFatMult = hasAbility(defender, 'thick-fat', attacker) && (effectiveMove.type === 'fire' || effectiveMove.type === 'ice') ? 0.5 : 1
+    const extraAbilityMult = getAbilityDamageMultiplier(attacker, defender, effectiveMove, {
+      effectiveness,
+      weather: battleWeather,
+      weatherActive: battleWeatherActive,
+      isCrit: false,
+      isContact: isContactMove(effectiveMove),
+      defenderAtFullHp: defender.hp >= defender.maxHp,
+      movedLast: false,
+    })
+    finalDamage = Math.floor(finalDamage * pinchMult * technicianMult * tintedLensMult * toughClawsMult * thickFatMult * extraAbilityMult)
+    if (hasAbility(defender, 'dry-skin', attacker) && effectiveMove.type === 'fire') finalDamage = Math.floor(finalDamage * 1.25)
+    if (hasAbility(defender, 'multiscale', attacker) && defender.hp >= defender.maxHp) finalDamage = Math.floor(finalDamage * 0.5)
 
-    const moveCritStage = move.critRatio ?? 0
+    const critInfo = getAbilityCritInfo(attacker, defender, effectiveMove)
+    const moveCritStage = effectiveMove.critRatio ?? 0
     const moveCritChance = moveCritStage >= 3 ? 0.5 : moveCritStage === 2 ? 0.25 : moveCritStage === 1 ? 0.125 : 0
-    const isCrit = moveCritChance > 0 && Math.random() < moveCritChance
+    const critChance = moveCritChance + critInfo.chanceBonus
+    const isCrit = !critInfo.immune && (critInfo.always || (critChance > 0 && Math.random() < critChance))
+    lastHitCrit = lastHitCrit || isCrit
     if (isCrit) finalDamage = Math.floor(finalDamage * (hasAbility(attacker, 'sniper') ? 2 : 1.5))
 
     const curHp = Number.isFinite(currentDefender.hp) ? currentDefender.hp : currentDefender.maxHp
@@ -607,8 +704,8 @@ function performPvpHit(
     totalDamage += finalDamage
 
     let hitLine = totalHits > 1
-      ? t('b.usesHitMulti', { attacker: attacker.name, move: moveName(move), dmg: finalDamage, hit: hit + 1, total: totalHits })
-      : t('b.usesHit', { attacker: attacker.name, move: moveName(move), dmg: finalDamage })
+      ? t('b.usesHitMulti', { attacker: attacker.name, move: moveName(effectiveMove), dmg: finalDamage, hit: hit + 1, total: totalHits })
+      : t('b.usesHit', { attacker: attacker.name, move: moveName(effectiveMove), dmg: finalDamage })
     if (isCrit) hitLine += t('b.critSuffix')
     if (message) hitLine += ` (${message})`
     if (abilityBlockMsg) hitLine += ` (${abilityBlockMsg})`
@@ -618,33 +715,22 @@ function performPvpHit(
   }
   }
 
-  // --- Absorción por habilidad (cura y sube stats) ---
-  if (abilityBlocked && currentDefender.hp > 0) {
-    const absorbHeal = (hasAbility(defender, 'water-absorb') || hasAbility(defender, 'volt-absorb') || hasAbility(defender, 'flash-fire') || hasAbility(defender, 'dry-skin'))
-      ? Math.max(1, Math.floor(currentDefender.maxHp / 4)) : 0
-    if (absorbHeal > 0) {
-      currentDefender = { ...currentDefender, hp: Math.min(currentDefender.maxHp, currentDefender.hp + absorbHeal) }
-      lines.push(t('b.abilityAbsorb', { name: currentDefender.name, hp: absorbHeal, ability: abilityName(defenderAbility, getLanguage()) }))
-    }
-    let boostKey: 'attack' | 'spAttack' | 'speed' | null = hasAbility(defender, 'sap-sipper') ? 'attack' : hasAbility(defender, 'lightning-rod') ? 'spAttack' : hasAbility(defender, 'motor-drive') ? 'speed' : null
-    if (boostKey) {
-      const stages = currentDefender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
-      if (stages[boostKey] < 6) {
-        currentDefender = { ...currentDefender, statStages: { ...stages, [boostKey]: stages[boostKey] + 1 } }
-        lines.push(t('b.abilityStatUp', { name: currentDefender.name, ability: abilityName(defenderAbility, getLanguage()) }))
-      }
-    }
+  // --- Absorción/efecto de inmunidad ---
+  if (abilityBlocked && abilityImmunity && currentDefender.hp > 0) {
+    const absorbed = absorbAbilityMove(currentDefender, abilityImmunity)
+    currentDefender = absorbed.defender
+    lines.push(...absorbed.logs)
   }
 
   // --- Robustez (Sturdy): aguanta con 1 HP a plena vida ---
-  if (currentDefender.hp <= 0 && hasAbility(defender, 'sturdy') && defender.hp >= defender.maxHp) {
+  if (currentDefender.hp <= 0 && hasAbility(defender, 'sturdy', attacker) && defender.hp >= defender.maxHp) {
     currentDefender = { ...currentDefender, hp: 1 }
     lines.push(t('b.abilitySturdy', { name: currentDefender.name, ability: abilityName(defenderAbility, getLanguage()) }))
   }
 
   // --- Estado: solo si sobrevive y no es inmune por habilidad ---
-  if (effectiveness > 0 && totalHits > 0 && currentDefender.hp > 0 && move.ailment && !currentDefender.status && !isStatusImmune(currentDefender, move.ailment)) {
-    const chance = move.ailmentChance ?? 1
+  if (effectiveness > 0 && totalHits > 0 && currentDefender.hp > 0 && effectiveMove.ailment && !currentDefender.status && !isStatusImmune(currentDefender, effectiveMove.ailment, battleWeather, battleWeatherActive)) {
+    const chance = effectiveMove.ailmentChance ?? 1
     if (Math.random() < chance) {
       const ailmentTurns: Record<StatusType, number> = {
         burn: 999,
@@ -657,9 +743,9 @@ function performPvpHit(
       }
       currentDefender = {
         ...currentDefender,
-        status: { type: move.ailment, turns: ailmentTurns[move.ailment] },
+        status: { type: effectiveMove.ailment, turns: ailmentTurns[effectiveMove.ailment] },
       }
-      lines.push(statusAppliedLine(currentDefender.name, move.ailment))
+      lines.push(statusAppliedLine(currentDefender.name, effectiveMove.ailment))
     }
   }
 
@@ -685,7 +771,7 @@ function performPvpHit(
 
       if (changesHitSelf) {
         const stageKey: keyof typeof attackerStages = sc.stat === 'special-attack' ? 'spAttack' : sc.stat === 'special-defense' ? 'spDefense' : sc.stat
-        const change = Number.isFinite(sc.change) ? sc.change : 0
+        const change = adjustAbilityStatChange(attacker, Number.isFinite(sc.change) ? sc.change : 0)
         const oldStage = attackerStages[stageKey] ?? 0
         const newStage = Math.max(-6, Math.min(6, oldStage + change))
         if (newStage !== oldStage) {
@@ -697,12 +783,9 @@ function performPvpHit(
       } else if (currentDefender.hp > 0) {
         let newStages = currentDefender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
         const stageKey: keyof typeof newStages = sc.stat === 'special-attack' ? 'spAttack' : sc.stat === 'special-defense' ? 'spDefense' : sc.stat
-        const change = Number.isFinite(sc.change) ? sc.change : 0
+        const change = adjustAbilityStatChange(currentDefender, Number.isFinite(sc.change) ? sc.change : 0)
         // Habilidades de protección de bajada de stats.
-        const statDropBlocked = change < 0 && (
-          hasAbility(currentDefender, 'clear-body') || hasAbility(currentDefender, 'white-smoke')
-          || (hasAbility(currentDefender, 'hyper-cutter') && stageKey === 'attack')
-        )
+        const statDropBlocked = change < 0 && getAbilityStatDropBlocked(currentDefender, stageKey as 'attack' | 'defense' | 'spAttack' | 'spDefense' | 'speed')
         if (statDropBlocked) {
           lines.push(t('b.abilityNoStatDown', { name: currentDefender.name, ability: abilityName(currentDefender.ability, getLanguage()) }))
           continue
@@ -715,6 +798,11 @@ function performPvpHit(
           const direction = change > 0 ? 'subió' : 'bajó'
           const statName = sc.stat === 'attack' ? 'Ataque' : sc.stat === 'defense' ? 'Defensa' : sc.stat === 'special-attack' ? 'At. Esp.' : sc.stat === 'special-defense' ? 'Def. Esp.' : 'Velocidad'
           lines.push(`${currentDefender.name} ${direction} su ${statName}! (${oldStage > 0 ? '+' : ''}${oldStage} → ${newStage > 0 ? '+' : ''}${newStage})`)
+          if (change < 0) {
+            const reaction = applyAbilityStatDropReaction(currentDefender, change, stageKey as 'attack' | 'defense' | 'spAttack' | 'spDefense' | 'speed')
+            currentDefender = reaction.pokemon
+            lines.push(...reaction.logs)
+          }
         }
       }
     }
@@ -722,9 +810,16 @@ function performPvpHit(
 
   const hasAttackerStageChange = attackerStages.attack !== 0 || attackerStages.defense !== 0 || attackerStages.spAttack !== 0 || attackerStages.spDefense !== 0 || attackerStages.speed !== 0
   const protectUsed = (move.power ?? 0) === 0 && /proteg|protec|protect|evita todos los ataques|evade all attacks|escudo|shield|refugio/i.test(`${move.name} ${move.description}`)
-  let updatedAttacker = hasAttackerStageChange
+  let updatedAttacker: Pokemon = hasAttackerStageChange
     ? { ...attacker, statStages: attackerStages, protected: protectUsed }
     : { ...attacker, protected: protectUsed }
+  // Sincronía (Synchronize): devuelve el estado alterado al atacante.
+  if (defender.ability === 'synchronize' && currentDefender.status && !updatedAttacker.status && currentDefender.status.type !== 'flinch') {
+    if (!getAbilityStatusImmune(updatedAttacker, currentDefender.status.type, battleWeather, battleWeatherActive)) {
+      updatedAttacker = { ...updatedAttacker, status: { ...currentDefender.status } }
+      lines.push(t('b.abilityContactStatus', { name: updatedAttacker.name, status: statusLabel(currentDefender.status.type), ability: abilityName('synchronize', getLanguage()) }))
+    }
+  }
   if (move.recoilPercent && move.recoilPercent > 0 && totalDamage > 0 && !hasAbility(attacker, 'rock-head')) {
     const recoilDamage = Math.floor(totalDamage * move.recoilPercent)
     updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - recoilDamage) }
@@ -732,14 +827,19 @@ function performPvpHit(
   }
   if (move.drainPercent && move.drainPercent > 0 && totalDamage > 0 && updatedAttacker.hp > 0) {
     const drainHeal = Math.floor(totalDamage * move.drainPercent)
-    updatedAttacker = { ...updatedAttacker, hp: Math.min(updatedAttacker.maxHp, updatedAttacker.hp + drainHeal) }
-    lines.push(`${attacker.name} drena ${drainHeal} HP.`)
+    if (defender.ability === 'liquid-ooze') {
+      updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - drainHeal) }
+      lines.push(t('b.abilityOpponentDamage', { name: defender.name, target: attacker.name, dmg: drainHeal, ability: abilityName('liquid-ooze', getLanguage()) }))
+    } else {
+      updatedAttacker = { ...updatedAttacker, hp: Math.min(updatedAttacker.maxHp, updatedAttacker.hp + drainHeal) }
+      lines.push(`${attacker.name} drena ${drainHeal} HP.`)
+    }
   }
 
   // --- Efectos de contacto del defensor (Piel Áspera, Estática...) ---
-  const isContact = move.damageClass !== 'special'
+  const isContact = isContactMove(effectiveMove) && !hasAbility(attacker, 'long-reach')
   if (totalDamage > 0 && isContact && currentDefender.hp > 0 && updatedAttacker.hp > 0) {
-    if (hasAbility(defender, 'rough-skin')) {
+    if (hasAbility(defender, 'rough-skin', attacker)) {
       const skinDmg = Math.max(1, Math.floor(updatedAttacker.maxHp / 8))
       updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - skinDmg) }
       lines.push(t('b.abilityRoughSkin', { name: updatedAttacker.name, dmg: skinDmg, ability: abilityName(defenderAbility, getLanguage()) }))
@@ -750,7 +850,7 @@ function performPvpHit(
       { ability: 'poison-point', status: 'poison' },
     ]
     for (const cs of contactStatus) {
-      if (!hasAbility(defender, cs.ability)) continue
+      if (!hasAbility(defender, cs.ability, attacker)) continue
       if (updatedAttacker.status) break
       if (Math.random() < 0.30) {
         updatedAttacker = { ...updatedAttacker, status: { type: cs.status, turns: 999 } }
@@ -759,6 +859,17 @@ function performPvpHit(
       }
     }
   }
+
+  // --- Efectos adicionales al recibir el golpe ---
+  const onHit = applyAbilityOnHit(updatedAttacker, currentDefender, effectiveMove, totalDamage, {
+    defenderHpBefore: defender.hp,
+    isContact,
+    isCrit: lastHitCrit,
+    weather: battleWeather,
+  })
+  updatedAttacker = onHit.attacker
+  currentDefender = onHit.defender
+  lines.push(...onHit.logs)
 
   return {
     // No persistir las stats efectivas (ya multiplicadas): si se guardaran,

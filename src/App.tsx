@@ -30,7 +30,18 @@ import {
   type PokemonDetails
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
-import { abilityName, abilityDesc, weatherName, weatherDescription, weatherTypeMultiplier, weatherSpeedMultiplier, weatherChipDmg, WEATHER_SETTERS, WEATHER_INFO, natureName, natureStatMods, natureMultiplier, randomNature, generateIVs, ivStatBonus, hasAbility, type WeatherKind, type MetaStatKey } from './game/pokemonMeta'
+import { abilityName, abilityDesc, weatherName, weatherDescription, weatherTypeMultiplier, weatherChipDmg, WEATHER_SETTERS, WEATHER_INFO, natureName, natureStatMods, natureMultiplier, randomNature, generateIVs, ivStatBonus, hasAbility, type WeatherKind, type MetaStatKey } from './game/pokemonMeta'
+import {
+  getAbilityMoveImmunity, absorbAbilityMove, getAbilityMoveType, getAbilityStabTypes,
+  adjustEffectivenessForAbilities, getAbilityAccuracyMultiplier, getAbilityCritInfo,
+  getAbilityPriorityBonus, blocksPriorityMove, getAbilitySpeedMultiplier,
+  getAbilityDamageMultiplier, getAbilityStatusImmune, getAbilityStatDropBlocked,
+  isIndirectDamageImmune, isWeatherSuppressed, getSleepTick,
+  getBurnDamage, applyAbilityOnHit, applyAbilityEntrySelf,
+  applyAbilityEndTurn, isContactMove, isTrappedByAbility,
+  adjustAbilityStatChange, applyAbilityStatDropReaction, applyAbilitySwitchOut,
+  isPowderMove, isSoundMove,
+} from './game/abilities'
 import { isLeaderboardEnabled, submitInfiniteScore, fetchInfiniteLeaderboard, formatDuration, getCurrentUser, onAuthChange, signUpWithUsername, signIn, signOut, getUsername, isUsernameTaken, type LeaderboardEntry, type InfiniteScoreInsert } from './game/leaderboard'
 import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, cancelExchangeOffer, sendCoopChat, getCoopChat, finishCoopSession, resetCoopSession, clearCoopRestart, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange, type CoopChatMessage } from './game/coop'
 import { isPvpEnabled, createPvpRoom, findPvpOpponent, joinPvpRoom, getPvpMatch, getPvpState, submitPvpAction, resolvePvpTurn as resolvePvpTurnRpc, forfeitPvpMatch, cancelPvpMatch, finishPvpMatch, clearPvpAction, startPvpTimer, expirePvpTimer, getPvpElo, getPvpEloLeaderboard, awardPvpElo, rematchPvpRoom, serializePvpPokemon, type PvpTurnSnapshot, type PvpRoomResult, type PvpState, type PvpEloEntry } from './game/pvp'
@@ -1061,6 +1072,16 @@ const ITEM_SPRITES: Record<string, string> = {
   'Iron Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/iron-ball.png',
   'Black Glasses': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/black-glasses.png',
   'Twisted Spoon': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/twisted-spoon.png',
+  'Amuleto Claro': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/clear-amulet.png',
+  'Gafas Protectoras': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/safety-goggles.png',
+  'Capa Furtiva': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/covert-cloak.png',
+  'Dado Cargado': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/loaded-dice.png',
+  'Seguro Debilidad': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/weakness-policy.png',
+  'Globo Helio': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/air-balloon.png',
+  'Hierba Blanca': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/white-herb.png',
+  'Hierba Mental': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mental-herb.png',
+  'Espray Bucal': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/throat-spray.png',
+  'Guantes Protectores': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/protective-pads.png',
   'Mega Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/key-stone.png',
   'Dynamax Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png',
   'Prisma Rojo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/red-orb.png',
@@ -1227,6 +1248,17 @@ interface HoldableItem {
   isPrimalOrb?: boolean
   isExpShare?: boolean
   isRedCard?: boolean
+  statDropImmune?: boolean
+  weatherImmune?: boolean
+  powderImmune?: boolean
+  secondaryImmune?: boolean
+  loadedDice?: boolean
+  weaknessPolicy?: boolean
+  airBalloon?: boolean
+  whiteHerb?: boolean
+  mentalHerb?: boolean
+  throatSpray?: boolean
+  noContact?: boolean
   typeBoost?: { types: string[]; boost: number; onlyIds?: number[] }
 }
 
@@ -1310,6 +1342,16 @@ const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
   'Manuscrito aguas': { name: 'Manuscrito aguas', desc: 'Evoluciona a Kubfu en Urshifu Fluido al subir de nivel.', price: 400 },
   'Mineral Negro': { name: 'Mineral Negro', desc: 'Evoluciona a Scyther en Kleavor al subir de nivel.', price: 200 },
   'Repartir Exp': { name: 'Repartir Exp', desc: 'Todos los Pokémon del PC ganan 1 nivel tras cada combate.', price: 130, isExpShare: true },
+  'Amuleto Claro': { name: 'Amuleto Claro', desc: 'Impide que el rival baje tus estadísticas.', price: 180, statDropImmune: true },
+  'Gafas Protectoras': { name: 'Gafas Protectoras', desc: 'Inmune al daño del clima y a los movimientos de polvo.', price: 150, weatherImmune: true, powderImmune: true },
+  'Capa Furtiva': { name: 'Capa Furtiva', desc: 'Anula los efectos secundarios de los movimientos de daño rivales.', price: 200, secondaryImmune: true },
+  'Dado Cargado': { name: 'Dado Cargado', desc: 'Los movimientos de varios golpes siempre dan 4 o 5 golpes.', price: 170, loadedDice: true },
+  'Seguro Debilidad': { name: 'Seguro Debilidad', desc: 'Al recibir un golpe superefectivo sube +2 Ataque y At. Esp. Se consume.', price: 200, weaknessPolicy: true },
+  'Globo Helio': { name: 'Globo Helio', desc: 'Inmunidad a Tierra hasta recibir un golpe. Se consume.', price: 160, airBalloon: true },
+  'Hierba Blanca': { name: 'Hierba Blanca', desc: 'Restaura las estadísticas bajadas una vez. Se consume.', price: 140, whiteHerb: true },
+  'Hierba Mental': { name: 'Hierba Mental', desc: 'Cura la anulación o la confusión una vez. Se consume.', price: 120, mentalHerb: true },
+  'Espray Bucal': { name: 'Espray Bucal', desc: 'Al usar un movimiento de sonido sube +1 At. Esp. Se consume.', price: 160, throatSpray: true },
+  'Guantes Protectores': { name: 'Guantes Protectores', desc: 'Tus ataques no activan efectos de contacto del rival.', price: 140, noContact: true },
 }
 
 const HOLDABLE_ITEM_NAMES = Object.keys(HOLDABLE_ITEMS)
@@ -1934,6 +1976,16 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_iron_ball', name: 'Iron Ball', desc: 'Reduce la Velocidad a la mitad. Los Pokémon Volador reciben daño neutral de Tierra.', price: 40, spriteKey: 'Iron Ball', category: 'holdable' },
   { id: 'unlock_vampire_fang', name: 'Black Glasses', desc: '+20% daño en movimientos de tipo Siniestro.', price: 60, spriteKey: 'Black Glasses', category: 'holdable' },
   { id: 'unlock_cursed_blade', name: 'Twisted Spoon', desc: '+20% daño en movimientos de tipo Psíquico.', price: 60, spriteKey: 'Twisted Spoon', category: 'holdable' },
+  { id: 'unlock_clear_amulet', name: 'Amuleto Claro', desc: 'Impide que el rival baje tus estadísticas. Aparece en tiendas.', price: 70, spriteKey: 'Amuleto Claro', category: 'holdable' },
+  { id: 'unlock_safety_goggles', name: 'Gafas Protectoras', desc: 'Inmune al daño del clima y a los movimientos de polvo. Aparece en tiendas.', price: 60, spriteKey: 'Gafas Protectoras', category: 'holdable' },
+  { id: 'unlock_covert_cloak', name: 'Capa Furtiva', desc: 'Anula los efectos secundarios de los movimientos de daño rivales. Aparece en tiendas.', price: 80, spriteKey: 'Capa Furtiva', category: 'holdable' },
+  { id: 'unlock_loaded_dice', name: 'Dado Cargado', desc: 'Los movimientos de varios golpes siempre dan 4 o 5 golpes. Aparece en tiendas.', price: 70, spriteKey: 'Dado Cargado', category: 'holdable' },
+  { id: 'unlock_weakness_policy', name: 'Seguro Debilidad', desc: 'Al recibir un golpe superefectivo sube +2 Ataque y At. Esp. Se consume.', price: 80, spriteKey: 'Seguro Debilidad', category: 'holdable' },
+  { id: 'unlock_air_balloon', name: 'Globo Helio', desc: 'Inmunidad a Tierra hasta recibir un golpe. Se consume.', price: 65, spriteKey: 'Globo Helio', category: 'holdable' },
+  { id: 'unlock_white_herb', name: 'Hierba Blanca', desc: 'Restaura las estadísticas bajadas una vez. Se consume.', price: 55, spriteKey: 'Hierba Blanca', category: 'holdable' },
+  { id: 'unlock_mental_herb', name: 'Hierba Mental', desc: 'Cura la anulación o la confusión una vez. Se consume.', price: 50, spriteKey: 'Hierba Mental', category: 'holdable' },
+  { id: 'unlock_throat_spray', name: 'Espray Bucal', desc: 'Al usar un movimiento de sonido sube +1 At. Esp. Se consume.', price: 65, spriteKey: 'Espray Bucal', category: 'holdable' },
+  { id: 'unlock_protective_pads', name: 'Guantes Protectores', desc: 'Tus ataques no activan efectos de contacto del rival. Aparece en tiendas.', price: 55, spriteKey: 'Guantes Protectores', category: 'holdable' },
   { id: 'unlock_mega_node', name: 'Nodo Mega', desc: 'Desbloquea nodos de Mega Piedra en Hard/Infinite.', price: 150, spriteKey: 'Mega Stone', category: 'upgrade' },
   { id: 'unlock_gmax_node', name: 'Nodo G-MAX', desc: 'Desbloquea nodos G-MAX en Hard/Infinite.', price: 200, spriteKey: 'Dynamax Band', category: 'upgrade' },
   { id: 'unlock_primal_node', name: 'Nodo Primal', desc: 'Desbloquea nodos Primal en Hard/Infinite. Otorgan Prisma Rojo o Azul.', price: 250, spriteKey: 'Prisma Rojo', category: 'upgrade' }, { id: 'unlock_casino_node', name: 'Nodo Casino', desc: 'Desbloquea nodos Casino en Hard/Infinite. Juega al Pachinko para ganar premios según tu puntuación.', price: 220, spriteKey: 'money', category: 'upgrade' },
@@ -2776,6 +2828,7 @@ function MainApp() {
     egglocke: false,
   })
   const [battleLog, setBattleLog] = useState<string[]>([])
+  const [battleLogExpanded, setBattleLogExpanded] = useState(false)
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [apiError, setApiError] = useState<string>('')
   const [restEncounter, setRestEncounter] = useState<Pokemon | null>(null)
@@ -2826,6 +2879,8 @@ function MainApp() {
   const [leagueTeamSelection, setLeagueTeamSelection] = useState(false)
   const [tempLeagueTeam, setTempLeagueTeam] = useState<string[]>([])
   const [battleTurns, setBattleTurns] = useState(0)
+  // Intentos de huida en el combate salvaje actual (cada fallo facilita el siguiente).
+  const [escapeAttempts, setEscapeAttempts] = useState(0)
   const [enemyHitFlash, setEnemyHitFlash] = useState(false)
   const [weather, setWeather] = useState<WeatherKind>('none')
 
@@ -3714,6 +3769,16 @@ function MainApp() {
     unlock_baya_waca: 'Baya Waca',
     unlock_baya_rindo: 'Baya Rindo',
     unlock_baya_chilan: 'Baya Chilan',
+    unlock_clear_amulet: 'Amuleto Claro',
+    unlock_safety_goggles: 'Gafas Protectoras',
+    unlock_covert_cloak: 'Capa Furtiva',
+    unlock_loaded_dice: 'Dado Cargado',
+    unlock_weakness_policy: 'Seguro Debilidad',
+    unlock_air_balloon: 'Globo Helio',
+    unlock_white_herb: 'Hierba Blanca',
+    unlock_mental_herb: 'Hierba Mental',
+    unlock_throat_spray: 'Espray Bucal',
+    unlock_protective_pads: 'Guantes Protectores',
   }
 
   // Una baya está desbloqueada según el mapa al que pertenezca (consumible o
@@ -3747,6 +3812,15 @@ function MainApp() {
     if (Object.values(LOCKED_CONSUMABLE_MAP).includes(name)) return isConsumableUnlocked(name)
     if (Object.values(LOCKED_HOLDABLE_MAP).includes(name)) return isHoldableUnlocked(name)
     return true
+  }
+  // Un objeto solo puede venderse en tiendas/Mercado Negro si su categoría
+  // concreta (consumible, ball, piedra u objeto equipable) está desbloqueada.
+  const isShopItemUnlocked = (name: string) => {
+    if (TREASURES.includes(name)) return false
+    if (HOLDABLE_ITEMS[name]) return isHoldableUnlocked(name)
+    if (POKEBALL_NAMES.includes(name)) return isPokeballUnlocked(name)
+    if ((EVOLUTION_STONES as readonly string[]).includes(name)) return isEvolutionStoneUnlocked(name)
+    return isConsumableUnlocked(name)
   }
 
   function isGenUnlocked(gen: number): boolean {
@@ -6651,6 +6725,7 @@ function MainApp() {
   }
 
   function blackMarketBuyItem(itemName: string): void {
+    if (runChallenges.noPurchasing || !isShopItemUnlocked(itemName)) { playError(); return }
     const price = blackMarketItemPrice(itemName)
     if (money < price) { playError(); return }
     playPurchase()
@@ -6675,6 +6750,7 @@ function MainApp() {
   }
 
   function blackMarketBuyPokemon(idx: number): void {
+    if (runChallenges.noPurchasing) { playError(); return }
     if (runChallenges.soloStarter || runChallenges.fixedTeam) {
       setBattleLog((prev) => [t('b.noModifyTeam'), ...prev].slice(0, 15))
       return
@@ -6722,30 +6798,35 @@ function MainApp() {
 
   function performDoubleHit(attacker: Pokemon, defender: Pokemon, move: Move): { attacker: Pokemon; defender: Pokemon; log: string[] } {
     const log: string[] = []
+    if (defender.protected && !hasAbility(attacker, 'unseen-fist') && !hasAbility(attacker, 'piercing-drill')) {
+      return { attacker: { ...attacker, protected: false }, defender: { ...defender, protected: false }, log: [t('b.protected', { defender: defender.name, attacker: attacker.name })] }
+    }
+    const abilityMoveType = getAbilityMoveType(attacker, move)
+    const effectiveMove = abilityMoveType !== move.type ? { ...move, type: abilityMoveType } : move
+    const battleWeatherActive = !isWeatherSuppressed(attacker, defender)
+    const battleWeather: WeatherKind = battleWeatherActive ? weather : 'none'
     // --- Precisión (Indefenso, Ojo Compuesto y clima sobre Trueno) ---
     const noGuard = hasAbility(attacker, 'no-guard') || hasAbility(defender, 'no-guard')
     if (move.accuracy != null && move.accuracy < 100 && !noGuard) {
       let acc = move.accuracy
       if (hasAbility(attacker, 'compound-eyes')) acc = Math.min(100, acc * 1.3)
-      if (move.type === 'electric' && (move.name === 'Trueno' || move.enName === 'Thunder')) {
-        if (weather === 'rain') acc = 100
-        else if (weather === 'sun') acc = Math.min(acc, 50)
+      acc = Math.min(100, acc * getAbilityAccuracyMultiplier(attacker, defender, effectiveMove, battleWeather, battleWeatherActive))
+      if (effectiveMove.type === 'electric' && (move.name === 'Trueno' || move.enName === 'Thunder')) {
+        if (battleWeather === 'rain') acc = 100
+        else if (battleWeather === 'sun') acc = Math.min(acc, 50)
       }
       if (Math.random() * 100 >= acc) {
-        return { attacker, defender, log: [t('b.missed', { attacker: attacker.name, move: moveName(move) })] }
+        return { attacker, defender, log: [t('b.missed', { attacker: attacker.name, move: moveName(effectiveMove) })] }
       }
     }
     const defTypes = defender.types ?? []
-    let { effectiveness, message } = getTypeEffectiveness(move.type, defTypes[0] || 'normal', defTypes[1])
+    let { effectiveness, message } = getTypeEffectiveness(effectiveMove.type, defTypes[0] || 'normal', defTypes[1])
+    effectiveness = adjustEffectivenessForAbilities(attacker, effectiveMove.type, effectiveness)
 
-    // --- Habilidades de inmunidad del defensor ---
+    // --- Habilidades de inmunidad/absorción del defensor ---
     const defenderAbility = defender.ability
-    const abilityBlocked =
-      (move.type === 'ground' && hasAbility(defender, 'levitate'))
-      || (move.type === 'water' && (hasAbility(defender, 'water-absorb') || hasAbility(defender, 'dry-skin')))
-      || (move.type === 'electric' && (hasAbility(defender, 'volt-absorb') || hasAbility(defender, 'lightning-rod') || hasAbility(defender, 'motor-drive')))
-      || (move.type === 'fire' && hasAbility(defender, 'flash-fire'))
-      || (move.type === 'grass' && hasAbility(defender, 'sap-sipper'))
+    const abilityImmunity = getAbilityMoveImmunity(defender, effectiveMove, attacker, effectiveness)
+    const abilityBlocked = !!abilityImmunity
     let abilityBlockMsg: string | null = null
     if (abilityBlocked) {
       effectiveness = 0
@@ -6753,14 +6834,14 @@ function MainApp() {
       abilityBlockMsg = t('b.abilityBlocked', { ability: abilityName(defenderAbility, getLanguage()) })
     }
 
-    const stab = (attacker.types ?? []).some(t => t === move.type) ? (hasAbility(attacker, 'adaptability') ? 2 : 1.5) : 1
+    const stab = getAbilityStabTypes(attacker, effectiveMove.type).some(t => t === effectiveMove.type) ? (hasAbility(attacker, 'adaptability') ? 2 : 1.5) : 1
 
     // --- Stats efectivas con habilidades (Agallas, Potencia Bruta, Poder Solar, Escama Especial) ---
     const attackerStatused = !!attacker.status
     const burnNerfD = attacker.status?.type === 'burn' ? 0.5 : 1
     const gutsMult = hasAbility(attacker, 'guts') && attackerStatused ? 1.5 : 1
     const hugePowerMult = hasAbility(attacker, 'huge-power') || hasAbility(attacker, 'pure-power') ? 2 : 1
-    const solarPowerMult = hasAbility(attacker, 'solar-power') && weather === 'sun' ? 1.5 : 1
+    const solarPowerMult = hasAbility(attacker, 'solar-power') && battleWeather === 'sun' ? 1.5 : 1
     const attackerEffective: Pokemon = {
       ...attacker,
       attack: Math.round(attacker.attack * burnNerfD * gutsMult * hugePowerMult),
@@ -6773,65 +6854,70 @@ function MainApp() {
       spDefense: Math.round(defender.spDefense * marvelScale),
     }
 
-    const result = applyDamage(attackerEffective, defenderEffective, move)
+    const defenderHpBefore = defender.hp
+    const result = applyDamage(attackerEffective, defenderEffective, effectiveMove)
     let damage = Math.max(1, Math.floor(result.damage * effectiveness * stab))
 
     // --- Multiplicadores por habilidad y clima ---
-    damage = Math.floor(damage * weatherTypeMultiplier(weather, move.type))
+    damage = Math.floor(damage * weatherTypeMultiplier(battleWeather, effectiveMove.type))
     const lowHp = attacker.hp / Math.max(1, attacker.maxHp) <= 1 / 3
     const pinchMult = (lowHp
-      && ((hasAbility(attacker, 'blaze') && move.type === 'fire')
-        || (hasAbility(attacker, 'overgrow') && move.type === 'grass')
-        || (hasAbility(attacker, 'torrent') && move.type === 'water')
-        || (hasAbility(attacker, 'swarm') && move.type === 'bug')))
+      && ((hasAbility(attacker, 'blaze') && effectiveMove.type === 'fire')
+        || (hasAbility(attacker, 'overgrow') && effectiveMove.type === 'grass')
+        || (hasAbility(attacker, 'torrent') && effectiveMove.type === 'water')
+        || (hasAbility(attacker, 'swarm') && effectiveMove.type === 'bug')))
       ? 1.5 : 1
-    const technicianMult = hasAbility(attacker, 'technician') && (move.power ?? 0) <= 60 ? 1.5 : 1
+    const technicianMult = hasAbility(attacker, 'technician') && (effectiveMove.power ?? 0) <= 60 ? 1.5 : 1
     const tintedLensMult = hasAbility(attacker, 'tinted-lens') && effectiveness < 1 ? 2 : 1
-    const toughClawsMult = hasAbility(attacker, 'tough-claws') && move.damageClass !== 'special' ? 1.3 : 1
-    const thickFatMult = hasAbility(defender, 'thick-fat') && (move.type === 'fire' || move.type === 'ice') ? 0.5 : 1
-    damage = Math.floor(damage * pinchMult * technicianMult * tintedLensMult * toughClawsMult * thickFatMult)
-    if (hasAbility(defender, 'dry-skin') && move.type === 'fire') damage = Math.floor(damage * 1.25)
-    if (hasAbility(defender, 'multiscale') && defender.hp >= defender.maxHp) damage = Math.floor(damage * 0.5)
-    const isCrit = !runChallenges.noCrits && (move.critRatio ?? 0) > 0 && Math.random() < ((move.critRatio ?? 0) >= 3 ? 0.5 : (move.critRatio ?? 0) === 2 ? 0.25 : 0.125)
+    const toughClawsMult = hasAbility(attacker, 'tough-claws') && effectiveMove.damageClass !== 'special' ? 1.3 : 1
+    const thickFatMult = hasAbility(defender, 'thick-fat', attacker) && (effectiveMove.type === 'fire' || effectiveMove.type === 'ice') ? 0.5 : 1
+    const extraAbilityMult = getAbilityDamageMultiplier(attacker, defender, effectiveMove, {
+      effectiveness,
+      weather: battleWeather,
+      weatherActive: battleWeatherActive,
+      isCrit: false,
+      isContact: isContactMove(effectiveMove),
+      defenderAtFullHp: defender.hp >= defender.maxHp,
+      movedLast: false,
+    })
+    damage = Math.floor(damage * pinchMult * technicianMult * tintedLensMult * toughClawsMult * thickFatMult * extraAbilityMult)
+    if (hasAbility(defender, 'dry-skin', attacker) && effectiveMove.type === 'fire') damage = Math.floor(damage * 1.25)
+    if (hasAbility(defender, 'multiscale', attacker) && defender.hp >= defender.maxHp) damage = Math.floor(damage * 0.5)
+    const critInfo = getAbilityCritInfo(attacker, defender, effectiveMove)
+    const critChance = ((effectiveMove.critRatio ?? 0) >= 3 ? 0.5 : (effectiveMove.critRatio ?? 0) === 2 ? 0.25 : (effectiveMove.critRatio ?? 0) === 1 ? 0.125 : 0) + critInfo.chanceBonus
+    const isCrit = !runChallenges.noCrits && !critInfo.immune && (critInfo.always || (critChance > 0 && Math.random() < critChance))
     if (isCrit) damage = Math.floor(damage * (hasAbility(attacker, 'sniper') ? 2 : 1.5))
 
+    if (effectiveness === 0) {
+      damage = 0
+      log.push(t('battle.noEffect'))
+    }
     const newHp = Math.max(0, defender.hp - damage)
     let finalDefender: Pokemon = { ...defender, hp: newHp }
-    const hitLine = t('b.usesHit', { attacker: attacker.name, move: moveName(move), dmg: damage })
+    const hitLine = t('b.usesHit', { attacker: attacker.name, move: moveName(effectiveMove), dmg: damage })
       + (isCrit ? t('b.critSuffix') : '')
       + (message ? ` (${message})` : '')
       + (abilityBlockMsg ? ` (${abilityBlockMsg})` : '')
     log.push(hitLine)
 
-    // --- Absorción por habilidad (cura al defensor y sube stats) ---
-    if (abilityBlocked && finalDefender.hp > 0) {
-      const absorbHeal = (hasAbility(defender, 'water-absorb') || hasAbility(defender, 'volt-absorb') || hasAbility(defender, 'flash-fire') || hasAbility(defender, 'dry-skin'))
-        ? Math.max(1, Math.floor(finalDefender.maxHp / 4)) : 0
-      if (absorbHeal > 0) {
-        finalDefender = { ...finalDefender, hp: Math.min(finalDefender.maxHp, finalDefender.hp + absorbHeal) }
-        log.push(t('b.abilityAbsorb', { name: finalDefender.name, hp: absorbHeal, ability: abilityName(defenderAbility, getLanguage()) }))
-      }
-      let boostKey: 'attack' | 'spAttack' | 'speed' | null = hasAbility(defender, 'sap-sipper') ? 'attack' : hasAbility(defender, 'lightning-rod') ? 'spAttack' : hasAbility(defender, 'motor-drive') ? 'speed' : null
-      if (boostKey) {
-        const stages = finalDefender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
-        if (stages[boostKey] < 6) {
-          finalDefender = { ...finalDefender, statStages: { ...stages, [boostKey]: stages[boostKey] + 1 } }
-          log.push(t('b.abilityStatUp', { name: finalDefender.name, ability: abilityName(defenderAbility, getLanguage()) }))
-        }
-      }
+    // --- Absorción/efecto de inmunidad ---
+    if (abilityBlocked && abilityImmunity && finalDefender.hp > 0) {
+      const absorbed = absorbAbilityMove(finalDefender, abilityImmunity)
+      finalDefender = absorbed.defender
+      log.push(...absorbed.logs)
     }
 
     // --- Robustez (Sturdy): aguanta con 1 HP a plena vida ---
-    if (finalDefender.hp <= 0 && hasAbility(defender, 'sturdy') && defender.hp >= defender.maxHp) {
+    if (finalDefender.hp <= 0 && hasAbility(defender, 'sturdy', attacker) && defender.hp >= defender.maxHp) {
       finalDefender = { ...finalDefender, hp: 1 }
       log.push(t('b.abilitySturdy', { name: finalDefender.name, ability: abilityName(defenderAbility, getLanguage()) }))
     }
 
     // --- Efectos de contacto del defensor (Piel Áspera, Estática...) ---
     let finalAttacker = attacker
-    const isContact = move.damageClass !== 'special'
+    const isContact = isContactMove(effectiveMove) && !hasAbility(attacker, 'long-reach')
     if (damage > 0 && isContact && finalDefender.hp > 0 && finalAttacker.hp > 0) {
-      if (hasAbility(defender, 'rough-skin')) {
+      if (hasAbility(defender, 'rough-skin', attacker)) {
         const skinDmg = Math.max(1, Math.floor(finalAttacker.maxHp / 8))
         finalAttacker = { ...finalAttacker, hp: Math.max(1, finalAttacker.hp - skinDmg) }
         log.push(t('b.abilityRoughSkin', { name: finalAttacker.name, dmg: skinDmg, ability: abilityName(defenderAbility, getLanguage()) }))
@@ -6842,7 +6928,7 @@ function MainApp() {
         { ability: 'poison-point', status: 'poison' },
       ]
       for (const cs of contactStatus) {
-        if (!hasAbility(defender, cs.ability)) continue
+        if (!hasAbility(defender, cs.ability, attacker)) continue
         if (finalAttacker.status) break
         if (Math.random() < 0.30) {
           finalAttacker = { ...finalAttacker, status: { type: cs.status, turns: 999 } }
@@ -6852,13 +6938,30 @@ function MainApp() {
       }
     }
 
+    // --- Efectos adicionales al recibir el golpe ---
+    const onHit = applyAbilityOnHit(finalAttacker, finalDefender, effectiveMove, damage, {
+      defenderHpBefore,
+      isContact,
+      isCrit,
+      weather: battleWeather,
+    })
+    finalAttacker = onHit.attacker
+    finalDefender = onHit.defender
+    log.push(...onHit.logs)
+
     // Aplicar estado (parálisis, quemadura, veneno, confusión...) como en el
     // combate normal: solo si el objetivo sobrevive al golpe.
     if (finalDefender.hp > 0) {
-      const ailmented = applyAilmentToTarget(finalDefender, move)
+      const ailmented = applyAilmentToTarget(finalDefender, effectiveMove)
       if (ailmented.status && ailmented.status.type !== finalDefender.status?.type) {
         finalDefender = ailmented
         log.push(statusAppliedLine(finalDefender.name, ailmented.status.type))
+      }
+    }
+    if (defender.ability === 'synchronize' && finalDefender.status && !finalAttacker.status && finalDefender.status.type !== 'flinch') {
+      if (!getAbilityStatusImmune(finalAttacker, finalDefender.status.type, battleWeather, battleWeatherActive)) {
+        finalAttacker = { ...finalAttacker, status: { ...finalDefender.status } }
+        log.push(t('b.abilityContactStatus', { name: finalAttacker.name, status: statusLabel(finalDefender.status.type), ability: abilityName('synchronize', getLanguage()) }))
       }
     }
     return { attacker: finalAttacker, defender: finalDefender, log }
@@ -6990,14 +7093,29 @@ function MainApp() {
 
     // --- Habilidades y clima por turno (los 4 activos) ---
     const endLog: string[] = []
+    const doubleWeatherSuppressed = [...teamCopy, ...enemies].some(m => m && m.hp > 0 && (m.ability === 'air-lock' || m.ability === 'cloud-nine'))
+    const firstEnemy = enemies.find(e => e && e.hp > 0)
+    const firstPlayer = teamCopy.find(p => p && p.hp > 0)
     actives.forEach((ti) => {
       if (ti === undefined || !teamCopy[ti] || teamCopy[ti].hp <= 0) return
-      teamCopy[ti] = applyTurnAbilities(teamCopy[ti], endLog)
+      teamCopy[ti] = applyTurnAbilities(teamCopy[ti], endLog, firstEnemy, doubleWeatherSuppressed)
     })
     enemies.forEach((e, ei) => {
       if (!e || e.hp <= 0) return
-      enemies[ei] = applyTurnAbilities(e, endLog)
+      enemies[ei] = applyTurnAbilities(e, endLog, firstPlayer, doubleWeatherSuppressed)
     })
+    // Mal Sueño (Bad Dreams) en dobles: daña a los rivales dormidos.
+    if (firstPlayer?.ability === 'bad-dreams') {
+      enemies.forEach((e, ei) => {
+        if (e && e.hp > 0 && e.status?.type === 'sleep' && !isIndirectDamageImmune(e)) enemies[ei] = { ...e, hp: Math.max(1, e.hp - Math.max(1, Math.floor(e.maxHp / 8))) }
+      })
+    }
+    if (firstEnemy?.ability === 'bad-dreams') {
+      actives.forEach((ti) => {
+        const p = ti !== undefined ? teamCopy[ti] : undefined
+        if (ti !== undefined && p && p.hp > 0 && p.status?.type === 'sleep' && !isIndirectDamageImmune(p)) teamCopy[ti] = { ...p, hp: Math.max(1, p.hp - Math.max(1, Math.floor(p.maxHp / 8))) }
+      })
+    }
     log.push(...endLog)
 
     // Auto-cambio: si un activo se debilitó, entra el siguiente vivo del equipo.
@@ -7037,26 +7155,33 @@ function MainApp() {
     }
     // Habilidades de entrada del que entra (Intimidación frente a los enemigos y clima).
     const entryLogs: string[] = []
-    const incomingPokemon = teamCopy[teamIdx]
+    let incomingPokemon = teamCopy[teamIdx]
     enemies.forEach((e, ei) => {
       if (!e || e.hp <= 0) return
       const entry = applyEntryAbilities(incomingPokemon, e)
       enemies[ei] = entry.opponentUpdated
       entryLogs.push(...entry.logs)
     })
+    const incomingSelf = applyAbilityEntrySelf(incomingPokemon, enemies.find(e => e && e.hp > 0) ?? incomingPokemon)
+    incomingPokemon = incomingSelf.entering
+    teamCopy[teamIdx] = incomingPokemon
+    entryLogs.push(...incomingSelf.logs)
     log.push(...entryLogs)
 
     doubleEnemyCounterattack(teamCopy, actives, enemies, log, hits)
 
     // --- Habilidades y clima por turno ---
     const endLog: string[] = []
+    const doubleWeatherSuppressed = [...teamCopy, ...enemies].some(m => m && m.hp > 0 && (m.ability === 'air-lock' || m.ability === 'cloud-nine'))
+    const firstEnemy = enemies.find(e => e && e.hp > 0)
+    const firstPlayer = teamCopy.find(p => p && p.hp > 0)
     actives.forEach((ti) => {
       if (ti === undefined || !teamCopy[ti] || teamCopy[ti].hp <= 0) return
-      teamCopy[ti] = applyTurnAbilities(teamCopy[ti], endLog)
+      teamCopy[ti] = applyTurnAbilities(teamCopy[ti], endLog, firstEnemy, doubleWeatherSuppressed)
     })
     enemies.forEach((e, ei) => {
       if (!e || e.hp <= 0) return
-      enemies[ei] = applyTurnAbilities(e, endLog)
+      enemies[ei] = applyTurnAbilities(e, endLog, firstPlayer, doubleWeatherSuppressed)
     })
     log.push(...endLog)
 
@@ -7350,7 +7475,7 @@ function MainApp() {
 
     if (currentNode.type === 'blackmarket') {
       // Mercado Negro: vende objetos/Pokémon y compra objetos baratos y Pokémon.
-      const blackItems = [...Object.keys(ALL_SHOP_ITEMS)].filter(i => isConsumableUnlocked(i) && !TREASURES.includes(i))
+      const blackItems = [...Object.keys(ALL_SHOP_ITEMS)].filter(i => isShopItemUnlocked(i) && !TREASURES.includes(i))
       const shuffledItems = [...blackItems].sort(() => 0.5 - Math.random())
       setBlackMarketItems(shuffledItems.slice(0, 6))
       setBlackMarketPokemon([])
@@ -7420,7 +7545,9 @@ function MainApp() {
             en = entry.opponentUpdated
             entryLogs.push(...entry.logs)
           }
-          return en
+          const selfEntry = applyAbilityEntrySelf(en, activePokemons[0] ?? en)
+          entryLogs.push(...selfEntry.logs)
+          return selfEntry.entering
         })
         const teamWithEntry = team.map((p, i) => {
           if (!activesIdx.includes(i)) return p
@@ -7430,7 +7557,9 @@ function MainApp() {
             updated = entry.opponentUpdated
             entryLogs.push(...entry.logs)
           }
-          return updated
+          const selfEntry = applyAbilityEntrySelf(updated, enemyWithEntry[0] ?? updated)
+          entryLogs.push(...selfEntry.logs)
+          return selfEntry.entering
         })
         const forcedWeather = (modifier?.forcedWeather ?? modifier2?.forcedWeather) as WeatherKind | undefined
         if (forcedWeather) {
@@ -8486,6 +8615,27 @@ function MainApp() {
   }
 
   function processStatusTick(p: Pokemon): { updatedPokemon: Pokemon; skipTurn: boolean; log: string[] } {
+    // Pereza (Truant): alterna un turno de acción y otro de descanso.
+    if (p.ability === 'truant') {
+      const active = (p.abilityState?.truant ?? 0) === 0
+      if (!active) {
+        return {
+          updatedPokemon: { ...p, abilityState: { ...(p.abilityState ?? {}), truant: 0 } },
+          skipTurn: true,
+          log: [t('b.abilityTruant', { name: p.name })],
+        }
+      }
+      p = { ...p, abilityState: { ...(p.abilityState ?? {}), truant: 1 } }
+    }
+    // Hierba Mental: cura una anulación o confusión una vez.
+    if (p.holdItem && HOLDABLE_ITEMS[p.holdItem]?.mentalHerb && (p.disabled || p.status?.type === 'confusion')) {
+      const curedStatus = p.status?.type === 'confusion' ? undefined : p.status
+      return {
+        updatedPokemon: { ...p, disabled: undefined, status: curedStatus, holdItem: undefined },
+        skipTurn: false,
+        log: [t('b.itemMentalHerb', { name: p.name, item: itemLocalizedName(p.holdItem) })],
+      }
+    }
     if (!p.status) return { updatedPokemon: p, skipTurn: false, log: [] }
 
     const logs: string[] = []
@@ -8494,12 +8644,20 @@ function MainApp() {
 
     switch (p.status.type) {
       case 'burn': {
-        const burnDmg = Math.max(1, Math.floor(p.maxHp / 16))
+        if (isIndirectDamageImmune(updated)) break
+        const burnDmg = getBurnDamage(updated, Math.max(1, Math.floor(p.maxHp / 16)))
         updated = { ...updated, hp: Math.max(0, updated.hp - burnDmg) }
         logs.push(t('b.burn', { name: updated.name, dmg: burnDmg }))
         break
       }
       case 'poison': {
+        if (updated.ability === 'poison-heal') {
+          const heal = Math.max(1, Math.floor(updated.maxHp / 8))
+          updated = { ...updated, hp: Math.min(updated.maxHp, updated.hp + heal) }
+          logs.push(t('b.abilityWeatherHeal', { name: updated.name, hp: heal, ability: abilityName('poison-heal', getLanguage()) }))
+          break
+        }
+        if (isIndirectDamageImmune(updated)) break
         const poisonDmg = Math.max(1, Math.floor(p.maxHp / 8))
         updated = { ...updated, hp: Math.max(0, updated.hp - poisonDmg) }
         logs.push(t('b.poison', { name: updated.name, dmg: poisonDmg }))
@@ -8523,7 +8681,7 @@ function MainApp() {
         break
       }
       case 'sleep': {
-        const remaining = (p.status.turns ?? 2) - 1
+        const remaining = (p.status.turns ?? 2) - getSleepTick(p)
         if (remaining <= 0) {
           updated = { ...updated, status: undefined }
           logs.push(t('b.wokeUp', { name: updated.name }))
@@ -8548,6 +8706,13 @@ function MainApp() {
         skipTurn = true
         updated = { ...updated, status: undefined }
         logs.push(t('b.flinch', { name: updated.name }))
+        if (updated.ability === 'steadfast') {
+          const stages = updated.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+          if (stages.speed < 6) {
+            updated = { ...updated, statStages: { ...stages, speed: stages.speed + 1 } }
+            logs.push(t('b.abilitySpeedBoost', { name: updated.name, ability: abilityName('steadfast', getLanguage()) }))
+          }
+        }
         break
       }
     }
@@ -8563,15 +8728,8 @@ function MainApp() {
   function applyAilmentToTarget(target: Pokemon, move: Move): Pokemon {
     if (!move.ailment) return target
     if (target.status) return target
-    // Habilidades de inmunidad a estados.
-    const abilityImmune =
-      (move.ailment === 'poison' && (hasAbility(target, 'immunity')))
-      || (move.ailment === 'burn' && hasAbility(target, 'water-veil'))
-      || (move.ailment === 'freeze' && hasAbility(target, 'magma-armor'))
-      || (move.ailment === 'paralysis' && hasAbility(target, 'limber'))
-      || (move.ailment === 'sleep' && (hasAbility(target, 'insomnia') || hasAbility(target, 'vital-spirit')))
-      || (move.ailment === 'confusion' && hasAbility(target, 'own-tempo'))
-    if (abilityImmune) return target
+    // Habilidades de inmunidad a estados (todas las del catálogo).
+    if (getAbilityStatusImmune(target, move.ailment, weather, !isWeatherSuppressed(target))) return target
     // Si el movimiento trae afección pero no chance (p. ej. Polvo Veneno con
     // ailment_chance 0 en PokeAPI), se aplica garantizada.
     const chance = move.ailmentChance ?? 1
@@ -8601,9 +8759,25 @@ function MainApp() {
     const ability = entering.ability
     if (hasAbility(entering, 'intimidate') && opp.hp > 0) {
       const stages = opp.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
-      if (stages.attack > -6) {
+      if (hasAbility(opp, 'guard-dog')) {
+        if (stages.attack < 6) {
+          opp = { ...opp, statStages: { ...stages, attack: Math.min(6, stages.attack + 1) } }
+          logs.push(t('b.abilityEntryStat', { name: opp.name, ability: abilityName('guard-dog', getLanguage()), stat: t('stat.attack') }))
+        }
+      } else if (stages.attack > -6 && !getAbilityStatDropBlocked(opp, 'attack') && !HOLDABLE_ITEMS[opp.holdItem ?? '']?.statDropImmune) {
         opp = { ...opp, statStages: { ...stages, attack: stages.attack - 1 } }
         logs.push(t('b.abilityIntimidate', { name: entering.name, target: opp.name, ability: abilityName(ability, getLanguage()) }))
+        const reaction = applyAbilityStatDropReaction(opp, -1, 'attack')
+        opp = reaction.pokemon
+        logs.push(...reaction.logs)
+        if (HOLDABLE_ITEMS[opp.holdItem ?? '']?.whiteHerb) {
+          const restored = { ...(opp.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }) }
+          for (const key of ['attack', 'defense', 'spAttack', 'spDefense', 'speed'] as const) {
+            if (restored[key] < 0) restored[key] = 0
+          }
+          opp = { ...opp, statStages: restored, holdItem: undefined }
+          logs.push(t('b.itemWhiteHerb', { name: opp.name, item: itemLocalizedName('Hierba Blanca') }))
+        }
       }
     }
     const weatherToSet = ability ? WEATHER_SETTERS[ability] : undefined
@@ -8612,14 +8786,23 @@ function MainApp() {
       unlockAchievement('weather_setter')
       logs.push(t('b.abilityWeather', { name: entering.name, weather: weatherName(weatherToSet, getLanguage()) }))
     }
+    if (hasAbility(entering, 'supersweet-syrup') && opp.hp > 0) {
+      const stages = opp.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+      if (stages.speed > -6) {
+        opp = { ...opp, statStages: { ...stages, speed: stages.speed - 1 } }
+        logs.push(t('b.abilityEntryDrop', { name: entering.name, target: opp.name, stat: t('stat.speed'), ability: abilityName(ability, getLanguage()) }))
+      }
+    }
     return { opponentUpdated: opp, logs }
   }, [weather])
 
   // Efectos de habilidades y clima al FINAL del turno (compartido entre el
   // combate normal y los combates dobles).
-  function applyTurnAbilities(p: Pokemon, logs: string[]): Pokemon {
+  function applyTurnAbilities(p: Pokemon, logs: string[], opponent?: Pokemon, forcedSuppressed = false): Pokemon {
     let updated = { ...p }
     if (updated.hp <= 0) return updated
+    const suppressed = forcedSuppressed || isWeatherSuppressed(updated, opponent)
+    const turnWeather: WeatherKind = suppressed ? 'none' : weather
     // Impulso (Speed Boost): +1 Velocidad al final del turno.
     if (hasAbility(updated, 'speed-boost')) {
       const stages = updated.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
@@ -8628,14 +8811,15 @@ function MainApp() {
         logs.push(t('b.abilitySpeedBoost', { name: updated.name, ability: abilityName(updated.ability, getLanguage()) }))
       }
     }
-    // Daño de clima (arena y granizo).
-    const chip = weatherChipDmg(updated, weather)
+    // Daño de clima (arena y granizo). Las Gafas Protectoras lo anulan.
+    const turnItem = updated.holdItem ? HOLDABLE_ITEMS[updated.holdItem] : null
+    const chip = turnItem?.weatherImmune ? 0 : weatherChipDmg(updated, turnWeather)
     if (chip > 0) {
       updated = { ...updated, hp: Math.max(0, updated.hp - chip) }
-      logs.push(t('b.weatherChip', { name: updated.name, dmg: chip, weather: weatherName(weather, getLanguage()) }))
+      logs.push(t('b.weatherChip', { name: updated.name, dmg: chip, weather: weatherName(turnWeather, getLanguage()) }))
     }
     // Cura Lluvia (Rain Dish) y Piel Seca (Dry Skin) curan bajo la lluvia.
-    if (weather === 'rain' && (hasAbility(updated, 'rain-dish') || hasAbility(updated, 'dry-skin')) && updated.hp > 0) {
+    if (turnWeather === 'rain' && (hasAbility(updated, 'rain-dish') || hasAbility(updated, 'dry-skin')) && updated.hp > 0) {
       const heal = hasAbility(updated, 'rain-dish')
         ? Math.max(1, Math.floor(updated.maxHp / 16))
         : Math.max(1, Math.floor(updated.maxHp / 8))
@@ -8643,13 +8827,13 @@ function MainApp() {
       logs.push(t('b.abilityWeatherHeal', { name: updated.name, hp: heal, ability: abilityName(updated.ability, getLanguage()) }))
     }
     // Poder Solar (Solar Power): pierde HP bajo el sol.
-    if (weather === 'sun' && hasAbility(updated, 'solar-power') && updated.hp > 1) {
+    if (turnWeather === 'sun' && hasAbility(updated, 'solar-power') && updated.hp > 1) {
       const loss = Math.max(1, Math.floor(updated.maxHp / 8))
       updated = { ...updated, hp: Math.max(1, updated.hp - loss) }
       logs.push(t('b.abilitySolarPower', { name: updated.name, dmg: loss, ability: abilityName(updated.ability, getLanguage()) }))
     }
     // Hidratación (Hydration) cura estados bajo la lluvia.
-    if (weather === 'rain' && hasAbility(updated, 'hydration') && updated.status) {
+    if (turnWeather === 'rain' && hasAbility(updated, 'hydration') && updated.status) {
       updated = { ...updated, status: undefined }
       logs.push(t('b.abilityHydration', { name: updated.name, ability: abilityName(updated.ability, getLanguage()) }))
     }
@@ -8658,6 +8842,10 @@ function MainApp() {
       updated = { ...updated, status: undefined }
       logs.push(t('b.abilityShedSkin', { name: updated.name, ability: abilityName(updated.ability, getLanguage()) }))
     }
+    // Resto de habilidades con efecto de fin de turno.
+    const extra = applyAbilityEndTurn(updated, turnWeather, opponent, !suppressed)
+    updated = extra.pokemon
+    logs.push(...extra.logs)
     return updated
   }
 
@@ -8666,12 +8854,17 @@ function MainApp() {
   useEffect(() => {
     if (screen === 'battle' && enemy && activePokemon && !entryAbilitiesAppliedRef.current) {
       entryAbilitiesAppliedRef.current = true
+      setEscapeAttempts(0)
       const playerEntry = applyEntryAbilities(activePokemon, enemy)
       const enemyEntry = applyEntryAbilities(enemy, activePokemon)
-      setEnemy(playerEntry.opponentUpdated)
-      setTeam(prev => prev.map((p, i) => i === activeIndex ? enemyEntry.opponentUpdated : p))
+      const playerBase = enemyEntry.opponentUpdated
+      const enemyBase = playerEntry.opponentUpdated
+      const playerSelf = applyAbilityEntrySelf(playerBase, enemyBase)
+      const enemySelf = applyAbilityEntrySelf(enemyBase, playerSelf.entering)
+      setEnemy(enemySelf.entering)
+      setTeam(prev => prev.map((p, i) => i === activeIndex ? playerSelf.entering : p))
       const forcedWeather = (modifier?.forcedWeather ?? modifier2?.forcedWeather) as WeatherKind | undefined
-      const logs = [...playerEntry.logs, ...enemyEntry.logs]
+      const logs = [...playerEntry.logs, ...enemyEntry.logs, ...playerSelf.logs, ...enemySelf.logs]
       if (forcedWeather) {
         setWeather(forcedWeather)
         logs.push(t('b.abilityWeather', { name: runModName('weathermania'), weather: weatherName(forcedWeather, getLanguage()) }))
@@ -8689,8 +8882,9 @@ function MainApp() {
     isEnemyHit: boolean,
     defenderMovedFirst = false
   ): { updatedDefender: Pokemon; updatedAttacker: Pokemon; lines: string[]; attackerHeal: number; crits: number; superEffective: boolean } {
-    // El defensor está protegido (Protección/Protect): se bloquea el ataque.
-    if (defender.protected) {
+    // El defensor está protegido (Protección/Protect): se bloquea el ataque,
+    // salvo que el atacante tenga Puño Invisible o Taladro Perforador.
+    if (defender.protected && !hasAbility(attacker, 'unseen-fist') && !hasAbility(attacker, 'piercing-drill')) {
       return {
         updatedDefender: { ...defender, protected: false },
         updatedAttacker: { ...attacker, protected: false },
@@ -8713,8 +8907,8 @@ function MainApp() {
     }
     const enemyBoost = isEnemyHit ? modifier?.enemyAttackDelta ?? 0 : 0
 
-    const attackerItem = attacker.holdItem ? HOLDABLE_ITEMS[attacker.holdItem] : null
-    const defenderItem = defender.holdItem ? HOLDABLE_ITEMS[defender.holdItem] : null
+    const attackerItem = attacker.holdItem && !hasAbility(attacker, 'klutz') ? HOLDABLE_ITEMS[attacker.holdItem] : null
+    const defenderItem = defender.holdItem && !hasAbility(defender, 'klutz') ? HOLDABLE_ITEMS[defender.holdItem] : null
 
     const playerAtkMod = !isEnemyHit ? (modifier?.playerAttackMod ?? 0) : 0
     const playerSpdMod = !isEnemyHit ? (modifier?.playerSpeedMod ?? 0) : 0
@@ -8734,35 +8928,43 @@ function MainApp() {
     const defStageMult = getStageMultiplier(defStages.defense)
     const spDefStageMult = getStageMultiplier(defStages.spDefense ?? 0)
 
+    const battleWeatherActive = !isWeatherSuppressed(attacker, defender)
+    const battleWeather: WeatherKind = battleWeatherActive ? weather : 'none'
     const attackerStatused = !!attacker.status
     const gutsMod = hasAbility(attacker, 'guts') && attackerStatused ? 1.5 : 1
     const hugePowerMod = hasAbility(attacker, 'huge-power') || hasAbility(attacker, 'pure-power') ? 2 : 1
-    const solarPowerMod = hasAbility(attacker, 'solar-power') && weather === 'sun' ? 1.5 : 1
-    const quickFeetMod = hasAbility(attacker, 'quick-feet') && attackerStatused ? 1.5 : 1
-    const abilitySpeed = weatherSpeedMultiplier(attacker, weather)
+    const solarPowerMod = hasAbility(attacker, 'solar-power') && battleWeather === 'sun' ? 1.5 : 1
+    const abilitySpeed = getAbilitySpeedMultiplier(attacker, battleWeather, battleWeatherActive)
     const marvelScaleMod = hasAbility(defender, 'marvel-scale') && !!defender.status ? 1.5 : 1
+    // Indefenso (Unaware): ignora las etapas del rival.
+    const attackStageMult = hasAbility(defender, 'unaware', attacker) ? 1 : atkStageMult
+    const specialAttackStageMult = hasAbility(defender, 'unaware', attacker) ? 1 : spaStageMult
+    const defenseStageMult = hasAbility(attacker, 'unaware') ? 1 : defStageMult
+    const specialDefenseStageMult = hasAbility(attacker, 'unaware') ? 1 : spDefStageMult
 
     const effectiveAttacker: Pokemon = {
       ...attacker,
-      attack: Math.round(attacker.attack * (1 + (attackerItem?.attackMod ?? 0) + playerAtkMod) * burnNerf * atkStageMult * gutsMod * hugePowerMod),
-      spAttack: Math.round(attacker.spAttack * (1 + (attackerItem?.spAttackMod ?? 0) + playerAtkMod) * spaStageMult * solarPowerMod),
-      speed: Math.round(attacker.speed * (1 + (attackerItem?.speedMod ?? 0) + playerSpdMod) * paralysisSpdNerf * spdStageMult * quickFeetMod * abilitySpeed + enemySpdDelta)
+      attack: Math.round(attacker.attack * (1 + (attackerItem?.attackMod ?? 0) + playerAtkMod) * burnNerf * attackStageMult * gutsMod * hugePowerMod),
+      spAttack: Math.round(attacker.spAttack * (1 + (attackerItem?.spAttackMod ?? 0) + playerAtkMod) * specialAttackStageMult * solarPowerMod),
+      speed: Math.round(attacker.speed * (1 + (attackerItem?.speedMod ?? 0) + playerSpdMod) * paralysisSpdNerf * spdStageMult * abilitySpeed + enemySpdDelta)
     }
     const effectiveDefender: Pokemon = {
       ...defender,
-      defense: Math.round(defender.defense * (1 + (defenderItem?.defenseMod ?? 0) + (defenderItem?.eviolite && canStillEvolve(defender) ? 0.50 : 0) + playerDefMod) * defStageMult * marvelScaleMod + enemyDefDelta),
-      spDefense: Math.round(defender.spDefense * (1 + (defenderItem?.spDefenseMod ?? 0) + (defenderItem?.eviolite && canStillEvolve(defender) ? 0.50 : 0) + playerDefMod) * spDefStageMult + enemyDefDelta)
+      defense: Math.round(defender.defense * (1 + (defenderItem?.defenseMod ?? 0) + (defenderItem?.eviolite && canStillEvolve(defender) ? 0.50 : 0) + playerDefMod) * defenseStageMult * marvelScaleMod + enemyDefDelta),
+      spDefense: Math.round(defender.spDefense * (1 + (defenderItem?.spDefenseMod ?? 0) + (defenderItem?.eviolite && canStillEvolve(defender) ? 0.50 : 0) + playerDefMod) * specialDefenseStageMult + enemyDefDelta)
     }
 
+    const abilityMoveType = getAbilityMoveType(attacker, move)
     const effectiveMove = runChallenges.typeRandomizer
       ? { ...move, type: randomFrom(ALL_TYPES) }
-      : move
+      : (abilityMoveType !== move.type ? { ...move, type: abilityMoveType } : move)
 
     const defTypes = (effectiveDefender as any).types ?? []
     const primaryType = defTypes[0] || 'normal'
     const secondaryType = defTypes[1] || undefined
 
     let { effectiveness, message } = getTypeEffectiveness(effectiveMove.type, primaryType, secondaryType)
+    effectiveness = adjustEffectivenessForAbilities(attacker, effectiveMove.type, effectiveness)
 
     // --- Bola Férrea (desde Gen 5): un Pokémon de tipo Volador que la lleva
     // recibe SIEMPRE efectividad neutral de los movimientos de tipo Tierra,
@@ -8772,31 +8974,31 @@ function MainApp() {
       message = null
     }
 
-    // --- Habilidades de inmunidad del defensor ---
+    // --- Habilidades de inmunidad/absorción del defensor ---
     const defenderAbility = defender.ability
-    const defenderAbilityBlocked = (() => {
-      if (effectiveMove.type === 'ground' && hasAbility(defender, 'levitate')) return true
-      if (effectiveMove.type === 'water' && (hasAbility(defender, 'water-absorb') || hasAbility(defender, 'dry-skin'))) return true
-      if (effectiveMove.type === 'electric' && (hasAbility(defender, 'volt-absorb') || hasAbility(defender, 'lightning-rod') || hasAbility(defender, 'motor-drive'))) return true
-      if (effectiveMove.type === 'fire' && hasAbility(defender, 'flash-fire')) return true
-      if (effectiveMove.type === 'grass' && hasAbility(defender, 'sap-sipper')) return true
-      return false
-    })()
+    const abilityImmunity = getAbilityMoveImmunity(defender, effectiveMove, attacker, effectiveness)
+    const airBalloonBlocked = !!defenderItem?.airBalloon && defender.holdItem === 'Globo Helio' && effectiveMove.type === 'ground' && (effectiveMove.power ?? 0) > 0
+    const powderBlocked = !!defenderItem?.powderImmune && isPowderMove(effectiveMove)
+    const defenderAbilityBlocked = !!abilityImmunity || airBalloonBlocked || powderBlocked
     let abilityBlockMessage: string | null = null
     if (defenderAbilityBlocked) {
       effectiveness = 0
       message = null
-      abilityBlockMessage = t('b.abilityBlocked', { ability: abilityName(defenderAbility, getLanguage()) })
+      abilityBlockMessage = airBalloonBlocked
+        ? t('b.itemBlocked', { item: itemLocalizedName('Globo Helio') })
+        : powderBlocked
+          ? t('b.itemBlocked', { item: itemLocalizedName('Gafas Protectoras') })
+          : t('b.abilityBlocked', { ability: abilityName(defenderAbility, getLanguage()) })
     }
 
     // --- Sebo (Thick Fat): mitad de daño de Fuego y Hielo ---
     let thickFatMult = 1
-    if (hasAbility(defender, 'thick-fat') && (effectiveMove.type === 'fire' || effectiveMove.type === 'ice')) {
+    if (hasAbility(defender, 'thick-fat', attacker) && (effectiveMove.type === 'fire' || effectiveMove.type === 'ice')) {
       thickFatMult = 0.5
     }
 
     // --- STAB (Same-Type Attack Bonus) ---
-    const attackerTypes: string[] = (attacker as any).types ?? []
+    const attackerTypes: string[] = getAbilityStabTypes(attacker, effectiveMove.type)
     const stabBonus = attackerTypes.some(t => t === effectiveMove.type)
       ? (hasAbility(attacker, 'adaptability') ? 2 : 1.5)
       : 1
@@ -8804,14 +9006,14 @@ function MainApp() {
     // --- Accuracy check ---
     const noGuardBoth = hasAbility(attacker, 'no-guard') || hasAbility(defender, 'no-guard')
     if (move.accuracy !== null && move.accuracy < 100 && !noGuardBoth) {
-      const attackerItem = attacker.holdItem ? HOLDABLE_ITEMS[attacker.holdItem] : null
+      const attackerItem = attacker.holdItem && !hasAbility(attacker, 'klutz') ? HOLDABLE_ITEMS[attacker.holdItem] : null
       let effectiveAccuracy = move.accuracy
       const abilityAcc = hasAbility(attacker, 'compound-eyes') ? 1.3 : 1
-      effectiveAccuracy = Math.min(100, effectiveAccuracy * abilityAcc)
+      effectiveAccuracy = Math.min(100, effectiveAccuracy * abilityAcc * getAbilityAccuracyMultiplier(attacker, defender, effectiveMove, battleWeather, battleWeatherActive))
       // Trueno (Thunder): bajo lluvia acierta siempre; bajo sol solo 50%.
       if (effectiveMove.type === 'electric' && (effectiveMove.name === 'Trueno' || effectiveMove.enName === 'Thunder')) {
-        if (weather === 'rain') effectiveAccuracy = 100
-        else if (weather === 'sun') effectiveAccuracy = Math.min(effectiveAccuracy, 50)
+        if (battleWeather === 'rain') effectiveAccuracy = 100
+        else if (battleWeather === 'sun') effectiveAccuracy = Math.min(effectiveAccuracy, 50)
       }
       if (defenderMovedFirst && attackerItem?.accuracyMod) {
         effectiveAccuracy = Math.min(100, effectiveAccuracy * (1 + attackerItem.accuracyMod))
@@ -8833,6 +9035,10 @@ function MainApp() {
     let totalHits = 1
     if (move.minHits && move.maxHits) {
       totalHits = Math.floor(Math.random() * (move.maxHits - move.minHits + 1)) + move.minHits
+      if (attackerItem?.loadedDice) {
+        const loadedMinimum = move.maxHits <= 2 ? move.maxHits : 4
+        totalHits = Math.min(move.maxHits, Math.max(totalHits, loadedMinimum))
+      }
     }
 
     let currentDefender = effectiveDefender
@@ -8840,6 +9046,7 @@ function MainApp() {
     let totalDamage = 0
     let totalCrits = 0
     const defenderAtFullHp = currentDefender.hp >= currentDefender.maxHp
+    const defenderHpBefore = defender.hp
     let resistBerryUsed = false
 
     const isDamagingMove = (effectiveMove.power ?? 0) > 0
@@ -8847,32 +9054,22 @@ function MainApp() {
       // Movimiento sin efecto (p. ej. Eléctrico contra Tierra): no golpea ni
       // aplica efectos secundarios.
       lines.push(t('battle.noEffect'))
-      // Habilidades que absorben el ataque y curan o suben stats al defensor.
-      if (defenderAbilityBlocked && currentDefender.hp > 0) {
-        const absorbHeal = (hasAbility(defender, 'water-absorb') || hasAbility(defender, 'volt-absorb') || hasAbility(defender, 'flash-fire') || hasAbility(defender, 'dry-skin'))
-          ? Math.max(1, Math.floor(currentDefender.maxHp / 4))
-          : 0
-        if (absorbHeal > 0) {
-          currentDefender = { ...currentDefender, hp: Math.min(currentDefender.maxHp, currentDefender.hp + absorbHeal) }
-          lines.push(t('b.abilityAbsorb', { name: currentDefender.name, hp: absorbHeal, ability: abilityName(defenderAbility, getLanguage()) }))
-        }
-        let boostedStages = currentDefender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
-        let boostKey: keyof typeof boostedStages | null = null
-        if (hasAbility(defender, 'sap-sipper')) boostKey = 'attack'
-        else if (hasAbility(defender, 'lightning-rod')) boostKey = 'spAttack'
-        else if (hasAbility(defender, 'motor-drive')) boostKey = 'speed'
-        if (boostKey && boostedStages[boostKey] < 6) {
-          boostedStages = { ...boostedStages, [boostKey]: boostedStages[boostKey] + 1 }
-          currentDefender = { ...currentDefender, statStages: boostedStages }
-          lines.push(t('b.abilityStatUp', { name: currentDefender.name, ability: abilityName(defenderAbility, getLanguage()) }))
-        }
+      // Habilidades que absorben el ataque, curan o suben stats al defensor.
+      if (defenderAbilityBlocked && abilityImmunity && currentDefender.hp > 0) {
+        const absorbed = absorbAbilityMove(currentDefender, abilityImmunity)
+        currentDefender = absorbed.defender
+        lines.push(...absorbed.logs)
+      }
+      if (airBalloonBlocked && currentDefender.holdItem === 'Globo Helio') {
+        currentDefender = { ...currentDefender, holdItem: undefined }
+        lines.push(t('b.itemAirBalloon', { name: currentDefender.name, item: itemLocalizedName('Globo Helio') }))
       }
     } else if (isDamagingMove) {
       for (let hit = 0; hit < totalHits; hit++) {
         const result = applyDamage(effectiveAttacker, currentDefender, effectiveMove, enemyBoost)
         let finalDamage = Math.floor(result.damage * effectiveness * stabBonus)
         // --- Multiplicadores por habilidad y clima del atacante ---
-        const weatherMult = weatherTypeMultiplier(weather, effectiveMove.type)
+        const weatherMult = weatherTypeMultiplier(battleWeather, effectiveMove.type)
         const lowHpAbility = attacker.hp / Math.max(1, attacker.maxHp) <= 1 / 3
         const pinchType = effectiveMove.type
         const pinchMult = (lowHpAbility
@@ -8881,14 +9078,23 @@ function MainApp() {
             || (hasAbility(attacker, 'torrent') && pinchType === 'water')
             || (hasAbility(attacker, 'swarm') && pinchType === 'bug')))
           ? 1.5 : 1
-        const technicianMult = hasAbility(attacker, 'technician') && (move.power ?? 0) <= 60 ? 1.5 : 1
+        const technicianMult = hasAbility(attacker, 'technician') && (effectiveMove.power ?? 0) <= 60 ? 1.5 : 1
         const tintedLensMult = hasAbility(attacker, 'tinted-lens') && effectiveness < 1 ? 2 : 1
         const toughClawsMult = hasAbility(attacker, 'tough-claws') && effectiveMove.damageClass !== 'special' ? 1.3 : 1
-        finalDamage = Math.floor(finalDamage * weatherMult * pinchMult * technicianMult * tintedLensMult * toughClawsMult * thickFatMult)
-        if (hasAbility(defender, 'dry-skin') && effectiveMove.type === 'fire') {
+        const extraAbilityMult = getAbilityDamageMultiplier(attacker, defender, effectiveMove, {
+          effectiveness,
+          weather: battleWeather,
+          weatherActive: battleWeatherActive,
+          isCrit: false,
+          isContact: isContactMove(effectiveMove),
+          defenderAtFullHp,
+          movedLast: false,
+        })
+        finalDamage = Math.floor(finalDamage * weatherMult * pinchMult * technicianMult * tintedLensMult * toughClawsMult * thickFatMult * extraAbilityMult)
+        if (hasAbility(defender, 'dry-skin', attacker) && effectiveMove.type === 'fire') {
           finalDamage = Math.floor(finalDamage * 1.25)
         }
-        if (hasAbility(defender, 'multiscale') && defenderAtFullHp) {
+        if (hasAbility(defender, 'multiscale', attacker) && defenderAtFullHp) {
           finalDamage = Math.floor(finalDamage * 0.5)
         }
         if (attackerItem?.damageBoost) {
@@ -8920,17 +9126,18 @@ function MainApp() {
         }
         // Baya resistente (Baya Oca, Kasib, Babiri...): reduce a la mitad un
         // movimiento superefectivo de su tipo. Se consume al activarse.
-        if (defenderItem?.resistType && !resistBerryUsed && effectiveMove.type === defenderItem.resistType && effectiveness > 1) {
+        if (defenderItem?.resistType && !resistBerryUsed && !hasAbility(attacker, 'unnerve') && effectiveMove.type === defenderItem.resistType && effectiveness > 1) {
           finalDamage = Math.floor(finalDamage / 2)
           resistBerryUsed = true
         }
 
-        // --- Crit: base from items/modifiers + move crit stage ---
+        // --- Crit: base from items/modifiers + move crit stage + habilidad ---
         const modCrit = !isEnemyHit ? (modifier?.playerCritChance ?? 0) : 0
-        const moveCritStage = move.critRatio ?? 0
+        const moveCritStage = effectiveMove.critRatio ?? 0
         const moveCritChance = moveCritStage >= 3 ? 0.5 : moveCritStage === 2 ? 0.25 : moveCritStage === 1 ? 0.125 : 0
-        const totalCrit = (attackerItem?.critChance ?? 0) + modCrit + moveCritChance
-        const isCrit = !runChallenges.noCrits && totalCrit > 0 && Math.random() < totalCrit
+        const critInfo = getAbilityCritInfo(attacker, defender, effectiveMove)
+        const totalCrit = (attackerItem?.critChance ?? 0) + modCrit + moveCritChance + critInfo.chanceBonus
+        const isCrit = !runChallenges.noCrits && !critInfo.immune && (critInfo.always || (totalCrit > 0 && Math.random() < totalCrit))
         if (isCrit) {
           finalDamage = Math.floor(finalDamage * (hasAbility(attacker, 'sniper') ? 2 : 1.5))
           totalCrits++
@@ -8954,12 +9161,25 @@ function MainApp() {
       // --- Objetos de supervivencia y bayas (se resuelven tras los golpes) ---
       // Baya resistente consumida: se elimina del Pokémon.
       if (resistBerryUsed) {
-        currentDefender = { ...currentDefender, holdItem: undefined }
+        currentDefender = {
+          ...currentDefender,
+          holdItem: undefined,
+          abilityState: hasAbility(defender, 'unburden')
+            ? { ...(currentDefender.abilityState ?? {}), unburden: 1 }
+            : currentDefender.abilityState,
+        }
         lines.push(t('b.resistBerry', { name: currentDefender.name, berry: itemLocalizedName(defender.holdItem ?? '') }))
       }
       // Cinta Focus (Focus Sash): a plena vida aguanta un golpe letal y se consume.
       if (currentDefender.hp <= 0 && defenderItem?.focusSash && defenderAtFullHp) {
-        currentDefender = { ...currentDefender, hp: 1, holdItem: undefined }
+        currentDefender = {
+          ...currentDefender,
+          hp: 1,
+          holdItem: undefined,
+          abilityState: hasAbility(defender, 'unburden')
+            ? { ...(currentDefender.abilityState ?? {}), unburden: 1 }
+            : currentDefender.abilityState,
+        }
         lines.push(t('b.focusSash', { name: currentDefender.name }))
       } else if (currentDefender.hp <= 0 && defenderItem?.endureChance && Math.random() < defenderItem.endureChance) {
         // Cinta Focus (Focus Band): probabilidad de aguantar un golpe letal.
@@ -8970,10 +9190,42 @@ function MainApp() {
         currentDefender = { ...currentDefender, hp: 1 }
         lines.push(t('b.abilitySturdy', { name: currentDefender.name, ability: abilityName(defender.ability, getLanguage()) }))
       }
+      // Globo Helio: se pincha al recibir cualquier golpe (o al bloquear uno de Tierra).
+      if (defenderItem?.airBalloon && (totalDamage > 0 || airBalloonBlocked) && currentDefender.holdItem === 'Globo Helio') {
+        currentDefender = { ...currentDefender, holdItem: undefined }
+        lines.push(t('b.itemAirBalloon', { name: currentDefender.name, item: itemLocalizedName('Globo Helio') }))
+      }
+      // Seguro Debilidad: +2 Ataque y At. Esp. tras un golpe superefectivo.
+      if (defenderItem?.weaknessPolicy && effectiveness > 1 && totalDamage > 0 && currentDefender.hp > 0 && currentDefender.holdItem === 'Seguro Debilidad') {
+        const stages = currentDefender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+        currentDefender = {
+          ...currentDefender,
+          holdItem: undefined,
+          statStages: {
+            ...stages,
+            attack: Math.min(6, stages.attack + 2),
+            spAttack: Math.min(6, stages.spAttack + 2),
+          },
+        }
+        lines.push(t('b.itemWeaknessPolicy', { name: currentDefender.name, item: itemLocalizedName('Seguro Debilidad') }))
+      }
       // Baya Sitrus: restaura HP al estar por debajo del 50%. Se consume.
-      if (defenderItem?.berryHeal && totalDamage > 0 && currentDefender.hp > 0 && currentDefender.hp < currentDefender.maxHp / 2) {
-        const sitrusHeal = Math.floor(currentDefender.maxHp * defenderItem.berryHeal)
-        currentDefender = { ...currentDefender, hp: Math.min(currentDefender.maxHp, currentDefender.hp + sitrusHeal), holdItem: undefined }
+      // Cachetero (Cheek Pouch) y Maduración (Ripen) potencian la baya;
+      // Liviano (Unburden) acelera al Pokémon tras consumirla.
+      if (defenderItem?.berryHeal && !hasAbility(attacker, 'unnerve') && totalDamage > 0 && currentDefender.hp > 0 && currentDefender.hp < currentDefender.maxHp / 2) {
+        let sitrusHeal = Math.floor(currentDefender.maxHp * defenderItem.berryHeal)
+        if (hasAbility(defender, 'ripen')) sitrusHeal *= 2
+        if (hasAbility(defender, 'cheek-pouch')) sitrusHeal += Math.max(1, Math.floor(currentDefender.maxHp / 3))
+        currentDefender = {
+          ...currentDefender,
+          hp: Math.min(currentDefender.maxHp, currentDefender.hp + sitrusHeal),
+          holdItem: undefined,
+          abilityState: {
+            ...(currentDefender.abilityState ?? {}),
+            ...(hasAbility(defender, 'unburden') ? { unburden: 1 } : {}),
+            ...(hasAbility(defender, 'cud-chew') ? { cudChew: 1 } : {}),
+          },
+        }
         lines.push(t('b.sitrusHeal', { name: currentDefender.name, hp: sitrusHeal }))
       }
     } else {
@@ -8984,7 +9236,8 @@ function MainApp() {
     }
 
     // --- Ailment application on first hit only ---
-    if (effectiveness > 0 && totalHits > 0 && currentDefender.hp > 0) {
+    const cloakBlocksSecondary = !!defenderItem?.secondaryImmune && (effectiveMove.power ?? 0) > 0
+    if (effectiveness > 0 && totalHits > 0 && currentDefender.hp > 0 && !cloakBlocksSecondary) {
       // Sorpresa/Abatimiento (Fake Out): solo aturde en la PRIMERA acción del
       // Pokémon tras entrar a la lucha; si ya actuó antes, no aturde.
       const firstAction = attacker.justEntered ?? false
@@ -9037,7 +9290,7 @@ function MainApp() {
 
         if (changesHitSelf) {
           const stageKey: keyof typeof attackerStages = sc.stat === 'special-attack' ? 'spAttack' : sc.stat === 'special-defense' ? 'spDefense' : sc.stat
-          const change = Number.isFinite(sc.change) ? sc.change : 0
+          const change = adjustAbilityStatChange(attacker, Number.isFinite(sc.change) ? sc.change : 0)
           const oldStage = attackerStages[stageKey] ?? 0
           const newStage = Math.max(-6, Math.min(6, oldStage + change))
           if (newStage !== oldStage) {
@@ -9049,15 +9302,19 @@ function MainApp() {
         } else if (currentDefender.hp > 0) {
           let newStages = currentDefender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
           const stageKey: keyof typeof newStages = sc.stat === 'special-attack' ? 'spAttack' : sc.stat === 'special-defense' ? 'spDefense' : sc.stat
-          const change = Number.isFinite(sc.change) ? sc.change : 0
-          // Habilidades de protección: Cuerpo Claro/Humo Blanco bloquean toda
-          // bajada de stats y Cortador la de Ataque.
+          const change = adjustAbilityStatChange(currentDefender, Number.isFinite(sc.change) ? sc.change : 0)
+          // Habilidades de protección: Cuerpo Claro/Humo Blanco/Metal Pesado
+          // bloquean la bajada; Desafiante/Competitivo/Alarmado reaccionan.
           const statDropBlocked = change < 0 && (
-            hasAbility(currentDefender, 'clear-body') || hasAbility(currentDefender, 'white-smoke')
-            || (hasAbility(currentDefender, 'hyper-cutter') && stageKey === 'attack')
+            getAbilityStatDropBlocked(currentDefender, stageKey as 'attack' | 'defense' | 'spAttack' | 'spDefense' | 'speed')
+            || !!defenderItem?.statDropImmune
           )
+          // Capa Furtiva anula los cambios de stats secundarios de golpes dañinos.
+          if (isDamaging && defenderItem?.secondaryImmune) continue
           if (statDropBlocked) {
-            lines.push(t('b.abilityNoStatDown', { name: currentDefender.name, ability: abilityName(currentDefender.ability, getLanguage()) }))
+            lines.push(defenderItem?.statDropImmune
+              ? t('b.itemNoStatDown', { name: currentDefender.name, item: itemLocalizedName('Amuleto Claro') })
+              : t('b.abilityNoStatDown', { name: currentDefender.name, ability: abilityName(currentDefender.ability, getLanguage()) }))
             continue
           }
           const oldStage = newStages[stageKey] ?? 0
@@ -9068,6 +9325,19 @@ function MainApp() {
             const direction = change > 0 ? 'subió' : 'bajó'
             const statName = sc.stat === 'attack' ? 'Ataque' : sc.stat === 'defense' ? 'Defensa' : sc.stat === 'special-attack' ? 'At. Esp.' : sc.stat === 'special-defense' ? 'Def. Esp.' : 'Velocidad'
             lines.push(direction === 'subió' ? t('b.statUp', { name: currentDefender.name, stat: statName, old: `${oldStage > 0 ? '+' : ''}${oldStage}`, new: `${newStage > 0 ? '+' : ''}${newStage}` }) : t('b.statDown', { name: currentDefender.name, stat: statName, old: `${oldStage > 0 ? '+' : ''}${oldStage}`, new: `${newStage > 0 ? '+' : ''}${newStage}` }))
+            if (change < 0) {
+              const reaction = applyAbilityStatDropReaction(currentDefender, change, stageKey as 'attack' | 'defense' | 'spAttack' | 'spDefense' | 'speed')
+              currentDefender = reaction.pokemon
+              lines.push(...reaction.logs)
+              if (defenderItem?.whiteHerb && currentDefender.holdItem === 'Hierba Blanca') {
+                const restored = { ...(currentDefender.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }) }
+                for (const key of ['attack', 'defense', 'spAttack', 'spDefense', 'speed'] as const) {
+                  if (restored[key] < 0) restored[key] = 0
+                }
+                currentDefender = { ...currentDefender, statStages: restored, holdItem: undefined }
+                lines.push(t('b.itemWhiteHerb', { name: currentDefender.name, item: itemLocalizedName('Hierba Blanca') }))
+              }
+            }
           }
         }
       }
@@ -9094,9 +9364,26 @@ function MainApp() {
     const hasAttackerStageChange = attackerStages.attack !== 0 || attackerStages.defense !== 0 || attackerStages.spAttack !== 0 || attackerStages.spDefense !== 0 || attackerStages.speed !== 0
     const furiaActive = move.name === 'Furia' || attacker.furiaActive || false
     const protectUsed = isProtectMove(effectiveMove)
-    let updatedAttacker = hasAttackerStageChange
+    let updatedAttacker: Pokemon = hasAttackerStageChange
       ? { ...attacker, statStages: attackerStages, furiaActive, protected: protectUsed, lastMove: effectiveMove.name, justEntered: false }
       : { ...attacker, furiaActive, protected: protectUsed, lastMove: effectiveMove.name, justEntered: false }
+    // Espray Bucal: +1 At. Esp. al usar un movimiento de sonido.
+    if (attackerItem?.throatSpray && isSoundMove(effectiveMove) && updatedAttacker.holdItem === 'Espray Bucal') {
+      const stages = updatedAttacker.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
+      updatedAttacker = {
+        ...updatedAttacker,
+        holdItem: undefined,
+        statStages: { ...stages, spAttack: Math.min(6, stages.spAttack + 1) },
+      }
+      lines.push(t('b.itemThroatSpray', { name: updatedAttacker.name, item: itemLocalizedName('Espray Bucal') }))
+    }
+    // Sincronía (Synchronize): devuelve el estado alterado al atacante.
+    if (defender.ability === 'synchronize' && currentDefender.status && !updatedAttacker.status && currentDefender.status.type !== 'flinch') {
+      if (!getAbilityStatusImmune(updatedAttacker, currentDefender.status.type, battleWeather, battleWeatherActive)) {
+        updatedAttacker = { ...updatedAttacker, status: { ...currentDefender.status } }
+        lines.push(t('b.abilityContactStatus', { name: updatedAttacker.name, status: statusLabel(currentDefender.status.type), ability: abilityName('synchronize', getLanguage()) }))
+      }
+    }
     if (move.recoilPercent && move.recoilPercent > 0 && totalDamage > 0 && !hasAbility(attacker, 'rock-head')) {
       recoilDamage = Math.floor(totalDamage * move.recoilPercent)
       updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - recoilDamage) }
@@ -9109,16 +9396,16 @@ function MainApp() {
       lines.push(t('b.lifeOrb', { name: attacker.name, hp: orbRecoil }))
     }
     // --- Casco Dentado (Rocky Helmet): el atacante (físico) pierde 1/6 de su HP ---
-    if (defenderItem?.rockyHelmet && totalDamage > 0 && effectiveMove.damageClass !== 'special') {
+    if (defenderItem?.rockyHelmet && !attackerItem?.noContact && totalDamage > 0 && effectiveMove.damageClass !== 'special') {
       const helmetRecoil = Math.max(1, Math.floor(attacker.maxHp / 6))
       updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - helmetRecoil) }
       lines.push(t('b.rockyHelmet', { name: attacker.name, hp: helmetRecoil }))
     }
     // --- Habilidades de contacto del defensor (movimientos físicos) ---
-    const isContact = effectiveMove.damageClass !== 'special'
+    const isContact = isContactMove(effectiveMove) && !hasAbility(attacker, 'long-reach') && !attackerItem?.noContact
     if (totalDamage > 0 && isContact && updatedAttacker.hp > 0) {
       const contactAbility = defender.ability
-      if (hasAbility(defender, 'rough-skin')) {
+      if (hasAbility(defender, 'rough-skin', attacker)) {
         const skinDmg = Math.max(1, Math.floor(attacker.maxHp / 8))
         updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - skinDmg) }
         lines.push(t('b.abilityRoughSkin', { name: attacker.name, dmg: skinDmg, ability: abilityName(contactAbility, getLanguage()) }))
@@ -9129,7 +9416,7 @@ function MainApp() {
         { ability: 'poison-point', status: 'poison', turns: 999 },
       ]
       for (const cs of contactStatus) {
-        if (!hasAbility(defender, cs.ability)) continue
+        if (!hasAbility(defender, cs.ability, attacker)) continue
         if (updatedAttacker.status) break
         if (Math.random() < 0.30) {
           updatedAttacker = { ...updatedAttacker, status: { type: cs.status, turns: cs.turns } }
@@ -9139,12 +9426,28 @@ function MainApp() {
       }
     }
 
+    // --- Efectos adicionales al recibir el golpe (motor central) ---
+    const onHit = applyAbilityOnHit(updatedAttacker, currentDefender, effectiveMove, totalDamage, {
+      defenderHpBefore,
+      isContact,
+      isCrit: totalCrits > 0,
+      weather: battleWeather,
+    })
+    updatedAttacker = onHit.attacker
+    currentDefender = onHit.defender
+    lines.push(...onHit.logs)
+
     // --- Drain (Absorb, Megaagotar, etc.) ---
     if (move.drainPercent && move.drainPercent > 0 && totalDamage > 0 && updatedAttacker.hp > 0) {
       const drainMult = attackerItem?.bigRoot ? 1.30 : 1
       const drainHeal = Math.floor(totalDamage * move.drainPercent * drainMult)
-      updatedAttacker = { ...updatedAttacker, hp: Math.min(updatedAttacker.maxHp, updatedAttacker.hp + drainHeal) }
-      lines.push(t('b.drained', { name: attacker.name, hp: drainHeal }))
+      if (defender.ability === 'liquid-ooze') {
+        updatedAttacker = { ...updatedAttacker, hp: Math.max(1, updatedAttacker.hp - drainHeal) }
+        lines.push(t('b.abilityOpponentDamage', { name: defender.name, target: attacker.name, dmg: drainHeal, ability: abilityName('liquid-ooze', getLanguage()) }))
+      } else {
+        updatedAttacker = { ...updatedAttacker, hp: Math.min(updatedAttacker.maxHp, updatedAttacker.hp + drainHeal) }
+        lines.push(t('b.drained', { name: attacker.name, hp: drainHeal }))
+      }
     }
 
     // --- Lifesteal ---
@@ -9244,8 +9547,66 @@ function MainApp() {
     return updatedPokemon
   }
 
-  async function onPlayerMove(move: Move): Promise<void> {
+  // Probabilidad de huida de un combate salvaje. Fuga (Run Away) garantiza
+  // la huida salvo que el rival impida escapar con una habilidad de trampa.
+  function getEscapeChance(): number {
+    if (!activePokemon || !enemy) return 0
+    if (hasAbility(activePokemon, 'run-away')) return 1
+    const playerSpeed = activePokemon.speed * getStageMultiplier(activePokemon.statStages?.speed ?? 0)
+    const enemySpeed = enemy.speed * getStageMultiplier(enemy.statStages?.speed ?? 0)
+    const speedFactor = (playerSpeed - enemySpeed) / Math.max(1, enemySpeed)
+    return Math.max(0.15, Math.min(0.95, 0.4 + speedFactor * 0.35 + escapeAttempts * 0.1))
+  }
+
+  function attemptEscape(): void {
+    if (!activePokemon || !enemy || screen !== 'battle' || isTrainerBattle) return
+    if (currentNode?.type === 'gmax') return
+    if (activePokemon.hp <= 0) return
+    if (isTrappedByAbility(activePokemon, enemy)) {
+      playError()
+      setBattleLog(prev => [t('b.escapeTrapped', { ability: abilityName(enemy.ability, getLanguage()) }), ...prev].slice(0, 15))
+      const trappedEscapeMove = activePokemon.moves[0] ?? {
+        name: 'Huida',
+        power: 0,
+        type: 'normal',
+        accuracy: null,
+        description: '',
+      }
+      void onPlayerMove(trappedEscapeMove, { escape: true })
+      return
+    }
+    const chance = getEscapeChance()
+    if (Math.random() < chance) {
+      playSelect()
+      setBattleLog(prev => [
+        hasAbility(activePokemon, 'run-away')
+          ? t('b.escapeRunAway', { name: activePokemon.name })
+          : t('b.escapeSuccess', { name: activePokemon.name }),
+        ...prev,
+      ].slice(0, 15))
+      setIsTeamRocketBattle(false)
+      void completeCurrentNode()
+      return
+    }
+    setEscapeAttempts(prev => prev + 1)
+    playError()
+    const nextChance = Math.round(Math.max(0.15, Math.min(0.95, chance + 0.1)) * 100)
+    setBattleLog(prev => [t('b.escapeFail', { chance: nextChance }), ...prev].slice(0, 15))
+    // Un intento fallido consume el turno: el rival ataca y se aplican los
+    // efectos de fin de turno, el clima, los estados, etc.
+    const escapeMove = activePokemon.moves[0] ?? {
+      name: 'Huida',
+      power: 0,
+      type: 'normal',
+      accuracy: null,
+      description: '',
+    }
+    void onPlayerMove(escapeMove, { escape: true })
+  }
+
+  async function onPlayerMove(move: Move, options?: { escape?: boolean }): Promise<void> {
     if (!activePokemon || !enemy) return
+    const isEscape = options?.escape ?? false
 
     // Si el Pokémon activo está debilitado no se puede atacar: se fuerza el
     // cambio al siguiente sano o la derrota en lugar de quedarse bloqueado.
@@ -9264,12 +9625,12 @@ function MainApp() {
 
     // --- Objetos Choice y Chaleco Asalto: restricciones del movimiento ---
     const activeHoldable = activePokemon.holdItem ? HOLDABLE_ITEMS[activePokemon.holdItem] : null
-    if (activeHoldable?.assaultVest && (!move.power || move.power <= 0)) {
+    if (!isEscape && activeHoldable?.assaultVest && (!move.power || move.power <= 0)) {
       setBattleLog((prev) => [t('b.assaultVestBlock', { name: activePokemon.name }), ...prev].slice(0, 15))
       return
     }
     let choiceLockedMove = activePokemon.choiceLockedMove
-    if (activeHoldable?.choiceLock) {
+    if (!isEscape && activeHoldable?.choiceLock) {
       if (choiceLockedMove && choiceLockedMove !== move.name) {
         setBattleLog((prev) => [t('b.choiceLock', { name: activePokemon.name, move: moveName({ name: choiceLockedMove ?? '' }) }), ...prev].slice(0, 15))
         return
@@ -9403,9 +9764,13 @@ function MainApp() {
     const enemyItem = nextEnemy.holdItem ? HOLDABLE_ITEMS[nextEnemy.holdItem] : null
     const playerParalysisNerf = nextPlayer.status?.type === 'paralysis' ? 0.75 : 1
     const enemyParalysisNerf = nextEnemy.status?.type === 'paralysis' ? 0.75 : 1
-    const playerPriority = move.priority ?? 0
     const enemyMoveForPriority = nextEnemy.moves[Math.floor(Math.random() * nextEnemy.moves.length)]
-    const enemyPriority = enemyMoveForPriority.priority ?? 0
+    const playerPriority = isEscape
+      ? -99
+      : (move.priority ?? 0) + getAbilityPriorityBonus(nextPlayer, move)
+    const enemyPriority = (enemyMoveForPriority.priority ?? 0) + getAbilityPriorityBonus(nextEnemy, enemyMoveForPriority)
+    const speedWeatherActive = !isWeatherSuppressed(nextPlayer, nextEnemy)
+    const speedWeather: WeatherKind = speedWeatherActive ? weather : 'none'
 
     let playerStarts: boolean
     if (playerPriority !== enemyPriority) {
@@ -9415,8 +9780,8 @@ function MainApp() {
       const eStages = nextEnemy.statStages ?? { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }
       const pSpdStage = getStageMultiplier(pStages.speed)
       const eSpdStage = getStageMultiplier(eStages.speed)
-      const playerEffectiveSpeed = Math.round(nextPlayer.speed * (1 + (playerItem?.speedMod ?? 0)) * playerParalysisNerf * pSpdStage * weatherSpeedMultiplier(nextPlayer, weather))
-      const enemyEffectiveSpeed = Math.round(nextEnemy.speed * (1 + (enemyItem?.speedMod ?? 0)) * enemyParalysisNerf * eSpdStage * weatherSpeedMultiplier(nextEnemy, weather))
+      const playerEffectiveSpeed = Math.round(nextPlayer.speed * (1 + (playerItem?.speedMod ?? 0)) * playerParalysisNerf * pSpdStage * getAbilitySpeedMultiplier(nextPlayer, speedWeather, speedWeatherActive))
+      const enemyEffectiveSpeed = Math.round(nextEnemy.speed * (1 + (enemyItem?.speedMod ?? 0)) * enemyParalysisNerf * eSpdStage * getAbilitySpeedMultiplier(nextEnemy, speedWeather, speedWeatherActive))
       playerStarts = playerEffectiveSpeed >= enemyEffectiveSpeed
     }
 
@@ -9428,7 +9793,12 @@ function MainApp() {
 
     let playerCrits = 0
     const doPlayerAttack = async () => {
+      if (isEscape) return
       if (nextPlayer.hp <= 0 || nextEnemy.hp <= 0 || playerSkipped || playerConfusedSelfHit) return
+      if ((move.priority ?? 0) > 0 && blocksPriorityMove(nextEnemy)) {
+        logs.push(t('b.abilityProtectPriority', { name: nextEnemy.name, ability: abilityName(nextEnemy.ability, getLanguage()) }))
+        return
+      }
       if (move.name !== 'Furia') nextPlayer = { ...nextPlayer, furiaActive: false }
       const playerHit = performHit(nextPlayer, nextEnemy, move, false, !playerStarts)
       const prevEnemyHp = nextEnemy.hp
@@ -9463,6 +9833,10 @@ function MainApp() {
 
     const doEnemyAttack = async () => {
       if (nextEnemy.hp <= 0 || nextPlayer.hp <= 0 || enemySkipped || enemyConfusedSelfHit) return
+      if ((enemyMoveForPriority.priority ?? 0) > 0 && blocksPriorityMove(nextPlayer)) {
+        logs.push(t('b.abilityProtectPriority', { name: nextPlayer.name, ability: abilityName(nextPlayer.ability, getLanguage()) }))
+        return
+      }
       let enemyMove = enemyMoveForPriority
       // Objetos Choice del rival: se queda con el primer movimiento elegido.
       const enemyHoldable = nextEnemy.holdItem ? HOLDABLE_ITEMS[nextEnemy.holdItem] : null
@@ -9522,11 +9896,15 @@ function MainApp() {
             const redPlayerEntry = applyEntryAbilities(nextPlayer, redCardEnemy)
             nextPlayer = redEnemyEntry.opponentUpdated
             nextEnemy = redPlayerEntry.opponentUpdated
+            const redEnemySelf = applyAbilityEntrySelf(nextEnemy, nextPlayer)
+            nextEnemy = redEnemySelf.entering
+            const redPlayerSelf = applyAbilityEntrySelf(nextPlayer, nextEnemy)
+            nextPlayer = redPlayerSelf.entering
             setTrainerTeam(teamWithCurrent)
             setTrainerPokemonIndex(picked.idx)
             logs.push(t('b.redCard', { name: nextPlayer.name }))
             logs.push(t('b.enemySendsOut', { trainer: trainerName, name: picked.p.name, lvl: picked.p.level }))
-            logs.push(...redPlayerEntry.logs, ...redEnemyEntry.logs)
+            logs.push(...redPlayerEntry.logs, ...redEnemyEntry.logs, ...redPlayerSelf.logs, ...redEnemySelf.logs)
           }
         }
       }
@@ -9573,8 +9951,15 @@ function MainApp() {
     nextEnemy = applyTurnEffects(nextEnemy)
 
     // --- Habilidades y clima por turno ---
-    nextPlayer = applyTurnAbilities(nextPlayer, logs)
-    nextEnemy = applyTurnAbilities(nextEnemy, logs)
+    nextPlayer = applyTurnAbilities(nextPlayer, logs, nextEnemy)
+    nextEnemy = applyTurnAbilities(nextEnemy, logs, nextPlayer)
+    // Mal Sueño (Bad Dreams) daña al rival dormido; el registro ya se añadió.
+    if (nextPlayer.ability === 'bad-dreams' && nextEnemy.status?.type === 'sleep' && nextEnemy.hp > 0 && !isIndirectDamageImmune(nextEnemy)) {
+      nextEnemy = { ...nextEnemy, hp: Math.max(1, nextEnemy.hp - Math.max(1, Math.floor(nextEnemy.maxHp / 8))) }
+    }
+    if (nextEnemy.ability === 'bad-dreams' && nextPlayer.status?.type === 'sleep' && nextPlayer.hp > 0 && !isIndirectDamageImmune(nextPlayer)) {
+      nextPlayer = { ...nextPlayer, hp: Math.max(1, nextPlayer.hp - Math.max(1, Math.floor(nextPlayer.maxHp / 8))) }
+    }
 
     // --- G-MAX turn counter decrement ---
     if (nextPlayer.gmaxEvolved && nextPlayer.gmaxTurnsLeft) {
@@ -9689,6 +10074,17 @@ function MainApp() {
       )
 
       const newTeam = await Promise.all(updatedTeamPromises)
+      // Habilidades de recolección: Recojo y Recogemiel aportan dinero extra.
+      if (isFullWin && !runChallenges.noMoney) {
+        const pickupBonus = newTeam.some(p => p.ability === 'pickup') ? 20 : 0
+        const honeyBonus = newTeam.some(p => p.ability === 'honey-gather') ? 15 : 0
+        const fetchBonus = newTeam.some(p => p.ability === 'ball-fetch') ? 10 : 0
+        const utilityBonus = pickupBonus + honeyBonus + fetchBonus
+        if (utilityBonus > 0) {
+          setMoney(prev => prev + utilityBonus)
+          logs.push(t('b.abilityUtilityReward', { money: utilityBonus }))
+        }
+      }
       const pendingPc: Pokemon[] = []
 
       // Repartir Exp: si algún Pokémon (equipo o PC) lo lleva equipado, todos
@@ -9872,16 +10268,23 @@ function MainApp() {
         const nextPkmn = updatedTrainerTeam[nextTrainerIndex]
         const newEnemyBase: Pokemon = { ...nextPkmn, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, justEntered: true }
         // Habilidades de entrada del nuevo enemigo y del activo del jugador.
+        // applyEntryAbilities devuelve el rival afectado, no el que entra.
         const enemyEntry = applyEntryAbilities(newEnemyBase, newTeam[activeIndex])
         const playerEntry = applyEntryAbilities(newTeam[activeIndex], newEnemyBase)
+        const playerBase = enemyEntry.opponentUpdated
+        const enemyBase = playerEntry.opponentUpdated
+        const enemySelf = applyAbilityEntrySelf(enemyBase, playerBase)
+        const playerSelf = applyAbilityEntrySelf(playerBase, enemySelf.entering)
         setTrainerTeam(updatedTrainerTeam)
         setTrainerPokemonIndex(nextTrainerIndex)
-        setEnemy(playerEntry.opponentUpdated)
-        setTeam(newTeam.map((p, i) => i === activeIndex ? enemyEntry.opponentUpdated : p))
+        setEnemy(enemySelf.entering)
+        setTeam(newTeam.map((p, i) => i === activeIndex ? playerSelf.entering : p))
         setBattleLog((prev) => [
           t('b.enemySendsOut', { trainer: trainerName, name: nextPkmn.name, lvl: nextPkmn.level }),
           ...playerEntry.logs,
           ...enemyEntry.logs,
+          ...playerSelf.logs,
+          ...enemySelf.logs,
           logMsg,
           ...logs,
           ...prev
@@ -9994,7 +10397,10 @@ function MainApp() {
       ? (enemy.status.type === 'sleep' || enemy.status.type === 'freeze' ? 2.5 : 1.5)
       : 1
     const speciesRate = (enemy.captureRate ?? 45) / 255
-    const catchProbability = Math.min(hpFactor * ballRate * statusMult * speciesRate, 1)
+    const abilityCatchBonus = hasAbility(activePokemon, 'illuminate') ? 1.2
+      : hasAbility(activePokemon, 'run-away') ? 1.1
+      : 1
+    const catchProbability = Math.min(hpFactor * ballRate * statusMult * speciesRate * abilityCatchBonus, 1)
 
     // Consumir la ball
     setInventory(prev => prev.filter((_, i) => i !== ballIdx))
@@ -10173,21 +10579,22 @@ function MainApp() {
   function switchActive(index: number): void {
     const target = team[index]
     if (!target || target.hp <= 0 || index === activeIndex) return
+    if (screen === 'battle' && enemy && isTrappedByAbility(activePokemon, enemy)) {
+      setBattleLog(prev => [t('b.abilityTrapped', { name: activePokemon.name, ability: abilityName(enemy.ability, getLanguage()) }), ...prev].slice(0, 15))
+      playError()
+      return
+    }
     const orig = team[activeIndex]?.megaOrig
     setTeam(prev => prev.map((p, i) => {
       // Al cambiar de Pokémon se pierden Drenadoras y Anulación (como en los juegos reales),
       // y el que entra cuenta como "recién llegado" para Sorpresa/Abatimiento.
       if (i === activeIndex && orig) {
-        let outgoing: Pokemon = { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false, choiceLockedMove: undefined, ...orig }
-        if (hasAbility(outgoing, 'natural-cure')) outgoing = { ...outgoing, status: undefined }
-        if (hasAbility(outgoing, 'regenerator')) outgoing = { ...outgoing, hp: Math.min(outgoing.maxHp, outgoing.hp + Math.floor(outgoing.maxHp / 3)) }
-        return outgoing
+        const outgoing: Pokemon = { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false, choiceLockedMove: undefined, ...orig }
+        return applyAbilitySwitchOut(outgoing).pokemon
       }
       if (i === activeIndex) {
-        let outgoing = { ...p, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false, choiceLockedMove: undefined }
-        if (hasAbility(outgoing, 'natural-cure')) outgoing = { ...outgoing, status: undefined }
-        if (hasAbility(outgoing, 'regenerator')) outgoing = { ...outgoing, hp: Math.min(outgoing.maxHp, outgoing.hp + Math.floor(outgoing.maxHp / 3)) }
-        return outgoing
+        const outgoing = { ...p, leechSeed: false, disabled: undefined, lastMove: undefined, justEntered: false, choiceLockedMove: undefined }
+        return applyAbilitySwitchOut(outgoing).pokemon
       }
       if (i === index) return { ...p, justEntered: true }
       return p
@@ -10197,9 +10604,12 @@ function MainApp() {
     // efectos de salida (Cura Natural, Regeneración) ya aplicados arriba.
     if (screen === 'battle' && enemy) {
       const entry = applyEntryAbilities(target, enemy)
+      const selfEntry = applyAbilityEntrySelf(target, entry.opponentUpdated)
       setEnemy(entry.opponentUpdated)
-      if (entry.logs.length > 0) {
-        setBattleLog(prev => [...entry.logs, ...prev].slice(0, 15))
+      setTeam(prev => prev.map((p, i) => i === index ? selfEntry.entering : p))
+      const entryLogs = [...entry.logs, ...selfEntry.logs]
+      if (entryLogs.length > 0) {
+        setBattleLog(prev => [...entryLogs, ...prev].slice(0, 15))
       }
     }
     if (screen === 'move') {
@@ -11670,7 +12080,8 @@ function MainApp() {
                 const hpFactor = Math.max(0.05, (3 * enemy.maxHp - 2 * enemy.hp) / (3 * enemy.maxHp))
                 const statusMult = enemy.status ? (enemy.status.type === 'sleep' || enemy.status.type === 'freeze' ? 2.5 : 1.5) : 1
                 const speciesRate = (enemy.captureRate ?? 45) / 255
-                const chance = b.isMaster ? 100 : Math.min(Math.round(hpFactor * ballRate * statusMult * speciesRate * 100), 100)
+                const catchAbilityBonus = hasAbility(activePokemon, 'illuminate') ? 1.2 : hasAbility(activePokemon, 'run-away') ? 1.1 : 1
+                const chance = b.isMaster ? 100 : Math.min(Math.round(hpFactor * ballRate * statusMult * speciesRate * catchAbilityBonus * 100), 100)
                 return (
                   <button
                     key={b.name}
@@ -14130,7 +14541,7 @@ function MainApp() {
                     const remaining = Math.max(0, allowance - bought)
                     const soldOut = remaining <= 0
                     const totalPrice = finalPrice
-                    const canBuy = money >= totalPrice && remaining >= 1
+                    const canBuy = !runChallenges.noPurchasing && money >= totalPrice && remaining >= 1
 
                     return (
                       <div
@@ -14162,24 +14573,21 @@ function MainApp() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           {soldOut ? (
                             <button
-                              className="tiny-btn"
+                              className="tiny-btn buy-red"
                               type="button"
                               disabled
-                              style={{ background: '#475569', minWidth: '70px', color: '#d9d6f2', fontWeight: 'bold', cursor: 'not-allowed' }}
+                              style={{ minWidth: '70px', cursor: 'not-allowed' }}
                             >
                               {t('shop.soldOut')}
                             </button>
                           ) : (
                             <button
-                              className="tiny-btn"
+                              className={`tiny-btn ${canBuy ? 'buy-green' : 'buy-red'}`}
                               type="button"
                               onClick={() => isHoldable ? buyHoldableItem(itemName) : buyShopItem(itemName, 1)}
                               disabled={!canBuy}
                               style={{
-                                background: canBuy ? '#10b981' : '#475569',
                                 minWidth: '70px',
-                                color: canBuy ? '#12122b' : '#d9d6f2',
-                                fontWeight: 'bold',
                                 cursor: canBuy ? 'pointer' : 'not-allowed'
                               }}
                             >
@@ -14305,14 +14713,25 @@ function MainApp() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '1rem' }}>
                   {blackMarketItems.map((itemName) => {
                     const price = blackMarketItemPrice(itemName)
-                    const canBuy = money >= price
+                    const canBuy = !runChallenges.noPurchasing && money >= price
                     return (
                       <div key={itemName} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {ITEM_SPRITES[itemName] && <img src={ITEM_SPRITES[itemName]} alt={itemName} style={{ width: '26px', height: '26px', imageRendering: 'pixelated' }} />}
                           <strong style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{itemLocalizedName(itemName)}</strong>
                         </div>
-                        <button className="tiny-btn" type="button" disabled={!canBuy} onClick={() => blackMarketBuyItem(itemName)} style={{ color: canBuy ? '#fb923c' : '#7d7ab5' }}>🪙 ${price}</button>
+                        <button
+                          className={`tiny-btn ${canBuy ? 'buy-green' : 'buy-red'}`}
+                          type="button"
+                          disabled={!canBuy}
+                          onClick={() => blackMarketBuyItem(itemName)}
+                          style={{
+                            minWidth: '76px',
+                            cursor: canBuy ? 'pointer' : 'not-allowed'
+                          }}
+                        >
+                          🪙 ${price}
+                        </button>
                       </div>
                     )
                   })}
@@ -14344,7 +14763,7 @@ function MainApp() {
                   ) : (
                     blackMarketPokemon.map((p, idx) => {
                       const price = 100 + p.level * 15
-                      const canBuy = money >= price
+                      const canBuy = !runChallenges.noPurchasing && money >= price
                       return (
                         <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15,23,42,0.5)', padding: '6px 10px', borderRadius: '6px', border: '1px solid #3f3f6e' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -14354,7 +14773,18 @@ function MainApp() {
                               <div style={{ fontSize: '0.7rem', color: '#9b98cf' }}>{p.types?.join(' / ')}</div>
                             </div>
                           </div>
-                          <button className="tiny-btn" type="button" disabled={!canBuy} onClick={() => blackMarketBuyPokemon(idx)} style={{ color: canBuy ? '#fb923c' : '#7d7ab5' }}>🪙 ${price}</button>
+                          <button
+                            className={`tiny-btn ${canBuy ? 'buy-green' : 'buy-red'}`}
+                            type="button"
+                            disabled={!canBuy}
+                            onClick={() => blackMarketBuyPokemon(idx)}
+                            style={{
+                              minWidth: '76px',
+                              cursor: canBuy ? 'pointer' : 'not-allowed'
+                            }}
+                          >
+                            🪙 ${price}
+                          </button>
                         </div>
                       )
                     })
@@ -15152,6 +15582,20 @@ function MainApp() {
                     </>
                   )}
                 </div>
+                {!isTrainerBattle && currentNode?.type !== 'gmax' && activePokemon.hp > 0 && (
+                  <button
+                    className="cta"
+                    onClick={attemptEscape}
+                    type="button"
+                    disabled={isLoading || (runChallenges.speedrun && speedrunSeconds <= 0)}
+                    title={t('b.escapeHint')}
+                    style={{ marginTop: '8px', width: '100%', background: hasAbility(activePokemon, 'run-away') ? '#7c3aed' : '#0ea5e9' }}
+                  >
+                    {hasAbility(activePokemon, 'run-away')
+                      ? t('b.escapeSure')
+                      : t('b.escapeTryChance', { chance: Math.round(getEscapeChance() * 100) })}
+                  </button>
+                )}
                 {!isTrainerBattle && currentNode?.type !== 'gmax' && (
                   <button
                     className="cta"
@@ -15276,8 +15720,19 @@ function MainApp() {
               </div>
             )}
 
-            <div className="log-mini">
-              <p className="small-tag">Battle log</p>
+            <div className={`log-mini${battleLogExpanded ? ' expanded' : ''}`}>
+              <div className="log-mini-header">
+                <p className="small-tag">Battle log</p>
+                <button
+                  className="log-expand-btn"
+                  type="button"
+                  onClick={() => setBattleLogExpanded(prev => !prev)}
+                  aria-expanded={battleLogExpanded}
+                  title={battleLogExpanded ? t('battle.logCollapse') : t('battle.logExpand')}
+                >
+                  {battleLogExpanded ? '⤡' : '⤢'}
+                </button>
+              </div>
               <ul>
                 {battleLog.map((line, index) => (
                   <li key={`${line}-${index}`}>{line}</li>

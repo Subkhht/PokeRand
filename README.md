@@ -44,11 +44,12 @@ Cada ruta es una línea de nodos (combates, tiendas, descansos, etc.). El tipo d
 - **Etapas de stats**: Ataque, Defensa, At. Esp., Def. Esp. y Velocidad suben/bajan durante el combate (máx **±6**, el multiplicador se bloquea a 4x). Se **resetean al terminar cada combate**.
 - **Críticos**, recoil (daño de retroceso), drenaje, robo de vida (lifesteal) y movimientos de protección.
 - **Mega-evolución**, **Gigamax** y **Primal Reversion**: 1 vez por combate, con objetos equipables (Mega Stone, Dynamax Band, Prisma Rojo/Azul).
-- **Habilidades**: cada Pokémon usa su habilidad real de PokeAPI (~60 implementadas: Intimidación, Levitación, Piel Áspera, Estática, Sebo, Robustez, Agallas, Absorbes, Mar Llamas/Espesura, Impulso, creadores de clima, etc.). Activas también en Combates Dobles y en el PvP 1vs1.
+- **Habilidades**: cada Pokémon usa su habilidad real de PokeAPI. El catálogo completo (374 habilidades de Gen 1-9) tiene nombre, descripción y efecto funcional: Intimidación, Levitación, absorciones, Piel Áspera, Estática, Sebo, Robustez, Agallas, Impulso, clima, terrenos, trampas, prioridad, cambio de tipo, formas y las habilidades de ruina y paradoja de Gen 9. Activas también en Combates Dobles y en el PvP 1vs1.
 - **Clima**: lluvia, sol abrasador, tormenta de arena y granizo con efectos sobre los tipos y daño por turno. Lo crean las habilidades, también en Dobles y PvP.
+- **Huida salvaje**: botón para intentar escapar de Pokémon salvajes según la Velocidad. Un fallo consume el turno y el rival ataca; **Fuga** garantiza la huida. Las habilidades de trampa la bloquean.
 - **Naturalezas**: 25 naturalezas (+10%/−10% en una stat) asignadas al nacer.
 - **IVs**: 6 valores al azar (0-31) por Pokémon que modifican sus stats.
-- **Objetos pasivos**: 30+ objetos equipables que modifican stats (% ataque, defensa, velocidad, crítico, robo de vida, curación por turno, etc.).
+- **Objetos pasivos**: 40+ objetos equipables que modifican stats (% ataque, defensa, velocidad, crítico, robo de vida, curación por turno, etc.), incluyendo Amuleto Claro, Gafas Protectoras, Capa Furtiva, Dado Cargado, Seguro Debilidad, Globo Helio, Hierba Blanca, Hierba Mental, Espray Bucal y Guantes Protectores.
 
 ---
 

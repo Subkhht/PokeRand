@@ -96,6 +96,7 @@ export function serializePvpPokemon(p: Pokemon): Pokemon {
     baseStatTotal: p.baseStatTotal,
     shiny: p.shiny,
     ability: p.ability,
+    abilityState: p.abilityState,
     nature: p.nature,
     ivs: p.ivs,
     moves: p.moves.map((m: Move): Move => ({ ...m, pp: m.pp ?? 10, maxPp: m.maxPp ?? 10 })),

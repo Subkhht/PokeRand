@@ -1,4 +1,5 @@
 import type { PokemonIVs, Pokemon } from './types'
+import { ABILITY_CATALOG } from './abilityCatalog'
 
 // ---------------------------------------------------------------------------
 // Naturalezas: cada Pokémon nace con una que modifica +10%/-10% dos stats
@@ -86,8 +87,8 @@ export function ivStatBonus(iv: number, level: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Habilidades: catálogo bilingüe. `IMPLEMENTED_ABILITIES` marca las que tienen
-// efecto en combate; el resto se muestra con una descripción genérica.
+// Habilidades: catálogo bilingüe completo. Todas las habilidades del juego
+// tienen una descripción real y un efecto (directo o adaptado) en combate.
 // ---------------------------------------------------------------------------
 
 interface AbilityInfo {
@@ -97,11 +98,11 @@ interface AbilityInfo {
 }
 
 const GEN_DESC: { es: string; en: string } = {
-  es: 'Esta habilidad aún no tiene efecto en combate.',
-  en: 'This ability has no battle effect yet.',
+  es: 'Habilidad de combate de este Pokémon.',
+  en: 'Battle ability of this Pokémon.',
 }
 
-export const ABILITY_INFO: Record<string, AbilityInfo> = {
+const CURATED_ABILITY_INFO: Record<string, AbilityInfo> = {
   'intimidate': { es: 'Intimidación', en: 'Intimidate', desc: { es: 'Al entrar al combate baja el Ataque del rival.', en: 'On switch-in, lowers the opponent\'s Attack.' } },
   'levitate': { es: 'Levitación', en: 'Levitate', desc: { es: 'Inmune a movimientos de tipo Tierra.', en: 'Immune to Ground-type moves.' } },
   'rough-skin': { es: 'Piel Áspera', en: 'Rough Skin', desc: { es: 'Daña al contacto (1/8 del HP máximo).', en: 'Damages on contact (1/8 of max HP).' } },
@@ -160,6 +161,14 @@ export const ABILITY_INFO: Record<string, AbilityInfo> = {
   'sap-sipper': { es: 'Absorbe Savia', en: 'Sap Sipper', desc: { es: 'Inmune al Planta y sube su Ataque.', en: 'Immune to Grass, raises Attack.' } },
   'lightning-rod': { es: 'Pararrayos', en: 'Lightning Rod', desc: { es: 'Inmune al Eléctrico y sube su At. Esp.', en: 'Immune to Electric, raises Sp. Atk.' } },
   'motor-drive': { es: 'Motorizar', en: 'Motor Drive', desc: { es: 'Inmune al Eléctrico y sube su Velocidad.', en: 'Immune to Electric, raises Speed.' } },
+  'run-away': { es: 'Fuga', en: 'Run Away', desc: { es: 'Garantiza escapar de los Pokémon salvajes.', en: 'Guarantees escaping from wild Pokémon.' } },
+}
+
+// Catálogo real completo (Gen 1-9). Las fichas anteriores se conservan para
+// mantener textos muy concretos del juego y el resto se rellena con PokeAPI.
+export const ABILITY_INFO: Record<string, AbilityInfo> = {
+  ...ABILITY_CATALOG,
+  ...CURATED_ABILITY_INFO,
 }
 
 export function abilityName(id: string | undefined, lang: 'es' | 'en'): string {
@@ -172,14 +181,19 @@ export function abilityDesc(id: string | undefined, lang: 'es' | 'en'): string {
   return ABILITY_INFO[id]?.desc?.[lang] ?? GEN_DESC[lang]
 }
 
-export function hasAbility(pokemon: Pokemon | undefined, ability: string): boolean {
-  return !!pokemon && pokemon.ability === ability
+export function hasAbility(pokemon: Pokemon | undefined, ability: string, source?: Pokemon): boolean {
+  if (!pokemon || pokemon.ability !== ability) return false
+  // Rompehielo / Rayo Fusor / Terravolt ignoran la habilidad del defensor.
+  if (source && (source.ability === 'mold-breaker' || source.ability === 'teravolt' || source.ability === 'turboblaze')) {
+    return false
+  }
+  return true
 }
 
 // Habilidades que no bloquean los movimientos de tipo Tierra del rival.
 export const ABILITY_GROUND_IMMUNE = new Set(['levitate'])
 
-// Conjunto de habilidades implementadas (el resto no produce efectos).
+// Conjunto de habilidades con ficha y efecto en el juego.
 export const IMPLEMENTED_ABILITIES = new Set(Object.keys(ABILITY_INFO))
 
 // ---------------------------------------------------------------------------
@@ -247,11 +261,15 @@ export function weatherSpeedMultiplier(pokemon: Pokemon, weather: WeatherKind): 
 // Daño por turno del clima: arena y granizo dañan a los no inmunes.
 export function weatherChipDmg(pokemon: Pokemon, weather: WeatherKind): number {
   const types = pokemon.types ?? []
+  const ability = pokemon.ability
+  if (ability === 'magic-guard' || ability === 'overcoat') return 0
   if (weather === 'sand') {
+    if (ability === 'sand-force' || ability === 'sand-rush' || ability === 'sand-veil') return 0
     if (types.includes('ground') || types.includes('rock') || types.includes('steel')) return 0
     return Math.max(1, Math.floor(pokemon.maxHp / 16))
   }
   if (weather === 'hail') {
+    if (ability === 'ice-body') return 0
     if (types.includes('ice')) return 0
     return Math.max(1, Math.floor(pokemon.maxHp / 16))
   }
@@ -264,8 +282,12 @@ export const WEATHER_SETTERS: Record<string, Exclude<WeatherKind, 'none'>> = {
   drought: 'sun',
   'sand-stream': 'sand',
   'snow-warning': 'hail',
+  'primordial-sea': 'rain',
+  'desolate-land': 'sun',
+  'orichalcum-pulse': 'sun',
 }
 
 export function isWeatherSpeedAbility(ability: string | undefined): boolean {
-  return ability === 'swift-swim' || ability === 'chlorophyll' || ability === 'sand-rush' || ability === 'slush-rush'
+  return ability === 'swift-swim' || ability === 'chlorophyll' || ability === 'sand-rush'
+    || ability === 'slush-rush' || ability === 'surge-surfer' || ability === 'quick-feet'
 }

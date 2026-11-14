@@ -977,6 +977,47 @@ input[type='range'].range-slider::-moz-range-progress {
   padding: 8px;
 }
 
+.log-mini-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.log-mini-header .small-tag {
+  margin: 0;
+}
+
+.log-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: #12122b;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 180ms ease, color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.log-expand-btn:hover {
+  background: #24244a;
+  color: #f8fafc;
+  border-color: var(--accent-yellow);
+  transform: scale(1.06);
+}
+
+.log-mini.expanded .log-expand-btn {
+  background: rgba(250, 204, 21, 0.14);
+  color: var(--accent-yellow);
+  border-color: var(--accent-yellow);
+}
+
 .log-mini ul {
   list-style: none;
   margin: 6px 0 0;
@@ -985,6 +1026,12 @@ input[type='range'].range-slider::-moz-range-progress {
   gap: 4px;
   max-height: 140px;
   overflow-y: auto;
+  scroll-behavior: smooth;
+  transition: max-height 360ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.log-mini.expanded ul {
+  max-height: min(70vh, 620px);
 }
 
 .log-mini li {
@@ -5690,4 +5737,60 @@ html:not([data-gameboy]) .setup-hero-actions > .setup-pokest:hover {
   border-color: rgba(216, 180, 106, 0.78) !important;
   color: #fff3cf !important;
   box-shadow: 0 0 26px rgba(216, 180, 106, 0.16) !important;
+}
+
+/* Nombres de Pokémon/objetos con contraste alto en PokeRand y Spin */
+html:not([data-gameboy]) .roulette-item-name {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  font-weight: 700;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.95),
+    0 0 8px rgba(0, 0, 0, 0.65);
+}
+
+html:not([data-gameboy]) .roulette-item-desc {
+  color: #dbe7ff !important;
+  -webkit-text-fill-color: #dbe7ff !important;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+/* Botones de compra: verde si puedes pagar y rojo si no puedes o está agotado */
+html body .tiny-btn.buy-green {
+  background: #10b981 !important;
+  border-color: #059669 !important;
+  color: #052e16 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25) !important;
+}
+
+html body .tiny-btn.buy-green:hover:not(:disabled) {
+  background: #34d399 !important;
+  border-color: #10b981 !important;
+  color: #022c22 !important;
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.35) !important;
+}
+
+html body .tiny-btn.buy-red {
+  background: #ef4444 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.22) !important;
+}
+
+html body .tiny-btn.buy-red:hover:not(:disabled) {
+  background: #f87171 !important;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.32) !important;
+}
+
+html body .tiny-btn.buy-green:disabled,
+html body .tiny-btn.buy-red:disabled {
+  opacity: 0.72 !important;
+  filter: saturate(0.75);
+  cursor: not-allowed !important;
+  transform: none !important;
 }
