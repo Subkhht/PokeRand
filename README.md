@@ -153,7 +153,7 @@ Eliges 6 Pokémon y te enfrentas a 8 jefes a nivel 50. Se desbloquea al completa
 ## 🌐 Modos online (requieren Supabase)
 
 ### PvP (1v1)
-Batallas en tiempo real contra otros jugadores con **ranking Elo**. Necesita cuenta (usuario + email + contraseña) y el esquema de Supabase.
+Batallas en tiempo real contra otros jugadores con **ranking Elo**. Necesita cuenta (usuario + email + contraseña) y el esquema de Supabase. El creador de equipo tiene pestañas separadas para **Pokémon capturados** y **Shinys capturados**, con sprites shiny y movimientos independientes.
 
 ### Co-op (2 jugadores)
 Ruta compartida (misma semilla) donde ambos juegan sus propios encuentros, pueden **intercambiar** Pokémon y objetos, y escribir en **chat**. Victoria al derrotar al jefe final juntos.

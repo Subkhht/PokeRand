@@ -2246,6 +2246,8 @@ interface PokedexEntry {
   caught: boolean
   shinySeen?: boolean
   shinyCaught?: boolean
+  // Sprite shiny independiente para no sobrescribir el sprite normal.
+  shinySprite?: string
 }
 
 function nodeTypeLabel(node: RouteNode): string {
@@ -3053,9 +3055,22 @@ function MainApp() {
         if (name.startsWith('legendary-')) {
           name = name.replace('legendary-', '')
         }
+        const hasShinyData = !!(val.shinySeen || val.shinyCaught)
+        const spriteLooksShiny = typeof val.sprite === 'string' && val.sprite.includes('/shiny/')
+        const shinySprite = hasShinyData
+          ? (typeof val.shinySprite === 'string' && val.shinySprite
+            ? val.shinySprite
+            : (spriteLooksShiny ? val.sprite : pokemonSpriteUrl(id, true)))
+          : val.shinySprite
+        // Migración: antes el sprite shiny sobrescribía el normal. Si la
+        // entrada también está capturada en la Pokédex normal, restauramos el
+        // sprite normal y conservamos el shiny en su propio campo.
+        const normalSprite = val.caught && spriteLooksShiny ? pokemonSpriteUrl(id, false) : val.sprite
         migrated[id] = {
           ...val,
           name,
+          sprite: normalSprite,
+          shinySprite,
           seen: val.seen ?? true,
           caught: val.caught ?? true
         }
@@ -3248,6 +3263,8 @@ function MainApp() {
   const [showPvpTeamBuilder, setShowPvpTeamBuilder] = useState<boolean>(false)
   const [pvpBuildTeam, setPvpBuildTeam] = useState<Pokemon[]>([])
   const [pvpBuildSelected, setPvpBuildSelected] = useState<number | null>(null)
+  const [pvpBuildSelectedShiny, setPvpBuildSelectedShiny] = useState<boolean>(false)
+  const [pvpBuildDexMode, setPvpBuildDexMode] = useState<'normal' | 'shiny'>('normal')
   const [pvpBuildMoves, setPvpBuildMoves] = useState<Move[]>([])
   const [pvpBuildSelectedMoveNames, setPvpBuildSelectedMoveNames] = useState<Set<string>>(new Set())
   const [pvpBuildLoading, setPvpBuildLoading] = useState<boolean>(false)
@@ -3310,7 +3327,7 @@ function MainApp() {
   useEffect(() => {
     if (!stageNotice) return
     playBadgeFanfare()
-    const timer = window.setTimeout(() => setStageNotice(null), 3200)
+    const timer = window.setTimeout(() => setStageNotice(null), 2400)
     return () => window.clearTimeout(timer)
   }, [stageNotice])
   const inventoryEntries = useMemo(() => groupInventory(inventory), [inventory])
@@ -3990,7 +4007,8 @@ function MainApp() {
           [pokemonId]: {
             ...current,
             name: pokemon.name,
-            sprite: pokemon.sprite,
+            sprite: current.caught || current.seen ? current.sprite : pokemonSpriteUrl(pokemonId, false),
+            shinySprite: pokemon.sprite,
             types: (pokemon as any).types ?? [],
             shinySeen: true,
             shinyCaught: true,
@@ -4074,7 +4092,8 @@ function MainApp() {
           [pokemonId]: {
             ...current,
             name: pokemon.name,
-            sprite: pokemon.sprite,
+            sprite: current.caught || current.seen ? current.sprite : pokemonSpriteUrl(pokemonId, false),
+            shinySprite: pokemon.sprite,
             types: (pokemon as any).types ?? [],
             shinySeen: true,
             shinyCaught: current.shinyCaught ?? false,
@@ -5282,8 +5301,18 @@ function MainApp() {
   async function completeCurrentNode(): Promise<void> {
     // Las etapas de stats (subidas/bajadas de Ataque, Def. Esp., etc.) solo
     // duran un combate: se eliminan SIEMPRE al completar el nodo, tanto bufos
-    // como debufos, para que nada se "pegue" de un combate a otro.
-    setTeam(prev => prev.map(p => ({ ...p, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false })))
+    // como debufos, para que nada se "pegue" de un combate a otro. También se
+    // limpian los estados ligados al combate como Drenadoras o Anulación.
+    setTeam(prev => prev.map(p => ({
+      ...p,
+      statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 },
+      furiaActive: false,
+      leechSeed: false,
+      disabled: undefined,
+      lastMove: undefined,
+      justEntered: false,
+      choiceLockedMove: undefined,
+    })))
 
     if (difficulty === 'coliseum') {
       setTeam(prev => prev.map(p => ({ ...p, hp: p.maxHp, status: undefined })))
@@ -5892,18 +5921,21 @@ function MainApp() {
     playClick()
     setPvpBuildTeam(pvpTeam.map(p => JSON.parse(JSON.stringify(p)) as Pokemon))
     setPvpBuildSelected(null)
+    setPvpBuildSelectedShiny(false)
+    setPvpBuildDexMode('normal')
     setPvpBuildMoves([])
     setPvpBuildSelectedMoveNames(new Set())
     setPvpBuildSearch('')
     setShowPvpTeamBuilder(true)
   }
 
-  async function loadPvpBuildMoves(id: number, existingMoveNames: string[] = []): Promise<void> {
+  async function loadPvpBuildMoves(id: number, existingMoveNames: string[] = [], shiny = false): Promise<void> {
     setPvpBuildLoading(true)
     setPvpBuildSelected(id)
+    setPvpBuildSelectedShiny(shiny)
     setPvpBuildMoves([])
     try {
-      const base = await buildPokemonFromApi(id, 1, 50, false, 'pvp')
+      const base = await buildPokemonFromApi(id, 1, 50, shiny, 'pvp')
       const levelUp = (base.rawLevelUpMoves ?? []).slice(0, 40)
       const details = (await Promise.all(levelUp.map(m => getMoveDetails(m.url)))).filter((m): m is Move => m !== null)
       const seen = new Set<string>()
@@ -5923,9 +5955,11 @@ function MainApp() {
 
   function addPvpBuildPokemon(): void {
     if (pvpBuildSelected === null) return
-    const existing = pvpBuildTeam.find(p => p.id === pvpBuildSelected)
+    const isShiny = pvpBuildSelectedShiny
+    const samePokemon = (p: Pokemon) => p.id === pvpBuildSelected && !!p.shiny === isShiny
+    const existing = pvpBuildTeam.find(samePokemon)
     if (existing) {
-      setPvpBuildTeam(prev => prev.map(p => p.id === pvpBuildSelected
+      setPvpBuildTeam(prev => prev.map(p => samePokemon(p)
         ? { ...existing, moves: pvpBuildMoves.filter(m => pvpBuildSelectedMoveNames.has(m.name)) }
         : p))
       setPvpBuildSelected(null)
@@ -5936,10 +5970,11 @@ function MainApp() {
     if (pvpBuildTeam.length >= 6) return
     void (async () => {
       try {
-        const full = await buildPokemonFromApi(pvpBuildSelected, 1, 50, false, 'pvp')
+        const full = await buildPokemonFromApi(pvpBuildSelected, 1, 50, isShiny, 'pvp')
         const chosenMoves = pvpBuildMoves.filter(m => pvpBuildSelectedMoveNames.has(m.name))
         const pokemon: Pokemon = {
           ...full,
+          shiny: isShiny || undefined,
           hp: full.maxHp,
           moves: chosenMoves,
         }
@@ -7437,10 +7472,19 @@ function MainApp() {
     const currentNode = overrideNode ?? route[routeIndex] ?? null
     if (!activePokemon || !currentNode) return
 
-    // Red de seguridad: las etapas de stats SIEMPRE se eliminan al entrar a un
-    // nodo nuevo (bufos y debufos), cubriendo cualquier ruta de fin de combate
-    // que no pasara por completeCurrentNode.
-    setTeam(prev => prev.map(p => ({ ...p, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, furiaActive: false })))
+    // Red de seguridad: las etapas de stats y los estados ligados al combate
+    // SIEMPRE se eliminan al entrar a un nodo nuevo, cubriendo cualquier ruta
+    // de fin de combate que no pasara por completeCurrentNode.
+    setTeam(prev => prev.map(p => ({
+      ...p,
+      statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 },
+      furiaActive: false,
+      leechSeed: false,
+      disabled: undefined,
+      lastMove: undefined,
+      justEntered: false,
+      choiceLockedMove: undefined,
+    })))
 
     // El flag de batalla TeamR debe reflejar SIEMPRE el nodo actual, para que un
     // TeamR escapado (Cuerda Huida) o un combate normal no hereden el robo/elección.
@@ -11490,6 +11534,10 @@ function MainApp() {
   const shinyDexSeen = shinyDexList.length
   const shinyDexCaught = shinyDexList.filter(p => p.shinyCaught).length
   const activeDexList = pokedexMode === 'shiny' ? shinyDexList : normalDexList
+  // PvP: Pokémon capturados (normales) y shinys capturados por separado.
+  const pvpBuildNormalDex = pokedexList.filter(p => p.caught)
+  const pvpBuildShinyDex = pokedexList.filter(p => p.shinyCaught)
+  const pvpBuildSourceDex = pvpBuildDexMode === 'shiny' ? pvpBuildShinyDex : pvpBuildNormalDex
 
   const leaderboardActiveEntries: LeaderboardEntry[] = leaderboardGen === 0
     ? Object.values(leaderboardByGen).flat().sort((a, b) => (b.node - a.node) || (a.duration_seconds - b.duration_seconds))
@@ -16579,7 +16627,7 @@ function MainApp() {
                   ) : (
                     <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
                       {pvpTeam.map((p, i) => (
-                        <img key={i} src={p.sprite} alt={p.name} title={p.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
+                        <img key={i} src={p.sprite} alt={p.name} title={`${p.name}${p.shiny ? ' ✨' : ''}`} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated', filter: p.shiny ? 'drop-shadow(0 0 5px #ffcb05)' : undefined }} />
                       ))}
                     </div>
                   )}
@@ -16646,15 +16694,16 @@ function MainApp() {
               {Array.from({ length: 6 }).map((_, i) => {
                 const p = pvpBuildTeam[i]
                 return (
-                  <div key={i} style={{ position: 'relative', width: '56px', height: '56px', borderRadius: '8px', border: p ? '1px solid #a855f7' : '1px dashed #3f3f6e', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.3)' }}>
+                  <div key={i} style={{ position: 'relative', width: '56px', height: '56px', borderRadius: '8px', border: p ? (p.shiny ? '1px solid #ffcb05' : '1px solid #a855f7') : '1px dashed #3f3f6e', display: 'flex', alignItems: 'center', justifyContent: 'center', background: p?.shiny ? 'rgba(250,204,21,0.12)' : 'rgba(0,0,0,0.3)' }}>
                     {p ? (
                       <>
-                        <img src={p.sprite} alt={p.name} title={p.name} onError={fallbackSprite} className="pvp-sprite-bob" style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} />
+                        <img src={p.sprite} alt={p.name} title={`${p.name}${p.shiny ? ' ✨' : ''}`} onError={fallbackSprite} className="pvp-sprite-bob" style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} />
+                        {p.shiny && <span style={{ position: 'absolute', top: '-5px', left: '-5px', fontSize: '0.75rem', textShadow: '0 1px 2px #000' }}>✨</span>}
                         <button
                           type="button"
                           onClick={() => {
                             setPvpBuildTeam(prev => prev.filter((_, x) => x !== i))
-                            if (pvpBuildSelected === p.id) {
+                            if (pvpBuildSelected === p.id && pvpBuildSelectedShiny === !!p.shiny) {
                               setPvpBuildSelected(null)
                               setPvpBuildMoves([])
                               setPvpBuildSelectedMoveNames(new Set())
@@ -16669,21 +16718,56 @@ function MainApp() {
               })}
             </div>
 
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
+              {([
+                ['normal', t('pvp.caughtTab', { n: pvpBuildNormalDex.length }), '#a855f7', 'rgba(168,85,247,0.22)'],
+                ['shiny', t('pvp.shinyCaughtTab', { n: pvpBuildShinyDex.length }), '#ffcb05', 'rgba(250,204,21,0.18)'],
+              ] as const).map(([mode, label, color, bg]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => {
+                    playClick()
+                    setPvpBuildDexMode(mode)
+                    setPvpBuildSelected(null)
+                    setPvpBuildSelectedShiny(false)
+                    setPvpBuildMoves([])
+                    setPvpBuildSelectedMoveNames(new Set())
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '7px 10px',
+                    borderRadius: '7px',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    background: pvpBuildDexMode === mode ? bg : 'rgba(15,23,42,0.5)',
+                    border: `1px solid ${pvpBuildDexMode === mode ? color : '#3f3f6e'}`,
+                    color: pvpBuildDexMode === mode ? color : '#9b98cf',
+                    fontWeight: pvpBuildDexMode === mode ? 'bold' : 'normal',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
               <input type="text" placeholder={t('pvp.searchPokemon')} value={pvpBuildSearch} onChange={e => setPvpBuildSearch(e.target.value)}
                 style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(15,23,42,0.8)', color: '#fff', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }} />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto', marginBottom: '1rem' }}>
-              {Object.values(pokedex).filter(p => p.caught).filter(p => {
+              {pvpBuildSourceDex.filter(p => {
                 const term = pvpBuildSearch.toLowerCase().trim()
                 return !term || p.name.toLowerCase().includes(term) || String(p.id).includes(term)
               }).sort((a, b) => a.id - b.id).map(pkmn => {
-                const inTeam = pvpBuildTeam.some(p => p.id === pkmn.id)
-                const isSelected = pvpBuildSelected === pkmn.id
+                const isShiny = pvpBuildDexMode === 'shiny'
+                const inTeam = pvpBuildTeam.some(p => p.id === pkmn.id && !!p.shiny === isShiny)
+                const isSelected = pvpBuildSelected === pkmn.id && pvpBuildSelectedShiny === isShiny
+                const sprite = pokemonSpriteUrl(pkmn.id, isShiny)
                 return (
                   <div
-                    key={pkmn.id}
+                    key={`${pkmn.id}-${isShiny ? 'shiny' : 'normal'}`}
                     onClick={() => {
                       if (!inTeam && pvpBuildTeam.length >= 6) return
                       if (isSelected) {
@@ -16691,18 +16775,27 @@ function MainApp() {
                         setPvpBuildMoves([])
                         setPvpBuildSelectedMoveNames(new Set())
                       } else {
-                        void loadPvpBuildMoves(pkmn.id, inTeam ? (pvpBuildTeam.find(p => p.id === pkmn.id)?.moves.map(m => m.name) ?? []) : [])
+                        void loadPvpBuildMoves(
+                          pkmn.id,
+                          inTeam ? (pvpBuildTeam.find(p => p.id === pkmn.id && !!p.shiny === isShiny)?.moves.map(m => m.name) ?? []) : [],
+                          isShiny,
+                        )
                       }
                     }}
-                    style={{ border: `1px solid ${isSelected ? '#a855f7' : inTeam ? '#37d16b' : '#3f3f6e'}`, borderRadius: '8px', padding: '6px', textAlign: 'center', cursor: 'pointer', background: isSelected ? 'rgba(168,85,247,0.15)' : 'rgba(15,23,42,0.5)' }}
+                    style={{ border: `1px solid ${isSelected ? (isShiny ? '#ffcb05' : '#a855f7') : inTeam ? '#37d16b' : '#3f3f6e'}`, borderRadius: '8px', padding: '6px', textAlign: 'center', cursor: 'pointer', background: isSelected ? (isShiny ? 'rgba(250,204,21,0.14)' : 'rgba(168,85,247,0.15)') : 'rgba(15,23,42,0.5)' }}
                   >
-                    <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} className="pvp-sprite-bob" style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} />
-                    <div style={{ fontSize: '0.7rem', color: '#f3f1ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pkmn.name}</div>
+                    <img src={sprite} alt={pkmn.name} onError={fallbackSprite} className="pvp-sprite-bob" style={{ width: '48px', height: '48px', imageRendering: 'pixelated' }} />
+                    <div style={{ fontSize: '0.7rem', color: isShiny ? '#ffcb05' : '#f3f1ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isShiny ? '✨ ' : ''}{pkmn.name}</div>
                     {inTeam && <div style={{ fontSize: '0.65rem', color: '#37d16b' }}>✓ En equipo</div>}
                   </div>
                 )
               })}
             </div>
+            {pvpBuildSourceDex.length === 0 && (
+              <p style={{ color: '#7d7ab5', fontSize: '0.8rem', textAlign: 'center', margin: '0 0 1rem' }}>
+                {pvpBuildDexMode === 'shiny' ? t('pvp.shinyCaughtEmpty') : t('pvp.caughtEmpty')}
+              </p>
+            )}
 
             {pvpBuildSelected !== null && (
               <div style={{ padding: '0.75rem', borderRadius: '8px', background: 'rgba(15,23,42,0.6)', border: '1px solid #a855f7', marginBottom: '1rem' }}>
@@ -17784,7 +17877,15 @@ function MainApp() {
       {stageNotice && (
         <div className="stage-notice" role="status" aria-live="assertive">
           <div className="stage-notice-card">
-            <div className="stage-notice-spark">✦</div>
+            <button
+              className="stage-notice-spark"
+              type="button"
+              onClick={() => setStageNotice(null)}
+              aria-label={t('stageNotice.close')}
+              title={t('stageNotice.close')}
+            >
+              ✦
+            </button>
             <img src={stageNotice.medal.sprite} alt={stageNotice.medal.name} className="stage-notice-medal" />
             <div className="stage-notice-kicker">{language === 'en' ? 'Badge obtained' : '¡Medalla conseguida!'}</div>
             <div className="stage-notice-name">{stageNotice.medal.name}</div>

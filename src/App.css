@@ -4488,11 +4488,37 @@ html[data-theme]:not([data-theme="dark"]) .app-shell .node.current {
 
 .stage-notice-spark {
   position: absolute;
-  top: 0.35rem;
-  right: 0.7rem;
+  top: 0.2rem;
+  right: 0.45rem;
+  width: 2.2rem;
+  height: 2.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
   color: #ffec70;
+  font-family: inherit;
   font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
   animation: pulseGlow 1s infinite;
+  transition: transform 0.18s ease, filter 0.18s ease, background 0.18s ease;
+}
+
+.stage-notice-spark:hover,
+.stage-notice-spark:focus-visible {
+  transform: scale(1.16) rotate(10deg);
+  background: rgba(255, 236, 112, 0.14);
+  filter: drop-shadow(0 0 8px #ffec70);
+  outline: none;
+}
+
+.stage-notice-spark:active {
+  transform: scale(0.94);
 }
 
 .stage-notice-medal {

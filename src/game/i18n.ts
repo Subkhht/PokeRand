@@ -42,6 +42,7 @@ const DICT: Record<string, Entry> = {
   'topbar.money': { es: 'Dinero', en: 'Money' },
   'topbar.pokeCoins': { es: 'PokéCoins', en: 'PokéCoins' },
   'common.close': { es: 'Cerrar', en: 'Close' },
+  'stageNotice.close': { es: 'Cerrar aviso de medalla', en: 'Close badge notice' },
   'common.back': { es: 'Volver', en: 'Back' },
   'common.cancel': { es: 'Cancelar', en: 'Cancel' },
   'common.confirm': { es: 'Confirmar', en: 'Confirm' },
@@ -284,6 +285,10 @@ const DICT: Record<string, Entry> = {
   'pvp.pickMoves': { es: 'Elige 4 movimientos para {name}', en: 'Choose 4 moves for {name}' },
   'pvp.ready': { es: '✅ Listo', en: '✅ Ready' },
   'pvp.select4': { es: 'Selecciona un Pokémon capturado y elige 4 movimientos.', en: 'Select a caught Pokémon and pick 4 moves.' },
+  'pvp.caughtTab': { es: 'Pokémon capturados ({n})', en: 'Caught Pokémon ({n})' },
+  'pvp.shinyCaughtTab': { es: '✨ Shinys capturados ({n})', en: '✨ Caught shinies ({n})' },
+  'pvp.shinyCaughtEmpty': { es: 'Aún no has capturado ningún Pokémon shiny.', en: 'You have not caught any shiny Pokémon yet.' },
+  'pvp.caughtEmpty': { es: 'Aún no has capturado ningún Pokémon.', en: 'You have not caught any Pokémon yet.' },
   'coliseum.select': { es: 'Selecciona 6 Pokémon de tu Pokédex para enfrentar 8 jefes a nivel 50.', en: 'Select 6 Pokémon from your Pokédex to face 8 bosses at level 50.' },
   'coliseum.picked': { es: 'Elegidos: {n}/6', en: 'Picked: {n}/6' },
   'coliseum.start': { es: '👑 ¡Comenzar COLISEUM!', en: '👑 Start COLISEUM!' },
@@ -623,9 +628,9 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v3.2.1', en: 'v3.2.1' },
+  'help.version': { es: 'v3.2.2', en: 'v3.2.2' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
-  'changelog.button': { es: 'Ver cambios v3.2.1', en: 'See changes v3.2.1' },
+  'changelog.button': { es: 'Ver cambios v3.2.2', en: 'See changes v3.2.2' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -1968,6 +1973,16 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v3.2.2',
+    items: [
+      { es: '✨ El creador de equipos PvP ahora tiene dos pestañas: Pokémon capturados y Shinys capturados. Los shinys se muestran con su sprite shiny, borde dorado y brillo, y pueden formar parte del equipo competitivo igual que los normales.', en: '✨ The PvP team builder now has two tabs: caught Pokémon and caught shinies. Shinies use their shiny sprite, a golden border and glow, and can join the competitive team just like normal Pokémon.' },
+      { es: '🛠️ Se pueden tener a la vez la versión normal y la shiny de la misma especie en el equipo, con movimientos independientes. El equipo guardado conserva el estado shiny y se muestra con un ✨ en la vista previa del PvP.', en: '🛠️ You can have both the normal and shiny version of the same species on the team, each with independent moves. Saved teams keep the shiny status and show a ✨ in the PvP preview.' },
+      { es: '🐛 Corregido que algunos Pokémon normales (como Charmander o Kakuna) aparecieran con sprite shiny en la lista de capturados. La Pokédex guarda ahora el sprite normal y el shiny por separado, y el constructor PvP usa el sprite correcto según la pestaña.', en: '🐛 Fixed some normal Pokémon (such as Charmander or Kakuna) showing their shiny sprite in the caught list. The Pokédex now stores normal and shiny sprites separately, and the PvP builder uses the correct sprite for each tab.' },
+      { es: '🏅 El aviso de medalla dura ahora 2,4 segundos (antes 3,2) y se puede cerrar al instante pulsando la estrella ✦ de la esquina superior derecha.', en: '🏅 The badge notice now lasts 2.4 seconds (down from 3.2) and can be closed instantly by clicking the ✦ star in the top-right corner.' },
+      { es: '🌱 Corregido el estado Drenadoras: ahora se elimina al terminar el combate igual que las etapas de stats, además de limpiarse al entrar en un nodo nuevo. También se limpian Anulación, último movimiento usado y bloqueo de objeto Choice al cerrar el combate.', en: '🌱 Fixed the Leech Seed state: it is now removed when a battle ends, just like stat stages, and also cleaned when entering a new node. Disable, last used move and Choice item lock are also cleared when closing the battle.' },
+    ],
+  },
   {
     version: 'v3.2.1',
     items: [

@@ -1499,7 +1499,7 @@ export async function buildPokemonFromApi(
   bypassMinAppearLevel: boolean = false,
   meta?: { nature?: string; ivs?: PokemonIVs }
 ): Promise<Pokemon> {
-  const cacheKey = `${identifier}_lvl${targetLevel}_${difficulty}_b${bypassMinAppearLevel ? 1 : 0}_r${runSeed}`
+  const cacheKey = `${identifier}_lvl${targetLevel}_${difficulty}_b${bypassMinAppearLevel ? 1 : 0}_s${shiny ? 1 : 0}_r${runSeed}`
   let base: Pokemon
   const cached = pokemonCache.get(cacheKey)
   if (cached) {
