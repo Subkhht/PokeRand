@@ -55,7 +55,7 @@ import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, PokemonIVs, RouteNode, BranchNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, itemLocalizedName, metaItemDesc, moveName, statusLabel, statusAppliedLine, themeName, themeDesc, bgName, bgDesc, type Language, getChangelog } from './game/i18n'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp' | 'dungeon' | 'pokest'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'speculator' | 'safari' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp' | 'dungeon' | 'pokest'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum' | 'original' | 'branch'
 
 // Historial local de partidas finalizadas (victorias/derrotas). Solo se
@@ -68,6 +68,26 @@ interface MatchRecord {
   duration: number
   team: Array<{ name: string; sprite: string; shiny?: boolean; level?: number }>
   challenges: string[]
+}
+
+interface AccessibilitySettings {
+  reduceAnimations: boolean
+  highContrast: boolean
+  colorBlind: boolean
+  readableFont: boolean
+  textScale: number
+  floatingDamage: boolean
+  battleSpeed: 1 | 2 | 4
+}
+
+const DEFAULT_ACCESSIBILITY: AccessibilitySettings = {
+  reduceAnimations: false,
+  highContrast: false,
+  colorBlind: false,
+  readableFont: false,
+  textScale: 100,
+  floatingDamage: true,
+  battleSpeed: 1,
 }
 
 const MATCH_HISTORY_KEY = 'pokerand_match_history'
@@ -200,6 +220,21 @@ function StatusFloat({ pokemon }: { pokemon?: Pokemon }) {
       }}
     >
       {emoji}
+    </span>
+  )
+}
+
+interface CombatFloatData {
+  id: number
+  text: string
+  color: string
+}
+
+function FloatingCombatText({ data }: { data: CombatFloatData | null }) {
+  if (!data) return null
+  return (
+    <span key={data.id} className="damage-float" style={{ color: data.color }}>
+      {data.text}
     </span>
   )
 }
@@ -2267,6 +2302,8 @@ function nodeTypeLabel(node: RouteNode): string {
     case 'trade': return en ? 'Trade' : 'Intercambio'
     case 'rival': return 'Rival'
     case 'blackmarket': return en ? 'Black Market' : 'Mercado Negro'
+    case 'speculator': return en ? 'Speculator' : 'Especulador'
+    case 'safari': return 'Safari'
     case 'double': return en ? 'Double Battle' : 'Combate Doble'
     case 'casino': return 'Casino'
     case 'elite': return en ? 'Elite' : 'Elite'
@@ -2342,6 +2379,8 @@ const NODE_EMOJIS: Record<string, string> = {
   trade: '🤝',
   rival: '👤',
   blackmarket: '🕶️',
+  speculator: '🙊',
+  safari: '🦁',
   double: '🥊',
   casino: '🃏',
   elite: '🗻',
@@ -2363,10 +2402,51 @@ const NODE_TYPE_COLORS: Record<string, string> = {
   trade: '#37d16b',
   rival: '#f472b6',
   blackmarket: '#fb923c',
+  speculator: '#ff8a33',
+  safari: '#22c55e',
   double: '#facc15',
   casino: '#f0abfc',
   elite: '#cba3ff',
   legendary: '#ffcb05',
+}
+
+// Especulador: los tipos más raros/poderosos pagan mejor. El multiplicador es
+// visible en la interfaz para que la venta sea clara.
+const SPECULATOR_TYPE_MULTIPLIERS: Record<string, number> = {
+  normal: 1.00,
+  bug: 1.00,
+  grass: 1.05,
+  water: 1.10,
+  fire: 1.10,
+  electric: 1.15,
+  flying: 1.15,
+  poison: 1.20,
+  ground: 1.20,
+  rock: 1.25,
+  fighting: 1.30,
+  ice: 1.30,
+  psychic: 1.35,
+  ghost: 1.40,
+  dark: 1.45,
+  steel: 1.50,
+  fairy: 1.55,
+  dragon: 1.60,
+}
+
+function speculatorTypeMultiplier(pokemon: Pokemon): number {
+  const primary = pokemon.types?.[0] ?? 'normal'
+  const secondary = pokemon.types?.[1]
+  const base = SPECULATOR_TYPE_MULTIPLIERS[primary] ?? 1
+  return secondary && secondary !== primary ? base + 0.05 : base
+}
+
+function speculatorPrice(pokemon: Pokemon): number {
+  const bst = pokemon.baseStatTotal
+    ?? pokemon.maxHp + pokemon.attack + pokemon.defense + pokemon.spAttack + pokemon.spDefense + pokemon.speed
+  const base = 25 + pokemon.level * 6 + Math.floor(bst / 10)
+  const typeMult = speculatorTypeMultiplier(pokemon)
+  const shinyMult = pokemon.shiny ? 2 : 1
+  return Math.max(20, Math.round(base * typeMult * shinyMult))
 }
 
 function getNodeMapLayout(nodeCount: number): { positions: Array<{ x: number; y: number }>; width: number; height: number } {
@@ -2833,6 +2913,27 @@ function MainApp() {
   })
   const [battleLog, setBattleLog] = useState<string[]>([])
   const [battleLogExpanded, setBattleLogExpanded] = useState(false)
+  const [accessibility, setAccessibility] = useState<AccessibilitySettings>(() => {
+    try {
+      const raw = localStorage.getItem('pokerand_accessibility')
+      if (!raw) return DEFAULT_ACCESSIBILITY
+      const parsed = { ...DEFAULT_ACCESSIBILITY, ...JSON.parse(raw) } as AccessibilitySettings
+      return {
+        ...parsed,
+        reduceAnimations: !!parsed.reduceAnimations,
+        highContrast: !!parsed.highContrast,
+        colorBlind: !!parsed.colorBlind,
+        readableFont: !!parsed.readableFont,
+        floatingDamage: parsed.floatingDamage !== false,
+        textScale: Math.max(85, Math.min(130, Number(parsed.textScale) || 100)),
+        battleSpeed: parsed.battleSpeed === 2 || parsed.battleSpeed === 4 ? parsed.battleSpeed : 1,
+      }
+    } catch {
+      return DEFAULT_ACCESSIBILITY
+    }
+  })
+  const [playerCombatFloat, setPlayerCombatFloat] = useState<CombatFloatData | null>(null)
+  const [enemyCombatFloat, setEnemyCombatFloat] = useState<CombatFloatData | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [apiError, setApiError] = useState<string>('')
   const [restEncounter, setRestEncounter] = useState<Pokemon | null>(null)
@@ -2914,6 +3015,17 @@ function MainApp() {
   // Mercado Negro
   const [blackMarketItems, setBlackMarketItems] = useState<string[]>([])
   const [blackMarketPokemon, setBlackMarketPokemon] = useState<Pokemon[]>([])
+  const [speculatorConfirm, setSpeculatorConfirm] = useState<{ kind: 'team' | 'pc'; index: number; name: string; price: number } | null>(null)
+  // Safari: 3 siluetas, Pokémon elegido, humor, caricias y bolas.
+  const [safariChoices, setSafariChoices] = useState<Pokemon[]>([])
+  const [safariSelected, setSafariSelected] = useState<Pokemon | null>(null)
+  const [safariLoading, setSafariLoading] = useState(false)
+  const [safariMood, setSafariMood] = useState(60)
+  const [safariBonus, setSafariBonus] = useState(0)
+  const [safariPetCount, setSafariPetCount] = useState(0)
+  const [safariThreat, setSafariThreat] = useState(0)
+  const [safariLog, setSafariLog] = useState<string[]>([])
+  const [safariSelectedBall, setSafariSelectedBall] = useState('')
 
   // Casino (Pachinko)
   const [casinoScore, setCasinoScore] = useState<number | null>(null)
@@ -3478,6 +3590,18 @@ function MainApp() {
     if (metaProgression.gameboyMode) root.setAttribute('data-gameboy', 'true')
     else root.removeAttribute('data-gameboy')
   }, [metaProgression.gameboyMode])
+
+  // Preferencias de accesibilidad y ritmo de combate.
+  useEffect(() => {
+    const root = document.documentElement
+    root.setAttribute('data-reduce-animations', String(accessibility.reduceAnimations))
+    root.setAttribute('data-high-contrast', String(accessibility.highContrast))
+    root.setAttribute('data-colorblind', String(accessibility.colorBlind))
+    root.setAttribute('data-readable-font', String(accessibility.readableFont))
+    root.setAttribute('data-battle-speed', String(accessibility.battleSpeed))
+    root.style.fontSize = `${Math.max(85, Math.min(130, accessibility.textScale))}%`
+    localStorage.setItem('pokerand_accessibility', JSON.stringify(accessibility))
+  }, [accessibility])
 
   // Código secreto: escribir "adminsub" abre el modal de contraseña del modo secreto.
   useEffect(() => {
@@ -4587,10 +4711,22 @@ function MainApp() {
         type = 'rival'
       }
     }
+    // Especulador: nodo exclusivo de Difícil e Infinite.
+    if (!runChallenges.allTeamRocket && !runChallenges.bossRush
+      && (difficulty === 'hard' || difficulty === 'infinite')
+      && (type === 'battle' || type === 'teamRocket') && rng() < 0.06) {
+      type = 'speculator'
+    }
+    // Safari: nodo de captura especial en rutas normales.
+    if (!runChallenges.allTeamRocket && !runChallenges.bossRush
+      && difficulty !== 'coliseum'
+      && (type === 'battle' || type === 'teamRocket') && rng() < 0.04) {
+      type = 'safari'
+    }
     return {
       id,
       type,
-      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : type === 'mega' ? `Mega #${id}` : type === 'gmax' ? `G-MAX #${id}` : type === 'primal' ? `Primal #${id}` : type === 'casino' ? `Casino #${id}` : type === 'rival' ? `Rival #${id}` : type === 'blackmarket' ? `Mercado Negro #${id}` : type === 'double' ? `Doble #${id}` : `Ruta ${id}`,
+      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : type === 'mega' ? `Mega #${id}` : type === 'gmax' ? `G-MAX #${id}` : type === 'primal' ? `Primal #${id}` : type === 'casino' ? `Casino #${id}` : type === 'rival' ? `Rival #${id}` : type === 'blackmarket' ? `Mercado Negro #${id}` : type === 'speculator' ? `Especulador #${id}` : type === 'safari' ? `Safari #${id}` : type === 'double' ? `Doble #${id}` : `Ruta ${id}`,
       done: false
     }
   }
@@ -4987,11 +5123,21 @@ function MainApp() {
               type = 'rival'
             }
           }
+          // Especulador: exclusivo de Difícil (Infinite usa generateRandomNodeType).
+          if (!activeChallenges.allTeamRocket && !activeChallenges.bossRush
+            && effectiveDifficulty === 'hard'
+            && (type === 'battle' || type === 'teamRocket') && rr() < 0.06) {
+            type = 'speculator'
+          }
+          if (!activeChallenges.allTeamRocket && !activeChallenges.bossRush
+            && (type === 'battle' || type === 'teamRocket') && rr() < 0.04) {
+            type = 'safari'
+          }
 
           customRoute.push({
             id: i,
             type,
-            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : type === 'mega' ? `Mega #${i}` : type === 'gmax' ? `G-MAX #${i}` : type === 'primal' ? `Primal #${i}` : type === 'casino' ? `Casino #${i}` : type === 'rival' ? `Rival #${i}` : type === 'blackmarket' ? `Mercado Negro #${i}` : type === 'double' ? `Doble #${i}` : `Ruta ${i}`,
+            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : type === 'mega' ? `Mega #${i}` : type === 'gmax' ? `G-MAX #${i}` : type === 'primal' ? `Primal #${i}` : type === 'casino' ? `Casino #${i}` : type === 'rival' ? `Rival #${i}` : type === 'blackmarket' ? `Mercado Negro #${i}` : type === 'speculator' ? `Especulador #${i}` : type === 'safari' ? `Safari #${i}` : type === 'double' ? `Doble #${i}` : `Ruta ${i}`,
             done: false
           })
         }
@@ -6728,7 +6874,8 @@ function MainApp() {
     setTeamRocketPickModal(false)
     setTeamRocketTeam([])
     setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
-    completeCurrentNode()
+    captureSummaryCompleteNodeRef.current = true
+    setCaptureSummary(captured)
   }
 
   function removeFaintedPokemon(indexToRemove: number): void {
@@ -6824,6 +6971,38 @@ function MainApp() {
       setPcStorage((prev) => [...prev, purchased])
     }
     setBattleLog((prev) => [t('b.boughtMarketPokemon', { name: pokemon.name, lvl: pokemon.level, price }), ...prev].slice(0, 15))
+  }
+
+  function sellSpeculatorPokemon(kind: 'team' | 'pc', index: number, price: number): void {
+    if (runChallenges.soloStarter || runChallenges.fixedTeam) {
+      playError()
+      setBattleLog((prev) => [t('b.noModifyTeam'), ...prev].slice(0, 15))
+      return
+    }
+    if (kind === 'team') {
+      const sold = team[index]
+      if (!sold) return
+      if (team.length <= 1) {
+        playError()
+        setBattleLog((prev) => [t('b.speculatorLastTeam'), ...prev].slice(0, 15))
+        return
+      }
+      const nextTeam = team.filter((_, i) => i !== index)
+      setTeam(nextTeam)
+      setActiveIndex((prev) => (prev > index ? prev - 1 : prev === index ? Math.min(index, nextTeam.length - 1) : prev))
+      setMoney((prev) => prev + price)
+      setRunStats((prev) => ({ ...prev, moneyEarned: prev.moneyEarned + price }))
+      setBattleLog((prev) => [t('b.speculatorSold', { name: sold.name, price }), ...prev].slice(0, 15))
+    } else {
+      const sold = pcStorage[index]
+      if (!sold) return
+      setPcStorage((prev) => prev.filter((_, i) => i !== index))
+      setMoney((prev) => prev + price)
+      setRunStats((prev) => ({ ...prev, moneyEarned: prev.moneyEarned + price }))
+      setBattleLog((prev) => [t('b.speculatorSold', { name: sold.name, price }), ...prev].slice(0, 15))
+    }
+    playPurchase()
+    setSpeculatorConfirm(null)
   }
 
   // --- Combate Doble (2 vs 2) ---
@@ -7534,6 +7713,24 @@ function MainApp() {
       } finally {
         setIsLoading(false)
       }
+      return
+    }
+
+    if (currentNode.type === 'speculator') {
+      // Especulador: vende Pokémon del equipo o PC por dinero de la partida.
+      setSpeculatorConfirm(null)
+      setIsLoading(false)
+      setApiError('')
+      setScreen('speculator')
+      return
+    }
+
+    if (currentNode.type === 'safari') {
+      // Safari: 3 siluetas y captura solo con Poké Balls.
+      setIsLoading(false)
+      setApiError('')
+      setScreen('safari')
+      void prepareSafari(currentNode)
       return
     }
 
@@ -8359,8 +8556,8 @@ function MainApp() {
         ...prev
       ].slice(0, 15))
     }
-    completeCurrentNode()
-    setScreen('route')
+    captureSummaryCompleteNodeRef.current = true
+    setCaptureSummary(pokemon)
   }
 
   function skipPokeRandPokemon(): void {
@@ -8370,6 +8567,204 @@ function MainApp() {
     ].slice(0, 15))
     completeCurrentNode()
     setScreen('route')
+  }
+
+  // --- Safari ---
+  function safariNatureProfile(pokemon: Pokemon): { tolerance: number; label: string } {
+    const mods = natureStatMods(pokemon.nature)
+    if (mods.up === 'speed') return { tolerance: 5, label: 'juguetón' }
+    if (mods.up === 'attack') return { tolerance: 2, label: 'orgulloso' }
+    if (mods.up === 'spAttack') return { tolerance: 4, label: 'curioso' }
+    if (mods.up === 'defense') return { tolerance: 3, label: 'tranquilo' }
+    if (mods.up === 'spDefense') return { tolerance: 3, label: 'cauteloso' }
+    return { tolerance: 4, label: 'neutral' }
+  }
+
+  function safariMoodEmoji(mood: number): string {
+    if (mood >= 70) return '😊'
+    if (mood >= 40) return '😐'
+    if (mood >= 20) return '😟'
+    return '😠'
+  }
+
+  function safariAvailableBalls(): string[] {
+    return Array.from(new Set(inventory.filter(name => POKEBALL_NAMES.includes(name))))
+  }
+
+  function safariCaptureChance(ballName: string): number {
+    if (!safariSelected) return 0
+    const ball = POKEBALL_DEFS[ballName]
+    if (ball?.isMaster) return 1
+    const ballRate = ball?.rate ?? 1
+    const speciesRate = (safariSelected.captureRate ?? 45) / 255
+    const levelPenalty = Math.max(0, safariSelected.level - (activePokemon?.level ?? safariSelected.level)) * 0.005
+    const base = 0.10 + speciesRate * 0.30 + (safariMood / 100) * 0.25 + safariBonus / 100
+    return Math.max(0.05, Math.min(0.95, base + (ballRate - 1) * 0.06 - levelPenalty))
+  }
+
+  async function prepareSafari(node: RouteNode): Promise<void> {
+    setSafariLoading(true)
+    setSafariChoices([])
+    setSafariSelected(null)
+    setSafariLog([])
+    setSafariMood(60)
+    setSafariBonus(0)
+    setSafariPetCount(0)
+    setSafariThreat(0)
+    try {
+      const targetGen = getEffectiveGen()
+      const avgPlayerLevel = Math.round(team.reduce((sum, p) => sum + p.level, 0) / Math.max(1, team.length))
+      const targetLevel = difficulty === 'infinite' ? getInfiniteTargetLevel() : avgPlayerLevel
+      const picks: Pokemon[] = []
+      const used = new Set<number>()
+      for (let attempt = 0; attempt < 14 && picks.length < 3; attempt++) {
+        const base = await getBalancedPokemonByGeneration(
+          targetGen, routeIndex, route.length, false, runChallenges.allShiny,
+          balDiff(difficulty), -1, getStageProgression(), targetLevel,
+        )
+        if (used.has(base.id)) continue
+        used.add(base.id)
+        const levelDiff = targetLevel - base.level
+        let scaled = scalePokemonForNode(base, node, routeIndex, levelDiff, balDiff(difficulty))
+        if (runChallenges.fixedLevel) scaled = { ...scaled, level: 50 }
+        picks.push(scaled)
+      }
+      setSafariChoices(picks)
+    } catch {
+      setApiError('No se pudo preparar el Safari.')
+    } finally {
+      setSafariLoading(false)
+    }
+  }
+
+  function selectSafariPokemon(pokemon: Pokemon): void {
+    playSelect()
+    setSafariSelected(pokemon)
+    setSafariMood(55 + Math.floor(Math.random() * 21))
+    setSafariBonus(0)
+    setSafariPetCount(0)
+    setSafariThreat(0)
+    const balls = safariAvailableBalls()
+    setSafariSelectedBall(balls[0] ?? '')
+    setSafariLog([`Has elegido una silueta... ¡es ${pokemon.name}!`])
+  }
+
+  function safariPokemonAttack(): void {
+    if (!safariSelected) return
+    if (!activePokemon || activePokemon.hp <= 0) {
+      setSafariLog(prev => [`⚠️ ¡${safariSelected.name} se siente amenazado!`, ...prev].slice(0, 6))
+      return
+    }
+    const damagingMoves = safariSelected.moves.filter(m => (m.power ?? 0) > 0)
+    const move = damagingMoves.length > 0
+      ? damagingMoves[Math.floor(Math.random() * damagingMoves.length)]
+      : null
+    if (!move) {
+      setSafariLog(prev => [`⚠️ ¡${safariSelected.name} te mira con desconfianza!`, ...prev].slice(0, 6))
+      return
+    }
+    const res = applyDamage(safariSelected, activePokemon, move)
+    const defTypes = activePokemon.types ?? ['normal']
+    const { effectiveness } = getTypeEffectiveness(move.type, defTypes[0] || 'normal', defTypes[1])
+    const stab = safariSelected.types?.includes(move.type) ? 1.5 : 1
+    const damage = Math.max(1, Math.floor((Number.isFinite(res.damage) ? res.damage : 3) * Math.max(0.25, effectiveness) * stab))
+    const newHp = Math.max(1, activePokemon.hp - damage)
+    setTeam(prev => prev.map((p, i) => i === activeIndex ? { ...p, hp: newHp } : p))
+    setSafariMood(prev => Math.max(0, prev - 5))
+    setSafariThreat(0)
+    setSafariLog(prev => [`⚠️ ¡${safariSelected.name} se sintió amenazado y usó ${moveName(move)}! ${activePokemon.name} perdió ${damage} HP.`, ...prev].slice(0, 6))
+  }
+
+  function petSafariPokemon(): void {
+    if (!safariSelected) return
+    const profile = safariNatureProfile(safariSelected)
+    const nextPet = safariPetCount + 1
+    const overTolerance = Math.max(0, nextPet - profile.tolerance)
+    const goodChance = Math.max(0.10, Math.min(0.94,
+      0.58 + (safariMood - 50) / 250 - overTolerance * 0.16
+      + (profile.tolerance >= 5 ? 0.08 : profile.tolerance <= 2 ? -0.08 : 0)
+    ))
+    const good = Math.random() < goodChance
+    const moodDelta = good ? 8 + Math.floor(Math.random() * 8) : -(10 + Math.floor(Math.random() * 10))
+    const bonusDelta = good ? 5 + Math.floor(Math.random() * 5) : -(5 + Math.floor(Math.random() * 5))
+    const nextMood = Math.max(0, Math.min(100, safariMood + moodDelta))
+    const nextThreat = good ? Math.max(0, safariThreat - 8) : safariThreat + 20
+    setSafariPetCount(nextPet)
+    setSafariMood(nextMood)
+    setSafariBonus(prev => Math.max(0, Math.min(60, prev + bonusDelta)))
+    setSafariThreat(nextThreat)
+    setSafariLog(prev => [
+      good
+        ? `💚 A ${safariSelected.name} le gusta la caricia (${profile.label}). Humor ${nextMood}%.`
+        : `💢 A ${safariSelected.name} no le gusta la caricia (${profile.label}). Humor ${nextMood}%.`,
+      ...prev,
+    ].slice(0, 6))
+    if (good) playSelect()
+    else playError()
+    if (!good && (nextMood < 25 || nextThreat >= 60)) {
+      setTimeout(() => safariPokemonAttack(), 350)
+    }
+  }
+
+  function throwSafariBall(): void {
+    if (!safariSelected) return
+    const balls = safariAvailableBalls()
+    const ballName = safariSelectedBall || balls[0]
+    if (!ballName) {
+      setSafariLog(prev => ['🎒 No tienes Poké Balls. Puedes seguir acariciando o salir del Safari.', ...prev].slice(0, 6))
+      playError()
+      return
+    }
+    const ballIndex = inventory.indexOf(ballName)
+    if (ballIndex === -1) return
+    const chance = safariCaptureChance(ballName)
+    const nextInventory = [...inventory]
+    nextInventory.splice(ballIndex, 1)
+    setInventory(nextInventory)
+    setRunStats(prev => ({ ...prev, itemsUsed: prev.itemsUsed + 1 }))
+    if (!nextInventory.some(item => POKEBALL_NAMES.includes(item))) setSafariSelectedBall('')
+    else if (!nextInventory.includes(ballName)) {
+      setSafariSelectedBall(nextInventory.find(item => POKEBALL_NAMES.includes(item)) ?? '')
+    }
+
+    if (Math.random() < chance) {
+      const hpBonus = modifier?.playerMaxHpBonus ?? 0
+      let captured: Pokemon = {
+        ...safariSelected,
+        maxHp: safariSelected.maxHp + hpBonus,
+        hp: safariSelected.maxHp + hpBonus,
+        holdItem: (difficulty === 'hard' || difficulty === 'infinite') ? null : safariSelected.holdItem,
+      }
+      if (runChallenges.noEvolution) captured = applyNoEvolutionBuff(captured)
+      if (runChallenges.fixedLevel) captured = { ...captured, level: 50 }
+      registerInPokedex(captured)
+      setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
+      if (captured.shiny) unlockAchievement('shiny_catch')
+      if ((captured.attack + captured.defense + captured.speed + captured.maxHp) >= 600) unlockAchievement('legendary_catch')
+      if (team.length >= maxTeamSize) {
+        setPcStorage(prev => [...prev, captured])
+        setBattleLog(prev => [t('b.capturedPC', { name: captured.name }), ...prev].slice(0, 15))
+      } else {
+        setTeam(prev => [...prev, captured])
+        setBattleLog(prev => [t('b.captured', { name: captured.name }), ...prev].slice(0, 15))
+      }
+      playCapture()
+      captureSummaryCompleteNodeRef.current = true
+      setCaptureSummary(captured)
+      setSafariLog(prev => [`🏆 ¡${captured.name} fue capturado con ${ballName}!`, ...prev].slice(0, 6))
+      return
+    }
+
+    const nextMood = Math.max(0, safariMood - 12)
+    const nextThreat = safariThreat + 25
+    setSafariMood(nextMood)
+    setSafariThreat(nextThreat)
+    setSafariBonus(prev => Math.max(0, prev - 5))
+    setSafariLog(prev => [`💨 ¡${safariSelected.name} se soltó de la ${ballName}!`, ...prev].slice(0, 6))
+    playError()
+    if (nextMood < 25 || nextThreat >= 60) {
+      setTimeout(() => safariPokemonAttack(), 350)
+    }
   }
 
   function casinoRewardForScore(score: number): { label: string; money: number; item: string | null } {
@@ -9596,7 +9991,7 @@ function MainApp() {
             registerInPokedex(finalEvolved)
             playEvolution()
             setEvoPopup({ oldSprite: updatedPokemon.sprite, newSprite: finalEvolved.sprite, oldName: updatedPokemon.name, newName: finalEvolved.name })
-            setTimeout(() => setEvoPopup(null), 2000)
+            setTimeout(() => setEvoPopup(null), 2000 / accessibility.battleSpeed)
             updatedPokemon = finalEvolved
             if (consumedItem && requiredItem && consumedItem === requiredItem) {
               updatedPokemon = { ...updatedPokemon, holdItem: undefined }
@@ -9610,6 +10005,17 @@ function MainApp() {
     }
 
     return updatedPokemon
+  }
+
+  function showCombatFloat(target: 'player' | 'enemy', text: string, color: string): void {
+    if (!accessibility.floatingDamage) return
+    const data: CombatFloatData = { id: Date.now() + Math.random(), text, color }
+    if (target === 'player') setPlayerCombatFloat(data)
+    else setEnemyCombatFloat(data)
+    window.setTimeout(() => {
+      if (target === 'player') setPlayerCombatFloat(prev => prev?.id === data.id ? null : prev)
+      else setEnemyCombatFloat(prev => prev?.id === data.id ? null : prev)
+    }, 900 / accessibility.battleSpeed)
   }
 
   // Probabilidad de huida de un combate salvaje. Fuga (Run Away) garantiza
@@ -9870,9 +10276,15 @@ function MainApp() {
       nextEnemy = playerHit.updatedDefender
       nextPlayer = playerHit.updatedAttacker
       if (nextEnemy.hp < prevEnemyHp) {
+        const damageDealt = prevEnemyHp - nextEnemy.hp
         setEnemyHitFlash(true)
         playHit()
-        setTimeout(() => setEnemyHitFlash(false), 400)
+        showCombatFloat(
+          'enemy',
+          `-${damageDealt}${playerHit.crits > 0 ? ' CRIT' : playerHit.superEffective ? ' SUPER' : ''}`,
+          playerHit.crits > 0 ? '#ffcb05' : playerHit.superEffective ? '#ff8a33' : '#f3f1ff',
+        )
+        setTimeout(() => setEnemyHitFlash(false), 400 / accessibility.battleSpeed)
       }
       // Golpe Definitivo: el ataque del jugador debilita al enemigo de un golpe.
       if (prevEnemyHp > 0 && nextEnemy.hp <= 0) {
@@ -9885,6 +10297,7 @@ function MainApp() {
       if (playerHit.attackerHeal > 0) {
         const healed = Math.min(nextPlayer.maxHp, nextPlayer.hp + playerHit.attackerHeal)
         nextPlayer = { ...nextPlayer, hp: healed }
+        showCombatFloat('player', `+${playerHit.attackerHeal}`, '#37d16b')
         logs.push(t('b.vampirism', { name: nextPlayer.name, hp: playerHit.attackerHeal }))
       }
       logs.push(...playerHit.lines)
@@ -9934,9 +10347,18 @@ function MainApp() {
       const enemyHit = performHit(nextEnemy, nextPlayer, enemyMove, true, playerStarts)
       nextPlayer = enemyHit.updatedDefender
       nextEnemy = enemyHit.updatedAttacker
+      const damageTaken = Math.max(0, playerHpBeforeEnemyHit - nextPlayer.hp)
+      if (damageTaken > 0) {
+        showCombatFloat(
+          'player',
+          `-${damageTaken}${enemyHit.crits > 0 ? ' CRIT' : enemyHit.superEffective ? ' SUPER' : ''}`,
+          enemyHit.crits > 0 ? '#ffcb05' : enemyHit.superEffective ? '#ff8a33' : '#ff8a80',
+        )
+      }
       if (enemyHit.attackerHeal > 0) {
         const healed = Math.min(nextEnemy.maxHp, nextEnemy.hp + enemyHit.attackerHeal)
         nextEnemy = { ...nextEnemy, hp: healed }
+        showCombatFloat('enemy', `+${enemyHit.attackerHeal}`, '#37d16b')
         logs.push(t('b.vampirism', { name: nextEnemy.name, hp: enemyHit.attackerHeal }))
       }
       logs.push(...enemyHit.lines)
@@ -9975,11 +10397,14 @@ function MainApp() {
       }
     }
 
+    const attackPause = 140 / accessibility.battleSpeed
     if (playerStarts) {
       await doPlayerAttack()
+      await sleep(attackPause)
       await doEnemyAttack()
     } else {
       await doEnemyAttack()
+      await sleep(attackPause)
       await doPlayerAttack()
     }
 
@@ -10494,7 +10919,7 @@ function MainApp() {
       playHit()
       setBattleLog(prev => [t('b.escapedBall', { name: enemy.name, ball: ballName, pct: Math.round(catchProbability * 100) }), ...prev].slice(0, 15))
       setCaptureMessage(`¡${enemy.name} escapó!`)
-      setTimeout(() => setCaptureMessage(null), 2000)
+      setTimeout(() => setCaptureMessage(null), 2000 / accessibility.battleSpeed)
     }
   }
 
@@ -10735,7 +11160,7 @@ function MainApp() {
       registerInPokedex(evolved)
       playEvolution()
       setEvoPopup({ oldSprite: targetPokemon.sprite, newSprite: evolved.sprite, oldName: targetPokemon.name, newName: evolved.name })
-      setTimeout(() => setEvoPopup(null), 2000)
+      setTimeout(() => setEvoPopup(null), 2000 / accessibility.battleSpeed)
       setTeam(prev => prev.map((p, i) => i === teamIndex ? evolved : p))
       setRunStats(prev => ({ ...prev, evolutions: prev.evolutions + 1 }))
       setInventory(prev => prev.filter((_, i) => i !== stoneEvoModal.stoneIndex))
@@ -11469,7 +11894,7 @@ function MainApp() {
       void pvpForfeit()
       return
     }
-    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double' || screen === 'casino') {
+    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'speculator' || screen === 'safari' || screen === 'double' || screen === 'casino') {
       // En Co-op, "Volver a inicio" solo sale a nivel local: NO se finaliza la
       // sesión, para no interrumpir la partida del compañero (la sesión queda
       // activa y el compañero puede continuar solo).
@@ -11492,7 +11917,7 @@ function MainApp() {
     const adventure =
       screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' ||
       screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' ||
-      screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double' ||
+      screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'speculator' || screen === 'safari' || screen === 'double' ||
       screen === 'casino'
     if (!adventure) return
     if (resetPendingRef.current) return
@@ -11661,7 +12086,7 @@ function MainApp() {
           <button className="tiny-btn" type="button" onClick={() => { playClick(); if (screen === 'setup') { onRestartRun() } else { setShowRestartConfirm(true) } }}>
             {t('topbar.restart')}
           </button>
-          {!coopMode && (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double' || screen === 'casino') && (
+          {!coopMode && (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'speculator' || screen === 'safari' || screen === 'double' || screen === 'casino') && (
             <button
               className="tiny-btn"
               type="button"
@@ -12702,6 +13127,74 @@ function MainApp() {
                       style={{ flex: 1, height: '6px', cursor: 'pointer', background: `linear-gradient(to right, #f59e0b ${sfxVol}%, rgba(255,255,255,0.12) ${sfxVol}%)` }}
                     />
                     <span style={{ fontSize: '0.8rem', color: '#9b98cf', minWidth: '32px', textAlign: 'right' }}>{sfxVol}%</span>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+                  <strong style={{ fontSize: '1rem', color: '#f8fafc', display: 'block', marginBottom: '0.6rem' }}>
+                    ♿ {t('options.accessibility')}
+                  </strong>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem 0.75rem', marginBottom: '0.75rem' }}>
+                    {([
+                      ['reduceAnimations', t('options.reduceAnimations')],
+                      ['highContrast', t('options.highContrast')],
+                      ['colorBlind', t('options.colorBlind')],
+                      ['readableFont', t('options.readableFont')],
+                      ['floatingDamage', t('options.floatingDamage')],
+                    ] as const).map(([key, label]) => (
+                      <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8rem', color: '#d9d6f2' }}>
+                        <input
+                          type="checkbox"
+                          checked={accessibility[key]}
+                          onChange={(e) => {
+                            playClick()
+                            setAccessibility(prev => ({ ...prev, [key]: e.target.checked }))
+                          }}
+                          style={{ width: '16px', height: '16px', accentColor: '#4d9bff', cursor: 'pointer' }}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9b98cf', fontSize: '0.78rem', marginBottom: '0.25rem' }}>
+                      <span>{t('options.textSize')}</span><span>{accessibility.textScale}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={85}
+                      max={130}
+                      step={5}
+                      value={accessibility.textScale}
+                      onChange={(e) => setAccessibility(prev => ({ ...prev, textScale: Number(e.target.value) }))}
+                      className="range-slider"
+                      style={{ width: '100%', height: '6px', cursor: 'pointer', background: `linear-gradient(to right, #4d9bff ${((accessibility.textScale - 85) / 45) * 100}%, rgba(255,255,255,0.12) ${((accessibility.textScale - 85) / 45) * 100}%)` }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <span style={{ color: '#9b98cf', fontSize: '0.78rem' }}>⚡ {t('options.battleSpeed')}</span>
+                    {([1, 2, 4] as const).map(speed => (
+                      <button
+                        key={speed}
+                        type="button"
+                        onClick={() => { playClick(); setAccessibility(prev => ({ ...prev, battleSpeed: speed })) }}
+                        style={{
+                          padding: '5px 10px',
+                          borderRadius: '7px',
+                          border: `1px solid ${accessibility.battleSpeed === speed ? '#ffcb05' : '#475569'}`,
+                          background: accessibility.battleSpeed === speed ? 'rgba(250,204,21,0.16)' : 'transparent',
+                          color: accessibility.battleSpeed === speed ? '#ffcb05' : '#9b98cf',
+                          fontWeight: 'bold',
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        x{speed}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -14031,7 +14524,7 @@ function MainApp() {
         </section>
       )}
 
-      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'double' || screen === 'casino') && activePokemon && (
+      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'speculator' || screen === 'safari' || screen === 'double' || screen === 'casino') && activePokemon && (
         <section className="roulette-layout">
           <article className="panel trainer-panel">
             <p className="muted small-tag">{t('route.trainer')}</p>
@@ -14040,6 +14533,7 @@ function MainApp() {
                 <img className={`sprite trainer-sprite${activePokemon.megaEvolved ? ' mega-active' : ''}${activePokemon.gmaxEvolved ? ' gmax-active' : ''} ${statusSpriteClass(activePokemon.status, activePokemon.leechSeed)}`} src={activePokemon.sprite} alt={activePokemon.name} onError={fallbackSprite} />
               </ThemedTooltip>
               <StatusFloat pokemon={activePokemon} />
+              <FloatingCombatText data={playerCombatFloat} />
             </div>
             <h2>
               {activePokemon.name}{activePokemon.shiny ? ' ✨' : ''}
@@ -14864,6 +15358,238 @@ function MainApp() {
               </div>
             )}
 
+            {screen === 'safari' && (() => {
+              const balls = safariAvailableBalls()
+              const profile = safariSelected ? safariNatureProfile(safariSelected) : null
+              const chance = safariSelectedBall ? safariCaptureChance(safariSelectedBall) : 0
+              const moodColor = safariMood >= 60 ? '#37d16b' : safariMood >= 30 ? '#facc15' : '#ef4444'
+              return (
+                <div className="action-block shop-block" style={{ marginTop: '1rem', borderColor: 'rgba(34,197,94,0.55)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <h3 style={{ margin: 0, color: '#22c55e' }}>🦁 Safari</h3>
+                    <span style={{ fontSize: '0.85rem', color: '#9b98cf' }}>Solo Poké Balls · sin ataques</span>
+                  </div>
+
+                  {safariLoading ? (
+                    <p style={{ color: '#9b98cf', fontSize: '0.85rem', textAlign: 'center', padding: '1.5rem 0' }}>Preparando las siluetas del Safari...</p>
+                  ) : !safariSelected ? (
+                    <>
+                      <p style={{ color: '#9b98cf', fontSize: '0.82rem', lineHeight: 1.45, marginBottom: '0.9rem' }}>
+                        Elige una de las tres siluetas. El Pokémon aparecerá adaptado al nivel de tu aventura. Después podrás acariciarlo para mejorar su humor y su captura, pero ten cuidado: si te pasas o se siente amenazado, puede reaccionar mal.
+                      </p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+                        {safariChoices.map((p, index) => (
+                          <button
+                            key={`${p.id}-${index}`}
+                            type="button"
+                            onClick={() => selectSafariPokemon(p)}
+                            style={{ padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #22c55e', background: 'rgba(34,197,94,0.08)', cursor: 'pointer', fontFamily: 'inherit' }}
+                          >
+                            <img src={p.sprite} alt="Silueta" onError={fallbackSprite} style={{ width: '72px', height: '72px', imageRendering: 'pixelated', filter: 'brightness(0) saturate(100%)', opacity: 0.85 }} />
+                            <div style={{ color: '#86efac', fontWeight: 'bold', fontSize: '0.85rem', marginTop: '0.4rem' }}>Silueta {index + 1}</div>
+                            <div style={{ color: '#7d7ab5', fontSize: '0.7rem' }}>Haz clic para revelar</div>
+                          </button>
+                        ))}
+                      </div>
+                      {safariChoices.length === 0 && <p style={{ color: '#ff8a80', fontSize: '0.82rem' }}>No se encontraron Pokémon para el Safari.</p>}
+                      <button className="cta" type="button" onClick={() => { setSafariSelected(null); setSafariChoices([]); completeCurrentNode() }} style={{ width: '100%' }}>Salir del Safari</button>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                        <img src={safariSelected.sprite} alt={safariSelected.name} onError={fallbackSprite} style={{ width: '92px', height: '92px', imageRendering: 'pixelated' }} />
+                        <div style={{ minWidth: 0 }}>
+                          <strong style={{ display: 'block', color: '#f3f1ff', fontSize: '1.1rem', textTransform: 'capitalize' }}>{safariSelected.name} {safariSelected.shiny ? '✨' : ''}</strong>
+                          <span style={{ color: '#9b98cf', fontSize: '0.78rem' }}>Nv. {safariSelected.level} · Naturaleza: {natureName(safariSelected.nature, language)} ({profile?.label})</span>
+                          <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', marginTop: '4px' }}>
+                            {safariSelected.types?.map(type => (
+                              <span key={type} style={{ background: TYPE_COLORS[type] ?? '#475569', color: '#fff', fontSize: '0.6rem', padding: '1px 6px', borderRadius: '4px', textTransform: 'capitalize' }}>{type}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9b98cf', fontSize: '0.72rem', marginBottom: '2px' }}>
+                            <span>Humor {safariMoodEmoji(safariMood)}</span><span>{safariMood}%</span>
+                          </div>
+                          <div style={{ height: '9px', background: '#0f172a', borderRadius: '999px', overflow: 'hidden' }}>
+                            <div style={{ width: `${safariMood}%`, height: '100%', background: moodColor, transition: 'width 0.25s ease' }} />
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9b98cf', fontSize: '0.72rem', marginBottom: '2px' }}>
+                            <span>Tensión</span><span>{safariThreat}%</span>
+                          </div>
+                          <div style={{ height: '9px', background: '#0f172a', borderRadius: '999px', overflow: 'hidden' }}>
+                            <div style={{ width: `${safariThreat}%`, height: '100%', background: safariThreat >= 60 ? '#ef4444' : '#fb923c', transition: 'width 0.25s ease' }} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', color: '#cbd5e1', fontSize: '0.78rem', marginBottom: '0.7rem' }}>
+                        <span>Caricias: <strong style={{ color: '#86efac' }}>{safariPetCount}</strong> / tolerancia {profile?.tolerance}</span>
+                        <span>Bonus captura: <strong style={{ color: '#7dd3fc' }}>+{safariBonus}%</strong></span>
+                        <span>Posibilidad: <strong style={{ color: '#fde047' }}>{Math.round(chance * 100)}%</strong></span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.8rem' }}>
+                        <button
+                          type="button"
+                          onClick={petSafariPokemon}
+                          style={{ padding: '8px 12px', borderRadius: '7px', border: '1px solid #22c55e', background: 'rgba(34,197,94,0.16)', color: '#86efac', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}
+                        >
+                          🤚 Acariciar
+                        </button>
+                        <select
+                          value={safariSelectedBall}
+                          onChange={(e) => setSafariSelectedBall(e.target.value)}
+                          disabled={balls.length === 0}
+                          style={{ padding: '8px 10px', borderRadius: '7px', border: '1px solid #3f3f6e', background: '#0f172a', color: '#f3f1ff', fontSize: '0.8rem', fontFamily: 'inherit' }}
+                        >
+                          {balls.length === 0 ? <option value="">Sin Poké Balls</option> : balls.map(ball => {
+                            const count = inventory.filter(item => item === ball).length
+                            return <option key={ball} value={ball}>{itemLocalizedName(ball)} ×{count} · {Math.round(safariCaptureChance(ball) * 100)}%</option>
+                          })}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={throwSafariBall}
+                          disabled={balls.length === 0}
+                          style={{
+                            padding: '8px 12px',
+                            borderRadius: '7px',
+                            border: `1px solid ${balls.length > 0 ? '#10b981' : '#dc2626'}`,
+                            background: balls.length > 0 ? '#10b981' : 'rgba(239,68,68,0.16)',
+                            color: balls.length > 0 ? '#052e16' : '#ff8a80',
+                            fontWeight: 'bold',
+                            fontSize: '0.8rem',
+                            cursor: balls.length > 0 ? 'pointer' : 'not-allowed',
+                            fontFamily: 'inherit',
+                          }}
+                        >
+                          Lanzar {safariSelectedBall ? itemLocalizedName(safariSelectedBall) : 'Poké Ball'}
+                        </button>
+                      </div>
+
+                      {safariLog.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '0.8rem' }}>
+                          {safariLog.map((line, index) => (
+                            <div key={`${line}-${index}`} style={{ fontSize: '0.72rem', color: index === 0 ? '#f3f1ff' : '#9b98cf', background: 'rgba(0,0,0,0.22)', padding: '4px 7px', borderRadius: '5px' }}>{line}</div>
+                          ))}
+                        </div>
+                      )}
+
+                      <button className="cta" type="button" onClick={() => { setSafariSelected(null); setSafariChoices([]); completeCurrentNode() }} style={{ width: '100%' }}>Salir del Safari</button>
+                    </>
+                  )}
+                </div>
+              )
+            })()}
+
+            {screen === 'speculator' && (() => {
+              const canModifyTeam = !runChallenges.soloStarter && !runChallenges.fixedTeam
+              const renderRow = (p: Pokemon, kind: 'team' | 'pc', index: number) => {
+                const price = speculatorPrice(p)
+                const typeMult = speculatorTypeMultiplier(p)
+                const canSell = canModifyTeam && !(kind === 'team' && team.length <= 1)
+                return (
+                  <div key={`${kind}-${index}-${p.name}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', background: 'rgba(0,0,0,0.3)', padding: '7px 10px', borderRadius: '6px', border: '1px solid rgba(255,138,51,0.22)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '34px', height: '34px', imageRendering: 'pixelated', flexShrink: 0 }} />
+                      <div style={{ minWidth: 0 }}>
+                        <strong style={{ display: 'block', color: '#f3f1ff', fontSize: '0.85rem', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}{p.shiny ? ' ✨' : ''} <span style={{ color: '#9b98cf', fontWeight: 'normal' }}>Nv.{p.level}</span></strong>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', marginTop: '2px' }}>
+                          {p.types?.map(type => (
+                            <span key={type} style={{ background: TYPE_COLORS[type] ?? '#475569', color: '#fff', fontSize: '0.58rem', padding: '1px 5px', borderRadius: '3px', textTransform: 'capitalize' }}>{type}</span>
+                          ))}
+                          <span style={{ color: '#ffb37a', fontSize: '0.62rem' }}>Tipo ×{typeMult.toFixed(2)}{p.shiny ? ' · ✨ ×2' : ''}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canSell}
+                      onClick={() => { if (!canSell) { playError(); return } setSpeculatorConfirm({ kind, index, name: p.name, price }) }}
+                      title={!canModifyTeam ? t('b.noModifyTeam') : kind === 'team' && team.length <= 1 ? t('b.speculatorLastTeam') : undefined}
+                      style={{
+                        minWidth: '104px',
+                        padding: '6px 9px',
+                        borderRadius: '6px',
+                        border: `1px solid ${canSell ? '#10b981' : '#dc2626'}`,
+                        background: canSell ? 'rgba(16,185,129,0.18)' : 'rgba(239,68,68,0.18)',
+                        color: canSell ? '#7ceb95' : '#ff8a80',
+                        fontWeight: 'bold',
+                        fontSize: '0.72rem',
+                        cursor: canSell ? 'pointer' : 'not-allowed',
+                        fontFamily: 'inherit',
+                        flexShrink: 0,
+                      }}
+                    >
+                      Vender ${price}
+                    </button>
+                  </div>
+                )
+              }
+              return (
+                <div className="action-block shop-block" style={{ marginTop: '1rem', borderColor: 'rgba(255,138,51,0.55)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <h3 style={{ margin: 0, color: '#ff8a33' }}>🙊 Especulador</h3>
+                    <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#7ceb95' }}>{t('shop.money')}: ${money}</span>
+                  </div>
+                  <p style={{ color: '#9b98cf', fontSize: '0.8rem', lineHeight: 1.45, marginBottom: '0.75rem' }}>
+                    Vende Pokémon de tu equipo o del PC por dinero de la partida. El precio depende del <strong style={{ color: '#ffb37a' }}>tipo</strong>, nivel y rareza: los tipos más poderosos pagan más. Los shinys valen el doble.
+                  </p>
+
+                  {speculatorConfirm && (
+                    <div style={{ background: 'rgba(255,138,51,0.12)', border: '1px solid #ff8a33', borderRadius: '8px', padding: '0.7rem', marginBottom: '0.9rem' }}>
+                      <strong style={{ display: 'block', color: '#ffb37a', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
+                        ¿Vender a {speculatorConfirm.name}?
+                      </strong>
+                      <p style={{ margin: '0 0 0.55rem', color: '#d9d6f2', fontSize: '0.78rem' }}>
+                        Recibirás <strong style={{ color: '#7ceb95' }}>${speculatorConfirm.price}</strong>. Esta acción no se puede deshacer.
+                      </p>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => sellSpeculatorPokemon(speculatorConfirm.kind, speculatorConfirm.index, speculatorConfirm.price)}
+                          style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #10b981', background: '#10b981', color: '#052e16', fontWeight: 'bold', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}
+                        >
+                          Confirmar venta
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSpeculatorConfirm(null)}
+                          style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #64748b', background: 'transparent', color: '#cbd5e1', fontWeight: 'bold', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <h4 style={{ color: '#ff8a33', margin: '0 0 0.4rem', fontSize: '0.9rem' }}>Equipo ({team.length})</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '1rem' }}>
+                    {team.length === 0 ? (
+                      <p style={{ color: '#7d7ab5', fontSize: '0.8rem', margin: 0 }}>No tienes Pokémon en el equipo.</p>
+                    ) : team.map((p, index) => renderRow(p, 'team', index))}
+                  </div>
+
+                  <h4 style={{ color: '#ff8a33', margin: '0 0 0.4rem', fontSize: '0.9rem' }}>PC ({pcStorage.length})</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '320px', overflowY: 'auto', marginBottom: '1rem' }}>
+                    {pcStorage.length === 0 ? (
+                      <p style={{ color: '#7d7ab5', fontSize: '0.8rem', margin: 0 }}>No tienes Pokémon en el PC.</p>
+                    ) : pcStorage.map((p, index) => renderRow(p, 'pc', index))}
+                  </div>
+
+                  <button className="cta" onClick={() => { setSpeculatorConfirm(null); completeCurrentNode() }} type="button" style={{ width: '100%' }}>
+                    Salir del Especulador
+                  </button>
+                </div>
+              )
+            })()}
+
             {screen === 'trade' && (
               <div className="action-block shop-block" style={{ marginTop: '1rem' }}>
                 <div style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
@@ -15263,7 +15989,7 @@ function MainApp() {
                   {t('route.nextNode', { name: `${nodeTypeLabel(currentNode)} #${currentNode.id}` })}
                 </p>
                 <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={() => enterNode()} type="button" disabled={isLoading}>
-                  {isLoading ? t('node.searching') : currentNode.type === 'teamRocket' ? t('node.teamRocket') : currentNode.type === 'spin' ? t('node.spin') : currentNode.type === 'pokeRand' ? t('node.pokeRand') : currentNode.type === 'mega' ? t('node.mega') : currentNode.type === 'gmax' ? t('node.gmax') : currentNode.type === 'primal' ? t('node.primal') : currentNode.type === 'trade' ? t('node.trade') : currentNode.type === 'rival' ? t('node.rival') : currentNode.type === 'blackmarket' ? t('node.blackmarket') : currentNode.type === 'double' ? t('node.double') : currentNode.type === 'casino' ? t('node.casino') : currentNode.type === 'legendary' ? t('node.legendary') : t('node.enter')}
+                  {isLoading ? t('node.searching') : currentNode.type === 'teamRocket' ? t('node.teamRocket') : currentNode.type === 'spin' ? t('node.spin') : currentNode.type === 'pokeRand' ? t('node.pokeRand') : currentNode.type === 'mega' ? t('node.mega') : currentNode.type === 'gmax' ? t('node.gmax') : currentNode.type === 'primal' ? t('node.primal') : currentNode.type === 'trade' ? t('node.trade') : currentNode.type === 'rival' ? t('node.rival') : currentNode.type === 'blackmarket' ? t('node.blackmarket') : currentNode.type === 'speculator' ? t('node.speculator') : currentNode.type === 'safari' ? t('node.safari') : currentNode.type === 'double' ? t('node.double') : currentNode.type === 'casino' ? t('node.casino') : currentNode.type === 'legendary' ? t('node.legendary') : t('node.enter')}
                 </button>
               </div>
             )}
@@ -15585,6 +16311,7 @@ function MainApp() {
                 <div style={{ position: 'relative', display: 'inline-block' }}>
                   <img className={`sprite enemy-sprite${enemy.gmaxEvolved ? ' gmax-active' : ''} ${statusSpriteClass(enemy.status, enemy.leechSeed)}`} src={enemy.sprite} alt={enemy.name} onError={fallbackSprite} style={enemyHitFlash ? { filter: 'brightness(1.5) sepia(1) hue-rotate(-40deg) saturate(5)', transition: 'filter 0.05s' } : { transition: 'filter 0.3s' }} />
                   <StatusFloat pokemon={enemy} />
+                  <FloatingCombatText data={enemyCombatFloat} />
                 </div>
                 <div className="hp-line">
                   <span>HP rival</span>
@@ -17212,7 +17939,7 @@ function MainApp() {
                   ['battle', 'help.battle'], ['rest', 'help.rest'], ['shop', 'help.shop'], ['boss', 'help.boss'],
                   ['teamRocket', 'help.teamRocket'], ['spin', 'help.spin'], ['pokeRand', 'help.pokeRand'], ['move', 'help.move'],
                   ['mega', 'help.mega'], ['gmax', 'help.gmax'], ['primal', 'help.primal'], ['trade', 'help.trade'],
-                  ['rival', 'help.rival'], ['blackmarket', 'help.blackmarket'], ['double', 'help.double'], ['casino', 'help.casino'],
+                  ['rival', 'help.rival'], ['blackmarket', 'help.blackmarket'], ['speculator', 'help.speculator'], ['safari', 'help.safari'], ['double', 'help.double'], ['casino', 'help.casino'],
                   ['elite', 'help.elite'], ['legendary', 'help.legendary'],
                 ] as Array<[string, string]>).map(([type, key], i) => (
                   <div

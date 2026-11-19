@@ -63,6 +63,14 @@ const DICT: Record<string, Entry> = {
   // ---------- Options modal ----------
   'options.musicVolume': { es: 'Volumen de Música', en: 'Music Volume' },
   'options.sfxVolume': { es: 'Volumen de Efectos', en: 'Sound Effects Volume' },
+  'options.accessibility': { es: 'Accesibilidad', en: 'Accessibility' },
+  'options.reduceAnimations': { es: 'Reducir animaciones', en: 'Reduce animations' },
+  'options.highContrast': { es: 'Alto contraste', en: 'High contrast' },
+  'options.colorBlind': { es: 'Paleta para daltonismo', en: 'Colorblind-friendly palette' },
+  'options.readableFont': { es: 'Fuente más legible', en: 'More readable font' },
+  'options.textSize': { es: 'Tamaño de texto', en: 'Text size' },
+  'options.floatingDamage': { es: 'Números de daño flotantes', en: 'Floating damage numbers' },
+  'options.battleSpeed': { es: 'Velocidad de combate', en: 'Battle speed' },
   'options.theme': { es: 'Tema Visual', en: 'Visual Theme' },
   'options.music': { es: 'Música', en: 'Music' },
   'options.menu': { es: 'Menú', en: 'Menu' },
@@ -138,6 +146,8 @@ const DICT: Record<string, Entry> = {
   'node.trade': { es: '🤝 Intercambiar', en: '🤝 Trade' },
   'node.rival': { es: '👤 ¡Enfrentar al Rival!', en: '👤 Fight the Rival!' },
   'node.blackmarket': { es: '🕶️ Entrar al Mercado Negro', en: '🕶️ Enter the Black Market' },
+  'node.speculator': { es: '🙊 Vender Pokémon al Especulador', en: '🙊 Sell Pokémon to the Speculator' },
+  'node.safari': { es: '🦁 Entrar al Safari', en: '🦁 Enter the Safari' },
   'node.double': { es: '🥊 ¡Combate Doble!', en: '🥊 Double Battle!' },
   'node.casino': { es: '🃏 ¡Jugar al Casino!', en: '🃏 Play the Casino!' },
   'node.legendary': { es: '🐉 ¡Enfrentar al Legendario!', en: '🐉 Fight the Legendary!' },
@@ -503,6 +513,8 @@ const DICT: Record<string, Entry> = {
   'b.boughtMarket': { es: '🕶️ Compraste {item} en el mercado negro por ${price}.', en: '🕶️ You bought {item} at the black market for ${price}.' },
   'b.soldMarket': { es: '🕶️ Vendiste {item} por ${value}.', en: '🕶️ You sold {item} for ${value}.' },
   'b.boughtMarketPokemon': { es: '🕶️ Compraste a {name} (Nv.{lvl}) por ${price}.', en: '🕶️ You bought {name} (Lv.{lvl}) for ${price}.' },
+  'b.speculatorSold': { es: '🙊 Vendiste a {name} al Especulador por ${price}.', en: '🙊 You sold {name} to the Speculator for ${price}.' },
+  'b.speculatorLastTeam': { es: '🙊 No puedes vender a tu último Pokémon de equipo.', en: '🙊 You cannot sell your last team Pokémon.' },
   'b.synergy': { es: '🔗 ¡SINERGIA: {name}! {desc}', en: '🔗 SYNERGY: {name}! {desc}' },
   'b.trainerTeam': { es: 'Equipo: {n} Pokémon', en: 'Team: {n} Pokémon' },
   'battle.leader': { es: 'Líder {name}', en: 'Leader {name}' },
@@ -628,9 +640,9 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v3.2.3', en: 'v3.2.3' },
+  'help.version': { es: 'v3.3.0', en: 'v3.3.0' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
-  'changelog.button': { es: 'Ver cambios v3.2.3', en: 'See changes v3.2.3' },
+  'changelog.button': { es: 'Ver cambios v3.3.0', en: 'See changes v3.3.0' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -656,6 +668,8 @@ const DICT: Record<string, Entry> = {
   'help.trade': { es: 'Intercambia Pokémon con el Comerciante.', en: 'Trade Pokémon with the Merchant.' },
   'help.rival': { es: 'Tu rival recurrente; aparece cada ~6 nodos.', en: 'Your recurring rival; appears every ~6 nodes.' },
   'help.blackmarket': { es: 'Compra barato, vende y adquiere Pokémon.', en: 'Buy cheap, sell and acquire Pokémon.' },
+  'help.speculator': { es: 'Vende Pokémon de tu equipo o PC por dinero de la partida; los tipos raros pagan más. Solo aparece en Difícil e Infinite.', en: 'Sell Pokémon from your team or PC for run money; rarer types pay more. Appears only on Hard and Infinite.' },
+  'help.safari': { es: 'Elige entre 3 siluetas, acaricia según su naturaleza y captura solo con Poké Balls. No puedes atacar, pero el Pokémon puede golpearte si se siente amenazado.', en: 'Pick one of 3 silhouettes, pet it according to its nature and catch it using only Poké Balls. You cannot attack, but the Pokémon may hit you if it feels threatened.' },
   'help.double': { es: 'Combate 2 contra 2.', en: 'A 2-vs-2 battle.' },
   'help.casino': { es: 'Minijuego al azar con recompensas según tu puntuación.', en: 'Random minigame with rewards based on your score.' },
   'help.battleTitle': { es: '⚔️ Combate', en: '⚔️ Battle' },
@@ -1973,6 +1987,18 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v3.3.0',
+    items: [
+      { es: '🙊 Nuevo nodo Especulador, exclusivo de Difícil e Infinite: vende Pokémon de tu equipo o PC por dinero de la partida. El precio depende del tipo (con multiplicador visible), nivel y rareza; los shinys pagan el doble.', en: '🙊 New Speculator node, exclusive to Hard and Infinite: sell Pokémon from your team or PC for run money. The price depends on type (with a visible multiplier), level and rarity; shinies pay double.' },
+      { es: '🟠 El nodo usa el emoji 🙊 y color naranja, y aparece en la lista de nodos de la ayuda con su explicación. La interfaz muestra equipo y PC por separado, el desglose de precio, confirmación antes de vender y bloquea vender a tu último Pokémon de equipo o modificar el equipo bajo desafíos de equipo fijo.', en: '🟠 The node uses the 🙊 emoji and orange color, and appears in the help node list with its explanation. The interface shows team and PC separately, the price breakdown, a confirmation before selling, and blocks selling your last team Pokémon or modifying the team under fixed-team challenges.' },
+      { es: '🛡️ La venta ajusta correctamente el índice activo si vendes a tu Pokémon en combate y actualiza el dinero de la partida sin tocar PokéCoins.', en: '🛡️ Selling correctly adjusts the active index if you sell your current battler and updates run money without touching PokéCoins.' },
+      { es: '🦁 Nuevo nodo Safari: elige entre 3 siluetas, revela un Pokémon adaptado al nivel de la aventura y captúralo solo con Poké Balls. Puedes acariciarlo para subir humor y probabilidad, pero su naturaleza, la tolerancia y la tensión hacen que pueda tomárselo mal. No puedes atacar, aunque el Pokémon puede golpearte si se siente amenazado.', en: '🦁 New Safari node: pick one of 3 silhouettes, reveal a Pokémon scaled to the adventure level and catch it using only Poké Balls. You can pet it to raise its mood and capture chance, but its nature, tolerance and tension can make it react badly. You cannot attack, though the Pokémon may hit you if it feels threatened.' },
+      { es: '📊 El resumen de datos del Pokémon (naturaleza, IVs, habilidad, nivel y tipos) aparece ahora también al rescatar un Pokémon del Team Rocket y al conseguirlo en un nodo PokeRand, además de en las capturas salvajes, descansos, legendarios y Safari.', en: '📊 The Pokémon data summary (nature, IVs, ability, level and types) now also appears when rescuing a Pokémon from Team Rocket and when obtaining one from a PokeRand node, in addition to wild captures, rest encounters, legendaries and Safari.' },
+      { es: '♿ Nuevas opciones de accesibilidad en Ajustes: reducir animaciones, alto contraste, paleta para daltonismo, fuente más legible, tamaño de texto ajustable (85-130%) y números de daño flotantes activables.', en: '♿ New accessibility options in Settings: reduce animations, high contrast, colorblind-friendly palette, more readable font, adjustable text size (85-130%) and toggleable floating damage numbers.' },
+      { es: '⚡ Velocidad de combate x1/x2/x4: acelera el ritmo entre ataques, los destellos de golpe y las animaciones de evolución/captura para farmear más rápido.', en: '⚡ Battle speed x1/x2/x4: speeds up the pacing between attacks, hit flashes and evolution/capture animations for faster farming.' },
+    ],
+  },
   {
     version: 'v3.2.3',
     items: [

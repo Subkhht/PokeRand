@@ -33,6 +33,8 @@ Cada ruta es una línea de nodos (combates, tiendas, descansos, etc.). El tipo d
 | **Mega / G-MAX / Primal** | Encuentros especiales (Hard/Infinite) que otorgan Mega Piedra, Banda Dynamax o Prismas. |
 | **Casino** | Minijuego al azar con recompensas según tu puntuación. |
 | **Intercambio / Mercado Negro** | Cambiar Pokémon con el Comerciante o comprar/vender a buen precio. |
+| **Especulador** | Solo en Difícil e Infinite: vende Pokémon de tu equipo o PC por dinero de la partida. El precio depende del tipo, nivel y rareza; los shinys pagan el doble. |
+| **Safari** | Elige entre 3 siluetas y captura usando solo Poké Balls. Acaricia al Pokémon según su naturaleza y humor; puede reaccionar mal y golpearte si se siente amenazado. |
 | **Combate Doble** | Batalla 2v2. |
 
 ---

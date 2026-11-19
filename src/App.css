@@ -5850,3 +5850,111 @@ html body .tiny-btn.buy-red:disabled {
     max-height: none;
   }
 }
+
+/* ============================================================
+   ACCESIBILIDAD Y EFECTOS FLOTANTES DE COMBATE
+   ============================================================ */
+
+html[data-reduce-animations="true"] *,
+html[data-reduce-animations="true"] *::before,
+html[data-reduce-animations="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+html[data-high-contrast="true"] {
+  --text-muted: #e2e8f0;
+  --panel-border: #cbd5e1;
+  --border-light: #f1f5f9;
+}
+
+html[data-high-contrast="true"] .panel,
+html[data-high-contrast="true"] .pokedex-frame,
+html[data-high-contrast="true"] .modal-backdrop > .panel {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 0 0 1px #020617, 0 0 0 3px #cbd5e1 !important;
+}
+
+html[data-high-contrast="true"] .muted,
+html[data-high-contrast="true"] .small-tag {
+  color: #e2e8f0 !important;
+}
+
+html[data-colorblind="true"] {
+  --accent-red: #d55e00;
+  --accent-green: #0072b2;
+  --accent-yellow: #f0e442;
+  --accent-blue: #56b4e9;
+}
+
+html[data-readable-font="true"] {
+  --font-title: 'Space Grotesk', 'DM Mono', sans-serif;
+  --font-body: 'Space Grotesk', 'DM Mono', sans-serif;
+}
+
+html[data-readable-font="true"] body,
+html[data-readable-font="true"] h1,
+html[data-readable-font="true"] h2,
+html[data-readable-font="true"] h3,
+html[data-readable-font="true"] h4,
+html[data-readable-font="true"] h5,
+html[data-readable-font="true"] h6,
+html[data-readable-font="true"] p,
+html[data-readable-font="true"] li,
+html[data-readable-font="true"] label,
+html[data-readable-font="true"] button,
+html[data-readable-font="true"] input,
+html[data-readable-font="true"] select,
+html[data-readable-font="true"] textarea,
+html[data-readable-font="true"] .panel,
+html[data-readable-font="true"] .move-btn,
+html[data-readable-font="true"] .cta,
+html[data-readable-font="true"] .tiny-btn {
+  font-family: 'Space Grotesk', 'DM Mono', sans-serif !important;
+}
+
+.damage-float {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  z-index: 40;
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: var(--font-title);
+  font-size: clamp(0.9rem, 2vw, 1.35rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 0 #000, 0 0 8px #000, 0 0 16px rgba(0, 0, 0, 0.7);
+  animation: damageFloatUp 0.9s ease-out forwards;
+}
+
+@keyframes damageFloatUp {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -46px) scale(1);
+  }
+}
+
+html[data-battle-speed="2"] .damage-float {
+  animation-duration: 0.45s;
+}
+
+html[data-battle-speed="4"] .damage-float {
+  animation-duration: 0.23s;
+}
+
+html[data-reduce-animations="true"] .damage-float {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: translate(-50%, -18px) !important;
+}
