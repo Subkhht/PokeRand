@@ -145,8 +145,8 @@ function gameEvolutionInfo(sourceName: string, details?: NonNullable<EvolutionCh
     // Seadra → Kingdra evoluciona con la Escama Dragón al nivel 45.
     level = 45
   } else if (name === 'slowpoke' && details?.held_item?.name === 'kings-rock') {
-    // Slowpoke → Slowking evoluciona con la Roca del Rey al nivel 30.
-    level = 30
+    // Slowpoke → Slowking evoluciona con la Roca del Rey equipada al nivel 37.
+    level = 37
   } else if (name === 'happiny') {
     // Happiny → Chansey evoluciona con la Piedra Oval al nivel 35.
     level = 35
@@ -2355,11 +2355,11 @@ export async function getEvolutionInfo(pokemonId: number): Promise<{ nextName: s
     if (pokemonId === 206) {
       return { nextName: Math.random() < 0.5 ? 'dudunsparce' : 'dudunsparce-three-segment', evolutionLevel: 45, heldItem: null, heldItemEvolutions: [], minAppearLevel: null }
     }
-    // Slowpoke → Slowking: en este juego evoluciona con la Roca del Rey al
-    // nivel 30 (la cadena de PokeAPI lo marca como intercambio a nivel 35).
-    // Slowbro sigue evolucionando por nivel a 37.
+    // Slowpoke → Slowbro por nivel 37 (sin objeto) o → Slowking al nivel 37
+    // con la Roca del Rey equipada (la cadena de PokeAPI lo marca como
+    // intercambio, así que se adapta a este juego).
     if (pokemonId === 79) {
-      return { nextName: 'slowbro', evolutionLevel: 37, heldItem: null, heldItemEvolutions: [{ item: "King's Rock", target: 'slowking', level: 30 }], minAppearLevel: null }
+      return { nextName: 'slowbro', evolutionLevel: 37, heldItem: null, heldItemEvolutions: [{ item: "King's Rock", target: 'slowking', level: 37 }], minAppearLevel: null }
     }
     // Slowpoke de Galar → Slowbro de Galar (Brazal Galanuez) o → Slowking de
     // Galar (Corona Galanuez): evoluciona con los objetos desde el inventario

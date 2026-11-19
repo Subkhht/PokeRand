@@ -628,9 +628,9 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v3.2.2', en: 'v3.2.2' },
+  'help.version': { es: 'v3.2.3', en: 'v3.2.3' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
-  'changelog.button': { es: 'Ver cambios v3.2.2', en: 'See changes v3.2.2' },
+  'changelog.button': { es: 'Ver cambios v3.2.3', en: 'See changes v3.2.3' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -1973,6 +1973,15 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v3.2.3',
+    items: [
+      { es: '🧬 Corregido el bug de evolución por nivel en Pokémon con una evolución alternativa mediante objeto. Ahora Kirlia evoluciona a Gardevoir, Snorunt a Glalie, Slowpoke a Slowbro y Mime Jr. a Mr. Mime sin necesidad de llevar la piedra u objeto alternativo. Las ramas con objeto (Gallade, Froslass, Slowking, etc.) siguen funcionando al equipar el objeto correspondiente.', en: '🧬 Fixed level-up evolution for Pokémon with an alternative item evolution. Kirlia now evolves into Gardevoir, Snorunt into Glalie, Slowpoke into Slowbro and Mime Jr. into Mr. Mime without needing the alternative stone or item. Item branches (Gallade, Froslass, Slowking, etc.) still work when holding the matching item.' },
+      { es: '🔎 La comprobación distingue ahora entre una evolución alternativa con objeto y una evolución por defecto que realmente exige objeto, por lo que Scyther, Porygon2, Dusclops, Seadra, Rhydon y similares siguen necesitando su objeto.', en: '🔎 The check now distinguishes between an alternative item evolution and a default evolution that truly requires an item, so Scyther, Porygon2, Dusclops, Seadra, Rhydon and similar Pokémon still require their item.' },
+      { es: '🐚 Slowpoke ahora evoluciona a Slowking al nivel 37 llevando la Roca del Rey equipada, mientras que sin objeto sigue evolucionando a Slowbro al nivel 37. La Pokédex muestra correctamente el nivel 37 y la Roca del Rey en la rama de Slowking.', en: '🐚 Slowpoke now evolves into Slowking at level 37 while holding King\'s Rock, while without an item it still evolves into Slowbro at level 37. The Pokédex correctly shows level 37 and King\'s Rock on the Slowking branch.' },
+      { es: '🏆 En la ventana de selección de equipo para la Liga, el último Pokémon seleccionado se resalta en dorado y aparece un panel a la derecha con sus estadísticas completas, tipos, habilidad visual y sus ataques con potencia, precisión y efectos. En móvil el panel pasa debajo de la lista.', en: '🏆 In the League team selection window, the last selected Pokémon is highlighted in gold and a right-side panel shows its full stats, types and moves with power, accuracy and effects. On mobile the panel moves below the list.' },
+    ],
+  },
   {
     version: 'v3.2.2',
     items: [

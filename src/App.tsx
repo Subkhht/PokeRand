@@ -9576,17 +9576,18 @@ function MainApp() {
       // Deep Sea Tooth o → Gorebyss con Deep Sea Scale), se elige la rama
       // según el objeto equipado. Sin objeto, no evoluciona por esta vía.
       const itemEvolutions = updatedPokemon.heldItemEvolutions ?? []
-      const hasItemEvolutions = itemEvolutions.length > 0
-      const matched = hasItemEvolutions
-        ? itemEvolutions.find(e => e.item === updatedPokemon.holdItem)
-        : null
-      const itemOk = !hasItemEvolutions || !!matched
+      const matched = itemEvolutions.find(e => e.item === updatedPokemon.holdItem) ?? null
+      // Tener ramas alternativas con objeto (p. ej. Kirlia → Gallade,
+      // Snorunt → Froslass o Slowpoke → Slowking) NO debe bloquear la
+      // evolución normal por nivel (Gardevoir, Glalie, Slowbro...). Solo se
+      // bloquea si la evolución por defecto exige un objeto equipado.
+      const itemOk = !!matched || !updatedPokemon.heldItemRequired
       if (itemOk) {
         try {
           // El objeto que el Pokémon necesita para evolucionar a su forma
           // especial (p. ej. Gorra de Ash para Greninja-Ash). Solo se
           // consume si esta evolución es exactamente la del objeto.
-          const requiredItem = matched ? matched.item : undefined
+          const requiredItem = matched ? matched.item : updatedPokemon.heldItemRequired
           const targetName = matched ? matched.target : undefined
           const evolved = await evolvePokemon(updatedPokemon, targetName)
           if (evolved) {
@@ -16173,9 +16174,13 @@ function MainApp() {
           ...pcStorage.map((p, i) => ({ key: `pc-${i}`, pkmn: p, isTeam: false })),
         ]
         const selectedKeys = new Set(tempLeagueTeam)
+        const lastSelectedKey = tempLeagueTeam[tempLeagueTeam.length - 1]
+        const lastSelected = lastSelectedKey
+          ? leaguePool.find(({ key }) => key === lastSelectedKey)
+          : undefined
         return (
           <div className="modal-backdrop" onClick={() => setLeagueTeamSelection(false)}>
-            <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', maxHeight: '80vh', overflow: 'auto', padding: '1.5rem' }}>
+            <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '880px', maxHeight: '86vh', overflow: 'auto', padding: '1.5rem' }}>
               <h3 style={{ color: '#4d9bff', margin: '0 0 0.5rem' }}>🏆 Equipo para la Liga</h3>
               <p style={{ color: '#9b98cf', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
                 Selecciona entre 1 y 6 Pokémon de tu equipo y PC ({tempLeagueTeam.length}/6)
@@ -16214,30 +16219,103 @@ function MainApp() {
                   🗻 ¡Comenzar la Calle Victoria!
                 </button>
               )}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '6px' }}>
-                {leaguePool.map(({ key, pkmn, isTeam }) => {
-                  const selected = selectedKeys.has(key)
-                  return (
-                    <div key={key}
-                      onClick={() => {
-                        if (selected) {
-                          setTempLeagueTeam(prev => prev.filter(k => k !== key))
-                        } else if (tempLeagueTeam.length < 6) {
-                          setTempLeagueTeam(prev => [...prev, key])
-                        }
-                      }}
-                      style={{
-                        padding: '6px', borderRadius: '8px', textAlign: 'center', cursor: 'pointer',
-                        background: selected ? 'rgba(56,189,248,0.2)' : 'rgba(30,41,59,0.6)',
-                        border: selected ? '2px solid #4d9bff' : '1px solid #3f3f6e', opacity: !selected && tempLeagueTeam.length >= 6 ? 0.4 : 1
-                      }}
-                    >
-                      <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
-                      <div style={{ fontSize: '0.7rem', textTransform: 'capitalize', color: selected ? '#4d9bff' : '#f3f1ff' }}>{pkmn.name}</div>
-                      <div style={{ fontSize: '0.6rem', color: isTeam ? '#7ceb95' : '#9b98cf' }}>Nv.{pkmn.level}</div>
-                    </div>
-                  )
-                })}
+              <div className="league-select-layout">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '6px', alignContent: 'start' }}>
+                  {leaguePool.map(({ key, pkmn, isTeam }) => {
+                    const selected = selectedKeys.has(key)
+                    const isLastSelected = key === lastSelectedKey
+                    return (
+                      <div key={key}
+                        onClick={() => {
+                          if (selected) {
+                            setTempLeagueTeam(prev => prev.filter(k => k !== key))
+                          } else if (tempLeagueTeam.length < 6) {
+                            setTempLeagueTeam(prev => [...prev, key])
+                          }
+                        }}
+                        style={{
+                          padding: '6px', borderRadius: '8px', textAlign: 'center', cursor: 'pointer',
+                          background: isLastSelected ? 'rgba(250,204,21,0.14)' : selected ? 'rgba(56,189,248,0.2)' : 'rgba(30,41,59,0.6)',
+                          border: isLastSelected ? '2px solid #ffcb05' : selected ? '2px solid #4d9bff' : '1px solid #3f3f6e',
+                          opacity: !selected && tempLeagueTeam.length >= 6 ? 0.4 : 1
+                        }}
+                      >
+                        <img src={pkmn.sprite} alt={pkmn.name} onError={fallbackSprite} style={{ width: '40px', height: '40px', imageRendering: 'pixelated' }} />
+                        <div style={{ fontSize: '0.7rem', textTransform: 'capitalize', color: isLastSelected ? '#ffcb05' : selected ? '#4d9bff' : '#f3f1ff' }}>{pkmn.name}</div>
+                        <div style={{ fontSize: '0.6rem', color: isTeam ? '#7ceb95' : '#9b98cf' }}>Nv.{pkmn.level}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <aside className="league-select-detail">
+                  {lastSelected ? (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.6rem' }}>
+                        <img src={lastSelected.pkmn.sprite} alt={lastSelected.pkmn.name} onError={fallbackSprite} style={{ width: '64px', height: '64px', imageRendering: 'pixelated' }} />
+                        <div style={{ minWidth: 0 }}>
+                          <strong style={{ display: 'block', color: '#f3f1ff', fontSize: '0.95rem', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {lastSelected.pkmn.name}{lastSelected.pkmn.shiny ? ' ✨' : ''}
+                          </strong>
+                          <span style={{ color: '#9b98cf', fontSize: '0.75rem' }}>Nv. {lastSelected.pkmn.level} · {lastSelected.isTeam ? (language === 'en' ? 'Team' : 'Equipo') : 'PC'}</span>
+                          <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', marginTop: '4px' }}>
+                            {lastSelected.pkmn.types?.map(type => (
+                              <span key={type} style={{ background: TYPE_COLORS[type] ?? '#475569', color: '#fff', fontSize: '0.6rem', padding: '1px 6px', borderRadius: '4px', textTransform: 'capitalize' }}>{type}</span>
+                            ))}
+                          </div>
+                          {lastSelected.pkmn.ability && (
+                            <div style={{ color: '#9da6ff', fontSize: '0.68rem', marginTop: '3px' }}>
+                              {language === 'en' ? 'Ability' : 'Habilidad'}: {abilityName(lastSelected.pkmn.ability, language)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <h4 style={{ color: '#4d9bff', margin: '0 0 0.35rem', fontSize: '0.8rem' }}>{language === 'en' ? 'Stats' : 'Estadísticas'}</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.2rem 0.6rem', fontSize: '0.78rem', marginBottom: '0.75rem' }}>
+                        {([
+                          ['HP', lastSelected.pkmn.maxHp, '#7ceb95'],
+                          [language === 'en' ? 'Attack' : 'Ataque', lastSelected.pkmn.attack, '#ff8a80'],
+                          [language === 'en' ? 'Defense' : 'Defensa', lastSelected.pkmn.defense, '#fdba74'],
+                          [language === 'en' ? 'Sp. Atk' : 'At. Esp.', lastSelected.pkmn.spAttack, '#7dd3fc'],
+                          [language === 'en' ? 'Sp. Def' : 'Def. Esp.', lastSelected.pkmn.spDefense, '#c4b5fd'],
+                          [language === 'en' ? 'Speed' : 'Velocidad', lastSelected.pkmn.speed, '#fde047'],
+                        ] as const).map(([label, value, color]) => (
+                          <Fragment key={label}>
+                            <span style={{ color: '#9b98cf' }}>{label}</span>
+                            <strong style={{ color, textAlign: 'right' }}>{value}</strong>
+                          </Fragment>
+                        ))}
+                      </div>
+
+                      <h4 style={{ color: '#4d9bff', margin: '0 0 0.35rem', fontSize: '0.8rem' }}>{language === 'en' ? 'Moves' : 'Ataques'}</h4>
+                      {lastSelected.pkmn.moves.length === 0 ? (
+                        <p style={{ color: '#7d7ab5', fontSize: '0.75rem', margin: 0 }}>{language === 'en' ? 'No moves.' : 'Sin ataques.'}</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {lastSelected.pkmn.moves.map(move => (
+                            <div key={move.name} style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid #3f3f6e', borderRadius: '6px', padding: '5px 6px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                <span style={{ color: '#f3f1ff', fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{moveName(move)}</span>
+                                <span style={{ background: TYPE_COLORS[move.type] ?? '#475569', color: '#fff', fontSize: '0.58rem', fontWeight: 'bold', padding: '1px 5px', borderRadius: '3px', textTransform: 'capitalize', flexShrink: 0 }}>{move.type}</span>
+                              </div>
+                              <div style={{ color: '#9b98cf', fontSize: '0.65rem', marginTop: '2px' }}>
+                                PWR {move.power || '—'} · ACC {move.accuracy ?? '—'}
+                              </div>
+                              {moveEffectSummary(move) && (
+                                <div style={{ color: '#7dd3fc', fontSize: '0.62rem', marginTop: '2px' }}>{moveEffectSummary(move)}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p style={{ color: '#7d7ab5', fontSize: '0.8rem', margin: 0, textAlign: 'center', padding: '1rem 0' }}>
+                      {language === 'en' ? 'Select a Pokémon to see its stats and moves.' : 'Selecciona un Pokémon para ver sus estadísticas y ataques.'}
+                    </p>
+                  )}
+                </aside>
               </div>
             </div>
           </div>
