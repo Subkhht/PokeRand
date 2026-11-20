@@ -16,6 +16,7 @@ import {
   checkAndLearnNewMove,
   getMoveDetails,
   getSpeciesIdsByGeneration,
+  getSpeciesIdsByPrimaryType,
   getAllSpeciesList,
   fetchPokemonTypes,
   buildPokemonFromApi,
@@ -27,6 +28,7 @@ import {
   stripRegional,
   setRunSeed,
   getPokemonAbilities,
+  getFirstStageSpeciesId,
   type PokemonDetails
 } from './game/pokeapi'
 import { getTypeEffectiveness } from './game/typesChart'
@@ -55,7 +57,7 @@ import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, PokemonIVs, RouteNode, BranchNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
 import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, itemLocalizedName, metaItemDesc, moveName, statusLabel, statusAppliedLine, themeName, themeDesc, bgName, bgDesc, type Language, getChangelog } from './game/i18n'
 
-type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'speculator' | 'safari' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp' | 'dungeon' | 'pokest'
+type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'speculator' | 'safari' | 'orchard' | 'fossil' | 'fishing' | 'mine' | 'daycare' | 'weather' | 'mirror' | 'ranch' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp' | 'dungeon' | 'pokest'
 type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum' | 'original' | 'branch'
 
 // Historial local de partidas finalizadas (victorias/derrotas). Solo se
@@ -1117,6 +1119,18 @@ const ITEM_SPRITES: Record<string, string> = {
   'Hierba Mental': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mental-herb.png',
   'Espray Bucal': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/throat-spray.png',
   'Guantes Protectores': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/protective-pads.png',
+  'Caña de Pescar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/old-rod.png',
+  'Fósil Hélix': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/helix-fossil.png',
+  'Fósil Domo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dome-fossil.png',
+  'Ámbar Viejo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/old-amber.png',
+  'Fósil Raíz': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/root-fossil.png',
+  'Fósil Garra': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/claw-fossil.png',
+  'Fósil Cráneo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/skull-fossil.png',
+  'Fósil Coraza': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/armor-fossil.png',
+  'Fósil Tapa': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/cover-fossil.png',
+  'Fósil Pluma': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/plume-fossil.png',
+  'Fósil Mandíbula': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/jaw-fossil.png',
+  'Fósil Vela': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sail-fossil.png',
   'Mega Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/key-stone.png',
   'Dynamax Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png',
   'Prisma Rojo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/red-orb.png',
@@ -1197,6 +1211,7 @@ const ITEM_SPRITES: Record<string, string> = {
   'Perla': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/pearl.png',
   'Corazón Marino': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/heart-scale.png',
   'Seta Pequeña': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tiny-mushroom.png',
+  'Huevo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mystery-egg.png',
   'Seta Grande': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/big-mushroom.png',
   'Correo Aéreo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/air-mail.png',
   'Fragmento Estelar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/star-piece.png',
@@ -1808,7 +1823,7 @@ const ALL_LEGENDARIES = Object.values(REGION_LEGENDARIES).flat()
 const RANDOM_EVENTS = [
   {
     id: 'legendary_appears',
-    weight: 1,
+    weight: 0.5,
     icon: '🐉',
     title: '¡Pokémon Legendario!',
     desc: 'Un Pokémon poderoso aparece delante de ti. ¿Capturarlo?',
@@ -2023,6 +2038,10 @@ const META_SHOP_ITEMS: MetaShopItem[] = [
   { id: 'unlock_mental_herb', name: 'Hierba Mental', desc: 'Cura la anulación o la confusión una vez. Se consume.', price: 50, spriteKey: 'Hierba Mental', category: 'holdable' },
   { id: 'unlock_throat_spray', name: 'Espray Bucal', desc: 'Al usar un movimiento de sonido sube +1 At. Esp. Se consume.', price: 65, spriteKey: 'Espray Bucal', category: 'holdable' },
   { id: 'unlock_protective_pads', name: 'Guantes Protectores', desc: 'Tus ataques no activan efectos de contacto del rival. Aparece en tiendas.', price: 55, spriteKey: 'Guantes Protectores', category: 'holdable' },
+  { id: 'unlock_daycare_node', name: 'Nodo Guardería', desc: 'Desbloquea nodos Guardería: recibe un huevo que ocupa un hueco del equipo y eclosiona tras 5 nodos; el Pokémon es aleatorio, de primera etapa y nivel 10.', price: 100, spriteKey: 'Huevo', category: 'upgrade' },
+  { id: 'unlock_mine_node', name: 'Nodo Mina', desc: 'Desbloquea nodos Mina: excava para encontrar tesoros desbloqueados en la Tienda Meta.', price: 75, spriteKey: 'Pieza Dorada', category: 'upgrade' },
+  { id: 'unlock_fishing_node', name: 'Nodo Pesca', desc: 'Desbloquea nodos Pesca: minijuego de caña para atrapar Pokémon de tipo Agua, con probabilidad shiny.', price: 100, spriteKey: 'Caña de Pescar', category: 'upgrade' },
+  { id: 'unlock_fossil_lab', name: 'Laboratorio de Fósiles', desc: 'Desbloquea nodos Laboratorio de Fósiles: elige entre 2 fósiles y revive un Pokémon especial.', price: 200, spriteKey: 'Fósil Hélix', category: 'upgrade' },
   { id: 'unlock_mega_node', name: 'Nodo Mega', desc: 'Desbloquea nodos de Mega Piedra en Hard/Infinite.', price: 150, spriteKey: 'Mega Stone', category: 'upgrade' },
   { id: 'unlock_gmax_node', name: 'Nodo G-MAX', desc: 'Desbloquea nodos G-MAX en Hard/Infinite.', price: 200, spriteKey: 'Dynamax Band', category: 'upgrade' },
   { id: 'unlock_primal_node', name: 'Nodo Primal', desc: 'Desbloquea nodos Primal en Hard/Infinite. Otorgan Prisma Rojo o Azul.', price: 250, spriteKey: 'Prisma Rojo', category: 'upgrade' }, { id: 'unlock_casino_node', name: 'Nodo Casino', desc: 'Desbloquea nodos Casino en Hard/Infinite. Juega al Pachinko para ganar premios según tu puntuación.', price: 220, spriteKey: 'money', category: 'upgrade' },
@@ -2304,6 +2323,14 @@ function nodeTypeLabel(node: RouteNode): string {
     case 'blackmarket': return en ? 'Black Market' : 'Mercado Negro'
     case 'speculator': return en ? 'Speculator' : 'Especulador'
     case 'safari': return 'Safari'
+    case 'orchard': return en ? 'Berry Orchard' : 'Huerto de Bayas'
+    case 'fossil': return en ? 'Fossil Lab' : 'Laboratorio de Fósiles'
+    case 'fishing': return en ? 'Fishing' : 'Pesca'
+    case 'mine': return en ? 'Mine' : 'Mina'
+    case 'daycare': return en ? 'Daycare' : 'Guardería'
+    case 'weather': return en ? 'Weather Station' : 'Estación Meteorológica'
+    case 'mirror': return en ? 'Mirror Battle' : 'Combate Espejo'
+    case 'ranch': return en ? 'Pokémon Ranch' : 'Rancho Pokémon'
     case 'double': return en ? 'Double Battle' : 'Combate Doble'
     case 'casino': return 'Casino'
     case 'elite': return en ? 'Elite' : 'Elite'
@@ -2381,6 +2408,14 @@ const NODE_EMOJIS: Record<string, string> = {
   blackmarket: '🕶️',
   speculator: '🙊',
   safari: '🦁',
+  orchard: '🫐',
+  fossil: '🦖',
+  fishing: '🎣',
+  mine: '⛏️',
+  daycare: '🥚',
+  weather: '🌦️',
+  mirror: '🪞',
+  ranch: '🐑',
   double: '🥊',
   casino: '🃏',
   elite: '🗻',
@@ -2404,6 +2439,14 @@ const NODE_TYPE_COLORS: Record<string, string> = {
   blackmarket: '#fb923c',
   speculator: '#ff8a33',
   safari: '#22c55e',
+  orchard: '#a3e635',
+  fossil: '#d6a66a',
+  fishing: '#38bdf8',
+  mine: '#c08457',
+  daycare: '#fde68a',
+  weather: '#60a5fa',
+  mirror: '#c084fc',
+  ranch: '#a3e635',
   double: '#facc15',
   casino: '#f0abfc',
   elite: '#cba3ff',
@@ -2432,6 +2475,32 @@ const SPECULATOR_TYPE_MULTIPLIERS: Record<string, number> = {
   fairy: 1.55,
   dragon: 1.60,
 }
+
+interface FossilOption {
+  item: string
+  speciesId: number
+  speciesName: string
+}
+
+interface DaycareEgg {
+  pokemon: Pokemon
+  nodesLeft: number
+  totalNodes: number
+}
+
+const FOSSIL_REVIVALS: FossilOption[] = [
+  { item: 'Fósil Hélix', speciesId: 138, speciesName: 'Omanyte' },
+  { item: 'Fósil Domo', speciesId: 140, speciesName: 'Kabuto' },
+  { item: 'Ámbar Viejo', speciesId: 142, speciesName: 'Aerodactyl' },
+  { item: 'Fósil Raíz', speciesId: 345, speciesName: 'Lileep' },
+  { item: 'Fósil Garra', speciesId: 347, speciesName: 'Anorith' },
+  { item: 'Fósil Cráneo', speciesId: 408, speciesName: 'Cranidos' },
+  { item: 'Fósil Coraza', speciesId: 410, speciesName: 'Shieldon' },
+  { item: 'Fósil Tapa', speciesId: 564, speciesName: 'Tirtouga' },
+  { item: 'Fósil Pluma', speciesId: 566, speciesName: 'Archen' },
+  { item: 'Fósil Mandíbula', speciesId: 696, speciesName: 'Tyrunt' },
+  { item: 'Fósil Vela', speciesId: 698, speciesName: 'Amaura' },
+]
 
 function speculatorTypeMultiplier(pokemon: Pokemon): number {
   const primary = pokemon.types?.[0] ?? 'normal'
@@ -3026,6 +3095,39 @@ function MainApp() {
   const [safariThreat, setSafariThreat] = useState(0)
   const [safariLog, setSafariLog] = useState<string[]>([])
   const [safariSelectedBall, setSafariSelectedBall] = useState('')
+  // Huerto de Bayas: bayas plantadas y modales de plantar/cosechar.
+  const [orchardPlanted, setOrchardPlanted] = useState<string[]>([])
+  const [orchardPlantModal, setOrchardPlantModal] = useState(false)
+  const [orchardSelected, setOrchardSelected] = useState<string[]>([])
+  const [orchardHarvest, setOrchardHarvest] = useState<Array<{ name: string; count: number }> | null>(null)
+  // Laboratorio de Fósiles.
+  const [fossilChoices, setFossilChoices] = useState<FossilOption[]>([])
+  const [fossilBusy, setFossilBusy] = useState(false)
+  // Pesca.
+  const [fishingEncounter, setFishingEncounter] = useState<Pokemon | null>(null)
+  const [fishingPhase, setFishingPhase] = useState<'idle' | 'waiting' | 'bite' | 'caught' | 'missed'>('idle')
+  const [fishingLoading, setFishingLoading] = useState(false)
+  const [fishingBusy, setFishingBusy] = useState(false)
+  const [fishingMessage, setFishingMessage] = useState('')
+  const [fishingAttempts, setFishingAttempts] = useState(0)
+  const fishingTimersRef = useRef<{ bite?: ReturnType<typeof setTimeout>; escape?: ReturnType<typeof setTimeout> }>({})
+  // Mina.
+  const [miningDigs, setMiningDigs] = useState(0)
+  const [miningBusy, setMiningBusy] = useState(false)
+  const [miningMessage, setMiningMessage] = useState('')
+  const [miningReveal, setMiningReveal] = useState<string | null>(null)
+  const miningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const miningRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Guardería.
+  const [daycareEgg, setDaycareEgg] = useState<DaycareEgg | null>(null)
+  const [daycareLoading, setDaycareLoading] = useState(false)
+  const [eggHatch, setEggHatch] = useState<Pokemon | null>(null)
+  const [eggHatchPlacement, setEggHatchPlacement] = useState<'team' | 'pc'>('team')
+  // Estación Meteorológica.
+  const [weatherStation, setWeatherStation] = useState<{ weather: Exclude<WeatherKind, 'none'>; battlesLeft: number } | null>(null)
+  // Rancho Pokémon.
+  const [ranchConfirm, setRanchConfirm] = useState<{ kind: 'team' | 'pc'; index: number; name: string } | null>(null)
+  const [ranchResult, setRanchResult] = useState<Array<{ name: string; count: number }> | null>(null)
 
   // Casino (Pachinko)
   const [casinoScore, setCasinoScore] = useState<number | null>(null)
@@ -3413,7 +3515,34 @@ function MainApp() {
   const routeSeedRef = useRef('')
   const routeRandRef = useRef<() => number>(() => Math.random())
   const teamRef = useRef<Pokemon[]>([])
-  useEffect(() => { teamRef.current = team }, [team])
+  const daycareEggRef = useRef<DaycareEgg | null>(null)
+  useEffect(() => { teamRef.current = team; daycareEggRef.current = daycareEgg }, [team, daycareEgg])
+
+  const weatherStationRef = useRef<{ weather: Exclude<WeatherKind, 'none'>; battlesLeft: number } | null>(null)
+  useEffect(() => { weatherStationRef.current = weatherStation }, [weatherStation])
+
+  // El huevo ocupa una casilla del equipo mientras se lleva encima.
+  function teamHasRoom(currentTeam: Pokemon[]): boolean {
+    return currentTeam.length + (daycareEggRef.current ? 1 : 0) < maxTeamSize
+  }
+
+  function chooseWeatherStation(nextWeather: Exclude<WeatherKind, 'none'>): void {
+    const next = { weather: nextWeather, battlesLeft: 2 }
+    weatherStationRef.current = next
+    setWeatherStation(next)
+    playSelect()
+  }
+
+  // Consume un combate del clima elegido en la Estación Meteorológica.
+  function consumeWeatherStation(): WeatherKind | null {
+    const current = weatherStationRef.current
+    if (!current || current.battlesLeft <= 0) return null
+    const remaining = current.battlesLeft - 1
+    const next = remaining > 0 ? { ...current, battlesLeft: remaining } : null
+    weatherStationRef.current = next
+    setWeatherStation(next)
+    return current.weather
+  }
 
   // Al mostrar el mapa de rutas, precargar la generación en segundo plano para
   // que entrar en un nodo sea casi instantáneo (las llamadas son idempotentes
@@ -3707,12 +3836,12 @@ function MainApp() {
       const pokemon = await buildPokemonFromApi(query, getEffectiveGen(), level, false)
       registerInPokedex(pokemon)
       const withStages: Pokemon = { ...pokemon, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 }, hp: pokemon.maxHp }
-      if (team.length < maxTeamSize) {
+      if (teamHasRoom(team)) {
         setTeam(prev => [...prev, withStages])
       } else {
         setPcStorage(prev => [...prev, withStages])
       }
-      setBattleLog(prev => [t('b.secretAdded', { name: pokemon.name, lvl: pokemon.level, toPc: team.length >= maxTeamSize ? t('b.toPc') : '' }), ...prev].slice(0, 15))
+      setBattleLog(prev => [t('b.secretAdded', { name: pokemon.name, lvl: pokemon.level, toPc: !teamHasRoom(team) ? t('b.toPc') : '' }), ...prev].slice(0, 15))
       setSecretPokemonQuery('')
       setSecretAddOpen(false)
     } catch {
@@ -4496,9 +4625,12 @@ function MainApp() {
     // En Modo Original no salen eventos aleatorios salvo el Mercader Misterioso,
     // que además puede aparecer varias veces durante la run.
     const onlyMerchant = difficulty === 'original'
+    // En Intermedio y Difícil los eventos son totalmente aleatorios y pueden
+    // repetirse durante la misma partida.
+    const repeatable = difficulty === 'medium' || difficulty === 'hard'
     let eligible = onlyMerchant
       ? RANDOM_EVENTS.filter(e => e.id === 'evolution_merchant' && routeProgress >= e.minRouteProgress)
-      : RANDOM_EVENTS.filter(e => routeProgress >= e.minRouteProgress && !randomEventUsed.has(e.id))
+      : RANDOM_EVENTS.filter(e => routeProgress >= e.minRouteProgress && (repeatable || !randomEventUsed.has(e.id)))
     // En modo Infinite la run es larga: si ya se usaron todos los eventos,
     // se reinicia el conjunto para que sigan apareciendo.
     if (!onlyMerchant && eligible.length === 0 && difficulty === 'infinite' && randomEventUsed.size > 0) {
@@ -4513,8 +4645,9 @@ function MainApp() {
       if (roll <= 0) {
         setActiveRandomEvent({ id: event.id, icon: event.icon, title: event.title, desc: event.desc })
         // En Modo Original el Mercader Misterioso no se marca como usado para
-        // poder repetirse; el resto de modos mantienen cada evento una sola vez.
-        if (!onlyMerchant) setRandomEventUsed(prev => new Set(prev).add(event.id))
+        // poder repetirse; en Intermedio/Difícil tampoco se limita. El resto de
+        // modos mantienen cada evento una sola vez.
+        if (!onlyMerchant && !repeatable) setRandomEventUsed(prev => new Set(prev).add(event.id))
         return
       }
     }
@@ -4723,10 +4856,53 @@ function MainApp() {
       && (type === 'battle' || type === 'teamRocket') && rng() < 0.04) {
       type = 'safari'
     }
+    // Huerto de Bayas: exclusivo de Difícil e Infinite.
+    if (!runChallenges.allTeamRocket && !runChallenges.bossRush
+      && (difficulty === 'hard' || difficulty === 'infinite')
+      && (type === 'battle' || type === 'teamRocket') && rng() < 0.04) {
+      type = 'orchard'
+    }
+    if (!runChallenges.allTeamRocket && !runChallenges.bossRush
+      && difficulty !== 'coliseum' && isActive('unlock_fossil_lab')
+      && (type === 'battle' || type === 'teamRocket') && rng() < 0.03) {
+      type = 'fossil'
+    }
+    if (!runChallenges.allTeamRocket && !runChallenges.bossRush
+      && difficulty !== 'coliseum' && isActive('unlock_fishing_node')
+      && (type === 'battle' || type === 'teamRocket') && rng() < 0.03) {
+      type = 'fishing'
+    }
+    // Mina: solo si hay al menos un tesoro desbloqueado que pueda aparecer.
+    if (!runChallenges.allTeamRocket && !runChallenges.bossRush
+      && difficulty !== 'coliseum' && isActive('unlock_mine_node')
+      && TREASURE_DROPS.some(isConsumableUnlocked)
+      && (type === 'battle' || type === 'teamRocket') && rng() < 0.03) {
+      type = 'mine'
+    }
+    if (!runChallenges.allTeamRocket && !runChallenges.bossRush
+      && difficulty !== 'coliseum' && isActive('unlock_daycare_node')
+      && (type === 'battle' || type === 'teamRocket') && rng() < 0.03) {
+      type = 'daycare'
+    }
+    if (!runChallenges.allTeamRocket && !runChallenges.bossRush
+      && difficulty !== 'coliseum'
+      && (type === 'battle' || type === 'teamRocket') && rng() < 0.03) {
+      type = 'weather'
+    }
+    if (!runChallenges.allTeamRocket && !runChallenges.bossRush
+      && difficulty !== 'coliseum'
+      && (type === 'battle' || type === 'teamRocket') && rng() < 0.03) {
+      type = 'mirror'
+    }
+    if (!runChallenges.allTeamRocket && !runChallenges.bossRush
+      && (difficulty === 'hard' || difficulty === 'infinite')
+      && (type === 'battle' || type === 'teamRocket') && rng() < 0.03) {
+      type = 'ranch'
+    }
     return {
       id,
       type,
-      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : type === 'mega' ? `Mega #${id}` : type === 'gmax' ? `G-MAX #${id}` : type === 'primal' ? `Primal #${id}` : type === 'casino' ? `Casino #${id}` : type === 'rival' ? `Rival #${id}` : type === 'blackmarket' ? `Mercado Negro #${id}` : type === 'speculator' ? `Especulador #${id}` : type === 'safari' ? `Safari #${id}` : type === 'double' ? `Doble #${id}` : `Ruta ${id}`,
+      label: type === 'teamRocket' ? `TeamR #${id}` : type === 'spin' ? `Spin #${id}` : type === 'pokeRand' ? `PokeRand #${id}` : type === 'move' ? `Move #${id}` : type === 'mega' ? `Mega #${id}` : type === 'gmax' ? `G-MAX #${id}` : type === 'primal' ? `Primal #${id}` : type === 'casino' ? `Casino #${id}` : type === 'rival' ? `Rival #${id}` : type === 'blackmarket' ? `Mercado Negro #${id}` : type === 'speculator' ? `Especulador #${id}` : type === 'safari' ? `Safari #${id}` : type === 'orchard' ? `Huerto de Bayas #${id}` : type === 'fossil' ? `Laboratorio de Fósiles #${id}` : type === 'fishing' ? `Pesca #${id}` : type === 'mine' ? `Mina #${id}` : type === 'daycare' ? `Guardería #${id}` : type === 'weather' ? `Estación Meteorológica #${id}` : type === 'mirror' ? `Combate Espejo #${id}` : type === 'ranch' ? `Rancho Pokémon #${id}` : type === 'double' ? `Doble #${id}` : `Ruta ${id}`,
       done: false
     }
   }
@@ -4918,6 +5094,28 @@ function MainApp() {
         setRouteIndex(0)
         setMoney(0)
         setInventory([])
+        setOrchardPlanted([])
+        setOrchardPlantModal(false)
+        setOrchardSelected([])
+        setOrchardHarvest(null)
+        setFossilChoices([])
+        setFossilBusy(false)
+        setFishingEncounter(null)
+        setFishingPhase('idle')
+        setFishingBusy(false)
+        setFishingMessage('')
+        setFishingAttempts(0)
+        setMiningDigs(0)
+        setMiningBusy(false)
+        setMiningMessage('')
+        setMiningReveal(null)
+        setDaycareEgg(null)
+        setDaycareLoading(false)
+        setEggHatch(null)
+        setEggHatchPlacement('team')
+        setWeatherStation(null)
+        setRanchConfirm(null)
+        setRanchResult(null)
         setPcStorage([])
         setModifier(null)
         setModifier2(null)
@@ -5133,11 +5331,50 @@ function MainApp() {
             && (type === 'battle' || type === 'teamRocket') && rr() < 0.04) {
             type = 'safari'
           }
+          if (!activeChallenges.allTeamRocket && !activeChallenges.bossRush
+            && effectiveDifficulty === 'hard'
+            && (type === 'battle' || type === 'teamRocket') && rr() < 0.04) {
+            type = 'orchard'
+          }
+          if (!activeChallenges.allTeamRocket && !activeChallenges.bossRush
+            && isActive('unlock_fossil_lab')
+            && (type === 'battle' || type === 'teamRocket') && rr() < 0.03) {
+            type = 'fossil'
+          }
+          if (!activeChallenges.allTeamRocket && !activeChallenges.bossRush
+            && isActive('unlock_fishing_node')
+            && (type === 'battle' || type === 'teamRocket') && rr() < 0.03) {
+            type = 'fishing'
+          }
+          if (!activeChallenges.allTeamRocket && !activeChallenges.bossRush
+            && isActive('unlock_mine_node')
+            && TREASURE_DROPS.some(isConsumableUnlocked)
+            && (type === 'battle' || type === 'teamRocket') && rr() < 0.03) {
+            type = 'mine'
+          }
+          if (!activeChallenges.allTeamRocket && !activeChallenges.bossRush
+            && isActive('unlock_daycare_node')
+            && (type === 'battle' || type === 'teamRocket') && rr() < 0.03) {
+            type = 'daycare'
+          }
+          if (!activeChallenges.allTeamRocket && !activeChallenges.bossRush
+            && (type === 'battle' || type === 'teamRocket') && rr() < 0.03) {
+            type = 'weather'
+          }
+          if (!activeChallenges.allTeamRocket && !activeChallenges.bossRush
+            && (type === 'battle' || type === 'teamRocket') && rr() < 0.03) {
+            type = 'mirror'
+          }
+          if (!activeChallenges.allTeamRocket && !activeChallenges.bossRush
+            && effectiveDifficulty === 'hard'
+            && (type === 'battle' || type === 'teamRocket') && rr() < 0.03) {
+            type = 'ranch'
+          }
 
           customRoute.push({
             id: i,
             type,
-            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : type === 'mega' ? `Mega #${i}` : type === 'gmax' ? `G-MAX #${i}` : type === 'primal' ? `Primal #${i}` : type === 'casino' ? `Casino #${i}` : type === 'rival' ? `Rival #${i}` : type === 'blackmarket' ? `Mercado Negro #${i}` : type === 'speculator' ? `Especulador #${i}` : type === 'safari' ? `Safari #${i}` : type === 'double' ? `Doble #${i}` : `Ruta ${i}`,
+            label: type === 'teamRocket' ? `TeamR #${i}` : type === 'spin' ? `Spin #${i}` : type === 'pokeRand' ? `PokeRand #${i}` : type === 'move' ? `Move #${i}` : type === 'mega' ? `Mega #${i}` : type === 'gmax' ? `G-MAX #${i}` : type === 'primal' ? `Primal #${i}` : type === 'casino' ? `Casino #${i}` : type === 'rival' ? `Rival #${i}` : type === 'blackmarket' ? `Mercado Negro #${i}` : type === 'speculator' ? `Especulador #${i}` : type === 'safari' ? `Safari #${i}` : type === 'orchard' ? `Huerto de Bayas #${i}` : type === 'fossil' ? `Laboratorio de Fósiles #${i}` : type === 'fishing' ? `Pesca #${i}` : type === 'mine' ? `Mina #${i}` : type === 'daycare' ? `Guardería #${i}` : type === 'weather' ? `Estación Meteorológica #${i}` : type === 'mirror' ? `Combate Espejo #${i}` : type === 'ranch' ? `Rancho Pokémon #${i}` : type === 'double' ? `Doble #${i}` : `Ruta ${i}`,
             done: false
           })
         }
@@ -5191,6 +5428,28 @@ function MainApp() {
         if (unlockedBerries.length > 0) startingItems.push(unlockedBerries[Math.floor(Math.random() * unlockedBerries.length)])
       }
       setInventory(startingItems)
+      setOrchardPlanted([])
+      setOrchardPlantModal(false)
+      setOrchardSelected([])
+      setOrchardHarvest(null)
+      setFossilChoices([])
+      setFossilBusy(false)
+      setFishingEncounter(null)
+      setFishingPhase('idle')
+      setFishingBusy(false)
+      setFishingMessage('')
+      setFishingAttempts(0)
+      setMiningDigs(0)
+      setMiningBusy(false)
+      setMiningMessage('')
+      setMiningReveal(null)
+      setDaycareEgg(null)
+      setDaycareLoading(false)
+      setEggHatch(null)
+      setEggHatchPlacement('team')
+      setWeatherStation(null)
+      setRanchConfirm(null)
+      setRanchResult(null)
       setModifier(effectiveDifficulty === 'original' ? null : run.modifier)
       setRoute(customRoute)
       setRouteIndex(0)
@@ -5445,6 +5704,9 @@ function MainApp() {
   }
 
   async function completeCurrentNode(): Promise<void> {
+    clearFishingTimers()
+    clearMiningTimers()
+    advanceDaycareEgg()
     // Las etapas de stats (subidas/bajadas de Ataque, Def. Esp., etc.) solo
     // duran un combate: se eliminan SIEMPRE al completar el nodo, tanto bufos
     // como debufos, para que nada se "pegue" de un combate a otro. También se
@@ -6591,7 +6853,7 @@ function MainApp() {
     unlockAchievement('coop_first_trade')
     if (offer.kind === 'pokemon') {
       const rebuilt = rebuildPokemonFromOffer(offer)
-      if (teamRef.current.length < maxTeamSize) {
+      if (teamHasRoom(teamRef.current)) {
         setTeam(prev => [...prev, rebuilt])
         setCoopTradeMsg(`🤝 ¡Intercambio completado! Recibiste a ${rebuilt.name} de tu compañero.`)
       } else {
@@ -6687,7 +6949,7 @@ function MainApp() {
       if (cancelled) {
         if (offer.kind === 'pokemon') {
           const rebuilt = rebuildPokemonFromOffer(offer)
-          if (teamRef.current.length < maxTeamSize) {
+          if (teamHasRoom(teamRef.current)) {
             setTeam(prev => [...prev, rebuilt])
           } else {
             setPcStorage(prev => [...prev, rebuilt])
@@ -6813,7 +7075,7 @@ function MainApp() {
       if (offer) {
         if (offer.kind === 'pokemon') {
           const rebuilt = rebuildPokemonFromOffer(offer)
-          if (teamRef.current.length < maxTeamSize) {
+          if (teamHasRoom(teamRef.current)) {
             setTeam(prev => [...prev, rebuilt])
           } else {
             setPcStorage(prev => [...prev, rebuilt])
@@ -6858,7 +7120,7 @@ function MainApp() {
     registerInPokedex(captured)
     if (captured.shiny) unlockAchievement('shiny_catch')
     if ((captured.attack + captured.defense + captured.speed + captured.maxHp) >= 600) unlockAchievement('legendary_catch')
-    if (team.length >= 6) {
+    if (!teamHasRoom(team)) {
       setPcStorage((prev) => [...prev, captured])
       setBattleLog((prev) => [
         t('b.capturedPC2', { name: pokemon.name }),
@@ -6902,7 +7164,7 @@ function MainApp() {
       setBattleLog((prev) => [t('b.noModifyTeam'), ...prev].slice(0, 15))
       return
     }
-    if (team.length < maxTeamSize) {
+    if (teamHasRoom(team)) {
       setTeam((prev) => [...prev, pokemon])
       setPcStorage((prev) => prev.filter((_, i) => i !== pcIndex))
       setBattleLog((prev) => [t('b.withdrawnPC', { name: pokemon.name }), ...prev].slice(0, 15))
@@ -6965,7 +7227,7 @@ function MainApp() {
     setMoney((prev) => prev - price)
     const purchased = { ...pokemon, hp: pokemon.maxHp, statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } }
     registerInPokedex(purchased)
-    if (team.length < maxTeamSize) {
+    if (teamHasRoom(team)) {
       setTeam((prev) => [...prev, purchased])
     } else {
       setPcStorage((prev) => [...prev, purchased])
@@ -7003,6 +7265,81 @@ function MainApp() {
     }
     playPurchase()
     setSpeculatorConfirm(null)
+  }
+
+  // --- Rancho Pokémon ---
+  function ranchRewardPool(pokemon: Pokemon): string[] {
+    const berries = BERRY_DROPS.filter(isBerryUnlocked)
+    const treasures = TREASURE_DROPS.filter(isConsumableUnlocked)
+    const stones = EVOLUTION_STONES.filter(isEvolutionStoneUnlocked)
+    const holdables = HOLDABLE_ITEM_NAMES.filter(isHoldableUnlocked)
+    const consumables = Object.keys(ALL_SHOP_ITEMS).filter(item =>
+      !TREASURES.includes(item) &&
+      !POKEBALL_NAMES.includes(item) &&
+      !(EVOLUTION_STONES as readonly string[]).includes(item) &&
+      isConsumableUnlocked(item)
+    )
+    const primary = pokemon.types?.[0] ?? 'normal'
+    let pool: string[] = []
+    if (['grass', 'bug', 'fairy'].includes(primary)) pool = [...berries, ...treasures]
+    else if (['rock', 'ground', 'steel'].includes(primary)) pool = [...treasures, ...stones]
+    else if (['fire', 'electric', 'ice', 'dragon'].includes(primary)) pool = [...stones, ...holdables]
+    else if (['water', 'flying'].includes(primary)) pool = [...consumables, ...berries]
+    else pool = [...holdables, ...treasures]
+    if (pokemon.level >= 30) pool = [...pool, ...stones, ...holdables]
+    if (pool.length === 0) pool = [...treasures, ...berries, ...consumables, ...holdables, ...stones]
+    if (pool.length === 0) pool = ['Potion']
+    return pool
+  }
+
+  function ranchRewardCount(pokemon: Pokemon): number {
+    const bst = pokemon.baseStatTotal
+      ?? pokemon.maxHp + pokemon.attack + pokemon.defense + pokemon.spAttack + pokemon.spDefense + pokemon.speed
+    let count = 1
+    if (pokemon.level >= 20) count++
+    if (pokemon.level >= 40) count++
+    if (bst >= 480) count++
+    if (pokemon.shiny) count++
+    return Math.min(5, count)
+  }
+
+  function ranchRewardItems(pokemon: Pokemon): string[] {
+    const pool = ranchRewardPool(pokemon)
+    const count = ranchRewardCount(pokemon)
+    return Array.from({ length: count }, () => pool[Math.floor(Math.random() * pool.length)] ?? 'Potion')
+  }
+
+  function sellRanchPokemon(kind: 'team' | 'pc', index: number): void {
+    if (runChallenges.soloStarter || runChallenges.fixedTeam) {
+      playError()
+      setBattleLog(prev => [t('b.noModifyTeam'), ...prev].slice(0, 15))
+      return
+    }
+    const sold = kind === 'team' ? team[index] : pcStorage[index]
+    if (!sold) return
+    if (kind === 'team' && team.length <= 1) {
+      playError()
+      setBattleLog(prev => [t('b.speculatorLastTeam'), ...prev].slice(0, 15))
+      return
+    }
+    const rewards = ranchRewardItems(sold)
+    if (kind === 'team') {
+      const nextTeam = team.filter((_, i) => i !== index)
+      setTeam(nextTeam)
+      setActiveIndex(prev => (prev > index ? prev - 1 : prev === index ? Math.min(index, nextTeam.length - 1) : prev))
+    } else {
+      setPcStorage(prev => prev.filter((_, i) => i !== index))
+    }
+    setInventory(prev => [...prev, ...rewards])
+    const grouped = new Map<string, number>()
+    for (const item of rewards) grouped.set(item, (grouped.get(item) ?? 0) + 1)
+    setRanchResult(Array.from(grouped.entries()).map(([name, count]) => ({ name, count })))
+    setRanchConfirm(null)
+    playPurchase()
+    setBattleLog(prev => [
+      `🐑 Intercambiaste a ${sold.name} por ${rewards.length} objeto${rewards.length === 1 ? '' : 's'}.`,
+      ...prev,
+    ].slice(0, 15))
   }
 
   // --- Combate Doble (2 vs 2) ---
@@ -7569,7 +7906,7 @@ function MainApp() {
       setBattleLog((prev) => [t('b.noModifyTeam'), ...prev].slice(0, 15))
       return
     }
-    if (team.length < maxTeamSize) {
+    if (teamHasRoom(team)) {
       const newTeam = [...team]
       const insertAt = toSlot !== undefined ? Math.min(toSlot, newTeam.length) : newTeam.length
       newTeam.splice(insertAt, 0, pokemon)
@@ -7734,6 +8071,78 @@ function MainApp() {
       return
     }
 
+    if (currentNode.type === 'orchard') {
+      // Huerto de Bayas: plantar ahora para cosechar en otro Huerto.
+      setIsLoading(false)
+      setApiError('')
+      setOrchardPlantModal(false)
+      setOrchardSelected([])
+      setOrchardHarvest(null)
+      setScreen('orchard')
+      return
+    }
+
+    if (currentNode.type === 'fossil') {
+      // Laboratorio de Fósiles: dos fósiles aleatorios para revivir.
+      setIsLoading(false)
+      setApiError('')
+      setFossilBusy(false)
+      setFossilChoices([...FOSSIL_REVIVALS].sort(() => 0.5 - Math.random()).slice(0, 2))
+      setScreen('fossil')
+      return
+    }
+
+    if (currentNode.type === 'fishing') {
+      // Pesca: minijuego de caña para atrapar un Pokémon de tipo Agua.
+      setIsLoading(false)
+      setApiError('')
+      setFishingBusy(false)
+      setFishingAttempts(0)
+      void prepareFishing()
+      setScreen('fishing')
+      return
+    }
+
+    if (currentNode.type === 'mine') {
+      // Mina: excavar para encontrar tesoros desbloqueados en la Tienda Meta.
+      setIsLoading(false)
+      setApiError('')
+      setMiningDigs(0)
+      setMiningBusy(false)
+      setMiningMessage('')
+      setMiningReveal(null)
+      setScreen('mine')
+      return
+    }
+
+    if (currentNode.type === 'daycare') {
+      // Guardería: recibe un huevo si no tienes uno activo y hay hueco.
+      setIsLoading(false)
+      setApiError('')
+      setEggHatch(null)
+      setScreen('daycare')
+      if (!daycareEgg && team.length < maxTeamSize) void prepareDaycareEgg()
+      return
+    }
+
+    if (currentNode.type === 'weather') {
+      // Estación Meteorológica: elegir clima para los próximos 2 combates.
+      setIsLoading(false)
+      setApiError('')
+      setScreen('weather')
+      return
+    }
+
+    if (currentNode.type === 'ranch') {
+      // Rancho Pokémon: intercambiar Pokémon por objetos.
+      setIsLoading(false)
+      setApiError('')
+      setRanchConfirm(null)
+      setRanchResult(null)
+      setScreen('ranch')
+      return
+    }
+
     if (currentNode.type === 'blackmarket') {
       // Mercado Negro: vende objetos/Pokémon y compra objetos baratos y Pokémon.
       const blackItems = [...Object.keys(ALL_SHOP_ITEMS)].filter(i => isShopItemUnlocked(i) && !TREASURES.includes(i))
@@ -7823,7 +8232,11 @@ function MainApp() {
           return selfEntry.entering
         })
         const forcedWeather = (modifier?.forcedWeather ?? modifier2?.forcedWeather) as WeatherKind | undefined
-        if (forcedWeather) {
+        const stationWeather = consumeWeatherStation()
+        if (stationWeather) {
+          setWeather(stationWeather)
+          entryLogs.push(t('b.stationWeather', { weather: weatherName(stationWeather, getLanguage()) }))
+        } else if (forcedWeather) {
           setWeather(forcedWeather)
           entryLogs.push(t('b.abilityWeather', { name: runModName('weathermania'), weather: weatherName(forcedWeather, getLanguage()) }))
         }
@@ -8134,7 +8547,46 @@ function MainApp() {
 
       const extraEnemyLevels = runChallenges.scalingEnemies ? routeIndex : 0
 
-      if (currentNode.type === 'rival') {
+      if (currentNode.type === 'mirror') {
+        // Combate Espejo: el rival copia exactamente tu equipo y niveles.
+        const mirrorTeam = team.map(p => ({
+          ...p,
+          moves: p.moves.map(m => ({ ...m })),
+          hp: p.maxHp,
+          maxHp: p.maxHp,
+          status: undefined,
+          statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 },
+          justEntered: false,
+          leechSeed: false,
+          megaEvolved: false,
+          gmaxEvolved: false,
+          primalEvolved: false,
+          originEvolved: false,
+          gmaxTurnsLeft: undefined,
+          megaOrig: undefined,
+          abilityState: undefined,
+          protected: false,
+          disabled: undefined,
+          lastMove: undefined,
+          choiceLockedMove: undefined,
+        }))
+        if (mirrorTeam.length === 0) throw new Error('empty mirror team')
+        mirrorTeam.forEach(p => seenInPokedex(p))
+        setIsTrainerBattle(true)
+        setTrainerTeam(mirrorTeam)
+        setTrainerPokemonIndex(0)
+        setTrainerName(language === 'en' ? 'Mirror Trainer' : 'Entrenador Espejo')
+        setTrainerSprite("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='12' fill='%232a1b4d'/%3E%3Cellipse cx='48' cy='44' rx='20' ry='26' fill='%23c084fc'/%3E%3Cellipse cx='48' cy='44' rx='14' ry='20' fill='%23e9d5ff'/%3E%3Cpath d='M20 88 q0 -30 28 -30 q28 0 28 30' fill='%23c084fc'/%3E%3C/svg%3E")
+        setTrainerBadge('')
+        setEnemy({ ...mirrorTeam[0], statStages: { attack: 0, defense: 0, spAttack: 0, spDefense: 0, speed: 0 } })
+        setIsTeamRocketBattle(false)
+        setIsRivalBattle(false)
+        setBattleLog(prev => [
+          language === 'en' ? '🪞 Mirror Battle: your rival copies your team.' : '🪞 Combate Espejo: el rival copia tu equipo.',
+          t('b.sendsOut', { name: mirrorTeam[0].name, lvl: mirrorTeam[0].level }),
+          ...prev
+        ])
+      } else if (currentNode.type === 'rival') {
         // Rival recurrente: escala contigo y da más dinero que el resto.
         const teamSize = trainerTeamSize(routeIndex, route.length, difficulty)
         const avgPlayerLevel = Math.round(team.reduce((s, p) => s + p.level, 0) / Math.max(1, team.length))
@@ -8543,7 +8995,7 @@ function MainApp() {
     if (pokemon.shiny) unlockAchievement('shiny_catch')
     if ((pokemon.attack + pokemon.defense + pokemon.speed + pokemon.maxHp) >= 600) unlockAchievement('legendary_catch')
     unlockAchievement('pokeRand_master')
-    if (team.length >= maxTeamSize) {
+    if (!teamHasRoom(team)) {
       setPcStorage((prev) => [...prev, pokemon])
       setBattleLog((prev) => [
         t('pokerand.logPC', { name: pokemon.name }),
@@ -8741,7 +9193,7 @@ function MainApp() {
       setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
       if (captured.shiny) unlockAchievement('shiny_catch')
       if ((captured.attack + captured.defense + captured.speed + captured.maxHp) >= 600) unlockAchievement('legendary_catch')
-      if (team.length >= maxTeamSize) {
+      if (!teamHasRoom(team)) {
         setPcStorage(prev => [...prev, captured])
         setBattleLog(prev => [t('b.capturedPC', { name: captured.name }), ...prev].slice(0, 15))
       } else {
@@ -8764,6 +9216,294 @@ function MainApp() {
     playError()
     if (nextMood < 25 || nextThreat >= 60) {
       setTimeout(() => safariPokemonAttack(), 350)
+    }
+  }
+
+  // --- Huerto de Bayas ---
+  function orchardAvailableBerries(): string[] {
+    return Array.from(new Set(inventory.filter(item => BERRY_DROPS.includes(item))))
+  }
+
+  function addOrchardBerry(name: string): void {
+    if (orchardSelected.length >= 3) return
+    const owned = inventory.filter(item => item === name).length
+    const chosen = orchardSelected.filter(item => item === name).length
+    if (chosen >= owned) return
+    setOrchardSelected(prev => [...prev, name])
+  }
+
+  function removeOrchardBerry(name: string): void {
+    setOrchardSelected(prev => {
+      const idx = prev.lastIndexOf(name)
+      if (idx === -1) return prev
+      const next = [...prev]
+      next.splice(idx, 1)
+      return next
+    })
+  }
+
+  function plantOrchardBerries(): void {
+    if (orchardSelected.length === 0 || orchardPlanted.length > 0) return
+    const planted = [...orchardSelected]
+    setInventory(prev => {
+      const next = [...prev]
+      for (const berry of planted) {
+        const idx = next.indexOf(berry)
+        if (idx !== -1) next.splice(idx, 1)
+      }
+      return next
+    })
+    setOrchardPlanted(planted)
+    setOrchardSelected([])
+    setOrchardPlantModal(false)
+    playSelect()
+    setBattleLog(prev => [
+      `🫐 Plantaste ${planted.length} baya${planted.length === 1 ? '' : 's'}: ${Array.from(new Set(planted)).map(itemLocalizedName).join(', ')}.`,
+      ...prev,
+    ].slice(0, 15))
+  }
+
+  function harvestOrchard(): void {
+    if (orchardPlanted.length === 0) return
+    const pool = BERRY_DROPS.filter(isBerryUnlocked)
+    const extras: string[] = []
+    for (let i = orchardPlanted.length; i < 3; i++) {
+      extras.push(pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : 'Oran Berry')
+    }
+    const harvest = [...orchardPlanted, ...extras].slice(0, 3)
+    setInventory(prev => [...prev, ...harvest])
+    setOrchardPlanted([])
+    const grouped = new Map<string, number>()
+    for (const berry of harvest) grouped.set(berry, (grouped.get(berry) ?? 0) + 1)
+    setOrchardHarvest(Array.from(grouped.entries()).map(([name, count]) => ({ name, count })))
+    playCapture()
+    setBattleLog(prev => [
+      `🫐 Cosechaste ${harvest.length} baya${harvest.length === 1 ? '' : 's'} del Huerto.`,
+      ...prev,
+    ].slice(0, 15))
+  }
+
+  // --- Guardería ---
+  async function prepareDaycareEgg(): Promise<void> {
+    setDaycareLoading(true)
+    try {
+      const ids = (await getSpeciesIdsByGeneration(getEffectiveGen()))
+        .filter(id => !ALL_LEGENDARIES.includes(id))
+      if (ids.length === 0) return
+      const randomId = ids[Math.floor(Math.random() * ids.length)]
+      const baseId = await getFirstStageSpeciesId(randomId)
+      const shiny = runChallenges.allShiny || Math.random() < 0.03
+      let pokemon = await buildPokemonFromApi(
+        baseId, getEffectiveGen(), 10, shiny, balDiff(difficulty), true,
+      )
+      pokemon = { ...pokemon, level: 10, hp: pokemon.maxHp, holdItem: null }
+      const totalNodes = 5
+      setDaycareEgg({ pokemon, nodesLeft: totalNodes, totalNodes })
+      playSelect()
+    } catch {
+      setApiError('No se pudo preparar el huevo de la Guardería.')
+    } finally {
+      setDaycareLoading(false)
+    }
+  }
+
+  function advanceDaycareEgg(): void {
+    if (!daycareEgg) return
+    if (currentNode?.type === 'daycare') return
+    const nextLeft = daycareEgg.nodesLeft - 1
+    if (nextLeft > 0) {
+      setDaycareEgg({ ...daycareEgg, nodesLeft: nextLeft })
+      return
+    }
+    const hatched: Pokemon = {
+      ...daycareEgg.pokemon,
+      level: 10,
+      hp: daycareEgg.pokemon.maxHp,
+      holdItem: null,
+    }
+    setDaycareEgg(null)
+    registerInPokedex(hatched)
+    setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
+    if (hatched.shiny) unlockAchievement('shiny_catch')
+    if ((hatched.attack + hatched.defense + hatched.speed + hatched.maxHp) >= 600) unlockAchievement('legendary_catch')
+    const placement: 'team' | 'pc' = team.length >= maxTeamSize ? 'pc' : 'team'
+    if (placement === 'pc') setPcStorage(prev => [...prev, hatched])
+    else setTeam(prev => [...prev, hatched])
+    setEggHatchPlacement(placement)
+    setEggHatch(hatched)
+    playCapture()
+    setBattleLog(prev => [
+      `🥚 ¡El huevo ha eclosionado! Ha nacido ${hatched.name}${hatched.shiny ? ' ✨' : ''}.`,
+      ...prev,
+    ].slice(0, 15))
+  }
+
+  // --- Mina ---
+  function clearMiningTimers(): void {
+    if (miningTimerRef.current) clearTimeout(miningTimerRef.current)
+    if (miningRevealTimerRef.current) clearTimeout(miningRevealTimerRef.current)
+    miningTimerRef.current = null
+    miningRevealTimerRef.current = null
+  }
+
+  function digMine(): void {
+    if (miningBusy || miningDigs >= 3) return
+    clearMiningTimers()
+    setMiningBusy(true)
+    setMiningDigs(prev => prev + 1)
+    setMiningMessage('⛏️ Excavando...')
+    playClick()
+    const delay = 650 / Math.max(1, accessibility.battleSpeed)
+    miningTimerRef.current = setTimeout(() => {
+      const pool = TREASURE_DROPS.filter(isConsumableUnlocked)
+      const found = pool.length > 0 && Math.random() < 0.6
+        ? pool[Math.floor(Math.random() * pool.length)]
+        : null
+      if (found) {
+        setInventory(prev => [...prev, found])
+        setMiningReveal(found)
+        setMiningMessage(`¡Has encontrado ${itemLocalizedName(found)}!`)
+        playCoin()
+        miningRevealTimerRef.current = setTimeout(() => setMiningReveal(null), 1800)
+      } else {
+        setMiningMessage(pool.length === 0
+          ? 'No tienes ningún tesoro desbloqueado en la Tienda Meta.'
+          : 'Solo has encontrado piedras...')
+        playError()
+      }
+      setMiningBusy(false)
+    }, delay)
+  }
+
+  // --- Pesca ---
+  function clearFishingTimers(): void {
+    if (fishingTimersRef.current.bite) clearTimeout(fishingTimersRef.current.bite)
+    if (fishingTimersRef.current.escape) clearTimeout(fishingTimersRef.current.escape)
+    fishingTimersRef.current = {}
+  }
+
+  async function prepareFishing(): Promise<void> {
+    clearFishingTimers()
+    setFishingLoading(true)
+    setFishingEncounter(null)
+    setFishingPhase('idle')
+    setFishingBusy(false)
+    setFishingMessage('')
+    try {
+      const waterIds = new Set((await getSpeciesIdsByPrimaryType('water'))
+        .filter(id => !ALL_LEGENDARIES.includes(id)))
+      if (waterIds.size === 0) waterIds.add(129)
+      const avgLevel = team.length > 0
+        ? Math.round(team.reduce((sum, p) => sum + p.level, 0) / team.length)
+        : 1
+      const targetLevel = difficulty === 'infinite' ? getInfiniteTargetLevel() : Math.max(1, avgLevel)
+      const shiny = runChallenges.allShiny || Math.random() < 0.05
+      let caught = await getBalancedPokemonByGeneration(
+        getEffectiveGen(), routeIndex, route.length, false, shiny,
+        balDiff(difficulty), -1, getStageProgression(), targetLevel, false, waterIds,
+      )
+      caught = {
+        ...caught,
+        hp: caught.maxHp,
+        holdItem: (difficulty === 'hard' || difficulty === 'infinite') ? null : caught.holdItem,
+      }
+      if (runChallenges.noEvolution) caught = applyNoEvolutionBuff(caught)
+      if (runChallenges.fixedLevel) caught = { ...caught, level: 50 }
+      setFishingEncounter(caught)
+    } catch {
+      setApiError('No se pudo preparar la Pesca.')
+    } finally {
+      setFishingLoading(false)
+    }
+  }
+
+  function castFishingLine(): void {
+    if (fishingPhase === 'waiting' || fishingPhase === 'bite') return
+    if (fishingAttempts >= 3 || fishingLoading || fishingBusy) return
+    setFishingAttempts(prev => prev + 1)
+    setFishingPhase('waiting')
+    setFishingMessage('Has lanzado la caña. Espera a que algo pique...')
+    playClick()
+    clearFishingTimers()
+    fishingTimersRef.current.bite = setTimeout(() => {
+      setFishingPhase('bite')
+      setFishingMessage('¡Pica! ¡Tira de la caña ahora!')
+      playHit()
+      fishingTimersRef.current.escape = setTimeout(() => {
+        setFishingPhase('missed')
+        setFishingMessage('Se ha escapado... vuelve a intentarlo.')
+        playError()
+      }, 900)
+    }, 1100 + Math.random() * 1900)
+  }
+
+  function reelFishingLine(): void {
+    if (fishingPhase !== 'bite' || !fishingEncounter || fishingBusy) return
+    clearFishingTimers()
+    setFishingBusy(true)
+    setFishingPhase('caught')
+    const caught = fishingEncounter
+    registerInPokedex(caught)
+    setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
+    if (caught.shiny) unlockAchievement('shiny_catch')
+    if ((caught.attack + caught.defense + caught.speed + caught.maxHp) >= 600) unlockAchievement('legendary_catch')
+    if (!teamHasRoom(team)) {
+      setPcStorage(prev => [...prev, caught])
+      setBattleLog(prev => [t('b.capturedPC', { name: caught.name }), ...prev].slice(0, 15))
+    } else {
+      setTeam(prev => [...prev, caught])
+      setBattleLog(prev => [t('b.captured', { name: caught.name }), ...prev].slice(0, 15))
+    }
+    playCapture()
+    setFishingMessage(`¡Has pescado a ${caught.name}!`)
+    captureSummaryCompleteNodeRef.current = true
+    setCaptureSummary(caught)
+  }
+
+  async function reviveFossil(fossil: FossilOption): Promise<void> {
+    if (fossilBusy) return
+    if (runChallenges.soloStarter || runChallenges.fixedTeam) {
+      setBattleLog((prev) => [t('b.noModifyTeam'), ...prev].slice(0, 15))
+      completeCurrentNode()
+      return
+    }
+    setFossilBusy(true)
+    try {
+      const avgLevel = team.length > 0
+        ? Math.round(team.reduce((sum, p) => sum + p.level, 0) / team.length)
+        : 1
+      const targetLevel = difficulty === 'infinite'
+        ? getInfiniteTargetLevel()
+        : Math.max(1, avgLevel)
+      let revived = await buildPokemonFromApi(
+        fossil.speciesId, getEffectiveGen(), targetLevel,
+        runChallenges.allShiny, balDiff(difficulty), true,
+      )
+      revived = {
+        ...revived,
+        hp: revived.maxHp,
+        holdItem: null,
+      }
+      if (runChallenges.noEvolution) revived = applyNoEvolutionBuff(revived)
+      if (runChallenges.fixedLevel) revived = { ...revived, level: 50 }
+      registerInPokedex(revived)
+      setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
+      if (revived.shiny) unlockAchievement('shiny_catch')
+      if ((revived.attack + revived.defense + revived.speed + revived.maxHp) >= 600) unlockAchievement('legendary_catch')
+      if (!teamHasRoom(team)) {
+        setPcStorage(prev => [...prev, revived])
+        setBattleLog(prev => [t('b.capturedPC', { name: revived.name }), ...prev].slice(0, 15))
+      } else {
+        setTeam(prev => [...prev, revived])
+        setBattleLog(prev => [t('b.captured', { name: revived.name }), ...prev].slice(0, 15))
+      }
+      playCapture()
+      captureSummaryCompleteNodeRef.current = true
+      setCaptureSummary(revived)
+    } catch {
+      setBattleLog(prev => ['🦖 No se pudo revivir el fósil. Inténtalo de nuevo.', ...prev].slice(0, 15))
+    } finally {
+      setFossilBusy(false)
     }
   }
 
@@ -9324,7 +10064,11 @@ function MainApp() {
       setTeam(prev => prev.map((p, i) => i === activeIndex ? playerSelf.entering : p))
       const forcedWeather = (modifier?.forcedWeather ?? modifier2?.forcedWeather) as WeatherKind | undefined
       const logs = [...playerEntry.logs, ...enemyEntry.logs, ...playerSelf.logs, ...enemySelf.logs]
-      if (forcedWeather) {
+      const stationWeather = consumeWeatherStation()
+      if (stationWeather) {
+        setWeather(stationWeather)
+        logs.push(t('b.stationWeather', { weather: weatherName(stationWeather, getLanguage()) }))
+      } else if (forcedWeather) {
         setWeather(forcedWeather)
         logs.push(t('b.abilityWeather', { name: runModName('weathermania'), weather: weatherName(forcedWeather, getLanguage()) }))
       }
@@ -10867,7 +11611,7 @@ function MainApp() {
       if (bst >= 600) unlockAchievement('legendary_catch')
       checkIvAchievements(capturedPkmn)
       setBattleLog(prev => [`🏆 ¡${capturedPkmn.name} fue capturado con ${ballName}!`, ...prev].slice(0, 15))
-      if (team.length >= maxTeamSize) {
+      if (!teamHasRoom(team)) {
         setPcStorage(prev => [...prev, capturedPkmn])
         setBattleLog(prev => [`📦 ${capturedPkmn.name} fue enviado al PC (equipo lleno).`, ...prev].slice(0, 15))
       } else {
@@ -10906,7 +11650,7 @@ function MainApp() {
       if (bst >= 600) unlockAchievement('legendary_catch')
       checkIvAchievements(capturedPkmn)
       setBattleLog(prev => [`🏆 ¡${capturedPkmn.name} fue capturado con ${ballName}! (${Math.round(catchProbability * 100)}%)`, ...prev].slice(0, 15))
-      if (team.length >= maxTeamSize) {
+      if (!teamHasRoom(team)) {
         setPcStorage(prev => [...prev, capturedPkmn])
         setBattleLog(prev => [`📦 ${capturedPkmn.name} fue enviado al PC (equipo lleno).`, ...prev].slice(0, 15))
       } else {
@@ -11577,7 +12321,7 @@ function MainApp() {
     setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
     if (captured.shiny) unlockAchievement('shiny_catch')
     if ((captured.attack + captured.defense + captured.speed + captured.maxHp) >= 600) unlockAchievement('legendary_catch')
-    if (team.length >= maxTeamSize) {
+    if (!teamHasRoom(team)) {
       setPcStorage((prev) => [...prev, captured])
       setBattleLog((prev) => [t('b.capturedPC', { name: captured.name }), ...prev].slice(0, 15))
     } else {
@@ -11616,7 +12360,7 @@ function MainApp() {
     setRunStats(prev => ({ ...prev, captures: prev.captures + 1 }))
     if (captured.shiny) unlockAchievement('shiny_catch')
     if ((captured.attack + captured.defense + captured.speed + captured.maxHp) >= 600) unlockAchievement('legendary_catch')
-    if (team.length >= maxTeamSize) {
+    if (!teamHasRoom(team)) {
       setPcStorage((prev) => [...prev, captured])
       setBattleLog((prev) => [t('b.capturedLegendPC', { name: captured.name }), ...prev].slice(0, 15))
     } else {
@@ -11820,6 +12564,13 @@ function MainApp() {
     setLegendaryEncounter(null)
     setDefeatSummary(null)
     setVictoryUnlocks(null)
+    setDaycareEgg(null)
+    setDaycareLoading(false)
+    setEggHatch(null)
+    setEggHatchPlacement('team')
+    setWeatherStation(null)
+    setRanchConfirm(null)
+    setRanchResult(null)
     setIsTrainerBattle(false)
     // Si se abandona una run diaria a mitad (p. ej. con "Volver a inicio"),
     // se consume: no se puede repetir el Desafío del Día el mismo día.
@@ -11894,7 +12645,7 @@ function MainApp() {
       void pvpForfeit()
       return
     }
-    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'speculator' || screen === 'safari' || screen === 'double' || screen === 'casino') {
+    if (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'speculator' || screen === 'safari' || screen === 'orchard' || screen === 'fossil' || screen === 'fishing' || screen === 'mine' || screen === 'daycare' || screen === 'weather' || screen === 'mirror' || screen === 'ranch' || screen === 'double' || screen === 'casino') {
       // En Co-op, "Volver a inicio" solo sale a nivel local: NO se finaliza la
       // sesión, para no interrumpir la partida del compañero (la sesión queda
       // activa y el compañero puede continuar solo).
@@ -11917,7 +12668,7 @@ function MainApp() {
     const adventure =
       screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' ||
       screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' ||
-      screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'speculator' || screen === 'safari' || screen === 'double' ||
+      screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'speculator' || screen === 'safari' || screen === 'orchard' || screen === 'fossil' || screen === 'fishing' || screen === 'mine' || screen === 'daycare' || screen === 'weather' || screen === 'mirror' || screen === 'ranch' || screen === 'double' ||
       screen === 'casino'
     if (!adventure) return
     if (resetPendingRef.current) return
@@ -12086,7 +12837,7 @@ function MainApp() {
           <button className="tiny-btn" type="button" onClick={() => { playClick(); if (screen === 'setup') { onRestartRun() } else { setShowRestartConfirm(true) } }}>
             {t('topbar.restart')}
           </button>
-          {!coopMode && (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'speculator' || screen === 'safari' || screen === 'double' || screen === 'casino') && (
+          {!coopMode && (screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'speculator' || screen === 'safari' || screen === 'orchard' || screen === 'fossil' || screen === 'fishing' || screen === 'mine' || screen === 'daycare' || screen === 'weather' || screen === 'mirror' || screen === 'ranch' || screen === 'double' || screen === 'casino') && (
             <button
               className="tiny-btn"
               type="button"
@@ -12132,6 +12883,16 @@ function MainApp() {
               </button>
             )}
             <span style={{ color: '#ffcb05', fontWeight: 'bold', marginLeft: '0.5rem' }}>💵 ${screen === 'setup' ? 100 + startMoneyBonus : money}</span>
+            {daycareEgg && (
+              <span title={language === 'en' ? 'Egg hatching soon' : 'Huevo a punto de eclosionar'} style={{ color: '#fde68a', fontWeight: 'bold', marginLeft: '0.5rem' }}>
+                🥚 {daycareEgg.nodesLeft}
+              </span>
+            )}
+            {weatherStation && (
+              <span title={language === 'en' ? 'Weather Station battles left' : 'Combates con clima restantes'} style={{ color: '#93c5fd', fontWeight: 'bold', marginLeft: '0.5rem' }}>
+                🌦️ {weatherStation.battlesLeft}
+              </span>
+            )}
             <span style={{ color: '#10b981', fontWeight: 'bold' }}>W {record.wins}</span>
             <span style={{ color: '#ee3b2f', fontWeight: 'bold' }}>L {record.losses}</span>
           </div>
@@ -12642,6 +13403,26 @@ function MainApp() {
             <button className="cta" onClick={closeCaptureSummary} type="button" style={{ marginTop: '1rem', width: '100%' }}>{t('route.continue')}</button>
           </div>
         </div>
+      )}
+
+      {eggHatch && createPortal(
+        <div className="modal-backdrop" onClick={() => setEggHatch(null)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '360px', textAlign: 'center', padding: '1.5rem' }}>
+            <h3 style={{ color: '#fde68a', margin: '0 0 0.5rem' }}>🥚 ¡El huevo ha eclosionado!</h3>
+            <img src={eggHatch.sprite} alt={eggHatch.name} onError={fallbackSprite} style={{ width: '96px', height: '96px', imageRendering: 'pixelated' }} />
+            <h4 style={{ color: '#f3f1ff', margin: '0.4rem 0 0.25rem', textTransform: 'capitalize' }}>
+              {eggHatch.name}{eggHatch.shiny ? ' ✨' : ''} <span style={{ color: '#7d7ab5', fontSize: '0.8rem' }}>Nv.{eggHatch.level}</span>
+            </h4>
+            <p style={{ color: '#d9d6f2', fontSize: '0.78rem', margin: '0 0 0.25rem' }}>
+              {t('stat.ability')}: {abilityName(eggHatch.ability, language)} · {t('stat.nature')}: {natureName(eggHatch.nature, language)}
+            </p>
+            <p style={{ color: '#9b98cf', fontSize: '0.78rem', margin: '0 0 0.9rem' }}>
+              Se ha unido a {eggHatchPlacement === 'team' ? (language === 'en' ? 'your team' : 'tu equipo') : (language === 'en' ? 'your PC' : 'tu PC')}.
+            </p>
+            <button className="cta" type="button" onClick={() => setEggHatch(null)} style={{ width: '100%' }}>Cerrar</button>
+          </div>
+        </div>,
+        document.body,
       )}
 
       {/* Evolution popup */}
@@ -14524,7 +15305,7 @@ function MainApp() {
         </section>
       )}
 
-      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'speculator' || screen === 'safari' || screen === 'double' || screen === 'casino') && activePokemon && (
+      {(screen === 'route' || screen === 'battle' || screen === 'shop' || screen === 'spin' || screen === 'pokeRand' || screen === 'move' || screen === 'mega' || screen === 'gmax' || screen === 'primal' || screen === 'trade' || screen === 'blackmarket' || screen === 'speculator' || screen === 'safari' || screen === 'orchard' || screen === 'fossil' || screen === 'fishing' || screen === 'mine' || screen === 'daycare' || screen === 'weather' || screen === 'mirror' || screen === 'ranch' || screen === 'double' || screen === 'casino') && activePokemon && (
         <section className="roulette-layout">
           <article className="panel trainer-panel">
             <p className="muted small-tag">{t('route.trainer')}</p>
@@ -14552,7 +15333,7 @@ function MainApp() {
               <div style={{ width: `${(activePokemon.hp / activePokemon.maxHp) * 100}%`, background: hpBarColor(activePokemon.hp / activePokemon.maxHp) }}></div>
             </div>
 
-            <p className="label">{t('route.team')} {team.length}/{maxTeamSize}</p>
+            <p className="label">{t('route.team')} {team.length}/{maxTeamSize}{daycareEgg ? ' · 🥚 1' : ''}</p>
             <div className="team-grid" onDragOver={(e) => { e.preventDefault() }}>
               {team.map((pokemon, index) => (
                 <div key={`${pokemon.id}-${index}`} className="sprite-tooltip-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -14698,7 +15479,14 @@ function MainApp() {
                   )}
                 </div>
               ))}
-              {Array.from({ length: Math.max(0, maxTeamSize - team.length) }).map((_, index) => (
+              {daycareEgg && (
+                <div className="team-slot" title={`${language === 'en' ? 'Egg' : 'Huevo'}: ${daycareEgg.nodesLeft} ${language === 'en' ? 'nodes left' : 'nodos restantes'}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px', borderStyle: 'dashed', borderColor: '#fde68a', cursor: 'default' }}>
+                  <img src={ITEM_SPRITES['Huevo']} alt="Huevo" style={{ width: '34px', height: '34px', imageRendering: 'pixelated' }} />
+                  <strong style={{ color: '#fde68a', fontSize: '0.72rem' }}>Huevo</strong>
+                  <span style={{ color: '#d9d6f2', fontSize: '0.7rem' }}>{daycareEgg.nodesLeft}</span>
+                </div>
+              )}
+              {Array.from({ length: Math.max(0, maxTeamSize - team.length - (daycareEgg ? 1 : 0)) }).map((_, index) => (
                 <div
                   key={`empty-${index}`}
                   className="team-slot empty"
@@ -15279,9 +16067,12 @@ function MainApp() {
                     const canBuy = !runChallenges.noPurchasing && money >= price
                     return (
                       <div key={itemName} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '6px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {ITEM_SPRITES[itemName] && <img src={ITEM_SPRITES[itemName]} alt={itemName} style={{ width: '26px', height: '26px', imageRendering: 'pixelated' }} />}
-                          <strong style={{ color: '#f3f1ff', fontSize: '0.85rem' }}>{itemLocalizedName(itemName)}</strong>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                          {ITEM_SPRITES[itemName] && <img src={ITEM_SPRITES[itemName]} alt={itemName} style={{ width: '26px', height: '26px', imageRendering: 'pixelated', flexShrink: 0 }} />}
+                          <div style={{ minWidth: 0 }}>
+                            <strong style={{ display: 'block', color: '#f3f1ff', fontSize: '0.85rem' }}>{itemLocalizedName(itemName)}</strong>
+                            <p style={{ margin: 0, color: '#9b98cf', fontSize: '0.7rem', lineHeight: 1.3 }}>{itemDesc(itemName)}</p>
+                          </div>
                         </div>
                         <button
                           className={`tiny-btn ${canBuy ? 'buy-green' : 'buy-red'}`}
@@ -15357,6 +16148,335 @@ function MainApp() {
                 <button className="cta" onClick={completeCurrentNode} type="button" style={{ width: '100%', marginTop: '1rem' }}>{t('shop.leaveMarket')}</button>
               </div>
             )}
+
+            {screen === 'daycare' && (
+              <div className="action-block shop-block" style={{ marginTop: '1rem', borderColor: 'rgba(253,230,138,0.6)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <h3 style={{ margin: 0, color: '#fde68a' }}>🥚 Guardería</h3>
+                  <span style={{ fontSize: '0.8rem', color: '#9b98cf' }}>Huevo de la aventura</span>
+                </div>
+
+                {daycareLoading ? (
+                  <p style={{ color: '#9b98cf', fontSize: '0.85rem', textAlign: 'center', padding: '1.5rem 0' }}>Preparando el huevo...</p>
+                ) : daycareEgg ? (
+                  <div style={{ background: 'rgba(253,230,138,0.08)', border: '1px solid rgba(253,230,138,0.45)', borderRadius: '10px', padding: '1rem', marginBottom: '0.85rem' }}>
+                    <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
+                      <img src={ITEM_SPRITES['Huevo']} alt="Huevo" style={{ width: '80px', height: '80px', imageRendering: 'pixelated' }} />
+                    </div>
+                    <p style={{ color: '#f3f1ff', fontSize: '0.9rem', textAlign: 'center', margin: '0 0 0.5rem', fontWeight: 'bold' }}>
+                      Huevo misterioso
+                    </p>
+                    <p style={{ color: '#fde68a', fontSize: '0.85rem', textAlign: 'center', margin: '0 0 0.5rem', fontWeight: 'bold' }}>
+                      🥚 Eclosiona en {daycareEgg.nodesLeft} nodo{daycareEgg.nodesLeft === 1 ? '' : 's'}
+                    </p>
+                    <div style={{ height: '8px', borderRadius: '999px', background: 'rgba(0,0,0,0.35)', overflow: 'hidden', marginBottom: '0.65rem' }}>
+                      <div style={{ height: '100%', width: `${Math.round(((daycareEgg.totalNodes - daycareEgg.nodesLeft) / daycareEgg.totalNodes) * 100)}%`, background: '#fde68a' }} />
+                    </div>
+                    <p style={{ color: '#d9d6f2', fontSize: '0.76rem', margin: '0 0 0.2rem' }}>
+                      Ocupa <strong style={{ color: '#fde68a' }}>1 hueco del equipo</strong> mientras lo llevas.
+                    </p>
+                    <p style={{ color: '#9b98cf', fontSize: '0.72rem', margin: '0.6rem 0 0' }}>
+                      El Pokémon será aleatorio, siempre de primera etapa evolutiva y nivel 10, con sus propios IVs y habilidad.
+                    </p>
+                  </div>
+                ) : team.length >= maxTeamSize ? (
+                  <p style={{ color: '#fca5a5', fontSize: '0.82rem', margin: '0 0 0.85rem' }}>
+                    No tienes ningún hueco libre en el equipo ({team.length}/{maxTeamSize}). Libera o envía un Pokémon al PC para poder llevar el huevo.
+                  </p>
+                ) : (
+                  <p style={{ color: '#9b98cf', fontSize: '0.82rem', margin: '0 0 0.85rem' }}>
+                    No hay ningún huevo activo. Vuelve a visitar la Guardería para recibir uno.
+                  </p>
+                )}
+
+                {!daycareLoading && !daycareEgg && team.length < maxTeamSize && (
+                  <button
+                    type="button"
+                    onClick={() => void prepareDaycareEgg()}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #fde68a', background: 'rgba(253,230,138,0.18)', color: '#fef3c7', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer', fontFamily: 'inherit', marginBottom: '0.55rem' }}
+                  >
+                    🥚 Recibir huevo
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={completeCurrentNode}
+                  disabled={daycareLoading}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #64748b', background: 'transparent', color: '#cbd5e1', fontWeight: 'bold', fontSize: '0.82rem', cursor: daycareLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+                >
+                  🚪 Marcharse
+                </button>
+              </div>
+            )}
+
+            {screen === 'mine' && (() => {
+              const unlockedTreasures = TREASURE_DROPS.filter(isConsumableUnlocked)
+              return (
+                <div className="action-block shop-block" style={{ marginTop: '1rem', borderColor: 'rgba(192,132,87,0.6)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <h3 style={{ margin: 0, color: '#c08457' }}>⛏️ Mina</h3>
+                    <span style={{ fontSize: '0.8rem', color: '#9b98cf' }}>{miningDigs}/3 excavaciones</span>
+                  </div>
+                  <p style={{ color: '#9b98cf', fontSize: '0.82rem', lineHeight: 1.45, marginBottom: '0.6rem' }}>
+                    Excava para encontrar tesoros que hayas desbloqueado en la Tienda Meta. Tienes 3 excavaciones por visita.
+                  </p>
+                  <p style={{ color: '#a8a5cf', fontSize: '0.76rem', margin: '0 0 0.8rem' }}>
+                    Tesoros disponibles: <strong style={{ color: '#fbbf24' }}>{unlockedTreasures.length}</strong>
+                  </p>
+
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '0.8rem' }}>
+                    {[0, 1, 2].map(i => (
+                      <span key={i} style={{ fontSize: '1.1rem', opacity: i < miningDigs ? 0.35 : 1, filter: i < miningDigs ? 'grayscale(1)' : 'none' }}>⛏️</span>
+                    ))}
+                  </div>
+
+                  <p style={{ color: miningMessage.startsWith('¡') ? '#fde68a' : '#9b98cf', fontSize: '0.82rem', textAlign: 'center', margin: '0 0 0.8rem', minHeight: '1.2rem' }}>
+                    {miningMessage || (unlockedTreasures.length === 0
+                      ? 'No tienes tesoros desbloqueados. Marcharte es la única opción.'
+                      : 'Pulsa Excavar para buscar un tesoro.')}
+                  </p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                    <button
+                      type="button"
+                      onClick={digMine}
+                      disabled={miningBusy || miningDigs >= 3 || unlockedTreasures.length === 0}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #c08457', background: miningBusy || miningDigs >= 3 || unlockedTreasures.length === 0 ? 'rgba(71,85,105,0.18)' : 'rgba(192,132,87,0.20)', color: miningBusy || miningDigs >= 3 || unlockedTreasures.length === 0 ? '#7d7ab5' : '#f5d6b3', fontWeight: 'bold', fontSize: '0.88rem', cursor: miningBusy || miningDigs >= 3 || unlockedTreasures.length === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+                    >
+                      {miningBusy ? '⛏️ Excavando...' : miningDigs >= 3 ? 'Sin excavaciones restantes' : '⛏️ Excavar'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { clearMiningTimers(); completeCurrentNode() }}
+                      disabled={miningBusy}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #64748b', background: 'transparent', color: '#cbd5e1', fontWeight: 'bold', fontSize: '0.82rem', cursor: miningBusy ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+                    >
+                      🚪 Marcharse
+                    </button>
+                  </div>
+
+                  {miningReveal && createPortal(
+                    <div className="modal-backdrop" onClick={() => { clearMiningTimers(); setMiningReveal(null) }}>
+                      <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '340px', textAlign: 'center', padding: '1.5rem' }}>
+                        <h3 style={{ color: '#fbbf24', margin: '0 0 0.5rem' }}>⛏️ ¡Tesoro encontrado!</h3>
+                        <img src={ITEM_SPRITES[miningReveal]} alt={miningReveal} style={{ width: '72px', height: '72px', imageRendering: 'pixelated' }} />
+                        <h4 style={{ color: '#f3f1ff', margin: '0.5rem 0 0.25rem' }}>{itemLocalizedName(miningReveal)}</h4>
+                        <p style={{ color: '#9b98cf', fontSize: '0.78rem', margin: 0 }}>Se ha añadido a tu inventario.</p>
+                      </div>
+                    </div>,
+                    document.body,
+                  )}
+                </div>
+              )
+            })()}
+
+            {screen === 'fishing' && (
+              <div className="action-block shop-block" style={{ marginTop: '1rem', borderColor: 'rgba(56,189,248,0.55)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <h3 style={{ margin: 0, color: '#38bdf8' }}>🎣 Pesca</h3>
+                  <span style={{ fontSize: '0.8rem', color: '#9b98cf' }}>{fishingAttempts}/3 intentos</span>
+                </div>
+                <p style={{ color: '#9b98cf', fontSize: '0.82rem', lineHeight: 1.45, marginBottom: '0.8rem' }}>
+                  Lanza la caña y recógela justo cuando pique para atrapar un Pokémon de tipo Agua. Tienes 3 intentos y un 5% de probabilidad de que sea shiny.
+                </p>
+
+                <div style={{ position: 'relative', height: '110px', borderRadius: '10px', marginBottom: '0.8rem', overflow: 'hidden', background: 'linear-gradient(180deg, #0c4a6e 0%, #075985 55%, #164e63 100%)', border: '1px solid rgba(56,189,248,0.45)' }}>
+                  <div style={{ position: 'absolute', left: 0, right: 0, top: '55%', height: '2px', background: 'rgba(186,230,253,0.25)' }} />
+                  <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%', background: 'rgba(2,132,199,0.25)' }} />
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.4rem' }}>
+                    {fishingPhase === 'waiting' ? '〰️' : fishingPhase === 'bite' ? '💦' : fishingPhase === 'caught' ? '🐟' : fishingPhase === 'missed' ? '🌊' : '🎣'}
+                  </div>
+                  {fishingPhase === 'bite' && (
+                    <div style={{ position: 'absolute', left: '50%', bottom: '10px', transform: 'translateX(-50%)', color: '#fef08a', fontWeight: 'bold', fontSize: '0.8rem', textShadow: '0 1px 3px #000' }}>¡PICA!</div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '0.75rem' }}>
+                  {[0, 1, 2].map(i => (
+                    <span key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', background: i < fishingAttempts ? '#38bdf8' : 'rgba(148,163,184,0.35)' }} />
+                  ))}
+                </div>
+
+                <p style={{ color: fishingPhase === 'bite' ? '#fef08a' : fishingPhase === 'caught' ? '#86efac' : fishingPhase === 'missed' ? '#fca5a5' : '#9b98cf', fontSize: '0.82rem', textAlign: 'center', margin: '0 0 0.8rem', minHeight: '1.2rem' }}>
+                  {fishingLoading ? 'Preparando el agua...' : fishingMessage || (fishingAttempts >= 3 ? 'No queda ningún intento. Puedes marcharte.' : 'Pulsa Lanzar caña para empezar.')}
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                  {fishingPhase === 'bite' ? (
+                    <button
+                      type="button"
+                      onClick={reelFishingLine}
+                      disabled={fishingBusy}
+                      style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #fef08a', background: 'rgba(254,240,138,0.22)', color: '#fef9c3', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      🎣 ¡Tirar de la caña!
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={castFishingLine}
+                      disabled={fishingPhase === 'waiting' || fishingLoading || fishingAttempts >= 3 || !fishingEncounter || fishingBusy}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #38bdf8', background: fishingPhase === 'waiting' || fishingLoading || fishingAttempts >= 3 || !fishingEncounter ? 'rgba(71,85,105,0.18)' : 'rgba(56,189,248,0.18)', color: fishingPhase === 'waiting' || fishingLoading || fishingAttempts >= 3 || !fishingEncounter ? '#7d7ab5' : '#bae6fd', fontWeight: 'bold', fontSize: '0.85rem', cursor: fishingPhase === 'waiting' || fishingLoading || fishingAttempts >= 3 || !fishingEncounter ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+                    >
+                      {fishingPhase === 'waiting' ? '⏳ Esperando a que pique...' : '🎣 Lanzar caña'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { clearFishingTimers(); completeCurrentNode() }}
+                    disabled={fishingBusy}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #64748b', background: 'transparent', color: '#cbd5e1', fontWeight: 'bold', fontSize: '0.82rem', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    🚪 Marcharse
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {screen === 'fossil' && (
+              <div className="action-block shop-block" style={{ marginTop: '1rem', borderColor: 'rgba(214,166,106,0.55)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <h3 style={{ margin: 0, color: '#d6a66a' }}>🦖 Laboratorio de Fósiles</h3>
+                  <span style={{ fontSize: '0.8rem', color: '#9b98cf' }}>2 fósiles disponibles</span>
+                </div>
+                <p style={{ color: '#9b98cf', fontSize: '0.82rem', lineHeight: 1.45, marginBottom: '0.9rem' }}>
+                  Elige uno de los dos fósiles para revivir un Pokémon especial adaptado al nivel de tu aventura. El fósil se consumirá al revivir.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+                  {fossilChoices.map(fossil => (
+                    <button
+                      key={fossil.item}
+                      type="button"
+                      onClick={() => void reviveFossil(fossil)}
+                      disabled={fossilBusy}
+                      style={{ padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #d6a66a', background: 'rgba(214,166,106,0.10)', cursor: fossilBusy ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: fossilBusy ? 0.6 : 1 }}
+                    >
+                      <img src={ITEM_SPRITES[fossil.item]} alt={fossil.item} style={{ width: '64px', height: '64px', imageRendering: 'pixelated' }} />
+                      <div style={{ color: '#f3e3c8', fontWeight: 'bold', fontSize: '0.85rem', marginTop: '0.4rem' }}>{itemLocalizedName(fossil.item)}</div>
+                      <div style={{ color: '#9b98cf', fontSize: '0.7rem' }}>Revivir Pokémon</div>
+                    </button>
+                  ))}
+                </div>
+                {fossilBusy && <p style={{ color: '#d6a66a', fontSize: '0.8rem', textAlign: 'center', marginBottom: '0.75rem' }}>Reviviendo el fósil...</p>}
+                <button className="cta" type="button" disabled={fossilBusy} onClick={completeCurrentNode} style={{ width: '100%' }}>Marcharse</button>
+              </div>
+            )}
+
+            {screen === 'orchard' && (() => {
+              const berries = orchardAvailableBerries()
+              const plantedCounts = new Map<string, number>()
+              for (const berry of orchardPlanted) plantedCounts.set(berry, (plantedCounts.get(berry) ?? 0) + 1)
+              const selectedCounts = new Map<string, number>()
+              for (const berry of orchardSelected) selectedCounts.set(berry, (selectedCounts.get(berry) ?? 0) + 1)
+              return (
+                <div className="action-block shop-block" style={{ marginTop: '1rem', borderColor: 'rgba(163,230,53,0.55)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <h3 style={{ margin: 0, color: '#a3e635' }}>🫐 Huerto de Bayas</h3>
+                    <span style={{ fontSize: '0.8rem', color: '#9b98cf' }}>Solo en Difícil e Infinite</span>
+                  </div>
+                  <p style={{ color: '#9b98cf', fontSize: '0.82rem', lineHeight: 1.45, marginBottom: '0.8rem' }}>
+                    Planta hasta 3 bayas ahora y recógelas en otro Huerto. Al recoger recibirás las bayas plantadas más bayas extra hasta un máximo de 3.
+                  </p>
+
+                  {orchardPlanted.length > 0 ? (
+                    <div style={{ background: 'rgba(163,230,53,0.10)', border: '1px solid rgba(163,230,53,0.45)', borderRadius: '8px', padding: '0.65rem', marginBottom: '0.8rem' }}>
+                      <div style={{ color: '#d9f99d', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '0.35rem' }}>🌱 Bayas plantadas ({orchardPlanted.length}/3)</div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {Array.from(plantedCounts.entries()).map(([name, count]) => (
+                          <span key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.25)', border: '1px solid #3f3f6e', borderRadius: '6px', padding: '3px 6px', color: '#f3f1ff', fontSize: '0.72rem' }}>
+                            {ITEM_SPRITES[name] && <img src={ITEM_SPRITES[name]} alt={name} style={{ width: '20px', height: '20px', imageRendering: 'pixelated' }} />}
+                            {itemLocalizedName(name)} ×{count}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ color: '#7d7ab5', fontSize: '0.78rem', margin: '0 0 0.8rem' }}>No hay bayas plantadas todavía.</p>
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                    <button
+                      type="button"
+                      onClick={harvestOrchard}
+                      disabled={orchardPlanted.length === 0}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: `1px solid ${orchardPlanted.length > 0 ? '#a3e635' : '#475569'}`, background: orchardPlanted.length > 0 ? 'rgba(163,230,53,0.18)' : 'rgba(71,85,105,0.18)', color: orchardPlanted.length > 0 ? '#d9f99d' : '#7d7ab5', fontWeight: 'bold', fontSize: '0.85rem', cursor: orchardPlanted.length > 0 ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
+                    >
+                      🧺 Recoger {orchardPlanted.length > 0 ? `(${orchardPlanted.length} plantadas)` : ''}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setOrchardSelected([]); setOrchardPlantModal(true) }}
+                      disabled={orchardPlanted.length > 0 || berries.length === 0}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: `1px solid ${orchardPlanted.length === 0 && berries.length > 0 ? '#84cc16' : '#475569'}`, background: orchardPlanted.length === 0 && berries.length > 0 ? 'rgba(132,204,22,0.18)' : 'rgba(71,85,105,0.18)', color: orchardPlanted.length === 0 && berries.length > 0 ? '#bef264' : '#7d7ab5', fontWeight: 'bold', fontSize: '0.85rem', cursor: orchardPlanted.length === 0 && berries.length > 0 ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
+                    >
+                      🌱 Cosechar
+                    </button>
+                    {berries.length === 0 && orchardPlanted.length === 0 && (
+                      <p style={{ color: '#7d7ab5', fontSize: '0.76rem', margin: 0, textAlign: 'center' }}>No tienes bayas para plantar.</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { setOrchardPlantModal(false); setOrchardSelected([]); setOrchardHarvest(null); completeCurrentNode() }}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #64748b', background: 'transparent', color: '#cbd5e1', fontWeight: 'bold', fontSize: '0.82rem', cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      🚪 Marcharse
+                    </button>
+                  </div>
+
+                  {orchardPlantModal && createPortal(
+                    <div className="modal-backdrop" onClick={() => setOrchardPlantModal(false)}>
+                      <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', maxHeight: '80vh', overflow: 'auto', padding: '1.25rem' }}>
+                        <h3 style={{ color: '#a3e635', margin: '0 0 0.4rem' }}>🌱 Selecciona hasta 3 bayas</h3>
+                        <p style={{ color: '#9b98cf', fontSize: '0.78rem', margin: '0 0 0.75rem' }}>Seleccionadas: {orchardSelected.length}/3</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '0.9rem' }}>
+                          {berries.map(name => {
+                            const owned = inventory.filter(item => item === name).length
+                            const chosen = selectedCounts.get(name) ?? 0
+                            return (
+                              <div key={name} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.25)', border: '1px solid #3f3f6e', borderRadius: '6px', padding: '5px 8px' }}>
+                                {ITEM_SPRITES[name] && <img src={ITEM_SPRITES[name]} alt={name} style={{ width: '24px', height: '24px', imageRendering: 'pixelated' }} />}
+                                <span style={{ flex: 1, color: '#f3f1ff', fontSize: '0.78rem' }}>{itemLocalizedName(name)} <span style={{ color: '#7d7ab5' }}>({owned})</span></span>
+                                <button type="button" onClick={() => removeOrchardBerry(name)} disabled={chosen === 0} style={{ width: '24px', height: '24px', borderRadius: '5px', border: '1px solid #64748b', background: 'transparent', color: chosen > 0 ? '#f3f1ff' : '#475569', cursor: chosen > 0 ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>−</button>
+                                <span style={{ minWidth: '16px', textAlign: 'center', color: '#d9f99d', fontWeight: 'bold', fontSize: '0.8rem' }}>{chosen}</span>
+                                <button type="button" onClick={() => addOrchardBerry(name)} disabled={chosen >= owned || orchardSelected.length >= 3} style={{ width: '24px', height: '24px', borderRadius: '5px', border: '1px solid #64748b', background: 'transparent', color: chosen < owned && orchardSelected.length < 3 ? '#f3f1ff' : '#475569', cursor: chosen < owned && orchardSelected.length < 3 ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>+</button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <button type="button" onClick={plantOrchardBerries} disabled={orchardSelected.length === 0} style={{ flex: 1, padding: '8px 10px', borderRadius: '7px', border: '1px solid #84cc16', background: orchardSelected.length > 0 ? '#84cc16' : 'rgba(71,85,105,0.3)', color: orchardSelected.length > 0 ? '#1a2e05' : '#7d7ab5', fontWeight: 'bold', cursor: orchardSelected.length > 0 ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>
+                            Plantar ({orchardSelected.length})
+                          </button>
+                          <button type="button" onClick={() => setOrchardPlantModal(false)} style={{ padding: '8px 12px', borderRadius: '7px', border: '1px solid #64748b', background: 'transparent', color: '#cbd5e1', fontWeight: 'bold', cursor: 'pointer', fontFamily: 'inherit' }}>
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    </div>,
+                    document.body,
+                  )}
+
+                  {orchardHarvest && createPortal(
+                    <div className="modal-backdrop" onClick={() => setOrchardHarvest(null)}>
+                      <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '380px', textAlign: 'center', padding: '1.5rem' }}>
+                        <h3 style={{ color: '#a3e635', margin: '0 0 0.4rem' }}>🧺 ¡Cosecha recogida!</h3>
+                        <p style={{ color: '#d9d6f2', fontSize: '0.82rem', marginBottom: '0.8rem' }}>Has recibido estas bayas:</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '1rem', textAlign: 'left' }}>
+                          {orchardHarvest.map(({ name, count }) => (
+                            <div key={name} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.25)', border: '1px solid #3f3f6e', borderRadius: '6px', padding: '6px 8px' }}>
+                              {ITEM_SPRITES[name] && <img src={ITEM_SPRITES[name]} alt={name} style={{ width: '28px', height: '28px', imageRendering: 'pixelated' }} />}
+                              <span style={{ color: '#f3f1ff', fontSize: '0.82rem' }}>{itemLocalizedName(name)} <strong style={{ color: '#d9f99d' }}>×{count}</strong></span>
+                            </div>
+                          ))}
+                        </div>
+                        <button type="button" className="cta" onClick={() => setOrchardHarvest(null)} style={{ width: '100%' }}>Cerrar</button>
+                      </div>
+                    </div>,
+                    document.body,
+                  )}
+                </div>
+              )
+            })()}
 
             {screen === 'safari' && (() => {
               const balls = safariAvailableBalls()
@@ -15483,6 +16603,139 @@ function MainApp() {
 
                       <button className="cta" type="button" onClick={() => { setSafariSelected(null); setSafariChoices([]); completeCurrentNode() }} style={{ width: '100%' }}>Salir del Safari</button>
                     </>
+                  )}
+                </div>
+              )
+            })()}
+
+            {screen === 'weather' && (
+              <div className="action-block shop-block" style={{ marginTop: '1rem', borderColor: 'rgba(96,165,250,0.55)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <h3 style={{ margin: 0, color: '#60a5fa' }}>🌦️ Estación Meteorológica</h3>
+                  <span style={{ fontSize: '0.8rem', color: '#9b98cf' }}>Próximos 2 combates</span>
+                </div>
+                <p style={{ color: '#9b98cf', fontSize: '0.82rem', lineHeight: 1.45, marginBottom: '0.8rem' }}>
+                  Elige el clima que estará activo durante los próximos 2 combates. Se aplicará al empezar cada batalla.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.6rem', marginBottom: '0.8rem' }}>
+                  {(['rain', 'sun', 'sand', 'hail'] as const).map(option => {
+                    const selected = weatherStation?.weather === option
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => chooseWeatherStation(option)}
+                        style={{ padding: '0.75rem', borderRadius: '9px', border: `1px solid ${selected ? '#60a5fa' : '#3f3f6e'}`, background: selected ? 'rgba(96,165,250,0.20)' : 'rgba(0,0,0,0.25)', color: '#f3f1ff', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        <div style={{ fontSize: '1.5rem', lineHeight: 1 }}>{WEATHER_INFO[option].icon}</div>
+                        <strong style={{ display: 'block', margin: '0.35rem 0 0.2rem', fontSize: '0.82rem', color: selected ? '#bfdbfe' : '#f3f1ff' }}>{weatherName(option, language)}</strong>
+                        <span style={{ display: 'block', color: '#9b98cf', fontSize: '0.68rem', lineHeight: 1.3 }}>{weatherDescription(option, language)}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <p style={{ color: weatherStation ? '#bfdbfe' : '#9b98cf', fontSize: '0.8rem', textAlign: 'center', margin: '0 0 0.8rem' }}>
+                  {weatherStation
+                    ? `${WEATHER_INFO[weatherStation.weather].icon} ${weatherName(weatherStation.weather, language)} · ${weatherStation.battlesLeft} combate${weatherStation.battlesLeft === 1 ? '' : 's'} restante${weatherStation.battlesLeft === 1 ? '' : 's'}`
+                    : 'Todavía no has elegido ningún clima.'}
+                </p>
+                <button className="cta" type="button" onClick={completeCurrentNode} style={{ width: '100%' }}>Marcharse</button>
+              </div>
+            )}
+
+            {screen === 'ranch' && (() => {
+              const canModifyTeam = !runChallenges.soloStarter && !runChallenges.fixedTeam
+              const renderRow = (p: Pokemon, kind: 'team' | 'pc', index: number) => {
+                const count = ranchRewardCount(p)
+                const canSell = canModifyTeam && !(kind === 'team' && team.length <= 1)
+                return (
+                  <div key={`${kind}-${index}-${p.name}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', background: 'rgba(0,0,0,0.3)', padding: '7px 10px', borderRadius: '6px', border: '1px solid rgba(163,230,53,0.22)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <img src={p.sprite} alt={p.name} onError={fallbackSprite} style={{ width: '34px', height: '34px', imageRendering: 'pixelated', flexShrink: 0 }} />
+                      <div style={{ minWidth: 0 }}>
+                        <strong style={{ display: 'block', color: '#f3f1ff', fontSize: '0.85rem', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}{p.shiny ? ' ✨' : ''} <span style={{ color: '#9b98cf', fontWeight: 'normal' }}>Nv.{p.level}</span></strong>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', marginTop: '2px' }}>
+                          {p.types?.map(type => (
+                            <span key={type} style={{ background: TYPE_COLORS[type] ?? '#475569', color: '#fff', fontSize: '0.58rem', padding: '1px 5px', borderRadius: '3px', textTransform: 'capitalize' }}>{type}</span>
+                          ))}
+                          <span style={{ color: '#bef264', fontSize: '0.62rem' }}>🧺 {count} objeto{count === 1 ? '' : 's'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canSell}
+                      onClick={() => { if (!canSell) { playError(); return } setRanchConfirm({ kind, index, name: p.name }) }}
+                      title={!canModifyTeam ? t('b.noModifyTeam') : kind === 'team' && team.length <= 1 ? t('b.speculatorLastTeam') : undefined}
+                      style={{ minWidth: '104px', padding: '6px 9px', borderRadius: '6px', border: `1px solid ${canSell ? '#a3e635' : '#dc2626'}`, background: canSell ? 'rgba(163,230,53,0.18)' : 'rgba(239,68,68,0.18)', color: canSell ? '#d9f99d' : '#ff8a80', fontWeight: 'bold', fontSize: '0.72rem', cursor: canSell ? 'pointer' : 'not-allowed', fontFamily: 'inherit', flexShrink: 0 }}
+                    >
+                      Intercambiar
+                    </button>
+                  </div>
+                )
+              }
+              return (
+                <div className="action-block shop-block" style={{ marginTop: '1rem', borderColor: 'rgba(163,230,53,0.55)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <h3 style={{ margin: 0, color: '#a3e635' }}>🐑 Rancho Pokémon</h3>
+                    <span style={{ fontSize: '0.8rem', color: '#9b98cf' }}>Solo en Difícil e Infinite</span>
+                  </div>
+                  <p style={{ color: '#9b98cf', fontSize: '0.8rem', lineHeight: 1.45, marginBottom: '0.75rem' }}>
+                    Intercambia Pokémon por <strong style={{ color: '#bef264' }}>objetos y materiales</strong> según su especie, tipo y nivel. No recibirás dinero directamente.
+                  </p>
+
+                  {ranchConfirm && (
+                    <div style={{ background: 'rgba(163,230,53,0.12)', border: '1px solid #a3e635', borderRadius: '8px', padding: '0.7rem', marginBottom: '0.9rem' }}>
+                      <strong style={{ display: 'block', color: '#d9f99d', fontSize: '0.9rem', marginBottom: '0.25rem' }}>
+                        ¿Intercambiar a {ranchConfirm.name}?
+                      </strong>
+                      <p style={{ margin: '0 0 0.55rem', color: '#d9d6f2', fontSize: '0.78rem' }}>
+                        Recibirás objetos y materiales. Esta acción no se puede deshacer.
+                      </p>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button type="button" onClick={() => sellRanchPokemon(ranchConfirm.kind, ranchConfirm.index)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #a3e635', background: '#a3e635', color: '#1a2e05', fontWeight: 'bold', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}>
+                          Confirmar intercambio
+                        </button>
+                        <button type="button" onClick={() => setRanchConfirm(null)} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #64748b', background: 'transparent', color: '#cbd5e1', fontWeight: 'bold', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <h4 style={{ color: '#a3e635', margin: '0 0 0.4rem', fontSize: '0.9rem' }}>Equipo ({team.length})</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '1rem' }}>
+                    {team.length === 0 ? (
+                      <p style={{ color: '#7d7ab5', fontSize: '0.8rem', margin: 0 }}>No tienes Pokémon en el equipo.</p>
+                    ) : team.map((p, index) => renderRow(p, 'team', index))}
+                  </div>
+
+                  <h4 style={{ color: '#a3e635', margin: '0 0 0.4rem', fontSize: '0.9rem' }}>PC ({pcStorage.length})</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '1rem' }}>
+                    {pcStorage.length === 0 ? (
+                      <p style={{ color: '#7d7ab5', fontSize: '0.8rem', margin: 0 }}>No tienes Pokémon en el PC.</p>
+                    ) : pcStorage.map((p, index) => renderRow(p, 'pc', index))}
+                  </div>
+
+                  <button className="cta" type="button" onClick={completeCurrentNode} style={{ width: '100%' }}>Marcharse</button>
+
+                  {ranchResult && createPortal(
+                    <div className="modal-backdrop" onClick={() => setRanchResult(null)}>
+                      <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '360px', textAlign: 'center', padding: '1.5rem' }}>
+                        <h3 style={{ color: '#a3e635', margin: '0 0 0.5rem' }}>🐑 ¡Intercambio completado!</h3>
+                        <p style={{ color: '#d9d6f2', fontSize: '0.8rem', marginBottom: '0.8rem' }}>Has recibido estos objetos:</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '1rem', textAlign: 'left' }}>
+                          {ranchResult.map(({ name, count }) => (
+                            <div key={name} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.25)', border: '1px solid #3f3f6e', borderRadius: '6px', padding: '6px 8px' }}>
+                              {ITEM_SPRITES[name] && <img src={ITEM_SPRITES[name]} alt={name} style={{ width: '28px', height: '28px', imageRendering: 'pixelated' }} />}
+                              <span style={{ color: '#f3f1ff', fontSize: '0.82rem' }}>{itemLocalizedName(name)} <strong style={{ color: '#d9f99d' }}>×{count}</strong></span>
+                            </div>
+                          ))}
+                        </div>
+                        <button className="cta" type="button" onClick={() => setRanchResult(null)} style={{ width: '100%' }}>Cerrar</button>
+                      </div>
+                    </div>,
+                    document.body,
                   )}
                 </div>
               )
@@ -15788,7 +17041,7 @@ function MainApp() {
                         type="button"
                         style={{ width: 'auto', padding: '10px 24px' }}
                       >
-                        {team.length >= maxTeamSize ? t('route.captureToPC', { n: pcStorage.length }) : t('route.captureTeam', { n: team.length, max: maxTeamSize })}
+                        {team.length + (daycareEgg ? 1 : 0) >= maxTeamSize ? t('route.captureToPC', { n: pcStorage.length }) : t('route.captureTeam', { n: team.length, max: maxTeamSize })}
                       </button>
                       <button
                         className="secondary"
@@ -15974,7 +17227,7 @@ function MainApp() {
                 </div>
                 <div className="moves-grid" style={{ marginBottom: '1rem' }}>
                   <button className="cta" onClick={captureLegendaryPokemon} type="button" style={{ background: '#d97706' }}>
-                    {team.length >= maxTeamSize ? t('route.captureToPC', { n: pcStorage.length }) : t('route.captureLegend')}
+                    {team.length + (daycareEgg ? 1 : 0) >= maxTeamSize ? t('route.captureToPC', { n: pcStorage.length }) : t('route.captureLegend')}
                   </button>
                   <button className="secondary" onClick={skipLegendaryCapture} type="button">
                     Skip
@@ -15989,7 +17242,7 @@ function MainApp() {
                   {t('route.nextNode', { name: `${nodeTypeLabel(currentNode)} #${currentNode.id}` })}
                 </p>
                 <button className={`cta ${currentNode.type === 'teamRocket' ? 'cta-danger' : ''}`} onClick={() => enterNode()} type="button" disabled={isLoading}>
-                  {isLoading ? t('node.searching') : currentNode.type === 'teamRocket' ? t('node.teamRocket') : currentNode.type === 'spin' ? t('node.spin') : currentNode.type === 'pokeRand' ? t('node.pokeRand') : currentNode.type === 'mega' ? t('node.mega') : currentNode.type === 'gmax' ? t('node.gmax') : currentNode.type === 'primal' ? t('node.primal') : currentNode.type === 'trade' ? t('node.trade') : currentNode.type === 'rival' ? t('node.rival') : currentNode.type === 'blackmarket' ? t('node.blackmarket') : currentNode.type === 'speculator' ? t('node.speculator') : currentNode.type === 'safari' ? t('node.safari') : currentNode.type === 'double' ? t('node.double') : currentNode.type === 'casino' ? t('node.casino') : currentNode.type === 'legendary' ? t('node.legendary') : t('node.enter')}
+                  {isLoading ? t('node.searching') : currentNode.type === 'teamRocket' ? t('node.teamRocket') : currentNode.type === 'spin' ? t('node.spin') : currentNode.type === 'pokeRand' ? t('node.pokeRand') : currentNode.type === 'mega' ? t('node.mega') : currentNode.type === 'gmax' ? t('node.gmax') : currentNode.type === 'primal' ? t('node.primal') : currentNode.type === 'trade' ? t('node.trade') : currentNode.type === 'rival' ? t('node.rival') : currentNode.type === 'blackmarket' ? t('node.blackmarket') : currentNode.type === 'speculator' ? t('node.speculator') : currentNode.type === 'safari' ? t('node.safari') : currentNode.type === 'orchard' ? t('node.orchard') : currentNode.type === 'fossil' ? t('node.fossil') : currentNode.type === 'fishing' ? t('node.fishing') : currentNode.type === 'mine' ? t('node.mine') : currentNode.type === 'daycare' ? t('node.daycare') : currentNode.type === 'weather' ? t('node.weather') : currentNode.type === 'mirror' ? t('node.mirror') : currentNode.type === 'ranch' ? t('node.ranch') : currentNode.type === 'double' ? t('node.double') : currentNode.type === 'casino' ? t('node.casino') : currentNode.type === 'legendary' ? t('node.legendary') : t('node.enter')}
                 </button>
               </div>
             )}
@@ -16020,7 +17273,7 @@ function MainApp() {
                 </div>
                 <div className="moves-grid" style={{ marginBottom: '1rem' }}>
                   <button className="cta" onClick={captureRestPokemon} type="button">
-                    {team.length >= maxTeamSize ? t('route.captureToPC', { n: pcStorage.length }) : t('route.catchLabel')}
+                    {team.length + (daycareEgg ? 1 : 0) >= maxTeamSize ? t('route.captureToPC', { n: pcStorage.length }) : t('route.catchLabel')}
                   </button>
                   <button className="secondary" onClick={skipRestCapture} type="button">
                     {t('common.skip')}
@@ -17939,7 +19192,7 @@ function MainApp() {
                   ['battle', 'help.battle'], ['rest', 'help.rest'], ['shop', 'help.shop'], ['boss', 'help.boss'],
                   ['teamRocket', 'help.teamRocket'], ['spin', 'help.spin'], ['pokeRand', 'help.pokeRand'], ['move', 'help.move'],
                   ['mega', 'help.mega'], ['gmax', 'help.gmax'], ['primal', 'help.primal'], ['trade', 'help.trade'],
-                  ['rival', 'help.rival'], ['blackmarket', 'help.blackmarket'], ['speculator', 'help.speculator'], ['safari', 'help.safari'], ['double', 'help.double'], ['casino', 'help.casino'],
+                  ['rival', 'help.rival'], ['blackmarket', 'help.blackmarket'], ['speculator', 'help.speculator'], ['safari', 'help.safari'], ['orchard', 'help.orchard'], ['fossil', 'help.fossil'], ['fishing', 'help.fishing'], ['mine', 'help.mine'], ['daycare', 'help.daycare'], ['weather', 'help.weather'], ['mirror', 'help.mirror'], ['ranch', 'help.ranch'], ['double', 'help.double'], ['casino', 'help.casino'],
                   ['elite', 'help.elite'], ['legendary', 'help.legendary'],
                 ] as Array<[string, string]>).map(([type, key], i) => (
                   <div

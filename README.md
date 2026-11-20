@@ -35,6 +35,14 @@ Cada ruta es una línea de nodos (combates, tiendas, descansos, etc.). El tipo d
 | **Intercambio / Mercado Negro** | Cambiar Pokémon con el Comerciante o comprar/vender a buen precio. |
 | **Especulador** | Solo en Difícil e Infinite: vende Pokémon de tu equipo o PC por dinero de la partida. El precio depende del tipo, nivel y rareza; los shinys pagan el doble. |
 | **Safari** | Elige entre 3 siluetas y captura usando solo Poké Balls. Acaricia al Pokémon según su naturaleza y humor; puede reaccionar mal y golpearte si se siente amenazado. |
+| **Huerto de Bayas** | Solo en Difícil e Infinite: planta hasta 3 bayas para cosecharlas en otro Huerto. Al recoger recibes las plantadas más extras hasta 3. |
+| **Laboratorio de Fósiles** | Desbloqueable en la Tienda Meta por 200 PokéCoins: elige entre 2 fósiles y revive un Pokémon especial al nivel de la aventura. |
+| **Pesca** | Desbloqueable en la Tienda Meta por 100 PokéCoins: minijuego de caña con 3 intentos para atrapar un Pokémon de tipo Agua, con un 5% de probabilidad shiny. |
+| **Mina** | Desbloqueable en la Tienda Meta por 75 PokéCoins: excava hasta 3 veces para encontrar tesoros desbloqueados, que aparecen brevemente con su sprite y nombre. |
+| **Guardería** | Desbloqueable en la Tienda Meta por 100 PokéCoins: recibe un huevo que ocupa un hueco del equipo y eclosiona tras 5 nodos. El Pokémon es aleatorio, siempre de primera etapa evolutiva y nivel 10, con IVs y habilidad propios. |
+| **Estación Meteorológica** | Elige Lluvia, Sol, Tormenta de Arena o Granizo para los próximos 2 combates. |
+| **Combate Espejo** | El rival copia tu equipo actual con tus mismos niveles, movimientos y habilidades. |
+| **Rancho Pokémon** | Solo en Difícil e Infinite: intercambia Pokémon por objetos y materiales según su especie, tipo y nivel. No da dinero. |
 | **Combate Doble** | Batalla 2v2. |
 
 ---

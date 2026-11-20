@@ -102,7 +102,7 @@ export interface Pokemon {
 
 export interface RouteNode {
   id: number
-  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'rival' | 'blackmarket' | 'double' | 'casino' | 'elite' | 'legendary' | 'speculator' | 'safari'
+  type: 'battle' | 'rest' | 'shop' | 'boss' | 'teamRocket' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'rival' | 'blackmarket' | 'double' | 'casino' | 'elite' | 'legendary' | 'speculator' | 'safari' | 'orchard' | 'fossil' | 'fishing' | 'mine' | 'daycare' | 'weather' | 'mirror' | 'ranch'
   label: string
   done: boolean
 }

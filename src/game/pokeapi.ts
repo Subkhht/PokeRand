@@ -20,6 +20,7 @@ const generationSpeciesCache = new Map<number, number[]>()
 const pokemonCache = new Map<string | number, Pokemon>()
 const moveDetailsCache = new Map<string, Move>()
 const legendaryIdsCache = new Map<number, Promise<Set<number>>>()
+const firstStageSpeciesCache = new Map<number, Promise<number>>()
 let allPokemonListPromise: Promise<Array<{ id: number; name: string }>> | null = null
 let runSeed = 0
 
@@ -1490,6 +1491,56 @@ export async function fetchPokemonMoves(
   }
 }
 
+// Devuelve la primera etapa evolutiva de una especie siguiendo
+// evolves_from_species hasta la raíz (por ejemplo, Pikachu → Pichu).
+export function getFirstStageSpeciesId(speciesId: number, identifier?: string): Promise<number> {
+  const cached = firstStageSpeciesCache.get(speciesId)
+  if (cached) return cached
+
+  const promise = (async () => {
+    const fetchSpecies = async (idOrName: number | string) => {
+      try {
+        const res = await fetch(`${API_BASE}/pokemon-species/${idOrName}`)
+        if (!res.ok) return null
+        const data = await res.json()
+        return {
+          id: Number(data.id) as number,
+          fromUrl: data.evolves_from_species?.url as string | undefined,
+        }
+      } catch {
+        return null
+      }
+    }
+
+    let current = speciesId
+    let name = identifier
+    const visited = new Set<number>()
+    while (!visited.has(current)) {
+      visited.add(current)
+      let entry = await fetchSpecies(current)
+      // Las formas (Alola, Galar, Hisui, Paldea, etc.) no tienen endpoint de
+      // especie propio: se prueba recortando sufijos hasta encontrar la especie.
+      if (!entry && name) {
+        const parts = name.split('-')
+        for (let i = parts.length - 1; i >= 1 && !entry; i--) {
+          entry = await fetchSpecies(parts.slice(0, i).join('-'))
+        }
+      }
+      if (!entry) break
+      current = entry.id
+      if (!entry.fromUrl) break
+      const parentId = extractIdFromResourceUrl(entry.fromUrl)
+      if (!parentId || parentId === current) break
+      current = parentId
+      name = undefined
+    }
+    return current
+  })()
+
+  firstStageSpeciesCache.set(speciesId, promise)
+  return promise
+}
+
 export async function buildPokemonFromApi(
   identifier: string | number,
   _generation: number,
@@ -1739,7 +1790,8 @@ export async function getBalancedPokemonByGeneration(
   bossStage: number = -1,
   stageIndex: number = 0,
   forcedLevel?: number,
-  isElite: boolean = false
+  isElite: boolean = false,
+  allowedIds?: Set<number>
 ): Promise<Pokemon> {
   const allIds = await getSpeciesIdsByGeneration(generation)
   const legendaryIds = await getLegendaryIdsByGeneration(generation)
@@ -1753,13 +1805,19 @@ export async function getBalancedPokemonByGeneration(
     ? routeProgress
     : (stageIndex + routeProgress) / stageDivisor
 
-  const candidateIds = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss, bossStage, legendaryIds)
+  const allowedAllIds = allowedIds ? allIds.filter(id => allowedIds.has(id)) : allIds
+  const candidateIdsRaw = filterSpeciesIdsForProgress(allIds, progressRatio, isBoss, bossStage, legendaryIds)
+  const candidateIds = allowedIds ? candidateIdsRaw.filter(id => allowedIds.has(id)) : candidateIdsRaw
+
+  // Si el filtro de tipos deja el pool de progreso vacío, se usa el pool
+  // completo del tipo para no dejar el nodo sin candidatos.
+  const candidatePool = candidateIds.length > 0 ? candidateIds : allowedAllIds
 
   // En Fácil, los jefes no sacan Pokémon legendarios: se excluyen de los
   // candidatos y de cualquier pool de respaldo.
   const bossNoLegendary = isBoss && difficulty === 'easy'
-  const effectiveCandidates = bossNoLegendary ? candidateIds.filter(id => !legendaryIds.has(id)) : candidateIds
-  const fallbackIds = bossNoLegendary ? allIds.filter(id => !legendaryIds.has(id)) : allIds
+  const effectiveCandidates = bossNoLegendary ? candidatePool.filter(id => !legendaryIds.has(id)) : candidatePool
+  const fallbackIds = bossNoLegendary ? allowedAllIds.filter(id => !legendaryIds.has(id)) : allowedAllIds
 
   const levelMult = difficulty === 'easy' ? 1.0 : difficulty === 'infinite' ? 1.0 : difficulty === 'hard' ? 2.0 : 1.5
   // forcedLevel: genera la especie directamente a un nivel concreto (el nivel
@@ -1856,7 +1914,7 @@ export async function getBalancedPokemonByGeneration(
   // su propia generación; el resto de formas pueden aparecer en cualquiera.
   // Se respeta su nivel mínimo de aparición (no formas evolucionadas por
   // piedra a niveles bajos).
-  if (Math.random() < 0.02) {
+  if (!allowedIds && Math.random() < 0.02) {
     const nonRegionalFormIds = await getNonRegionalFormIds()
     const regionalFormIds = await getRegionalFormIdsByGeneration(generation)
     const formIds = [...nonRegionalFormIds, ...regionalFormIds]
