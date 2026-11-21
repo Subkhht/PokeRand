@@ -648,9 +648,13 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v3.4.0', en: 'v3.4.0' },
+  'help.version': { es: 'v3.4.1', en: 'v3.4.1' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
-  'changelog.button': { es: 'Ver cambios v3.4.0', en: 'See changes v3.4.0' },
+  'changelog.intro': { es: 'La versión más reciente aparece abierta. Pulsa una versión para mostrar u ocultar sus cambios.', en: 'The latest version is expanded. Click a version to show or hide its changes.' },
+  'changelog.latest': { es: 'Última', en: 'Latest' },
+  'changelog.changes': { es: '{n} cambios', en: '{n} changes' },
+  'changelog.change': { es: '1 cambio', en: '1 change' },
+  'changelog.button': { es: 'Ver cambios v3.4.1', en: 'See changes v3.4.1' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -678,7 +682,7 @@ const DICT: Record<string, Entry> = {
   'help.blackmarket': { es: 'Compra barato, vende y adquiere Pokémon.', en: 'Buy cheap, sell and acquire Pokémon.' },
   'help.speculator': { es: 'Vende Pokémon de tu equipo o PC por dinero de la partida; los tipos raros pagan más. Solo aparece en Difícil e Infinite.', en: 'Sell Pokémon from your team or PC for run money; rarer types pay more. Appears only on Hard and Infinite.' },
   'help.safari': { es: 'Elige entre 3 siluetas, acaricia según su naturaleza y captura solo con Poké Balls. No puedes atacar, pero el Pokémon puede golpearte si se siente amenazado.', en: 'Pick one of 3 silhouettes, pet it according to its nature and catch it using only Poké Balls. You cannot attack, but the Pokémon may hit you if it feels threatened.' },
-  'help.orchard': { es: 'Planta hasta 3 bayas para cosecharlas más adelante en otro Huerto. Al recoger recibirás las plantadas más extras hasta un máximo de 3. Solo aparece en Difícil e Infinite.', en: 'Plant up to 3 berries to harvest later in another Orchard. Harvesting gives you the planted berries plus extras up to a maximum of 3. Appears only on Hard and Infinite.' },
+  'help.orchard': { es: 'Planta hasta 3 bayas. Si las recoges en el mismo Huerto recuperas exactamente las mismas bayas; si esperas a otro Huerto, recibirás las plantadas más extras hasta un máximo de 3. Solo aparece en Difícil e Infinite.', en: 'Plant up to 3 berries. Harvesting in the same Orchard returns exactly the same berries; waiting for another Orchard gives you the planted berries plus extras up to a maximum of 3. Appears only on Hard and Infinite.' },
   'help.fossil': { es: 'Elige entre 2 fósiles para revivir un Pokémon especial adaptado al nivel de la aventura. Se desbloquea en la Tienda Meta por 200 PokéCoins.', en: 'Choose between 2 fossils to revive a special Pokémon scaled to the adventure level. Unlocked in the Meta Shop for 200 PokéCoins.' },
   'help.fishing': { es: 'Lanza la caña y recógela justo cuando pique para atrapar un Pokémon de tipo Agua. Tienes 3 intentos y un 5% de probabilidad shiny. Se desbloquea en la Tienda Meta por 100 PokéCoins.', en: 'Cast the rod and reel it in right when a Pokémon bites to catch a Water-type Pokémon. You have 3 attempts and a 5% shiny chance. Unlocked in the Meta Shop for 100 PokéCoins.' },
   'help.mine': { es: 'Excava hasta 3 veces para encontrar tesoros que hayas desbloqueado en la Tienda Meta. Cada tesoro encontrado se añade a tu inventario. Se desbloquea en la Tienda Meta por 75 PokéCoins.', en: 'Dig up to 3 times to find treasures you have unlocked in the Meta Shop. Each treasure found is added to your inventory. Unlocked in the Meta Shop for 75 PokéCoins.' },
@@ -2021,6 +2025,14 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v3.4.1',
+    items: [
+      { es: '🫐 Huerto de Bayas: si recoges las bayas en el mismo Huerto donde las plantaste, recuperas exactamente las mismas bayas. Las bayas extra solo se obtienen al recogerlas en un Huerto posterior.', en: '🫐 Berry Orchard: harvesting in the same Orchard where you planted returns exactly the same berries. Extra berries are only obtained when harvesting in a later Orchard.' },
+      { es: '📜 Rediseñado el historial de versiones: la última versión aparece abierta y las anteriores se pueden desplegar una a una, con contador de cambios y un diseño más limpio.', en: '📜 Redesigned the version history: the latest version is expanded and older ones can be expanded one by one, with change counts and a cleaner layout.' },
+      { es: '🛠️ Corregido el historial de versiones para que las tarjetas mantengan su altura y el contenido se desplace correctamente dentro de la ventana.', en: '🛠️ Fixed the version history so cards keep their height and the content scrolls correctly inside the window.' },
+    ],
+  },
   {
     version: 'v3.4.0',
     items: [

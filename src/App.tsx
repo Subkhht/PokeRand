@@ -3097,6 +3097,7 @@ function MainApp() {
   const [safariSelectedBall, setSafariSelectedBall] = useState('')
   // Huerto de Bayas: bayas plantadas y modales de plantar/cosechar.
   const [orchardPlanted, setOrchardPlanted] = useState<string[]>([])
+  const [orchardPlantedNodeId, setOrchardPlantedNodeId] = useState<number | null>(null)
   const [orchardPlantModal, setOrchardPlantModal] = useState(false)
   const [orchardSelected, setOrchardSelected] = useState<string[]>([])
   const [orchardHarvest, setOrchardHarvest] = useState<Array<{ name: string; count: number }> | null>(null)
@@ -3246,6 +3247,7 @@ function MainApp() {
   const [showRestartConfirm, setShowRestartConfirm] = useState<boolean>(false)
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false)
   const [showChangelog, setShowChangelog] = useState<boolean>(false)
+  const [changelogExpanded, setChangelogExpanded] = useState<string | null>(null)
   const [language, setLanguageState] = useState<Language>(getLanguage())
   const changeLanguage = (lang: Language): void => {
     setI18nLanguage(lang)
@@ -5095,6 +5097,7 @@ function MainApp() {
         setMoney(0)
         setInventory([])
         setOrchardPlanted([])
+        setOrchardPlantedNodeId(null)
         setOrchardPlantModal(false)
         setOrchardSelected([])
         setOrchardHarvest(null)
@@ -5429,6 +5432,7 @@ function MainApp() {
       }
       setInventory(startingItems)
       setOrchardPlanted([])
+      setOrchardPlantedNodeId(null)
       setOrchardPlantModal(false)
       setOrchardSelected([])
       setOrchardHarvest(null)
@@ -9254,6 +9258,7 @@ function MainApp() {
       return next
     })
     setOrchardPlanted(planted)
+    setOrchardPlantedNodeId(currentNode?.id ?? null)
     setOrchardSelected([])
     setOrchardPlantModal(false)
     playSelect()
@@ -9265,14 +9270,20 @@ function MainApp() {
 
   function harvestOrchard(): void {
     if (orchardPlanted.length === 0) return
-    const pool = BERRY_DROPS.filter(isBerryUnlocked)
+    // En el mismo Huerto donde se plantaron, solo se recuperan exactamente las
+    // bayas plantadas. Las bayas extra solo se obtienen en un Huerto posterior.
+    const sameNode = orchardPlantedNodeId !== null && currentNode?.id === orchardPlantedNodeId
     const extras: string[] = []
-    for (let i = orchardPlanted.length; i < 3; i++) {
-      extras.push(pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : 'Oran Berry')
+    if (!sameNode) {
+      const pool = BERRY_DROPS.filter(isBerryUnlocked)
+      for (let i = orchardPlanted.length; i < 3; i++) {
+        extras.push(pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : 'Oran Berry')
+      }
     }
-    const harvest = [...orchardPlanted, ...extras].slice(0, 3)
+    const harvest = sameNode ? [...orchardPlanted] : [...orchardPlanted, ...extras].slice(0, 3)
     setInventory(prev => [...prev, ...harvest])
     setOrchardPlanted([])
+    setOrchardPlantedNodeId(null)
     const grouped = new Map<string, number>()
     for (const berry of harvest) grouped.set(berry, (grouped.get(berry) ?? 0) + 1)
     setOrchardHarvest(Array.from(grouped.entries()).map(([name, count]) => ({ name, count })))
@@ -16368,6 +16379,7 @@ function MainApp() {
               for (const berry of orchardPlanted) plantedCounts.set(berry, (plantedCounts.get(berry) ?? 0) + 1)
               const selectedCounts = new Map<string, number>()
               for (const berry of orchardSelected) selectedCounts.set(berry, (selectedCounts.get(berry) ?? 0) + 1)
+              const sameOrchard = orchardPlantedNodeId !== null && currentNode?.id === orchardPlantedNodeId
               return (
                 <div className="action-block shop-block" style={{ marginTop: '1rem', borderColor: 'rgba(163,230,53,0.55)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -16375,7 +16387,7 @@ function MainApp() {
                     <span style={{ fontSize: '0.8rem', color: '#9b98cf' }}>Solo en Difícil e Infinite</span>
                   </div>
                   <p style={{ color: '#9b98cf', fontSize: '0.82rem', lineHeight: 1.45, marginBottom: '0.8rem' }}>
-                    Planta hasta 3 bayas ahora y recógelas en otro Huerto. Al recoger recibirás las bayas plantadas más bayas extra hasta un máximo de 3.
+                    Planta hasta 3 bayas. Si las recoges en este mismo Huerto recuperarás exactamente las que plantaste; si esperas a otro Huerto, recibirás las plantadas más bayas extra hasta un máximo de 3.
                   </p>
 
                   {orchardPlanted.length > 0 ? (
@@ -16389,6 +16401,11 @@ function MainApp() {
                           </span>
                         ))}
                       </div>
+                      <p style={{ color: sameOrchard ? '#fca5a5' : '#bef264', fontSize: '0.72rem', margin: '0.55rem 0 0' }}>
+                        {sameOrchard
+                          ? 'Estás en el mismo Huerto: al recoger recuperarás exactamente estas bayas, sin extras.'
+                          : 'Has avanzado de Huerto: al recoger recibirás estas bayas más extras hasta 3.'}
+                      </p>
                     </div>
                   ) : (
                     <p style={{ color: '#7d7ab5', fontSize: '0.78rem', margin: '0 0 0.8rem' }}>No hay bayas plantadas todavía.</p>
@@ -19164,7 +19181,7 @@ function MainApp() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
               <h2 style={{ margin: 0, color: '#ffcb05' }}>❓ {t('help.title')} <span style={{ fontSize: '0.7rem', color: '#7d7ab5', fontWeight: 'normal' }}>{t('help.version')}</span></h2>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <button className="tiny-btn" type="button" onClick={() => { playClick(); setShowChangelog(true) }} title={t('changelog.title')}>
+                <button className="tiny-btn" type="button" onClick={() => { playClick(); setChangelogExpanded(null); setShowChangelog(true) }} title={t('changelog.title')}>
                   📜 {t('changelog.button')}
                 </button>
                 <button className="tiny-btn" type="button" onClick={() => setShowHelpModal(false)} style={{ color: '#ff8a80' }}>{t('common.close')}</button>
@@ -19255,27 +19272,80 @@ function MainApp() {
       )}
 
       {/* Modal Historial de versiones */}
-      {showChangelog && (
-        <div className="modal-backdrop" onClick={() => setShowChangelog(false)}>
-          <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', maxHeight: '82vh', overflow: 'auto', padding: '1.5rem', animation: 'casinoSlideUp 0.35s ease' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, color: '#ffcb05' }}>{t('changelog.title')}</h2>
-              <button className="tiny-btn" type="button" onClick={() => setShowChangelog(false)} style={{ color: '#ff8a80' }}>{t('common.close')}</button>
-            </div>
-            {getChangelog().map(g => (
-              <div key={g.version} style={{ marginBottom: '1.25rem' }}>
-                <h3 style={{ color: '#4d9bff', margin: '0 0 0.5rem', fontSize: '1rem', borderBottom: '1px solid #3f3f6e', paddingBottom: '0.3rem' }}>{g.version}</h3>
-                <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#d9d6f2', fontSize: '0.88rem', lineHeight: '1.7' }}>
-                  {g.items.map((item, idx) => <li key={idx}>{item}</li>)}
-                </ul>
+      {showChangelog && (() => {
+        const entries = getChangelog()
+        const latestVersion = entries[0]?.version ?? ''
+        const openVersion = changelogExpanded === '__none__'
+          ? null
+          : (changelogExpanded ?? latestVersion)
+        return (
+          <div className="modal-backdrop" onClick={() => setShowChangelog(false)}>
+            <div className="panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px', width: '100%', maxHeight: '86vh', overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column', animation: 'casinoSlideUp 0.35s ease' }}>
+              <div style={{ padding: '1.25rem 1.4rem 0.9rem', borderBottom: '1px solid rgba(63,63,110,0.7)', background: 'linear-gradient(180deg, rgba(77,155,255,0.10), transparent)', flexShrink: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                  <div>
+                    <h2 style={{ margin: 0, color: '#ffcb05' }}>{t('changelog.title')}</h2>
+                    <p style={{ margin: '0.3rem 0 0', color: '#9b98cf', fontSize: '0.78rem', lineHeight: 1.4 }}>{t('changelog.intro')}</p>
+                  </div>
+                  <button className="tiny-btn" type="button" onClick={() => setShowChangelog(false)} style={{ color: '#ff8a80', flexShrink: 0 }}>{t('common.close')}</button>
+                </div>
               </div>
-            ))}
-            <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
-              <button className="cta" onClick={() => setShowChangelog(false)} style={{ background: '#ffcb05', color: '#000' }}>{t('help.close')}</button>
+
+              <div style={{ padding: '1rem 1.1rem', flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                {entries.map((g, index) => {
+                  const isLatest = index === 0
+                  const isOpen = openVersion === g.version
+                  return (
+                    <div
+                      key={g.version}
+                      style={{
+                        border: `1px solid ${isLatest ? 'rgba(255,203,5,0.55)' : 'rgba(63,63,110,0.9)'}`,
+                        background: isLatest ? 'rgba(255,203,5,0.06)' : 'rgba(15,23,42,0.42)',
+                        borderRadius: '10px',
+                        overflow: 'hidden',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setChangelogExpanded(isOpen ? '__none__' : g.version)}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.7rem 0.85rem', background: 'transparent', border: 0, color: 'inherit', fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: '999px', background: isLatest ? 'rgba(255,203,5,0.18)' : 'rgba(77,155,255,0.14)', border: `1px solid ${isLatest ? 'rgba(255,203,5,0.55)' : 'rgba(77,155,255,0.35)'}`, color: isLatest ? '#ffcb05' : '#9ec5ff', fontSize: '0.78rem', fontWeight: 'bold', fontFamily: 'monospace' }}>
+                          {g.version}
+                        </span>
+                        {isLatest && (
+                          <span style={{ padding: '2px 7px', borderRadius: '999px', background: 'rgba(255,203,5,0.14)', color: '#ffe27a', fontSize: '0.64rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            {t('changelog.latest')}
+                          </span>
+                        )}
+                        <span style={{ marginLeft: 'auto', color: '#7d7ab5', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
+                          {g.items.length === 1 ? t('changelog.change') : t('changelog.changes', { n: g.items.length })}
+                        </span>
+                        <span style={{ color: '#9b98cf', fontSize: '0.8rem', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s ease' }}>▾</span>
+                      </button>
+
+                      {isOpen && (
+                        <ul style={{ listStyle: 'none', margin: 0, padding: '0 0.8rem 0.8rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          {g.items.map((item, idx) => (
+                            <li key={idx} style={{ background: 'rgba(0,0,0,0.18)', borderLeft: `3px solid ${isLatest ? '#ffcb05' : '#4d9bff'}`, borderRadius: '5px', padding: '0.45rem 0.6rem', color: '#d9d6f2', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div style={{ padding: '0.8rem 1.1rem 1rem', borderTop: '1px solid rgba(63,63,110,0.7)', textAlign: 'center', flexShrink: 0 }}>
+                <button className="cta" type="button" onClick={() => setShowChangelog(false)} style={{ background: '#ffcb05', color: '#000', width: '100%' }}>{t('help.close')}</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Modal Confirmar Volver a inicio */}
       {showRestartConfirm && (
