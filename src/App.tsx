@@ -1,11 +1,16 @@
-import { useMemo, useState, useEffect, useRef, useCallback, startTransition, Component, Fragment, type ReactNode, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { useMemo, useState, useEffect, useRef, useCallback, startTransition, lazy, Suspense, Component, Fragment, type ReactNode, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
+import { ALL_SHOP_ITEMS, EVOLUTION_STONES, EVOLUTION_STONE_UNLOCK_IDS, EVOLUTION_STONE_ITEM_NAMES, EVOLUTION_ITEM_UNLOCK_IDS, BERRY_DROPS, TREASURES, TREASURE_DROPS, rollMagmaEmblem, EEVEE_EVOLUTIONS, itemDescriptions, ITEM_SPRITES } from './game/itemData'
+import { canStillEvolve, HOLDABLE_ITEMS, HOLDABLE_ITEM_NAMES, POKEBALLS, POKEBALL_NAMES, POKEBALL_DEFS, POKEBALL_UNLOCK_IDS, getPokeBallRate, REGION_LEGENDARIES, ALL_LEGENDARIES } from './game/battleItems'
+import { GYM_BADGES, MEGA_CAPABLE_IDS, MEGA_FORM_IDS, MEGA_SPRITE_OVERRIDES, GMAX_CAPABLE_IDS, GMAX_FORM_IDS, PRIMAL_CAPABLE_IDS, PRIMAL_FORM_IDS, ORIGIN_CAPABLE_IDS, ORIGIN_FORM_IDS } from './game/forms'
+import { ACHIEVEMENTS, SYNERGIES, RANDOM_EVENTS, THEMES, REDESIGNS } from './game/runContent'
+import { metaShopItemMatches, META_SHOP_ITEMS, type MetaShopItem } from './game/metaShop'
+import { TYPE_COLORS, typeIconUrl, TRAINER_TYPES, GYM_LEADERS, type PokedexEntry } from './game/typeData'
+import { nodeTypeLabel, buildOriginalStageRoute, generateCoopRouteSegment, NODE_EMOJIS, NODE_TYPE_COLORS, type FossilOption, type DaycareEgg, FOSSIL_REVIVALS, speculatorTypeMultiplier, speculatorPrice, getNodeMapLayout, nearestBranchNodes, getBranchMapLayout, trainerTeamSize, trainerMaxSize, trainerMemberLevelOffset, getFirstHealthyIndex, softenFirstBattleEnemy, difficultyLabel, generations, generationRegions, maxTeamSize } from './game/nodeConfig'
 import './App.css'
 import { applyDamage, applyNoEvolutionBuff, healPokemon, randomFrom, scalePokemonForNode, balanceWildPokemonToTeam, startRun, generateBossRushRoute, ALL_TYPES, createSeededRandom, getDailyConfig, RUN_MODIFIERS } from './game/engine'
 import { playHover, playClick, playSelect, playHit, playEvolution, playCapture, playPerfectCapture, playEquip, playPurchase, playError, playCoin, playSlotMachine, playAchievement, playBadgeFanfare, startMenuMusic, startBattleMusic, playVictoryFanfare, playDefeatMusic, setVolume, getVolume, setSfxVolume, getSfxVolume, setMenuMusicTrack, setBattleMusicTrack, stopMusic, unlockAudio, isMusicMuted, setMusicMuted } from './game/sound'
-import { DungeonMode } from './dungeon/DungeonMode'
 import { DUNGEON_STORAGE_KEY } from './dungeon/data'
-import { PokestDungeon } from './pokest/PokestDungeon'
 import { POKEST_STORAGE_KEY } from './pokest/data'
 import {
   getBalancedPokemonByGeneration,
@@ -48,17 +53,28 @@ import { isLeaderboardEnabled, submitInfiniteScore, fetchInfiniteLeaderboard, fo
 import { isCoopEnabled, createCoopSession, joinCoopSession, getCoopSession, markNodeReady, getCoopProgress, submitExchangeOffer, getCoopExchange, completeCoopExchange, cancelExchangeOffer, sendCoopChat, getCoopChat, finishCoopSession, resetCoopSession, clearCoopRestart, cancelCoopSession as deleteCoopSessionRpc, type CoopTrade, type CoopExchange, type CoopChatMessage } from './game/coop'
 import { isPvpEnabled, createPvpRoom, findPvpOpponent, joinPvpRoom, getPvpMatch, getPvpState, submitPvpAction, resolvePvpTurn as resolvePvpTurnRpc, forfeitPvpMatch, cancelPvpMatch, finishPvpMatch, clearPvpAction, startPvpTimer, expirePvpTimer, getPvpElo, getPvpEloLeaderboard, awardPvpElo, rematchPvpRoom, serializePvpPokemon, type PvpTurnSnapshot, type PvpRoomResult, type PvpState, type PvpEloEntry } from './game/pvp'
 import { resolvePvpTurn, type PvpAction } from './game/pvpBattle'
-import CasinoMinigame from './minigames/CasinoMinigame'
-import MinigamePractice from './minigames/MinigamePractice'
 import BackgroundLayer from './BackgroundLayer'
 import BackgroundPreview from './BackgroundPreview'
 import { BACKGROUNDS } from './game/backgrounds'
 import type { User } from '@supabase/supabase-js'
-import type { Move, Pokemon, PokemonIVs, RouteNode, BranchNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType } from './game/types'
+import type { Move, Pokemon, PokemonIVs, RouteNode, BranchNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType, Difficulty } from './game/types'
 import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, itemLocalizedName, metaItemDesc, moveName, statusLabel, statusAppliedLine, themeName, themeDesc, bgName, bgDesc, type Language, getChangelog } from './game/i18n'
 
+// Pantallas pesadas cargadas bajo demanda para aligerar el bundle inicial.
+const DungeonMode = lazy(() => import('./dungeon/DungeonMode').then(m => ({ default: m.DungeonMode })))
+const PokestDungeon = lazy(() => import('./pokest/PokestDungeon').then(m => ({ default: m.PokestDungeon })))
+const CasinoMinigame = lazy(() => import('./minigames/CasinoMinigame'))
+const MinigamePractice = lazy(() => import('./minigames/MinigamePractice'))
+
+function LazyLoadingPanel({ label }: { label: string }) {
+  return (
+    <div style={{ padding: '3rem 1rem', textAlign: 'center', color: '#9b98cf', fontSize: '0.9rem' }}>
+      {label}
+    </div>
+  )
+}
+
 type Screen = 'setup' | 'route' | 'battle' | 'shop' | 'spin' | 'pokeRand' | 'move' | 'mega' | 'gmax' | 'primal' | 'trade' | 'blackmarket' | 'speculator' | 'safari' | 'orchard' | 'fossil' | 'fishing' | 'mine' | 'daycare' | 'weather' | 'mirror' | 'ranch' | 'double' | 'casino' | 'victory' | 'defeat' | 'coliseum_select' | 'pvp' | 'dungeon' | 'pokest'
-type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum' | 'original' | 'branch'
 
 // Historial local de partidas finalizadas (victorias/derrotas). Solo se
 // registran runs que terminan de verdad: no se cuentan reinicios ni abandonos.
@@ -319,6 +335,7 @@ function SetupBanner() {
     if (!ctx) return
     let raf = 0
     let last = performance.now()
+    let acc = 0
 
     interface FloatItem { x: number; y: number; r: number; vx: number; vy: number; type: number; rot: number }
     const items: FloatItem[] = Array.from({ length: 16 }, (_, i) => ({
@@ -384,6 +401,10 @@ function SetupBanner() {
       if (w === 0 || h === 0) { raf = requestAnimationFrame(loop); return }
       const dt = Math.min((now - last) / 1000, 1 / 30)
       last = now
+      acc += dt
+      // La decoración de la barra superior no necesita 60 fps.
+      if (acc < 1 / 30) { raf = requestAnimationFrame(loop); return }
+      acc = 0
       const t = now / 1000
       ctx.clearRect(0, 0, w, h)
       const g = ctx.createLinearGradient(0, 0, 0, h)
@@ -463,7 +484,7 @@ function drawStarSprite(ctx: CanvasRenderingContext2D, x: number, y: number, r: 
   ctx.restore()
 }
 
-function TopbarCanvas() {
+function TopbarCanvas({ paused = false }: { paused?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
@@ -473,6 +494,7 @@ function TopbarCanvas() {
     if (!ctx) return
     let raf = 0
     let last = performance.now()
+    let acc = 0
 
     interface FloatItem { x: number; y: number; r: number; vx: number; type: number; rot: number }
     const items: FloatItem[] = Array.from({ length: 12 }, (_, i) => ({
@@ -504,6 +526,10 @@ function TopbarCanvas() {
       if (w === 0 || h === 0) { raf = requestAnimationFrame(loop); return }
       const dt = Math.min((now - last) / 1000, 1 / 30)
       last = now
+      acc += dt
+      // La decoración de la barra superior no necesita 60 fps.
+      if (acc < 1 / 30) { raf = requestAnimationFrame(loop); return }
+      acc = 0
       const t = now / 1000
       ctx.clearRect(0, 0, w, h)
 
@@ -535,11 +561,11 @@ function TopbarCanvas() {
       }
       ctx.globalAlpha = 1
 
-      raf = requestAnimationFrame(loop)
+      if (!paused) raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [])
+  }, [paused])
 
   return <canvas ref={canvasRef} className="topbar-canvas" />
 }
@@ -649,1304 +675,7 @@ const authInputStyle: CSSProperties = {
   fontSize: '0.9rem',
 }
 
-const difficultyLabels: Record<Difficulty, { title: string; desc: string }> = {
-  easy: { title: 'Fácil', desc: '3 insignias · 5 rutas por etapa' },
-  medium: { title: 'Intermedia', desc: '3 insignias · 10 rutas por etapa' },
-  hard: { title: 'Difícil', desc: '3 insignias · 25 rutas por etapa' },
-  infinite: { title: 'Infinite', desc: 'Sin límite (Aventura infinita)' },
-  coliseum: { title: 'COLISEUM', desc: '8 jefes a nivel 50' },
-  original: { title: 'Original', desc: '10 nodos · 8 etapas (Tienda/Combate/Descanso/Rival)' },
-  branch: { title: 'Ruta', desc: 'Mapa de nodos · 8 medallas (2-3-4-3-4-3-2)' },
-}
-
-function difficultyLabel(lang: Language, d: Difficulty): { title: string; desc: string } {
-  if (lang === 'en') {
-    const map: Record<Difficulty, { title: string; desc: string }> = {
-      easy: { title: 'Easy', desc: '3 badges · 5 routes per stage' },
-      medium: { title: 'Medium', desc: '3 badges · 10 routes per stage' },
-      hard: { title: 'Hard', desc: '3 badges · 25 routes per stage' },
-      infinite: { title: 'Infinite', desc: 'No limit (endless adventure)' },
-      coliseum: { title: 'COLISEUM', desc: '8 bosses at level 50' },
-      original: { title: 'Original', desc: '10 nodes · 8 stages (Shop/Battle/Rest/Rival)' },
-      branch: { title: 'Path', desc: 'Branching node map · 8 medals (2-3-4-3-4-3-2)' },
-    }
-    return map[d]
-  }
-  return difficultyLabels[d]
-}
-
-const generations = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-const generationRegions: Record<number, string> = {
-  0: 'Todas',
-  1: 'Kanto',
-  2: 'Johto',
-  3: 'Hoenn',
-  4: 'Sinnoh',
-  5: 'Unova',
-  6: 'Kalos',
-  7: 'Alola',
-  8: 'Galar',
-  9: 'Paldea'
-}
-
-const maxTeamSize = 6
-
 // Catálogo base de la Tienda
-const ALL_SHOP_ITEMS: Record<string, { price: number; desc: string }> = {
-  'Potion': { price: 50, desc: 'Restaura 25 HP de un Pokémon.' },
-  'Super Potion': { price: 100, desc: 'Restaura 50 HP de un Pokémon.' },
-  'Hyper Potion': { price: 160, desc: 'Restaura 120 HP de un Pokémon.' },
-  'Full Restore': { price: 300, desc: 'Restaura todo el HP y cura estados.' },
-  'Oran Berry': { price: 30, desc: 'Restaura 15 HP de un Pokémon.' },
-  'Lum Berry': { price: 60, desc: 'Restaura 30 HP y cura estados.' },
-  'X Attack': { price: 75, desc: 'Aumenta permanentemente en +5 el ataque.' },
-  'X Defense': { price: 75, desc: 'Aumenta permanentemente en +5 la defensa.' },
-  'X Speed': { price: 75, desc: 'Aumenta permanentemente en +5 la velocidad.' },
-  'X Sp. Attack': { price: 75, desc: 'Aumenta permanentemente en +5 el Ataque Especial.' },
-  'X Sp. Defense': { price: 75, desc: 'Aumenta permanentemente en +5 la Defensa Especial.' },
-  'Full Heal': { price: 80, desc: 'Restaura 40 HP y cura estados.' },
-  'Antídoto': { price: 30, desc: 'Cura el envenenamiento de un Pokémon.' },
-  'Antiquemar': { price: 30, desc: 'Cura las quemaduras de un Pokémon.' },
-  'Paralizador': { price: 30, desc: 'Cura la parálisis de un Pokémon.' },
-  'Despertar': { price: 30, desc: 'Despierta a un Pokémon dormido.' },
-  'Descongelar': { price: 30, desc: 'Descongela a un Pokémon congelado.' },
-  'Baya Caquic': { price: 35, desc: 'Cura la confusión de un Pokémon.' },
-  'Baya Zreza': { price: 30, desc: 'Cura la parálisis de un Pokémon.' },
-  'Baya Atania': { price: 30, desc: 'Cura las quemaduras de un Pokémon.' },
-  'Baya Algama': { price: 30, desc: 'Cura el envenenamiento de un Pokémon.' },
-  'Baya Safre': { price: 30, desc: 'Descongela a un Pokémon congelado.' },
-  'Baya Siendrepis': { price: 30, desc: 'Despierta a un Pokémon dormido.' },
-  'Baya Cuaja': { price: 50, desc: 'Restaura 25 HP de un Pokémon.' },
-  'Baya Wiki': { price: 70, desc: 'Restaura 35 HP de un Pokémon.' },
-  'Baya Mago': { price: 90, desc: 'Restaura 45 HP de un Pokémon.' },
-  'Baya Aguav': { price: 110, desc: 'Restaura 55 HP de un Pokémon.' },
-  'Baya Ango': { price: 130, desc: 'Restaura 65 HP de un Pokémon.' },
-  'Revive': { price: 150, desc: 'Revive a un Pokémon debilitado con el 50% de su HP.' },
-  'Max Revive': { price: 300, desc: 'Revive a un Pokémon debilitado con el HP completo.' },
-  'Elixir': { price: 120, desc: 'Restaura 80 HP de un Pokémon.' },
-  'Super Elixir': { price: 250, desc: 'Restaura 200 HP de un Pokémon.' },
-  'Full Elixir': { price: 400, desc: 'Restaura todo el HP y cura todos los estados.' },
-  'Polvo Energía': { price: 60, desc: 'Restaura 60 HP de un Pokémon.' },
-  'Raíz Energía': { price: 120, desc: 'Restaura 120 HP de un Pokémon.' },
-  'Polvo Curación': { price: 80, desc: 'Cura los problemas de estado de un Pokémon.' },
-  'Más PS': { price: 200, desc: 'Aumenta permanentemente en +15 el HP máximo de un Pokémon.' },
-  'X Attack 2': { price: 150, desc: 'Aumenta permanentemente en +10 el ataque.' },
-  'X Defense 2': { price: 150, desc: 'Aumenta permanentemente en +10 la defensa.' },
-  'X Speed 2': { price: 150, desc: 'Aumenta permanentemente en +10 la velocidad.' },
-  'X Sp. Attack 2': { price: 150, desc: 'Aumenta permanentemente en +10 el Ataque Especial.' },
-  'X Sp. Defense 2': { price: 150, desc: 'Aumenta permanentemente en +10 la Defensa Especial.' },
-  'Cuerda Huida': { price: 200, desc: 'Permite escapar de cualquier combate de la aventura.' },
-  'Poké Radar': { price: 250, desc: 'Garantiza que el próximo Pokémon salvaje o de descanso sea shiny.' },
-  'Flauta Celeste': { price: 5000, desc: 'Garantiza que el próximo Pokémon salvaje sea legendario.' },
-  'Moomoo Milk': { price: 120, desc: 'Restaura 100 HP de un Pokémon.' },
-  'Berry Juice': { price: 40, desc: 'Restaura 20 HP de un Pokémon.' },
-  'Fresh Water': { price: 60, desc: 'Restaura 30 HP de un Pokémon.' },
-  'Soda Pop': { price: 80, desc: 'Restaura 40 HP de un Pokémon.' },
-  'Lemonade': { price: 100, desc: 'Restaura 60 HP de un Pokémon.' },
-  'Poké Ball': { price: 20, desc: 'Una ball básica para capturar Pokémon salvajes.' },
-  'Great Ball': { price: 50, desc: 'Una ball con mayor ratio de captura.' },
-  'Ultra Ball': { price: 80, desc: 'Una ball con alto ratio de captura.' },
-  'Master Ball': { price: 500, desc: '¡Captura cualquier Pokémon sin fallo!' },
-  'Quick Ball': { price: 60, desc: 'Más efectiva si se usa al inicio del combate.' },
-  'Timer Ball': { price: 60, desc: 'Más efectiva cuantos más turnos hayan pasado.' },
-  'Dusk Ball': { price: 60, desc: 'Más efectiva en la oscuridad.' },
-  'Net Ball': { price: 60, desc: 'Más efectiva contra tipos Agua o Bicho.' },
-  'Level Ball': { price: 60, desc: 'Más efectiva si superas en nivel al rival.' },
-  'Repeat Ball': { price: 60, desc: 'Más efectiva si ya capturaste esa especie.' },
-  'Love Ball': { price: 60, desc: 'Más efectiva si es de la misma familia evolutiva.' },
-  'Friend Ball': { price: 60, desc: 'Una ball especial amistosa.' },
-  'Heavy Ball': { price: 60, desc: 'Más efectiva contra Pokémon pesados.' },
-  'Fire Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
-  'Water Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
-  'Thunder Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
-  'Leaf Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
-  'Moon Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
-  'Sun Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
-  'Shiny Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
-  'Dusk Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
-  'Dawn Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
-  'Ice Stone': { price: 120, desc: 'Piedra que evoluciona a ciertos Pokémon.' },
-  'Disco MT': { price: 250, desc: 'Enseña un nuevo movimiento a un Pokémon, como el nodo Move Tutor.' },
-  'Proteína': { price: 200, desc: 'Aumenta permanentemente en +15 el ataque de un Pokémon.' },
-  'Calcio': { price: 200, desc: 'Aumenta permanentemente en +15 el Ataque Especial de un Pokémon.' },
-  'Hierro': { price: 200, desc: 'Aumenta permanentemente en +15 la defensa de un Pokémon.' },
-  'Zinc': { price: 200, desc: 'Aumenta permanentemente en +15 la Defensa Especial de un Pokémon.' },
-  'Carburante': { price: 200, desc: 'Aumenta permanentemente en +15 la velocidad de un Pokémon.' },
-  'Sacred Ash': { price: 400, desc: 'Revive a todos los Pokémon debilitados con el HP completo.' },
-  'Máquina de Naturalezas': { price: 400, desc: 'Cambia la naturaleza de un Pokémon del equipo.' },
-  'Reroll de IVs': { price: 300, desc: 'Re-tira los IVs de un Pokémon del equipo.' },
-  'Cápsula de Habilidad': { price: 500, desc: 'Cambia la habilidad de un Pokémon por otra de su especie.' },
-  'Perla Grande': { price: 1000, desc: 'Una perla grande y valiosa. Se vende por 500.' },
-  'Polvo Estelar': { price: 200, desc: 'Polvo de estrella. Se vende por 100.' },
-  'Perla': { price: 200, desc: 'Una perla valiosa. Se vende por 100.' },
-  'Corazón Marino': { price: 300, desc: 'Un corazón brillante. Se vende por 150.' },
-  'Seta Pequeña': { price: 100, desc: 'Una seta pequeña. Se vende por 50.' },
-  'Seta Grande': { price: 200, desc: 'Una seta grande. Se vende por 100.' },
-  'Correo Aéreo': { price: 600, desc: 'Una carta con alas. Se vende por 300.' },
-  'Fragmento Estelar': { price: 800, desc: 'Un fragmento de estrella. Se vende por 400.' },
-  'Pieza Dorada': { price: 1000, desc: 'Una pieza de oro. Se vende por 500.' },
-  'Perla Rara': { price: 1600, desc: 'Una perla rara muy valiosa. Se vende por 800.' },
-  'Cometa': { price: 2000, desc: 'Un fragmento de cometa. Se vende por 1000.' },
-  'Pieza Dorada II': { price: 3000, desc: 'Una pieza de oro enorme. Se vende por 1500.' },
-  'Hueso Raro': { price: 500, desc: 'Un hueso valioso. Se vende por 250.' },
-  'Miel': { price: 300, desc: 'Miel dulce. Se vende por 150.' },
-  'Fragmento Rojo': { price: 200, desc: 'Un fragmento rojo. Se vende por 100.' },
-  'Fragmento Azul': { price: 200, desc: 'Un fragmento azul. Se vende por 100.' },
-  'Fragmento Amarillo': { price: 200, desc: 'Un fragmento amarillo. Se vende por 100.' },
-  'Fragmento Verde': { price: 200, desc: 'Un fragmento verde. Se vende por 100.' },
-}
-
-const EVOLUTION_STONES = ['Fire Stone', 'Water Stone', 'Thunder Stone', 'Leaf Stone', 'Moon Stone', 'Sun Stone', 'Shiny Stone', 'Dusk Stone', 'Dawn Stone', 'Ice Stone'] as const
-
-const EVOLUTION_STONE_UNLOCK_IDS: Record<string, string> = {
-  'Fire Stone': 'unlock_fire_stone',
-  'Water Stone': 'unlock_water_stone',
-  'Thunder Stone': 'unlock_thunder_stone',
-  'Leaf Stone': 'unlock_leaf_stone',
-  'Moon Stone': 'unlock_moon_stone',
-  'Sun Stone': 'unlock_sun_stone',
-  'Shiny Stone': 'unlock_shiny_stone',
-  'Dusk Stone': 'unlock_dusk_stone',
-  'Dawn Stone': 'unlock_dawn_stone',
-  'Ice Stone': 'unlock_ice_stone',
-}
-
-const EVOLUTION_STONE_ITEM_NAMES: Record<string, string> = {
-  'Fire Stone': 'fire-stone',
-  'Water Stone': 'water-stone',
-  'Thunder Stone': 'thunder-stone',
-  'Leaf Stone': 'leaf-stone',
-  'Moon Stone': 'moon-stone',
-  'Sun Stone': 'sun-stone',
-  'Shiny Stone': 'shiny-stone',
-  'Dusk Stone': 'dusk-stone',
-  'Dawn Stone': 'dawn-stone',
-  'Ice Stone': 'ice-stone',
-  'Gorra de Ash': 'gorra-de-ash',
-  'Auspicious Armor': 'auspicious-armor',
-  'Malicious Armor': 'malicious-armor',
-  'Tart Apple': 'tart-apple',
-  'Sweet Apple': 'sweet-apple',
-  'Syrupy Apple': 'syrupy-apple',
-  'Cracked Pot': 'cracked-pot',
-  'Peat Block': 'peat-block',
-  'Unremarkable Teacup': 'unremarkable-teacup',
-  'Metal Alloy': 'metal-alloy',
-  'Galarica Cuff': 'galarica-cuff',
-  'Galarica Wreath': 'galarica-wreath',
-}
-
-const EVOLUTION_ITEM_UNLOCK_IDS: Record<string, string> = {
-  'Metal Coat': 'unlock_metal_coat',
-  "King's Rock": 'unlock_kings_rock',
-  'Dragon Scale': 'unlock_dragon_scale',
-  'Up-Grade': 'unlock_up_grade',
-  'Dubious Disc': 'unlock_dubious_disc',
-  'Reaper Cloth': 'unlock_reaper_cloth',
-  'Protector': 'unlock_protector',
-  'Electirizer': 'unlock_electirizer',
-  'Magmarizer': 'unlock_magmarizer',
-  'Prism Scale': 'unlock_prism_scale',
-  'Sachet': 'unlock_sachet',
-  'Whipped Dream': 'unlock_whipped_dream',
-  'Gorra de Ash': 'unlock_gorra_de_ash',
-  'Auspicious Armor': 'unlock_auspicious_armor',
-  'Malicious Armor': 'unlock_malicious_armor',
-  'Razor Claw': 'unlock_razor_claw',
-  'Razor Fang': 'unlock_razor_fang',
-  'Oval Stone': 'unlock_oval_stone',
-  'Deep Sea Tooth': 'unlock_deep_sea_tooth',
-  'Deep Sea Scale': 'unlock_deep_sea_scale',
-  'Manuscrito sombras': 'unlock_manuscrito_sombras',
-  'Manuscrito aguas': 'unlock_manuscrito_aguas',
-  'Mineral Negro': 'unlock_mineral_negro',
-  'Tart Apple': 'unlock_tart_apple',
-  'Sweet Apple': 'unlock_sweet_apple',
-  'Syrupy Apple': 'unlock_syrupy_apple',
-  'Cracked Pot': 'unlock_cracked_pot',
-  'Peat Block': 'unlock_peat_block',
-  'Unremarkable Teacup': 'unlock_unremarkable_teacup',
-  'Metal Alloy': 'unlock_metal_alloy',
-  'Galarica Cuff': 'unlock_galarica_cuff',
-  'Galarica Wreath': 'unlock_galarica_wreath',
-}
-
-// Bayas que pueden aparecer como drop. Las que están en la tienda meta se
-// filtran por su desbloqueo (consumibles o equipables).
-const BERRY_DROPS = [
-  'Oran Berry', 'Lum Berry', 'Baya Zreza', 'Baya Atania', 'Baya Algama', 'Baya Safre', 'Baya Siendrepis', 'Baya Caquic',
-  'Baya Cuaja', 'Baya Wiki', 'Baya Mago', 'Baya Aguav', 'Baya Ango',
-  'Sitrus Berry', 'Babiri Berry', 'Baya Oca', 'Baya Kasib', 'Baya Shuca', 'Baya Coba', 'Baya Charti',
-  'Baya Payapa', 'Baya Colbur', 'Baya Waca', 'Baya Rindo', 'Baya Chilan',
-]
-
-// Tesoros que pueden caer como drop (se filtran por desbloqueo en la tienda meta).
-const TREASURES = ['Seta Pequeña', 'Polvo Estelar', 'Seta Grande', 'Perla', 'Corazón Marino', 'Correo Aéreo', 'Fragmento Estelar', 'Perla Grande', 'Pieza Dorada', 'Perla Rara', 'Cometa', 'Pieza Dorada II', 'Hueso Raro', 'Miel', 'Fragmento Rojo', 'Fragmento Azul', 'Fragmento Amarillo', 'Fragmento Verde']
-const TREASURE_DROPS = TREASURES
-
-// Emblema Magma: drop poco frecuente que se canjea por 5 PokéCoins.
-const MAGMA_EMBLEM_DROP_CHANCE = 0.08
-const rollMagmaEmblem = (): string[] => (Math.random() < MAGMA_EMBLEM_DROP_CHANCE ? ['Emblema Magma'] : [])
-
-// Ids de las evoluciones de Eevee (Vaporeon, Jolteon, Flareon, Espeon, Umbreon,
-// Leafeon, Glaceon, Sylveon). Se usan para el logro "Familia Eevee".
-const EEVEE_EVOLUTIONS = [134, 135, 136, 196, 197, 470, 471, 700]
-
-const itemDescriptions: Record<string, string> = {
-  Potion: 'Restaura 25 HP al Pokémon activo.',
-  'Super Potion': 'Restaura 50 HP al Pokémon activo.',
-  'Hyper Potion': 'Restaura 120 HP al Pokémon activo.',
-  'Full Restore': 'Restaura todo el HP y cura estados.',
-  'X Attack': 'Aumenta permanentemente en +5 el ataque.',
-  'X Defense': 'Aumenta permanentemente en +5 la defensa.',
-  'X Speed': 'Aumenta permanentemente en +5 la velocidad.',
-  'X Sp. Attack': 'Aumenta permanentemente en +5 el Ataque Especial.',
-  'X Sp. Defense': 'Aumenta permanentemente en +5 la Defensa Especial.',
-  'Oran Berry': 'Restaura 15 HP al Pokémon activo.',
-  'Lum Berry': 'Restaura 30 HP y cura estados.',
-  'Full Heal': 'Restaura 40 HP y cura estados.',
-  'Antídoto': 'Cura el envenenamiento del Pokémon activo.',
-  'Antiquemar': 'Cura las quemaduras del Pokémon activo.',
-  'Paralizador': 'Cura la parálisis del Pokémon activo.',
-  'Despertar': 'Despierta al Pokémon activo.',
-  'Descongelar': 'Descongela al Pokémon activo.',
-  'Baya Caquic': 'Cura la confusión del Pokémon activo.',
-  'Baya Zreza': 'Cura la parálisis del Pokémon activo.',
-  'Baya Atania': 'Cura las quemaduras del Pokémon activo.',
-  'Baya Algama': 'Cura el envenenamiento del Pokémon activo.',
-  'Baya Safre': 'Descongela al Pokémon activo.',
-  'Baya Siendrepis': 'Despierta al Pokémon activo.',
-  'Baya Cuaja': 'Restaura 25 HP al Pokémon activo.',
-  'Baya Wiki': 'Restaura 35 HP al Pokémon activo.',
-  'Baya Mago': 'Restaura 45 HP al Pokémon activo.',
-  'Baya Aguav': 'Restaura 55 HP al Pokémon activo.',
-  'Baya Ango': 'Restaura 65 HP al Pokémon activo.',
-  'Revive': 'Revive a un Pokémon debilitado con 50% HP.',
-  'Max Revive': 'Revive a un Pokémon debilitado con el HP completo.',
-  'Elixir': 'Restaura 80 HP al Pokémon activo.',
-  'Super Elixir': 'Restaura 200 HP al Pokémon activo.',
-  'Full Elixir': 'Restaura todo el HP y cura estados.',
-  'Polvo Energía': 'Restaura 60 HP al Pokémon activo.',
-  'Raíz Energía': 'Restaura 120 HP al Pokémon activo.',
-  'Polvo Curación': 'Cura los problemas de estado del Pokémon activo.',
-  'Más PS': 'Aumenta permanentemente en +15 el HP máximo del Pokémon activo.',
-  'X Attack 2': 'Aumenta permanentemente en +10 el ataque.',
-  'X Defense 2': 'Aumenta permanentemente en +10 la defensa.',
-  'X Speed 2': 'Aumenta permanentemente en +10 la velocidad.',
-  'X Sp. Attack 2': 'Aumenta permanentemente en +10 el Ataque Especial.',
-  'X Sp. Defense 2': 'Aumenta permanentemente en +10 la Defensa Especial.',
-  'Poké Ball': 'Una ball básica para capturar Pokémon salvajes.',
-  'Great Ball': 'Una ball con mayor ratio de captura (x1.5).',
-  'Ultra Ball': 'Una ball con alto ratio de captura (x2).',
-  'Master Ball': '¡Captura cualquier Pokémon sin fallo!',
-  'Quick Ball': 'Más efectiva al inicio (x5 en turno 1).',
-  'Timer Ball': 'Mejora con los turnos (hasta x4).',
-  'Dusk Ball': 'Efectiva en la oscuridad (x3).',
-  'Net Ball': 'Efectiva contra Agua/Bicho (x3).',
-  'Level Ball': 'Mejor si superas en nivel al rival (hasta x8).',
-  'Repeat Ball': 'x3.5 si ya capturaste esa especie.',
-  'Love Ball': 'x8 si es de la misma familia evolutiva.',
-  'Friend Ball': 'Una ball especial amistosa (x1).',
-  'Heavy Ball': 'Mejor contra Pokémon pesados (hasta x4).',
-  'Mega Stone': 'Permite mega-evolucionar 1 vez por combate.',
-  'Dynamax Band': 'Permite gigamaximar 1 vez por combate (3 turnos).',
-  'Prisma Rojo': 'Despierta la Primal Reversion de Groudon (1 vez por combate).',
-  'Prisma Azul': 'Despierta la Primal Reversion de Kyogre (1 vez por combate).',
-  'Cuerda Huida': 'Escapa de cualquier combate de la aventura.',
-  'Poké Radar': 'Garantiza que el próximo Pokémon salvaje o de descanso sea shiny.',
-  'Flauta Celeste': 'Garantiza que el próximo Pokémon salvaje sea legendario.',
-  'Moomoo Milk': 'Restaura 100 HP de un Pokémon.',
-  'Berry Juice': 'Restaura 20 HP de un Pokémon.',
-  'Fresh Water': 'Restaura 30 HP de un Pokémon.',
-  'Soda Pop': 'Restaura 40 HP de un Pokémon.',
-  'Lemonade': 'Restaura 60 HP de un Pokémon.',
-  'Auspicious Armor': 'Armadura que evoluciona a Charcadet en Armarouge.',
-  'Malicious Armor': 'Armadura que evoluciona a Charcadet en Ceruledge.',
-  'Disco MT': 'Úsalo para enseñar un nuevo movimiento a tu Pokémon activo, igual que el nodo Move Tutor.',
-  'Proteína': 'Aumenta permanentemente en +15 el ataque del Pokémon activo.',
-  'Calcio': 'Aumenta permanentemente en +15 el Ataque Especial del Pokémon activo.',
-  'Hierro': 'Aumenta permanentemente en +15 la defensa del Pokémon activo.',
-  'Zinc': 'Aumenta permanentemente en +15 la Defensa Especial del Pokémon activo.',
-  'Carburante': 'Aumenta permanentemente en +15 la velocidad del Pokémon activo.',
-  'Sacred Ash': 'Revive a todos los Pokémon debilitados con el HP completo.',
-  "King's Rock": 'Evoluciona a Politoed y Slowking.',
-  'Perla Grande': 'Se vende por $500.',
-  'Polvo Estelar': 'Se vende por $100.',
-  'Perla': 'Se vende por $100.',
-  'Corazón Marino': 'Se vende por $150.',
-  'Seta Pequeña': 'Se vende por $50.',
-  'Seta Grande': 'Se vende por $100.',
-  'Correo Aéreo': 'Se vende por $300.',
-  'Fragmento Estelar': 'Se vende por $400.',
-  'Pieza Dorada': 'Se vende por $500.',
-  'Perla Rara': 'Se vende por $800.',
-  'Cometa': 'Se vende por $1000.',
-  'Pieza Dorada II': 'Se vende por $1500.',
-  'Hueso Raro': 'Se vende por $250.',
-  'Miel': 'Se vende por $150.',
-  'Fragmento Rojo': 'Se vende por $100.',
-  'Fragmento Azul': 'Se vende por $100.',
-  'Fragmento Amarillo': 'Se vende por $100.',
-  'Fragmento Verde': 'Se vende por $100.',
-  'Baya Oca': 'Reduce a la mitad un movimiento Fuego superefectivo.',
-  'Baya Kasib': 'Reduce a la mitad un movimiento Fantasma superefectivo.',
-  'Baya Shuca': 'Reduce a la mitad un movimiento Tierra superefectivo.',
-  'Baya Coba': 'Reduce a la mitad un movimiento Volador superefectivo.',
-  'Baya Charti': 'Reduce a la mitad un movimiento Roca superefectivo.',
-  'Baya Payapa': 'Reduce a la mitad un movimiento Psíquico superefectivo.',
-  'Baya Colbur': 'Reduce a la mitad un movimiento Siniestro superefectivo.',
-  'Baya Waca': 'Reduce a la mitad un movimiento Eléctrico superefectivo.',
-  'Baya Rindo': 'Reduce a la mitad un movimiento Planta superefectivo.',
-  'Baya Chilan': 'Reduce a la mitad un movimiento Normal superefectivo.',
-  'Manuscrito sombras': 'Evoluciona a Kubfu en Urshifu Brusco.',
-  'Manuscrito aguas': 'Evoluciona a Kubfu en Urshifu Fluido.',
-  'Tart Apple': 'Evoluciona a Applin en Flapple.',
-  'Sweet Apple': 'Evoluciona a Applin en Appletun.',
-  'Syrupy Apple': 'Evoluciona a Applin en Dipplin.',
-  'Cracked Pot': 'Evoluciona a Sinistea en Polteageist.',
-  'Peat Block': 'Evoluciona a Ursaring en Ursaluna.',
-  'Unremarkable Teacup': 'Evoluciona a Poltchageist en Sinistcha.',
-  'Metal Alloy': 'Evoluciona a Duraludon en Archaludon.',
-  'Galarica Cuff': 'Evoluciona a Slowpoke de Galar en Slowbro de Galar.',
-  'Galarica Wreath': 'Evoluciona a Slowpoke de Galar en Slowking de Galar.',
-  'Diamansfera': '+20% daño en movimientos Acero y Dragón para Dialga. Transforma a Dialga en su Forma Origen.',
-  'Lustresfera': '+20% daño en movimientos Agua y Dragón para Palkia. Transforma a Palkia en su Forma Origen.',
-  'Griseosfera': '+20% daño en movimientos Dragón y Fantasma para Giratina. Transforma a Giratina en su Forma Origen.',
-}
-
-// Sprites locales de objetos (carpeta src/assets/items). Se cargan automáticamente
-// con import.meta.glob y cada archivo se asocia a su objeto en LOCAL_ITEM_SPRITES.
-// Tienen prioridad sobre los sprites remotos de PokeAPI.
-const localItemSpriteFiles = import.meta.glob('./assets/items/*.png', { eager: true, import: 'default' }) as Record<string, string>
-
-const LOCAL_ITEM_SPRITES: Record<string, string> = {
-  'Galarica Cuff': localItemSpriteFiles['./assets/items/Brazal_galanuez.png'] ?? '',
-  'Galarica Wreath': localItemSpriteFiles['./assets/items/Corona_galanuez.png'] ?? '',
-  'Gorra de Ash': localItemSpriteFiles['./assets/items/Ash\'s_Cap.png'] ?? '',
-  'Tart Apple': localItemSpriteFiles['./assets/items/Manzana_ácida.png'] ?? '',
-  'Sweet Apple': localItemSpriteFiles['./assets/items/Manzana_dulce.png'] ?? '',
-  'Syrupy Apple': localItemSpriteFiles['./assets/items/Manzana_melosa.png'] ?? '',
-  'Cracked Pot': localItemSpriteFiles['./assets/items/Tetera_agrietada.png'] ?? '',
-  'Peat Block': localItemSpriteFiles['./assets/items/Bloque_de_turba.png'] ?? '',
-  'Unremarkable Teacup': localItemSpriteFiles['./assets/items/Cuenco_mediocre.png'] ?? '',
-  'Metal Alloy': localItemSpriteFiles['./assets/items/Metal_compuesto.png'] ?? '',
-  'Mineral Negro': localItemSpriteFiles['./assets/items/Mineral_negro.png'] ?? '',
-  'Auspicious Armor': localItemSpriteFiles['./assets/items/Armadura_auspiciosa.png'] ?? '',
-  'Malicious Armor': localItemSpriteFiles['./assets/items/Armadura_maldita.png'] ?? '',
-  'Manuscrito sombras': localItemSpriteFiles['./assets/items/Manuscrito_de_las_Sombras.png'] ?? '',
-  'Manuscrito aguas': localItemSpriteFiles['./assets/items/Manuscrito_de_las_Aguas.png'] ?? '',
-}
-
-const ITEM_SPRITES: Record<string, string> = {
-  'Potion': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/potion.png',
-  'Super Potion': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/super-potion.png',
-  'Hyper Potion': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/hyper-potion.png',
-  'Full Restore': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/full-restore.png',
-  'Oran Berry': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/oran-berry.png',
-  'Lum Berry': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/lum-berry.png',
-  'X Attack': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-attack.png',
-  'X Defense': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-defense.png',
-  'X Speed': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-speed.png',
-  'X Sp. Attack': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-sp-atk.png',
-  'X Sp. Defense': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-sp-def.png',
-  'Full Heal': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/full-heal.png',
-  'Antídoto': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/antidote.png',
-  'Antiquemar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/burn-heal.png',
-  'Paralizador': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/paralyze-heal.png',
-  'Despertar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/awakening.png',
-  'Descongelar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ice-heal.png',
-  'Baya Caquic': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/persim-berry.png',
-  'Baya Zreza': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/cheri-berry.png',
-  'Baya Atania': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rawst-berry.png',
-  'Baya Algama': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/pecha-berry.png',
-  'Baya Safre': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/aspear-berry.png',
-  'Baya Siendrepis': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/chesto-berry.png',
-  'Baya Cuaja': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/figy-berry.png',
-  'Baya Wiki': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/wiki-berry.png',
-  'Baya Mago': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mago-berry.png',
-  'Baya Aguav': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/aguav-berry.png',
-  'Baya Ango': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/iapapa-berry.png',
-  'Revive': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/revive.png',
-  'Max Revive': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-revive.png',
-  'Muscle Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/muscle-band.png',
-  'Wise Glasses': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/wise-glasses.png',
-  'Choice Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/choice-band.png',
-  'Leftovers': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/leftovers.png',
-  'Focus Sash': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/focus-sash.png',
-  'Assault Vest': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/assault-vest.png',
-  'Quick Claw': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/quick-claw.png',
-  'Eviolite': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/eviolite.png',
-  'Life Orb': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/life-orb.png',
-  'Rocky Helmet': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rocky-helmet.png',
-  'Scope Lens': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/scope-lens.png',
-  'Shell Bell': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shell-bell.png',
-  'Choice Scarf': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/choice-scarf.png',
-  'Babiri Berry': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/babiri-berry.png',
-  'Big Root': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/big-root.png',
-  'Wide Lens': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/wide-lens.png',
-  'Sitrus Berry': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sitrus-berry.png',
-  'Choice Specs': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/choice-specs.png',
-  'Charcoal': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/charcoal.png',
-  'Focus Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/focus-band.png',
-  'Rare Candy': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rare-candy.png',
-  'Elixir': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/elixir.png',
-  'Super Elixir': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-elixir.png',
-  'Full Elixir': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/max-potion.png',
-  'Polvo Energía': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/energy-powder.png',
-  'Raíz Energía': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/energy-root.png',
-  'Polvo Curación': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/heal-powder.png',
-  'Más PS': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/hp-up.png',
-  'X Attack 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-attack.png',
-  'X Defense 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-defense.png',
-  'X Speed 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-speed.png',
-  'X Sp. Attack 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-sp-atk.png',
-  'X Sp. Defense 2': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/x-sp-def.png',
-  'Dragon Fang': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dragon-fang.png',
-  'Mystic Water': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mystic-water.png',
-  'Expert Belt': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/expert-belt.png',
-  'Miracle Seed': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/miracle-seed.png',
-  'Sharp Beak': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sharp-beak.png',
-  'Iron Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/iron-ball.png',
-  'Black Glasses': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/black-glasses.png',
-  'Twisted Spoon': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/twisted-spoon.png',
-  'Amuleto Claro': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/clear-amulet.png',
-  'Gafas Protectoras': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/safety-goggles.png',
-  'Capa Furtiva': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/covert-cloak.png',
-  'Dado Cargado': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/loaded-dice.png',
-  'Seguro Debilidad': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/weakness-policy.png',
-  'Globo Helio': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/air-balloon.png',
-  'Hierba Blanca': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/white-herb.png',
-  'Hierba Mental': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mental-herb.png',
-  'Espray Bucal': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/throat-spray.png',
-  'Guantes Protectores': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/protective-pads.png',
-  'Caña de Pescar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/old-rod.png',
-  'Fósil Hélix': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/helix-fossil.png',
-  'Fósil Domo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dome-fossil.png',
-  'Ámbar Viejo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/old-amber.png',
-  'Fósil Raíz': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/root-fossil.png',
-  'Fósil Garra': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/claw-fossil.png',
-  'Fósil Cráneo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/skull-fossil.png',
-  'Fósil Coraza': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/armor-fossil.png',
-  'Fósil Tapa': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/cover-fossil.png',
-  'Fósil Pluma': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/plume-fossil.png',
-  'Fósil Mandíbula': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/jaw-fossil.png',
-  'Fósil Vela': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sail-fossil.png',
-  'Mega Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/key-stone.png',
-  'Dynamax Band': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/power-bracer.png',
-  'Prisma Rojo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/red-orb.png',
-  'Prisma Azul': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/blue-orb.png',
-  'Diamansfera': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/adamant-orb.png',
-  'Lustresfera': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/lustrous-orb.png',
-  'Griseosfera': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/griseous-orb.png',
-  'Baya Oca': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/occa-berry.png',
-  'Baya Kasib': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/kasib-berry.png',
-  'Baya Shuca': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shuca-berry.png',
-  'Baya Coba': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/coba-berry.png',
-  'Baya Charti': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/charti-berry.png',
-  'Baya Payapa': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/payapa-berry.png',
-  'Baya Colbur': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/colbur-berry.png',
-  'Baya Waca': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/wacan-berry.png',
-  'Baya Rindo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rindo-berry.png',
-  'Baya Chilan': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/chilan-berry.png',
-  'Poké Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png',
-  'Great Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/great-ball.png',
-  'Ultra Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ultra-ball.png',
-  'Master Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png',
-  'Quick Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/quick-ball.png',
-  'Timer Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/timer-ball.png',
-  'Dusk Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dusk-ball.png',
-  'Net Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/net-ball.png',
-  'Level Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/level-ball.png',
-  'Repeat Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/repeat-ball.png',
-  'Love Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/love-ball.png',
-  'Friend Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/friend-ball.png',
-  'Heavy Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/heavy-ball.png',
-  'Fire Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fire-stone.png',
-  'Water Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/water-stone.png',
-  'Thunder Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/thunder-stone.png',
-  'Leaf Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/leaf-stone.png',
-  'Moon Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/moon-stone.png',
-  'Sun Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sun-stone.png',
-  'Shiny Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shiny-stone.png',
-  'Dusk Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dusk-stone.png',
-  'Dawn Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dawn-stone.png',
-  'Ice Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ice-stone.png',
-  'Metal Coat': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/metal-coat.png',
-  'Dragon Scale': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dragon-scale.png',
-  'Up-Grade': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/up-grade.png',
-  'Dubious Disc': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dubious-disc.png',
-  'Reaper Cloth': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/reaper-cloth.png',
-  'Protector': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/protector.png',
-  'Electirizer': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/electirizer.png',
-  'Magmarizer': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/magmarizer.png',
-  'Prism Scale': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/prism-scale.png',
-  'Sachet': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sachet.png',
-  'Whipped Dream': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/whipped-dream.png',
-  'Cuerda Huida': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/escape-rope.png',
-  'Poké Radar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-radar.png',
-  'Flauta Celeste': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/azure-flute.png',
-  'gameboy': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/game-boy.png',
-  'rule-book': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rule-book.png',
-  'Detector de Objetos': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dowsing-machine.png',
-  'Telescopio': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/zoom-lens.png',
-  'Tarjeta Roja': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/red-card.png',
-  'Emblema Magma': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/magma-emblem.png',
-  'Moomoo Milk': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/moomoo-milk.png',
-  'Berry Juice': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/berry-juice.png',
-  'Fresh Water': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fresh-water.png',
-  'Soda Pop': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/soda-pop.png',
-  'Lemonade': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/lemonade.png',
-  'Disco MT': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tm-normal.png',
-  'Proteína': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/protein.png',
-  'Calcio': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/calcium.png',
-  'Hierro': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/iron.png',
-  'Zinc': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/zinc.png',
-  'Carburante': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/carbos.png',
-  'Sacred Ash': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/sacred-ash.png',
-  'Máquina de Naturalezas': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/colress-machine.png',
-  'Reroll de IVs': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/bottle-cap.png',
-  'Cápsula de Habilidad': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ability-capsule.png',
-  'Perla Grande': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/big-pearl.png',
-  'Polvo Estelar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/stardust.png',
-  'Perla': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/pearl.png',
-  'Corazón Marino': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/heart-scale.png',
-  'Seta Pequeña': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tiny-mushroom.png',
-  'Huevo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/mystery-egg.png',
-  'Seta Grande': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/big-mushroom.png',
-  'Correo Aéreo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/air-mail.png',
-  'Fragmento Estelar': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/star-piece.png',
-  'Pieza Dorada': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/nugget.png',
-  'Perla Rara': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/pearl-string.png',
-  'Cometa': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/comet-shard.png',
-  'Pieza Dorada II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/big-nugget.png',
-  'Hueso Raro': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/rare-bone.png',
-  'Miel': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/honey.png',
-  'Fragmento Rojo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/red-shard.png',
-  'Fragmento Azul': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/blue-shard.png',
-  'Fragmento Amarillo': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/yellow-shard.png',
-  'Fragmento Verde': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/green-shard.png',
-  'Caja Bonguri': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/apricorn-box.png',
-  'Estuche de MT': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/tm-case.png',
-  'Saco bayas': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/berry-pouch.png',
-  'Luxury Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/luxury-ball.png',
-  'Premier Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/premier-ball.png',
-  'Fast Ball': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/fast-ball.png',
-  'Nidobola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/nest-ball.png',
-  'Buceobola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dive-ball.png',
-  'Sanabola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/heal-ball.png',
-  'Safaribola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/safari-ball.png',
-  'Sueñobola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/dream-ball.png',
-  'Ball Luna': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/moon-ball.png',
-  'Entebola': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/beast-ball.png',
-  'Focus Sash II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/focus-sash.png',
-  'Scope Lens II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/scope-lens.png',
-  'Shell Bell II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/shell-bell.png',
-  'Assault Vest II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/assault-vest.png',
-  'Leftovers II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/leftovers.png',
-  'Quick Claw II': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/quick-claw.png',
-  'Razor Claw': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/razor-claw.png',
-  'Razor Fang': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/razor-fang.png',
-  'Oval Stone': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/oval-stone.png',
-  'Deep Sea Tooth': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/deep-sea-tooth.png',
-  'Deep Sea Scale': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/deep-sea-scale.png',
-  "King's Rock": 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/kings-rock.png',
-  'Repartir Exp': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/exp-share.png',
-  'Mineral Negro': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/hard-stone.png',
-}
-
-// Los sprites locales sobrescriben los remotos de PokeAPI.
-for (const [itemName, spriteUrl] of Object.entries(LOCAL_ITEM_SPRITES)) {
-  if (spriteUrl) ITEM_SPRITES[itemName] = spriteUrl
-}
-
-interface HoldableItem {
-  name: string
-  desc: string
-  price: number
-  attackMod?: number
-  defenseMod?: number
-  spAttackMod?: number
-  spDefenseMod?: number
-  speedMod?: number
-  maxHpMod?: number
-  healPerTurn?: number
-  damageBoost?: number
-  damageReduction?: number
-  critChance?: number
-  lifesteal?: number
-  lowHpBonus?: number
-  firstStrikeBonus?: number
-  accuracyMod?: number
-  physicalBoost?: number
-  specialBoost?: number
-  superEffectiveBoost?: number
-  choiceLock?: boolean
-  focusSash?: boolean
-  endureChance?: number
-  quickClawChance?: number
-  assaultVest?: boolean
-  eviolite?: boolean
-  lifeOrb?: boolean
-  rockyHelmet?: boolean
-  bigRoot?: boolean
-  healFraction?: number
-  berryHeal?: number
-  resistType?: string
-  ironBall?: boolean
-  isMegaStone?: boolean
-  isGmaxBand?: boolean
-  isPrimalOrb?: boolean
-  isExpShare?: boolean
-  isRedCard?: boolean
-  statDropImmune?: boolean
-  weatherImmune?: boolean
-  powderImmune?: boolean
-  secondaryImmune?: boolean
-  loadedDice?: boolean
-  weaknessPolicy?: boolean
-  airBalloon?: boolean
-  whiteHerb?: boolean
-  mentalHerb?: boolean
-  throatSpray?: boolean
-  noContact?: boolean
-  typeBoost?: { types: string[]; boost: number; onlyIds?: number[] }
-}
-
-// ¿Un Pokémon puede seguir evolucionando? (para la Joya Evolutiva/Eviolite).
-function canStillEvolve(pokemon: Pokemon): boolean {
-  return pokemon.evolutionLevel != null || (pokemon.heldItemEvolutions?.length ?? 0) > 0 || pokemon.heldItemRequired != null
-}
-
-const HOLDABLE_ITEMS: Record<string, HoldableItem> = {
-  'Muscle Band': { name: 'Muscle Band', desc: '+10% daño en movimientos físicos', price: 100, physicalBoost: 0.10 },
-  'Wise Glasses': { name: 'Wise Glasses', desc: '+10% daño en movimientos especiales', price: 100, specialBoost: 0.10 },
-  'Choice Band': { name: 'Choice Band', desc: '+50% Ataque, pero solo puedes usar un movimiento', price: 200, attackMod: 0.50, choiceLock: true },
-  'Choice Specs': { name: 'Choice Specs', desc: '+50% At. Esp., pero solo puedes usar un movimiento', price: 200, spAttackMod: 0.50, choiceLock: true },
-  'Choice Scarf': { name: 'Choice Scarf', desc: '+50% Velocidad, pero solo puedes usar un movimiento', price: 200, speedMod: 0.50, choiceLock: true },
-  'Leftovers': { name: 'Leftovers', desc: 'Recupera 1/16 de tu HP máximo cada turno', price: 150, healFraction: 1 / 16 },
-  'Focus Sash': { name: 'Focus Sash', desc: 'A plena vida, aguanta un golpe letal y se consume', price: 150, focusSash: true },
-  'Assault Vest': { name: 'Assault Vest', desc: '+50% Def. Esp., pero no puedes usar movimientos de estado', price: 200, spDefenseMod: 0.50, assaultVest: true },
-  'Quick Claw': { name: 'Quick Claw', desc: '20% de probabilidad de atacar primero', price: 150, quickClawChance: 0.20 },
-  'Eviolite': { name: 'Eviolite', desc: '+50% Defensa y Def. Esp. si aún puede evolucionar', price: 120, eviolite: true },
-  'Life Orb': { name: 'Life Orb', desc: '+30% daño, pero pierdes 1/10 del daño infligido', price: 250, damageBoost: 0.30, lifeOrb: true },
-  'Rocky Helmet': { name: 'Rocky Helmet', desc: 'El rival que te golpee pierde 1/6 de su HP máximo', price: 150, rockyHelmet: true },
-  'Scope Lens': { name: 'Scope Lens', desc: 'Aumenta la probabilidad de golpe crítico', price: 120, critChance: 0.20 },
-  'Telescopio': { name: 'Telescopio', desc: '+20% precisión si el rival ya atacó este turno', price: 120, accuracyMod: 0.20 },
-  'Shell Bell': { name: 'Shell Bell', desc: 'Recupera 1/8 del daño infligido', price: 150, lifesteal: 1 / 8 },
-  'Big Root': { name: 'Big Root', desc: '+30% de recuperación con movimientos drenantes', price: 150, bigRoot: true },
-  'Wide Lens': { name: 'Wide Lens', desc: '+10% de precisión', price: 100, accuracyMod: 0.10 },
-  'Sitrus Berry': { name: 'Sitrus Berry', desc: 'Restaura el 25% del HP al caer al 50%. Se consume', price: 120, berryHeal: 0.25 },
-  'Focus Band': { name: 'Focus Band', desc: '10% de probabilidad de aguantar un golpe letal', price: 150, endureChance: 0.10 },
-  'Iron Ball': { name: 'Iron Ball', desc: 'Reduce la Velocidad a la mitad. Los Pokémon Volador reciben daño neutral de Tierra', price: 100, speedMod: -0.50, ironBall: true },
-  'Dragon Fang': { name: 'Dragon Fang', desc: '+20% daño en movimientos de tipo Dragón', price: 150, typeBoost: { types: ['dragon'], boost: 0.20 } },
-  'Expert Belt': { name: 'Expert Belt', desc: '+20% daño en movimientos superefectivos', price: 150, superEffectiveBoost: 0.20 },
-  'Charcoal': { name: 'Charcoal', desc: '+20% daño en movimientos de tipo Fuego', price: 150, typeBoost: { types: ['fire'], boost: 0.20 } },
-  'Mystic Water': { name: 'Mystic Water', desc: '+20% daño en movimientos de tipo Agua', price: 150, typeBoost: { types: ['water'], boost: 0.20 } },
-  'Miracle Seed': { name: 'Miracle Seed', desc: '+20% daño en movimientos de tipo Planta', price: 150, typeBoost: { types: ['grass'], boost: 0.20 } },
-  'Sharp Beak': { name: 'Sharp Beak', desc: '+20% daño en movimientos de tipo Volador', price: 150, typeBoost: { types: ['flying'], boost: 0.20 } },
-  'Black Glasses': { name: 'Black Glasses', desc: '+20% daño en movimientos de tipo Siniestro', price: 150, typeBoost: { types: ['dark'], boost: 0.20 } },
-  'Twisted Spoon': { name: 'Twisted Spoon', desc: '+20% daño en movimientos de tipo Psíquico', price: 150, typeBoost: { types: ['psychic'], boost: 0.20 } },
-  'Tarjeta Roja': { name: 'Tarjeta Roja', desc: 'Si te golpean con daño y sobrevives, el rival cambia', price: 1000, isRedCard: true },
-  'Mega Stone': { name: 'Mega Stone', desc: 'Permite mega-evolucionar 1 vez por combate', price: 700, isMegaStone: true },
-  'Dynamax Band': { name: 'Dynamax Band', desc: 'Permite gigamaximar 1 vez por combate (3 turnos)', price: 0, isGmaxBand: true },
-  'Prisma Rojo': { name: 'Prisma Rojo', desc: 'Despierta la Primal Reversion de Groudon (1 vez por combate)', price: 0, isPrimalOrb: true },
-  'Prisma Azul': { name: 'Prisma Azul', desc: 'Despierta la Primal Reversion de Kyogre (1 vez por combate)', price: 0, isPrimalOrb: true },
-  'Diamansfera': { name: 'Diamansfera', desc: '+20% daño en movimientos Acero y Dragón si lo lleva Dialga. Transforma a Dialga en su Forma Origen.', price: 700, typeBoost: { types: ['steel', 'dragon'], boost: 0.20, onlyIds: [483] } },
-  'Lustresfera': { name: 'Lustresfera', desc: '+20% daño en movimientos Agua y Dragón si lo lleva Palkia. Transforma a Palkia en su Forma Origen.', price: 700, typeBoost: { types: ['water', 'dragon'], boost: 0.20, onlyIds: [484] } },
-  'Griseosfera': { name: 'Griseosfera', desc: '+20% daño en movimientos Dragón y Fantasma si la lleva Giratina. Transforma a Giratina en su Forma Origen.', price: 700, typeBoost: { types: ['dragon', 'ghost'], boost: 0.20, onlyIds: [487] } },
-  'Baya Oca': { name: 'Baya Oca', desc: 'Reduce a la mitad un movimiento Fuego superefectivo. Se consume', price: 120, resistType: 'fire' },
-  'Baya Kasib': { name: 'Baya Kasib', desc: 'Reduce a la mitad un movimiento Fantasma superefectivo. Se consume', price: 120, resistType: 'ghost' },
-  'Babiri Berry': { name: 'Babiri Berry', desc: 'Reduce a la mitad un movimiento Acero superefectivo. Se consume', price: 120, resistType: 'steel' },
-  'Baya Waca': { name: 'Baya Waca', desc: 'Reduce a la mitad un movimiento Eléctrico superefectivo. Se consume', price: 120, resistType: 'electric' },
-  'Baya Rindo': { name: 'Baya Rindo', desc: 'Reduce a la mitad un movimiento Planta superefectivo. Se consume', price: 120, resistType: 'grass' },
-  'Baya Colbur': { name: 'Baya Colbur', desc: 'Reduce a la mitad un movimiento Siniestro superefectivo. Se consume', price: 120, resistType: 'dark' },
-  'Baya Chilan': { name: 'Baya Chilan', desc: 'Reduce a la mitad un movimiento Normal superefectivo. Se consume', price: 120, resistType: 'normal' },
-  'Baya Shuca': { name: 'Baya Shuca', desc: 'Reduce a la mitad un movimiento Tierra superefectivo. Se consume', price: 120, resistType: 'ground' },
-  'Baya Coba': { name: 'Baya Coba', desc: 'Reduce a la mitad un movimiento Volador superefectivo. Se consume', price: 120, resistType: 'flying' },
-  'Baya Charti': { name: 'Baya Charti', desc: 'Reduce a la mitad un movimiento Roca superefectivo. Se consume', price: 120, resistType: 'rock' },
-  'Baya Payapa': { name: 'Baya Payapa', desc: 'Reduce a la mitad un movimiento Psíquico superefectivo. Se consume', price: 120, resistType: 'psychic' },
-  'Metal Coat': { name: 'Metal Coat', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  "King's Rock": { name: "King's Rock", desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Dragon Scale': { name: 'Dragon Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Up-Grade': { name: 'Up-Grade', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Dubious Disc': { name: 'Dubious Disc', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Reaper Cloth': { name: 'Reaper Cloth', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Protector': { name: 'Protector', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Electirizer': { name: 'Electirizer', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Magmarizer': { name: 'Magmarizer', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Prism Scale': { name: 'Prism Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Sachet': { name: 'Sachet', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Whipped Dream': { name: 'Whipped Dream', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Focus Sash II': { name: 'Focus Sash II', desc: 'A plena vida, aguanta un golpe letal. +30 HP máximos', price: 200, focusSash: true, maxHpMod: 30 },
-  'Scope Lens II': { name: 'Scope Lens II', desc: 'Mayor probabilidad de golpe crítico', price: 200, critChance: 0.30 },
-  'Shell Bell II': { name: 'Shell Bell II', desc: 'Recupera 1/6 del daño infligido', price: 250, lifesteal: 1 / 6 },
-  'Assault Vest II': { name: 'Assault Vest II', desc: '+65% Def. Esp., no puedes usar movimientos de estado', price: 250, spDefenseMod: 0.65, assaultVest: true },
-  'Leftovers II': { name: 'Leftovers II', desc: 'Recupera 1/8 de tu HP máximo cada turno', price: 250, healFraction: 1 / 8 },
-  'Quick Claw II': { name: 'Quick Claw II', desc: '35% de probabilidad de atacar primero', price: 200, quickClawChance: 0.35 },
-  'Razor Claw': { name: 'Razor Claw', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Razor Fang': { name: 'Razor Fang', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Oval Stone': { name: 'Oval Stone', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Deep Sea Tooth': { name: 'Deep Sea Tooth', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Deep Sea Scale': { name: 'Deep Sea Scale', desc: 'Evoluciona a ciertos Pokémon al subir de nivel.', price: 200 },
-  'Manuscrito sombras': { name: 'Manuscrito sombras', desc: 'Evoluciona a Kubfu en Urshifu Brusco al subir de nivel.', price: 400 },
-  'Manuscrito aguas': { name: 'Manuscrito aguas', desc: 'Evoluciona a Kubfu en Urshifu Fluido al subir de nivel.', price: 400 },
-  'Mineral Negro': { name: 'Mineral Negro', desc: 'Evoluciona a Scyther en Kleavor al subir de nivel.', price: 200 },
-  'Repartir Exp': { name: 'Repartir Exp', desc: 'Todos los Pokémon del PC ganan 1 nivel tras cada combate.', price: 130, isExpShare: true },
-  'Amuleto Claro': { name: 'Amuleto Claro', desc: 'Impide que el rival baje tus estadísticas.', price: 180, statDropImmune: true },
-  'Gafas Protectoras': { name: 'Gafas Protectoras', desc: 'Inmune al daño del clima y a los movimientos de polvo.', price: 150, weatherImmune: true, powderImmune: true },
-  'Capa Furtiva': { name: 'Capa Furtiva', desc: 'Anula los efectos secundarios de los movimientos de daño rivales.', price: 200, secondaryImmune: true },
-  'Dado Cargado': { name: 'Dado Cargado', desc: 'Los movimientos de varios golpes siempre dan 4 o 5 golpes.', price: 170, loadedDice: true },
-  'Seguro Debilidad': { name: 'Seguro Debilidad', desc: 'Al recibir un golpe superefectivo sube +2 Ataque y At. Esp. Se consume.', price: 200, weaknessPolicy: true },
-  'Globo Helio': { name: 'Globo Helio', desc: 'Inmunidad a Tierra hasta recibir un golpe. Se consume.', price: 160, airBalloon: true },
-  'Hierba Blanca': { name: 'Hierba Blanca', desc: 'Restaura las estadísticas bajadas una vez. Se consume.', price: 140, whiteHerb: true },
-  'Hierba Mental': { name: 'Hierba Mental', desc: 'Cura la anulación o la confusión una vez. Se consume.', price: 120, mentalHerb: true },
-  'Espray Bucal': { name: 'Espray Bucal', desc: 'Al usar un movimiento de sonido sube +1 At. Esp. Se consume.', price: 160, throatSpray: true },
-  'Guantes Protectores': { name: 'Guantes Protectores', desc: 'Tus ataques no activan efectos de contacto del rival.', price: 140, noContact: true },
-}
-
-const HOLDABLE_ITEM_NAMES = Object.keys(HOLDABLE_ITEMS)
-
-// --- Pokéballs ---
-interface PokeBallDef {
-  name: string
-  rate: number
-  desc: string
-  price: number
-  spriteKey: string
-  isMaster?: boolean
-  rateFn?: (target: Pokemon, turns: number, alreadyCaught: boolean, playerLevel?: number) => number
-}
-
-// Familias que evolucionan con Piedra Lunar (Bonus de la Ball Luna).
-const MOON_STONE_FAMILY = [29, 30, 31, 32, 33, 34, 35, 36, 39, 40, 300, 301, 517, 518]
-
-const POKEBALLS: PokeBallDef[] = [
-  { name: 'Poké Ball', rate: 1, desc: 'Una ball básica para capturar Pokémon.', price: 20, spriteKey: 'poke-ball' },
-  { name: 'Great Ball', rate: 1.5, desc: 'Una ball con mayor ratio de captura.', price: 50, spriteKey: 'great-ball' },
-  { name: 'Ultra Ball', rate: 2, desc: 'Una ball con alto ratio de captura.', price: 80, spriteKey: 'ultra-ball' },
-  { name: 'Master Ball', rate: 99, desc: '¡Captura cualquier Pokémon sin fallo!', price: 500, spriteKey: 'master-ball', isMaster: true },
-  { name: 'Quick Ball', rate: 1, desc: 'Más efectiva si se usa al inicio del combate.', price: 60, spriteKey: 'quick-ball', rateFn: (_, turns) => turns <= 1 ? 5 : 1 },
-  { name: 'Timer Ball', rate: 1, desc: 'Más efectiva cuantos más turnos hayan pasado.', price: 60, spriteKey: 'timer-ball', rateFn: (_, turns) => Math.min(1 + turns * 0.3, 4) },
-  { name: 'Dusk Ball', rate: 1, desc: 'Más efectiva en la oscuridad (x3).', price: 60, spriteKey: 'dusk-ball', rateFn: () => 3 },
-  { name: 'Net Ball', rate: 1, desc: 'Más efectiva contra tipos Agua o Bicho (x3).', price: 60, spriteKey: 'net-ball', rateFn: (target) => target.types?.some(t => t === 'water' || t === 'bug') ? 3 : 1 },
-  { name: 'Level Ball', rate: 1, desc: 'Más efectiva si tu nivel supera al del rival.', price: 60, spriteKey: 'level-ball', rateFn: (target, _, __, playerLevel) => { const ratio = (playerLevel ?? 50) / target.level; return ratio >= 4 ? 8 : ratio >= 2 ? 4 : ratio >= 1 ? 2 : 1; } },
-  { name: 'Repeat Ball', rate: 1, desc: 'Más efectiva si ya capturaste esta especie (x3.5).', price: 60, spriteKey: 'repeat-ball', rateFn: (_, __, alreadyCaught) => alreadyCaught ? 3.5 : 1 },
-  { name: 'Love Ball', rate: 1, desc: 'Más efectiva si es de la misma familia evolutiva (x8).', price: 60, spriteKey: 'love-ball', rateFn: (_, __, alreadyCaught) => alreadyCaught ? 8 : 1 },
-  { name: 'Friend Ball', rate: 1, desc: 'Hace más amistoso al Pokémon capturado.', price: 60, spriteKey: 'friend-ball' },
-  { name: 'Heavy Ball', rate: 1, desc: 'Más efectiva contra Pokémon pesados.', price: 60, spriteKey: 'heavy-ball', rateFn: (target) => Math.max(1, Math.min(Math.floor(target.maxHp / 40), 4)) },
-  { name: 'Luxury Ball', rate: 1.2, desc: 'Un poco más efectiva que la Poké Ball (x1.2).', price: 40, spriteKey: 'luxury-ball' },
-  { name: 'Premier Ball', rate: 1, desc: 'Una ball estándar y elegante.', price: 30, spriteKey: 'premier-ball' },
-  { name: 'Fast Ball', rate: 1, desc: 'Más efectiva contra Pokémon muy rápidos (x4).', price: 60, spriteKey: 'fast-ball', rateFn: (target) => target.speed >= 100 ? 4 : 1 },
-  { name: 'Nidobola', rate: 1, desc: 'Más efectiva contra Pokémon de nivel bajo.', price: 60, spriteKey: 'nest-ball', rateFn: (target) => { const lv = target.level; return lv < 15 ? 4 : lv < 25 ? 3 : lv < 35 ? 2 : 1; } },
-  { name: 'Buceobola', rate: 1, desc: 'Más efectiva contra Pokémon de tipo Agua (x3.5).', price: 60, spriteKey: 'dive-ball', rateFn: (target) => target.types?.some(t => t === 'water') ? 3.5 : 1 },
-  { name: 'Sanabola', rate: 1, desc: 'Cura al Pokémon capturado.', price: 40, spriteKey: 'heal-ball' },
-  { name: 'Safaribola', rate: 1.5, desc: 'Una ball de la Zona Safari (x1.5).', price: 40, spriteKey: 'safari-ball' },
-  { name: 'Sueñobola', rate: 1, desc: 'Más efectiva contra Pokémon dormidos (x4).', price: 60, spriteKey: 'dream-ball', rateFn: (target) => target.status?.type === 'sleep' ? 4 : 1 },
-  { name: 'Ball Luna', rate: 1, desc: 'Más efectiva contra Pokémon que evolucionan con Piedra Lunar (x4).', price: 60, spriteKey: 'moon-ball', rateFn: (target) => MOON_STONE_FAMILY.includes(Number(target.id)) ? 4 : 1 },
-  { name: 'Entebola', rate: 1, desc: 'Más efectiva contra Pokémon legendarios (x5).', price: 100, spriteKey: 'beast-ball', rateFn: (target) => Object.values(REGION_LEGENDARIES).flat().includes(Number(target.id)) ? 5 : 1 },
-]
-
-const POKEBALL_NAMES = POKEBALLS.map(b => b.name)
-const POKEBALL_RATES: Record<string, number> = {}
-for (const b of POKEBALLS) POKEBALL_RATES[b.name] = b.rate
-const POKEBALL_DEFS: Record<string, PokeBallDef> = {}
-for (const b of POKEBALLS) POKEBALL_DEFS[b.name] = b
-const POKEBALL_PRICES: Record<string, number> = {}
-for (const b of POKEBALLS) POKEBALL_PRICES[b.name] = b.price
-
-// IDs de meta-shop para desbloquear pokeballs
-const POKEBALL_UNLOCK_IDS: Record<string, string> = {
-  'Great Ball': 'unlock_great_ball',
-  'Ultra Ball': 'unlock_ultra_ball',
-  'Quick Ball': 'unlock_quick_ball',
-  'Timer Ball': 'unlock_timer_ball',
-  'Dusk Ball': 'unlock_dusk_ball',
-  'Net Ball': 'unlock_net_ball',
-  'Level Ball': 'unlock_level_ball',
-  'Repeat Ball': 'unlock_repeat_ball',
-  'Love Ball': 'unlock_love_ball',
-  'Friend Ball': 'unlock_friend_ball',
-  'Heavy Ball': 'unlock_heavy_ball',
-  'Master Ball': 'unlock_master_ball',
-  'Luxury Ball': 'unlock_luxury_ball',
-  'Premier Ball': 'unlock_premier_ball',
-  'Fast Ball': 'unlock_fast_ball',
-  'Nidobola': 'unlock_nido_ball',
-  'Buceobola': 'unlock_buceo_ball',
-  'Sanabola': 'unlock_sana_ball',
-  'Safaribola': 'unlock_safari_ball',
-  'Sueñobola': 'unlock_sueno_ball',
-  'Ball Luna': 'unlock_luna_ball',
-  'Entebola': 'unlock_ente_ball',
-}
-
-function getPokeBallRate(ballName: string, target: Pokemon, turns: number, alreadyCaught: boolean, playerLevel?: number): number {
-  const def = POKEBALL_DEFS[ballName]
-  if (!def) return 1
-  if (def.rateFn) return def.rateFn(target, turns, alreadyCaught, playerLevel)
-  return def.rate
-}
-
-const GYM_BADGES = [
-  { id: 'boulder', name: 'Boulder Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/1.png' },
-  { id: 'cascade', name: 'Cascade Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/2.png' },
-  { id: 'thunder', name: 'Thunder Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/3.png' },
-  { id: 'rainbow', name: 'Rainbow Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/4.png' },
-  { id: 'soul', name: 'Soul Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/5.png' },
-  { id: 'marsh', name: 'Marsh Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/6.png' },
-  { id: 'volcano', name: 'Volcano Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/7.png' },
-  { id: 'earth', name: 'Earth Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/8.png' },
-  { id: 'zephyr', name: 'Zephyr Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/9.png' },
-  { id: 'hive', name: 'Hive Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/10.png' },
-  { id: 'plain', name: 'Plain Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/11.png' },
-  { id: 'fog', name: 'Fog Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/12.png' },
-  { id: 'storm', name: 'Storm Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/13.png' },
-  { id: 'mineral', name: 'Mineral Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/14.png' },
-  { id: 'glacier', name: 'Glacier Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/15.png' },
-  { id: 'rising', name: 'Rising Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/16.png' },
-  { id: 'stone', name: 'Stone Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/17.png' },
-  { id: 'knuckle', name: 'Knuckle Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/18.png' },
-  { id: 'dynamo', name: 'Dynamo Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/19.png' },
-  { id: 'heat', name: 'Heat Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/20.png' },
-  { id: 'balance', name: 'Balance Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/21.png' },
-  { id: 'feather', name: 'Feather Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/22.png' },
-  { id: 'mind', name: 'Mind Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/23.png' },
-  { id: 'rain', name: 'Rain Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/24.png' },
-  { id: 'coal', name: 'Coal Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/25.png' },
-  { id: 'forest', name: 'Forest Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/26.png' },
-  { id: 'cobble', name: 'Cobble Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/27.png' },
-  { id: 'fen', name: 'Fen Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/28.png' },
-  { id: 'relic', name: 'Relic Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/29.png' },
-  { id: 'mine', name: 'Mine Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/30.png' },
-  { id: 'icicle', name: 'Icicle Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/31.png' },
-  { id: 'beacon', name: 'Beacon Badge', sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/badges/32.png' },
-]
-
-const MEGA_CAPABLE_IDS = new Set([
-  3, 6, 9, 15, 18, 26, 36, 65, 71, 80, 94, 115, 121, 127, 130, 142, 149, 150,
-  154, 160, 181, 208, 212, 214, 227, 229, 248,
-  254, 257, 260, 282, 302, 303, 306, 308, 310, 319, 323, 334, 354, 358, 359, 362, 373, 376, 380, 381, 384, 398,
-  428, 445, 448, 460, 475, 478, 485, 491,
-  500, 530, 531, 545, 560, 604, 609, 623,
-  652, 655, 658, 668, 670, 678, 687, 689, 691, 701, 719, 10025, 10120,
-  740, 768, 780, 801, 807,
-  870, 952, 970, 978, 998,
-])
-
-const MEGA_FORM_IDS: Record<number, number | number[]> = {
-  3: 10033, 6: [10034, 10035], 9: 10036, 15: 10090, 18: 10073,
-  26: [10304, 10305], 36: 10278, 65: 10037, 71: 10279, 80: 10071,
-  94: 10038, 115: 10039, 121: 10280, 127: 10040, 130: 10041,
-  142: 10042, 149: 10281, 150: [10043, 10044],
-  154: 10282, 160: 10283, 181: 10045, 208: 10072, 212: 10046,
-  214: 10047, 227: 10284, 229: 10048, 248: 10049,
-  254: 10065, 257: 10050, 260: 10064, 282: 10051, 302: 10066,
-  303: 10052, 306: 10053, 308: 10054, 310: 10055, 319: 10070, 323: 10087, 334: 10067, 354: 10056,
-  358: 10306, 359: [10057, 10307], 362: 10074, 373: 10089, 376: 10076,
-  380: 10062, 381: 10063, 384: 10079, 398: 10308,
-  428: 10088, 445: [10058, 10309], 448: [10059, 10310],
-  460: 10060, 475: 10068, 478: 10285, 485: 10311, 491: 10312,
-  500: 10286, 530: 10287, 531: 10069, 545: 10288, 560: 10289,
-  604: 10290, 609: 10291, 623: 10313,
-  652: 10292, 655: 10293, 658: 10294, 668: 10295, 670: 10296,
-  678: [10314, 10326], 687: 10297, 689: 10298, 691: 10299,
-  10025: [10314, 10326],
-  701: 10300, 719: 10075, 10120: 10301,
-  740: 10315, 768: 10316, 780: 10302, 801: [10317, 10318],
-  807: 10319,
-  870: 10303, 952: 10320, 970: 10321, 978: [10322, 10323, 10324],
-  998: 10325,
-}
-
-// Mega Zygarde (10301) no tiene sprite de batalla estático en PokeAPI: se usa su
-// arte oficial (el mismo diseño que Zygarde Forma Completa).
-const MEGA_SPRITE_OVERRIDES: Record<number, string> = {
-  10301: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10301.png',
-}
-
-const GMAX_CAPABLE_IDS = new Set([
-  3, 6, 9, 12, 25, 52, 68, 94, 99, 131, 133, 143, 569, 809,
-  812, 815, 818, 823, 826, 834, 839, 841, 842, 844, 849, 851,
-  858, 861, 869, 879, 884, 892, 10191,
-])
-
-const GMAX_FORM_IDS: Record<number, number | number[]> = {
-  3: 10195, 6: 10196, 9: 10197, 12: 10198, 25: 10199, 52: 10200,
-  68: 10201, 94: 10202, 99: 10203, 131: 10204, 133: 10205, 143: 10206,
-  569: 10207, 809: 10208, 812: 10209, 815: 10210, 818: 10211,
-  823: 10212, 826: 10213, 834: 10214, 839: 10215, 841: 10216,
-  842: 10217, 844: 10218, 849: [10219, 10228], 851: 10220,
-  858: 10221, 861: 10222, 869: 10223, 879: 10224, 884: 10225,
-  892: 10226, 10191: 10227,
-}
-
-const PRIMAL_CAPABLE_IDS = new Set([
-  382, 383,
-])
-
-const PRIMAL_FORM_IDS: Record<number, number> = {
-  382: 10077,
-  383: 10078,
-}
-
-// Formas Origen de Dialga, Palkia y Giratina mediante las esferas.
-const ORIGIN_CAPABLE_IDS = new Set([483, 484, 487])
-
-const ORIGIN_FORM_IDS: Record<number, number> = {
-  483: 10245,
-  484: 10246,
-  487: 10007,
-}
-
-const ACHIEVEMENTS: Achievement[] = [
-  { id: 'first_win', name: 'Primera Victoria', desc: 'Gana tu primera partida', icon: '🏆', hidden: false, reward: 15 },
-  { id: 'streak_3', name: 'En Racha', desc: 'Gana 3 partidas seguidas', icon: '🔥', hidden: false, reward: 25 },
-  { id: 'streak_5', name: 'Incombustible', desc: 'Gana 5 partidas seguidas', icon: '🌋', hidden: false, reward: 40 },
-  { id: 'streak_10', name: 'Leyenda Viva', desc: 'Gana 10 partidas seguidas', icon: '👑', hidden: false, reward: 60 },
-  { id: 'nuzlocke_win', name: 'Superviviente', desc: 'Gana una partida con Nuzlocke', icon: '💀', hidden: false, reward: 60 },
-  { id: 'solo_win', name: 'Uno Contra Todos', desc: 'Gana con solo 1 Pokémon en el equipo', icon: '⭐', hidden: false, reward: 100 },
-  { id: 'speedrun_win', name: 'Relámpago', desc: 'Gana una partida con Speedrun activo', icon: '⚡', hidden: false, reward: 60 },
-  { id: 'no_item_win', name: 'Purista', desc: 'Gana sin usar items', icon: '🚫', hidden: false, reward: 60 },
-  { id: 'ironman_win', name: 'Invencible', desc: 'Gana una partida Ironman', icon: '🛡️', hidden: false, reward: 60 },
-  { id: 'perfect_battle', name: 'Flawless', desc: 'Gana un combate sin recibir daño', icon: '✨', hidden: false, reward: 40 },
-  { id: 'one_shot', name: 'Golpe Definitivo', desc: 'Derrota a un Pokémon enemigo en 1 golpe', icon: '💥', hidden: false, reward: 15 },
-  { id: 'comeback', name: 'Resurgir', desc: 'Gana un combate con solo 1 Pokémon con ≤10% HP', icon: '❤️‍🔥', hidden: false, reward: 25 },
-  { id: 'collector_10', name: 'Coleccionista', desc: 'Captura 10 Pokémon en una partida', icon: '📦', hidden: false, reward: 15 },
-  { id: 'collector_25', name: 'Maestro Pokédex', desc: 'Captura 25 Pokémon en una partida', icon: '📖', hidden: false, reward: 40 },
-  { id: 'rich', name: 'Magnate', desc: 'Acumula $999 en una partida', icon: '💰', hidden: false, reward: 25 },
-  { id: 'crit_master', name: 'Crítico Nato', desc: 'Lanza 5 golpes críticos en una partida', icon: '🎯', hidden: false, reward: 25 },
-  { id: 'all_gens', name: 'Viajero Multiversal', desc: 'Gana al menos 1 partida en cada generación', icon: '🌍', hidden: false, reward: 40 },
-  { id: 'infinite_20', name: 'Infinito y Más Allá', desc: 'Llega al nodo 20 en modo Infinite', icon: '🚀', hidden: false, reward: 40 },
-  { id: 'shiny_catch', name: 'Afortunado', desc: 'Captura un Pokémon shiny', icon: '✨', hidden: false, reward: 25 },
-  { id: 'legendary_catch', name: 'Cazador de Leyendas', desc: 'Captura un Pokémon con BST ≥ 600', icon: '🐉', hidden: false, reward: 40 },
-  { id: 'daily_3', name: 'Habitual', desc: 'Juega desafíos diarios', icon: '📅', hidden: false, reward: 15 },
-  { id: 'meta_100', name: 'Inversor', desc: 'Acumula 100 PokéCoins', icon: '🪙', hidden: false, reward: 25 },
-  { id: 'boss_rush_win', name: 'Rush Total', desc: 'Gana una partida Boss Rush', icon: '🏆', hidden: false, reward: 25 },
-  { id: 'hard_win', name: 'Veterano', desc: 'Gana una partida en dificultad Hard', icon: '🎖️', hidden: false, reward: 25 },
-  { id: 'gauntlet_win', name: 'Gauntlet Master', desc: 'Gana una partida Challenge Gauntlet', icon: '🎯', hidden: false, reward: 40 },
-  { id: 'synergy_master', name: 'Maestro de Sinergias', desc: 'Activa una sinergia de items', icon: '🔗', hidden: false, reward: 15 },
-  { id: 'super_effective_10', name: 'Tierra de Nadie', desc: 'Landa 10 golpes supereficaces en una partida', icon: '🌿', hidden: false, reward: 15 },
-  { id: 'big_spender', name: 'Derrochador', desc: 'Gasta $500 en tiendas en una partida', icon: '💸', hidden: false, reward: 15 },
-  { id: 'rookie', name: 'Novato', desc: 'Gana una partida en dificultad Fácil', icon: '🐣', hidden: false, reward: 15 },
-  { id: 'infinite_50', name: 'Sin Límites', desc: 'Llega al nodo 50 en modo Infinite', icon: '🌌', hidden: false, reward: 60 },
-  { id: 'full_team', name: 'Equipo Completo', desc: 'Gana con 6 Pokémon en el equipo', icon: '🤝', hidden: false, reward: 15 },
-  { id: 'battle_20', name: 'Veterano de Guerra', desc: 'Gana 20 combates en una partida', icon: '⚔️', hidden: false, reward: 25 },
-  { id: 'item_user_10', name: 'Experimentado', desc: 'Usa 10 objetos en una partida', icon: '🧪', hidden: false, reward: 15 },
-  { id: 'gambler', name: 'Jugador', desc: 'Gana un nodo Spin', icon: '🎰', hidden: false, reward: 15 },
-  { id: 'pokeRand_master', name: 'Maestro Aleatorio', desc: 'Gana un nodo PokeRand', icon: '🎲', hidden: false, reward: 15 },
-  { id: 'weather_win', name: 'Climatología', desc: 'Gana una batalla con clima activo', icon: '🌦️', hidden: false, reward: 20 },
-  { id: 'weather_setter', name: 'Creador de Clima', desc: 'Crea un clima con una habilidad (Drizzle, Drought, Sand Stream o Snow Warning)', icon: '🌪️', hidden: false, reward: 20 },
-  { id: 'weather_mania_win', name: 'Maniático del Clima', desc: 'Gana una partida con el modificador Weather Mania', icon: '🌧️', hidden: false, reward: 30 },
-  { id: 'perfect_iv', name: 'Joyas de IVs', desc: 'Captura un Pokémon con un IV de 31 en al menos una stat', icon: '💎', hidden: false, reward: 15 },
-  { id: 'high_iv', name: 'Criador de Élite', desc: 'Captura un Pokémon con IVs totales ≥ 150', icon: '🧬', hidden: false, reward: 25 },
-  { id: 'coliseum_win', name: 'Coloso del Coliseo', desc: 'Gana el Coliseum', icon: '🏟️', hidden: false, reward: 60 },
-  { id: 'double_win', name: 'Dúo Perfecto', desc: 'Gana un Combate Doble sin perder ningún Pokémon', icon: '🥊', hidden: false, reward: 25 },
-  { id: 'level_100', name: 'Nivel Máximo', desc: 'Alcanza el nivel 100 con un Pokémon', icon: '📈', hidden: false, reward: 60 },
-  { id: 'original_win', name: 'Leyenda Original', desc: 'Gana el Modo Original', icon: '🏛️', hidden: false, reward: 40 },
-  { id: 'branch_win', name: 'Maestro de Rutas', desc: 'Gana el Modo Ruta', icon: '🗺️', hidden: false, reward: 40 },
-  { id: 'streak_15', name: 'Racha Imparable', desc: 'Gana 15 partidas seguidas', icon: '🔥', hidden: false, reward: 100 },
-  { id: 'streak_20', name: 'Leyenda de Racha', desc: 'Gana 20 partidas seguidas', icon: '🔥', hidden: false, reward: 200 },
-  { id: 'streak_25', name: 'Dios de la Racha', desc: 'Gana 25 partidas seguidas', icon: '🔥', hidden: false, reward: 250 },
-  { id: 'battle_50', name: 'Comandante', desc: 'Gana 50 combates en una partida', icon: '⚔️', hidden: false, reward: 40 },
-  { id: 'battle_100', name: 'General', desc: 'Gana 100 combates en una partida', icon: '⚔️', hidden: false, reward: 60 },
-  { id: 'battle_200', name: 'Estratega', desc: 'Gana 200 combates en una partida', icon: '⚔️', hidden: false, reward: 100 },
-  { id: 'battle_500', name: 'Conquistador', desc: 'Gana 500 combates en una partida', icon: '⚔️', hidden: false, reward: 250 },
-  { id: 'damage_1000', name: 'Aprendiz de Daño', desc: 'Inflige 1000 de daño en una partida', icon: '💥', hidden: false, reward: 25 },
-  { id: 'damage_5000', name: 'Especialista en Daño', desc: 'Inflige 5000 de daño en una partida', icon: '💥', hidden: false, reward: 40 },
-  { id: 'damage_10000', name: 'Maestro del Daño', desc: 'Inflige 10000 de daño en una partida', icon: '💥', hidden: false, reward: 60 },
-  { id: 'damage_50000', name: 'Dios del Daño', desc: 'Inflige 50000 de daño en una partida', icon: '💥', hidden: false, reward: 100 },
-  { id: 'tank_500', name: 'Escudo Humano', desc: 'Recibe 500 de daño en una partida', icon: '🛡️', hidden: false, reward: 25 },
-  { id: 'tank_1000', name: 'Muro Viviente', desc: 'Recibe 1000 de daño en una partida', icon: '🛡️', hidden: false, reward: 40 },
-  { id: 'crit_10', name: 'Crítico Frecuente', desc: 'Lanza 10 golpes críticos en una partida', icon: '🎯', hidden: false, reward: 40 },
-  { id: 'crit_20', name: 'Crítico Experto', desc: 'Lanza 20 golpes críticos en una partida', icon: '🎯', hidden: false, reward: 60 },
-  { id: 'crit_50', name: 'Crítico Legendario', desc: 'Lanza 50 golpes críticos en una partida', icon: '🎯', hidden: false, reward: 100 },
-  { id: 'super_effective_25', name: 'Eficaz Mejorado', desc: 'Acierta 25 golpes supereficaces', icon: '🌿', hidden: false, reward: 25 },
-  { id: 'super_effective_50', name: 'Súper Eficaz', desc: 'Acierta 50 golpes supereficaces', icon: '🌿', hidden: false, reward: 40 },
-  { id: 'super_effective_100', name: 'Maestro de Tipos', desc: 'Acierta 100 golpes supereficaces', icon: '🌿', hidden: false, reward: 60 },
-  { id: 'one_shot_5', name: 'Fulminante', desc: 'Derrota 5 Pokémon de 1 golpe', icon: '💥', hidden: false, reward: 40 },
-  { id: 'one_shot_10', name: 'Aniquilador', desc: 'Derrota 10 Pokémon de 1 golpe', icon: '💥', hidden: false, reward: 60 },
-  { id: 'collector_50', name: 'Acumulador', desc: 'Captura 50 Pokémon en una partida', icon: '📦', hidden: false, reward: 60 },
-  { id: 'item_user_25', name: 'Dependiente', desc: 'Usa 25 objetos en una partida', icon: '🧪', hidden: false, reward: 25 },
-  { id: 'item_user_50', name: 'Farmacéutico', desc: 'Usa 50 objetos en una partida', icon: '🧪', hidden: false, reward: 40 },
-  { id: 'rich_5000', name: 'Millonario', desc: 'Acumula $5000 en una partida', icon: '💰', hidden: false, reward: 40 },
-  { id: 'rich_10000', name: 'Magnate Global', desc: 'Acumula $10000 en una partida', icon: '💰', hidden: false, reward: 60 },
-  { id: 'rich_50000', name: 'Croesus', desc: 'Acumula $50000 en una partida', icon: '💰', hidden: false, reward: 100 },
-  { id: 'spender_1000', name: 'Gastador', desc: 'Gasta $1000 en tiendas en una partida', icon: '💸', hidden: false, reward: 40 },
-  { id: 'spender_5000', name: 'Derrochador Élite', desc: 'Gasta $5000 en tiendas en una partida', icon: '💸', hidden: false, reward: 60 },
-  { id: 'nodes_30', name: 'Explorador', desc: 'Limpia 30 nodos en una partida', icon: '🚶', hidden: false, reward: 25 },
-  { id: 'nodes_50', name: 'Aventurero', desc: 'Limpia 50 nodos en una partida', icon: '🚶', hidden: false, reward: 40 },
-  { id: 'nodes_100', name: 'Leyenda del Camino', desc: 'Limpia 100 nodos en una partida', icon: '🚶', hidden: false, reward: 60 },
-  { id: 'infinite_100', name: 'Infinito Profundo', desc: 'Llega al nodo 100 en modo Infinite', icon: '🌌', hidden: false, reward: 100 },
-  { id: 'total_wins_5', name: 'Victorioso', desc: 'Gana 5 partidas en total', icon: '🏆', hidden: false, reward: 25 },
-  { id: 'total_wins_10', name: 'Campeón Recurrente', desc: 'Gana 10 partidas en total', icon: '🏆', hidden: false, reward: 25 },
-  { id: 'total_wins_25', name: 'Leyenda Viva', desc: 'Gana 25 partidas en total', icon: '🏆', hidden: false, reward: 60 },
-  { id: 'total_wins_50', name: 'Inmortal', desc: 'Gana 50 partidas en total', icon: '🏆', hidden: false, reward: 60 },
-  { id: 'total_runs_10', name: 'Jugador Dedicado', desc: 'Juega 10 partidas en total', icon: '🎮', hidden: false, reward: 15 },
-  { id: 'total_runs_25', name: 'Veterano', desc: 'Juega 25 partidas en total', icon: '🎮', hidden: false, reward: 25 },
-  { id: 'total_runs_50', name: 'Adicto', desc: 'Juega 50 partidas en total', icon: '🎮', hidden: false, reward: 60 },
-  { id: 'meta_500', name: 'Coleccionista de Monedas', desc: 'Acumula 500 PokéCoins', icon: '🪙', hidden: false, reward: 40 },
-  { id: 'meta_1000', name: 'Inversor Mayorista', desc: 'Acumula 1000 PokéCoins', icon: '🪙', hidden: false, reward: 60 },
-  { id: 'meta_5000', name: 'Tiburón Financiero', desc: 'Acumula 5000 PokéCoins', icon: '🪙', hidden: false, reward: 100 },
-  { id: 'medium_win', name: 'Competente', desc: 'Gana en dificultad Media', icon: '🥈', hidden: false, reward: 15 },
-  { id: 'noShops_win', name: 'Ermitaño', desc: 'Gana con el desafío Sin Tiendas', icon: '🏪', hidden: false, reward: 100 },
-  { id: 'noRests_win', name: 'Insomne', desc: 'Gana con el desafío Sin Descanso', icon: '🛌', hidden: false, reward: 100 },
-  { id: 'allShiny_win', name: 'Brillante', desc: 'Gana con el desafío Todos Shiny', icon: '✨', hidden: false, reward: 40 },
-  { id: 'noMoney_win', name: 'Pobreza', desc: 'Gana con el desafío Sin Dinero', icon: '💸', hidden: false, reward: 100 },
-  { id: 'egglocke_win', name: 'Criador', desc: 'Gana con el desafío Egglocke', icon: '🥚', hidden: false, reward: 100 },
-  { id: 'nuzlockeHC_win', name: 'Superviviente Extremo', desc: 'Gana con Nuzlocke Hardcore', icon: '💀', hidden: false, reward: 100 },
-  { id: 'noHeal_win', name: 'Autosuficiente', desc: 'Gana con el desafío Sin Curación', icon: '🚑', hidden: false, reward: 100 },
-  { id: 'allTeamRocket_win', name: 'Team Rocket Forever', desc: 'Gana con el desafío Todo Team Rocket', icon: '🔴', hidden: false, reward: 100 },
-  { id: 'triple_challenge', name: 'Tres Retos', desc: 'Gana con 3 desafíos activos', icon: '🎯', hidden: false, reward: 100 },
-  { id: 'challenge_mania', name: 'Manía de Retos', desc: 'Gana con 5+ desafíos activos', icon: '🎯', hidden: false, reward: 200 },
-  { id: 'team_diversity_10', name: 'Versátil', desc: 'Usa 10 Pokémon diferentes en una partida', icon: '🔄', hidden: false, reward: 25 },
-  { id: 'team_diversity_20', name: 'Polivalente', desc: 'Usa 20 Pokémon diferentes en una partida', icon: '🔄', hidden: false, reward: 40 },
-  { id: 'total_turns_500', name: 'Paciente', desc: 'Juega 500 turnos en una partida', icon: '⌛', hidden: false, reward: 25 },
-  { id: 'total_turns_1000', name: 'Táctico', desc: 'Juega 1000 turnos en una partida', icon: '⌛', hidden: false, reward: 40 },
-  { id: 'back_from_brink', name: 'Al Límite', desc: 'Gana un combate con 1 HP restante', icon: '❤️‍🔥', hidden: false, reward: 25 },
-  { id: 'first_try', name: 'Novato con Suerte', desc: 'Gana tu primera partida', icon: '🍀', hidden: false, reward: 15 },
-  { id: 'hoarder_15', name: 'Acaparador', desc: 'Ten 15 objetos en el inventario', icon: '📦', hidden: false, reward: 25 },
-  { id: 'evolution_master', name: 'Evolucionador', desc: 'Evoluciona 5 Pokémon en una partida', icon: '🌀', hidden: false, reward: 15 },
-  { id: 'first_mega', name: 'Mega Evolución', desc: 'Mega-evoluciona un Pokémon por primera vez', icon: '💎', hidden: false, reward: 15 },
-  { id: 'mega_win', name: 'Poder Mega', desc: 'Gana una partida usando megaevolución', icon: '💎', hidden: false, reward: 25 },
-  { id: 'mega_master', name: 'Maestro Mega', desc: 'Mega-evoluciona 10 Pokémon en total', icon: '🔮', hidden: false, reward: 40 },
-  { id: 'first_gmax', name: 'Gigamax', desc: 'Gigamaxima un Pokémon por primera vez', icon: '⚡', hidden: false, reward: 15 },
-  { id: 'gmax_win', name: 'Poder Gigamax', desc: 'Gana una partida usando Gigamax', icon: '⚡', hidden: false, reward: 25 },
-  { id: 'gmax_master', name: 'Maestro Gigamax', desc: 'Gigamaxima 10 Pokémon en total', icon: '🌟', hidden: false, reward: 60 },
-  { id: 'coop_first_run', name: 'Compañero de Viaje', desc: 'Juega tu primera partida en cooperativo', icon: '🤝', hidden: false, reward: 15 },
-  { id: 'coop_win', name: 'Victoria Compartida', desc: 'Gana una partida en cooperativo', icon: '🏆', hidden: false, reward: 25 },
-  { id: 'coop_wins_5', name: 'Equipo Confiable', desc: 'Gana 5 partidas cooperativas', icon: '🫱🏻‍🫲🏽', hidden: false, reward: 40 },
-  { id: 'coop_wins_10', name: 'Equipo Legendario', desc: 'Gana 10 partidas cooperativas', icon: '👥', hidden: false, reward: 60 },
-  { id: 'coop_first_trade', name: 'Primer Trueque', desc: 'Completa tu primer intercambio en cooperativo', icon: '🔄', hidden: false, reward: 15 },
-  { id: 'coop_trades_5', name: 'Trueques Frecuentes', desc: 'Completa 5 intercambios en total', icon: '🤝', hidden: false, reward: 40 },
-  { id: 'coop_trades_10', name: 'Mercader Cooperativo', desc: 'Completa 10 intercambios en total', icon: '💼', hidden: false, reward: 60 },
-  { id: 'coop_hard_win', name: 'Dúo Imparable', desc: 'Gana una partida cooperativa en dificultad Difícil', icon: '⚡', hidden: false, reward: 60 },
-  { id: 'meta_complete', name: 'Magnate del PokéShop', desc: 'Compra todos los objetos de la Tienda Meta', icon: '🛍️', hidden: false, reward: 250 },
-  { id: 'eevee_master', name: 'Familia Eevee', desc: 'Obtén todas las evoluciones de Eevee en una partida', icon: '🦊', hidden: false, reward: 250 },
-  { id: 'cazador_50', name: 'Cazador', desc: 'Captura 50 especies distintas', icon: '📋', hidden: false, reward: 60 },
-  { id: 'cazador_100', name: 'Profesor Oak', desc: 'Captura 100 especies distintas', icon: '🧑‍🏫', hidden: false, reward: 100 },
-  { id: 'shiny_dex_10', name: 'Pokédex de Shinies', desc: 'Captura 10 especies shiny distintas', icon: '🌈', hidden: false, reward: 60 },
-  { id: 'legendary_catcher_5', name: 'Guardián de Leyendas', desc: 'Captura 5 legendarios distintos', icon: '🐉', hidden: false, reward: 60 },
-  { id: 'type_master', name: 'Maestro de Tipos', desc: 'Captura al menos un Pokémon de cada tipo', icon: '🎨', hidden: false, reward: 60 },
-]
-
-const SYNERGIES: Array<{ items: string[]; name: string; desc: string; effect: (pokemon: Pokemon) => Partial<Pokemon> }> = [
-  {
-    items: ['Life Orb', 'Expert Belt'],
-    name: 'Furia Desatada',
-    desc: '+10% Ataque (Vida Esfera + Cinturón Experto)',
-    effect: (p) => ({ attack: Math.round(p.attack * 1.1) })
-  },
-  {
-    items: ['Choice Band', 'Choice Scarf'],
-    name: 'Elección Absoluta',
-    desc: '+15% a todos los stats ofensivos',
-    effect: (p) => ({ attack: Math.round(p.attack * 1.1), spAttack: Math.round(p.spAttack * 1.1), speed: Math.round(p.speed * 1.1) })
-  },
-  {
-    items: ['Leftovers', 'Sitrus Berry'],
-    name: 'Regeneración Total',
-    desc: '+4 HP/turno extra',
-    effect: (p) => ({ maxHp: p.maxHp + 10, hp: Math.min(p.hp + 10, p.maxHp + 10) })
-  },
-  {
-    items: ['Scope Lens', 'Wide Lens'],
-    name: 'Ojo de Águila',
-    desc: '+15% crítico adicional y +5% SPD',
-    effect: (p) => ({ speed: Math.round(p.speed * 1.05) })
-  },
-  {
-    items: ['Shell Bell', 'Big Root'],
-    name: 'Vampirismo Extremo',
-    desc: '+10% lifesteal adicional',
-    effect: (p) => ({ attack: Math.round(p.attack * 1.05) })
-  },
-  {
-    items: ['Assault Vest', 'Eviolite'],
-    name: 'Fortaleza Total',
-    desc: '+10% defensa y +10 maxHP',
-    effect: (p) => ({ defense: Math.round(p.defense * 1.1), spDefense: Math.round(p.spDefense * 1.1), maxHp: p.maxHp + 10, hp: Math.min(p.hp + 10, p.maxHp + 10) })
-  },
-  {
-    items: ['Muscle Band', 'Focus Band'],
-    name: 'Potencia Bruta',
-    desc: '+10% ataque y +5% crítico',
-    effect: (p) => ({ attack: Math.round(p.attack * 1.1) })
-  },
-  {
-    items: ['Quick Claw', 'Choice Scarf'],
-    name: 'Velocidad Límite',
-    desc: '+15% velocidad',
-    effect: (p) => ({ speed: Math.round(p.speed * 1.15) })
-  },
-  {
-    items: ['Rocky Helmet', 'Babiri Berry'],
-    name: 'Castigo Reflejado',
-    desc: '+15 defensa permanente',
-    effect: (p) => ({ defense: p.defense + 15 })
-  },
-  {
-    items: ['Eviolite', 'Focus Sash'],
-    name: 'Juventud Eterna',
-    desc: '+10% a todos los stats',
-    effect: (p) => ({
-      attack: Math.round(p.attack * 1.1),
-      defense: Math.round(p.defense * 1.1),
-      spAttack: Math.round(p.spAttack * 1.1),
-      spDefense: Math.round(p.spDefense * 1.1),
-      speed: Math.round(p.speed * 1.1),
-    })
-  },
-  {
-    items: ['Wise Glasses', 'Choice Scarf'],
-    name: 'Mente Ágil',
-    desc: '+15% At. Esp. y +10% velocidad',
-    effect: (p) => ({ spAttack: Math.round(p.spAttack * 1.15), speed: Math.round(p.speed * 1.1) })
-  },
-]
-
-// Legendarios de cada región (por generación) para el encuentro del Modo Original.
-const REGION_LEGENDARIES: Record<number, number[]> = {
-  1: [144, 145, 146, 150, 151],
-  2: [243, 244, 245, 249, 250, 251],
-  3: [377, 378, 379, 380, 381, 382, 383, 384, 385],
-  4: [480, 481, 482, 483, 484, 485, 486, 487, 488, 490, 491, 492, 493],
-  5: [494, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649],
-  6: [716, 717, 718, 719, 720, 721],
-  7: [785, 786, 787, 788, 791, 792, 800, 801, 802, 807, 808, 809],
-  8: [888, 889, 890, 891, 892, 893, 894, 895, 896, 897, 898],
-  9: [1001, 1002, 1003, 1004, 1007, 1008],
-}
-
-// Todos los legendarios de todas las generaciones (para logros y la Entebola).
-const ALL_LEGENDARIES = Object.values(REGION_LEGENDARIES).flat()
-
-const RANDOM_EVENTS = [
-  {
-    id: 'legendary_appears',
-    weight: 0.5,
-    icon: '🐉',
-    title: '¡Pokémon Legendario!',
-    desc: 'Un Pokémon poderoso aparece delante de ti. ¿Capturarlo?',
-    minRouteProgress: 0.5,
-  },
-  {
-    id: 'mysterious_trader',
-    weight: 5,
-    icon: '🎭',
-    title: 'Comerciante Misterioso',
-    desc: 'Un extraño ofrece intercambiar uno de tus Pokémon por uno más fuerte.',
-    minRouteProgress: 0.3,
-  },
-  {
-    id: 'evolution_merchant',
-    weight: 4,
-    icon: '🧳',
-    title: 'Mercader Misterioso',
-    desc: 'Un misterioso mercader vende objetos evolutivos.',
-    minRouteProgress: 0.2,
-  },
-  {
-    id: 'trap',
-    weight: 6,
-    icon: '⚠️',
-    title: '¡Trampa de Team Rocket!',
-    desc: 'Una bomba explota. Tu Pokémon activo pierde 30% HP.',
-    minRouteProgress: 0.2,
-  },
-  {
-    id: 'fairy_blessing',
-    weight: 5,
-    icon: '🧚',
-    title: 'Bendición del Hada',
-    desc: 'Un hada te bendice. Tu Pokémon activo recupera HP completo.',
-    minRouteProgress: 0.1,
-  },
-  {
-    id: 'treasure_chest',
-    weight: 4,
-    icon: '📦',
-    title: 'Cofre del Tesoro',
-    desc: 'Encuentras un cofre con una poción y dinero.',
-    minRouteProgress: 0.0,
-  },
-  {
-    id: 'mysterious_help',
-    weight: 6,
-    icon: '🩺',
-    title: 'Ayuda Misteriosa',
-    desc: 'Una fuerza misteriosa revive a uno de tus Pokémon debilitados.',
-    minRouteProgress: 0.0,
-  },
-  {
-    id: 'shiny_spot',
-    weight: 2,
-    icon: '✨',
-    title: 'Zona Brillante',
-    desc: 'Un destello brillante te hace sentir que algo especial se acerca.',
-    minRouteProgress: 0.4,
-  },
-]
-
-const THEMES: Array<{ id: string; name: string; desc: string; price: number; colors: Record<string, string> }> = [
-  { id: 'dark', name: 'Oscuro (Default)', desc: 'El tema clásico oscuro', price: 0, colors: { bg: '#12122b', surface: '#1c1c3a', border: '#3f3f6e', text: '#f8fafc', accent: '#4d9bff', muted: '#9b98cf' } },
-  { id: 'retro', name: 'Retro Game Boy', desc: 'Verde y negro clásico', price: 50, colors: { bg: '#0f380f', surface: '#1b4d1b', border: '#3a7a3a', text: '#c8e08a', accent: '#9bbc0f', muted: '#7ca35c' } },
-  { id: 'light', name: 'Claro', desc: 'Tema blanco limpio', price: 40, colors: { bg: '#eef3fa', surface: '#ffffff', border: '#cbd5e1', text: '#0f172a', accent: '#2563eb', muted: '#64748b' } },
-  { id: 'neon', name: 'Neón Cyberpunk', desc: 'Rosa neón y negro', price: 75, colors: { bg: '#0a0a0f', surface: '#1a1a2e', border: '#e94560', text: '#f3f1ff', accent: '#e94560', muted: '#7c7c9a' } },
-  { id: 'crimson', name: 'Carmesí', desc: 'Rojo oscuro y dorado', price: 75, colors: { bg: '#1a0000', surface: '#2d0a0a', border: '#8b0000', text: '#ffd700', accent: '#ff4444', muted: '#8b4513' } },
-  { id: 'ocean', name: 'Océano Profundo', desc: 'Azules y turquesa', price: 60, colors: { bg: '#001220', surface: '#001f3f', border: '#0074D9', text: '#f3f1ff', accent: '#7FDBFF', muted: '#39CCCC' } },
-  { id: 'forest', name: 'Bosque Encantado', desc: 'Verdes y tierra', price: 60, colors: { bg: '#0d1f0d', surface: '#1a2e1a', border: '#2d5a27', text: '#d4edda', accent: '#28a745', muted: '#6b8e23' } },
-  { id: 'sunset', name: 'Atardecer', desc: 'Naranjas y rojos cálidos', price: 70, colors: { bg: '#1a0f00', surface: '#3a2205', border: '#7c4a03', text: '#ffe4b5', accent: '#ff8c42', muted: '#c9a06b' } },
-  { id: 'aurora', name: 'Aurora Polar', desc: 'Verdes y azules boreales', price: 75, colors: { bg: '#02130f', surface: '#06231b', border: '#0e4d3a', text: '#d0fff0', accent: '#4dffc2', muted: '#6fb3a0' } },
-  { id: 'sakura', name: 'Flores de Cerezo', desc: 'Rosas suaves y cálidos', price: 65, colors: { bg: '#2a0f1e', surface: '#431331', border: '#7a2455', text: '#ffe3f1', accent: '#ff6fb5', muted: '#d48ab3' } },
-  { id: 'ice', name: 'Glaciar', desc: 'Azules y blanco hielo', price: 65, colors: { bg: '#0b1a2e', surface: '#12294a', border: '#2c5f8a', text: '#e8f4ff', accent: '#9be8ff', muted: '#8aa7c9' } },
-  { id: 'desert', name: 'Desierto', desc: 'Arena y ámbar', price: 60, colors: { bg: '#1a1405', surface: '#2e2410', border: '#6b5620', text: '#f8edd0', accent: '#ffc94d', muted: '#c0a86a' } },
-  { id: 'matrix', name: 'Matrix', desc: 'Verde neón sobre negro', price: 85, colors: { bg: '#000000', surface: '#0a1a0a', border: '#0f3d0f', text: '#a4f7a4', accent: '#22ff22', muted: '#2f6b2f' } },
-  { id: 'midnight', name: 'Medianoche', desc: 'Azul profundo y plata', price: 70, colors: { bg: '#070b18', surface: '#101a30', border: '#2a3f6b', text: '#dbe6ff', accent: '#7aa2ff', muted: '#77839e' } },
-  { id: 'candy', name: 'Caramelo', desc: 'Rosa chicle y vibrantes', price: 75, colors: { bg: '#1e0f1e', surface: '#3a1b33', border: '#7a3a63', text: '#ffe6f5', accent: '#ff77dd', muted: '#c98aa8' } },
-  { id: 'lava', name: 'Volcán', desc: 'Lava ardiente y roca fundida', price: 90, colors: { bg: '#1a0500', surface: '#3a1205', border: '#7a2508', text: '#ffe3c4', accent: '#ff5a1f', muted: '#c87a4a' } },
-  { id: 'galaxy', name: 'Galaxia', desc: 'Nebulosas violeta y estrellas', price: 90, colors: { bg: '#070216', surface: '#150a38', border: '#4b2a86', text: '#f3e8ff', accent: '#c084fc', muted: '#8a7bb8' } },
-  { id: 'gold', name: 'Dorado', desc: 'Oro y negro lujoso', price: 110, colors: { bg: '#0d0a00', surface: '#221b05', border: '#8a6d1a', text: '#fff3c4', accent: '#ffd700', muted: '#b8a05a' } },
-  { id: 'emerald', name: 'Esmeralda', desc: 'Verde joya y dorado', price: 90, colors: { bg: '#00160a', surface: '#00291a', border: '#0f7a4a', text: '#d9ffe9', accent: '#2ee6a0', muted: '#6fb896' } },
-  { id: 'vaporwave', name: 'Vaporwave', desc: 'Estética retro ochentera', price: 95, colors: { bg: '#180833', surface: '#2d0a4e', border: '#c84bd0', text: '#e8f4ff', accent: '#22d3ee', muted: '#a87bc9' } },
-  { id: 'ghost', name: 'Fantasma', desc: 'Misterio etéreo y cian', price: 85, colors: { bg: '#0a0a14', surface: '#161630', border: '#4a3a7a', text: '#e6f4ff', accent: '#67e8f9', muted: '#8f9bb5' } },
-  { id: 'carbon', name: 'Carbono', desc: 'Grafito industrial con lima', price: 85, colors: { bg: '#0d0d0d', surface: '#1c1c1c', border: '#3d3d3d', text: '#f5f5f5', accent: '#a3e635', muted: '#7a7a7a' } },
-  { id: 'bloodmoon', name: 'Luna Sangrienta', desc: 'Rojo sangre y luna pálida', price: 100, colors: { bg: '#12030a', surface: '#260711', border: '#8a1435', text: '#ffe4ee', accent: '#ff2e5f', muted: '#b07c92' } },
-  { id: 'toxic', name: 'Tóxico', desc: 'Veneno ácido y ultravioleta', price: 90, colors: { bg: '#0e1100', surface: '#1e2600', border: '#5c6b00', text: '#f0ffd0', accent: '#b6f000', muted: '#8ba05c' } },
-  { id: 'samurai', name: 'Samurái', desc: 'Rojo lacado, oro y negro', price: 95, colors: { bg: '#140404', surface: '#2b0d0d', border: '#b02020', text: '#ffe8c4', accent: '#ffb020', muted: '#c09a6a' } },
-  { id: 'pastel', name: 'Pastel', desc: 'Tonos suaves y delicados', price: 80, colors: { bg: '#191424', surface: '#2e2740', border: '#6b5f8f', text: '#fdf3ff', accent: '#ff9fd4', muted: '#b3a6c9' } },
-  { id: 'tropical', name: 'Tropical', desc: 'Paraíso aguamarina y mango', price: 85, colors: { bg: '#00141a', surface: '#063238', border: '#0f6b6b', text: '#e8ffff', accent: '#ffb340', muted: '#6fc7b8' } },
-]
-
-// Rediseños: modos visuales completos que cambian la interfaz y los sprites.
-const REDESIGNS: Array<{ id: string; name: string; desc: string; price: number; icon: string; colors: Record<string, string> }> = [
-  {
-    id: 'gameboy',
-    name: 'Rediseño Game Boy',
-    desc: 'Lleva toda la interfaz y los sprites al clásico de 8 bits, con la paleta verde y las líneas de la consola original.',
-    price: 200,
-    icon: '🕹️',
-    colors: { bg: '#0f380f', surface: '#306230', border: '#8bac0f', text: '#9bbc0f' },
-  },
-]
-
-interface MetaShopItem {
-  id: string
-  name: string
-  desc: string
-  price: number
-  spriteKey: string
-  category: 'consumable' | 'holdable' | 'theme' | 'upgrade' | 'music' | 'pokeball' | 'evolution_stone' | 'evolution_item' | 'disco_mt' | 'treasure' | 'berry' | 'redesign'
-  requires?: string
-  // Bloquea la compra hasta desbloquear el resto de Poké Balls (Master/Entebola).
-  requiresAllBalls?: boolean
-}
-
-function metaShopItemMatches(item: { name: string; desc: string }, term: string): boolean {
-  if (!term) return true
-  return item.name.toLowerCase().includes(term) || item.desc.toLowerCase().includes(term)
-}
-
-// Checkbox de la Tienda Meta: activa/desactiva si un objeto aparece en la partida.
 function ShopItemToggle({ id, disabled, onToggle }: { id: string; disabled: boolean; onToggle: (id: string) => void }): ReactNode {
   const [checked, setChecked] = useState(!disabled)
   return (
@@ -1964,230 +693,6 @@ function ShopItemToggle({ id, disabled, onToggle }: { id: string; disabled: bool
     </label>
   )
 }
-
-const META_SHOP_ITEMS: MetaShopItem[] = [
-  { id: 'unlock_hyper_potion', name: 'Hyper Potion', desc: 'Restaura 120 HP. Aparece en tiendas.', price: 30, spriteKey: 'Hyper Potion', category: 'consumable' },
-  { id: 'unlock_full_restore', name: 'Full Restore', desc: 'Cura total. Aparece en tiendas.', price: 60, spriteKey: 'Full Restore', category: 'consumable' },
-  { id: 'unlock_max_revive', name: 'Max Revive', desc: 'Revive con HP completo.', price: 80, spriteKey: 'Max Revive', category: 'consumable' },
-  { id: 'unlock_rare_candy', name: 'Rare Candy', desc: 'Sube 1 nivel. Aparece en drops.', price: 40, spriteKey: 'Rare Candy', category: 'consumable' },
-  { id: 'unlock_nature_machine', name: 'Máquina de Naturalezas', desc: 'Cambia la naturaleza de un Pokémon. Aparece en tiendas.', price: 250, spriteKey: 'Máquina de Naturalezas', category: 'consumable' },
-  { id: 'unlock_iv_reroll', name: 'Reroll de IVs', desc: 'Re-tira los IVs de un Pokémon. Aparece en tiendas.', price: 200, spriteKey: 'Reroll de IVs', category: 'consumable' },
-  { id: 'unlock_ability_capsule', name: 'Cápsula de Habilidad', desc: 'Cambia la habilidad de un Pokémon por otra de su especie. Aparece en tiendas.', price: 300, spriteKey: 'Cápsula de Habilidad', category: 'consumable' },
-  { id: 'unlock_elixir', name: 'Elixir', desc: 'Restaura 80 HP.', price: 25, spriteKey: 'Elixir', category: 'consumable' },
-  { id: 'unlock_super_elixir', name: 'Super Elixir', desc: 'Restaura 200 HP.', price: 50, spriteKey: 'Super Elixir', category: 'consumable' },
-  { id: 'unlock_full_elixir', name: 'Full Elixir', desc: 'Restaura todo HP y cura estados.', price: 80, spriteKey: 'Full Elixir', category: 'consumable' },
-  { id: 'unlock_x_attack_2', name: 'X Attack 2', desc: '+10 ataque permanente.', price: 45, spriteKey: 'X Attack 2', category: 'consumable' },
-  { id: 'unlock_x_defense_2', name: 'X Defense 2', desc: '+10 defensa permanente.', price: 45, spriteKey: 'X Defense 2', category: 'consumable' },
-  { id: 'unlock_x_speed_2', name: 'X Speed 2', desc: '+10 velocidad permanente.', price: 45, spriteKey: 'X Speed 2', category: 'consumable' },
-  { id: 'unlock_x_sp_attack_2', name: 'X Sp. Attack 2', desc: '+10 Ataque Esp. permanente.', price: 45, spriteKey: 'X Sp. Attack 2', category: 'consumable' },
-  { id: 'unlock_x_sp_defense_2', name: 'X Sp. Defense 2', desc: '+10 Def. Esp. permanente.', price: 45, spriteKey: 'X Sp. Defense 2', category: 'consumable' },
-  { id: 'unlock_smoke_ball', name: 'Cuerda Huida', desc: 'Escapa de cualquier combate. Aparece en tiendas (25%).', price: 60, spriteKey: 'Cuerda Huida', category: 'consumable' },
-  { id: 'unlock_poke_radar', name: 'Poké Radar', desc: 'Garantiza que el próximo Pokémon salvaje o de descanso sea shiny. Aparece en tiendas y Spin.', price: 150, spriteKey: 'Poké Radar', category: 'consumable' },
-  { id: 'unlock_azure_flute', name: 'Flauta Celeste', desc: 'Garantiza que el próximo Pokémon salvaje sea legendario. Aparece en tiendas y Spin.', price: 250, spriteKey: 'Flauta Celeste', category: 'consumable' },
-  { id: 'unlock_moomoo_milk', name: 'Moomoo Milk', desc: 'Restaura 100 HP. Aparece en tiendas.', price: 30, spriteKey: 'Moomoo Milk', category: 'consumable' },
-  { id: 'unlock_berry_juice', name: 'Berry Juice', desc: 'Restaura 20 HP. Aparece en tiendas.', price: 15, spriteKey: 'Berry Juice', category: 'consumable' },
-  { id: 'unlock_fresh_water', name: 'Fresh Water', desc: 'Restaura 30 HP. Aparece en tiendas.', price: 20, spriteKey: 'Fresh Water', category: 'consumable' },
-  { id: 'unlock_soda_pop', name: 'Soda Pop', desc: 'Restaura 40 HP. Aparece en tiendas.', price: 25, spriteKey: 'Soda Pop', category: 'consumable' },
-  { id: 'unlock_lemonade', name: 'Lemonade', desc: 'Restaura 60 HP. Aparece en tiendas.', price: 30, spriteKey: 'Lemonade', category: 'consumable' },
-  { id: 'unlock_muscle_band', name: 'Muscle Band', desc: '+10% daño en movimientos físicos.', price: 30, spriteKey: 'Muscle Band', category: 'holdable' },
-  { id: 'unlock_wise_glasses', name: 'Wise Glasses', desc: '+10% daño en movimientos especiales.', price: 30, spriteKey: 'Wise Glasses', category: 'holdable' },
-  { id: 'unlock_choice_band', name: 'Choice Band', desc: '+50% Ataque, pero solo un movimiento.', price: 70, spriteKey: 'Choice Band', category: 'holdable' },
-  { id: 'unlock_leftovers', name: 'Leftovers', desc: 'Recupera 1/16 del HP máximo por turno.', price: 50, spriteKey: 'Leftovers', category: 'holdable' },
-  { id: 'unlock_focus_sash', name: 'Focus Sash', desc: 'A plena vida, aguanta un golpe letal.', price: 50, spriteKey: 'Focus Sash', category: 'holdable' },
-  { id: 'unlock_assault_vest', name: 'Assault Vest', desc: '+50% Def. Esp., sin movimientos de estado.', price: 70, spriteKey: 'Assault Vest', category: 'holdable' },
-  { id: 'unlock_quick_claw', name: 'Quick Claw', desc: '20% de probabilidad de atacar primero.', price: 50, spriteKey: 'Quick Claw', category: 'holdable' },
-  { id: 'unlock_eviolite', name: 'Eviolite', desc: '+50% Def. y Def. Esp. si puede evolucionar.', price: 40, spriteKey: 'Eviolite', category: 'holdable' },
-  { id: 'unlock_life_orb', name: 'Life Orb', desc: '+30% daño, pierdes 1/10 del daño infligido.', price: 100, spriteKey: 'Life Orb', category: 'holdable' },
-  { id: 'unlock_rocky_helmet', name: 'Rocky Helmet', desc: 'El rival que te golpee pierde 1/6 de su HP.', price: 50, spriteKey: 'Rocky Helmet', category: 'holdable' },
-  { id: 'unlock_scope_lens', name: 'Scope Lens', desc: 'Aumenta la probabilidad de crítico.', price: 60, spriteKey: 'Scope Lens', category: 'holdable' },
-  { id: 'unlock_telescopio', name: 'Telescopio', desc: '+20% precisión si el rival ya atacó este turno.', price: 60, spriteKey: 'Telescopio', category: 'holdable' },
-  { id: 'unlock_shell_bell', name: 'Shell Bell', desc: 'Recupera 1/8 del daño infligido.', price: 70, spriteKey: 'Shell Bell', category: 'holdable' },
-  { id: 'unlock_choice_scarf', name: 'Choice Scarf', desc: '+50% Velocidad, pero solo un movimiento.', price: 70, spriteKey: 'Choice Scarf', category: 'holdable' },
-  { id: 'unlock_babiri_berry', name: 'Babiri Berry', desc: 'Reduce a la mitad un movimiento Acero superefectivo.', price: 40, spriteKey: 'Babiri Berry', category: 'berry' },
-  { id: 'unlock_big_root', name: 'Big Root', desc: '+30% de curación con movimientos drenantes.', price: 70, spriteKey: 'Big Root', category: 'holdable' },
-  { id: 'unlock_wide_lens', name: 'Wide Lens', desc: '+10% de precisión.', price: 30, spriteKey: 'Wide Lens', category: 'holdable' },
-  { id: 'unlock_sitrus_berry', name: 'Sitrus Berry', desc: 'Restaura el 25% del HP al caer al 50%.', price: 40, spriteKey: 'Sitrus Berry', category: 'berry' },
-  { id: 'unlock_baya_oca', name: 'Baya Oca', desc: 'Reduce a la mitad un movimiento Fuego superefectivo.', price: 40, spriteKey: 'Baya Oca', category: 'berry' },
-  { id: 'unlock_baya_kasib', name: 'Baya Kasib', desc: 'Reduce a la mitad un movimiento Fantasma superefectivo.', price: 40, spriteKey: 'Baya Kasib', category: 'berry' },
-  { id: 'unlock_baya_meloc', name: 'Baya Shuca', desc: 'Reduce a la mitad un movimiento Tierra superefectivo.', price: 40, spriteKey: 'Baya Shuca', category: 'berry' },
-  { id: 'unlock_baya_zidra', name: 'Baya Coba', desc: 'Reduce a la mitad un movimiento Volador superefectivo.', price: 40, spriteKey: 'Baya Coba', category: 'berry' },
-  { id: 'unlock_baya_aou', name: 'Baya Charti', desc: 'Reduce a la mitad un movimiento Roca superefectivo.', price: 40, spriteKey: 'Baya Charti', category: 'berry' },
-  { id: 'unlock_baya_perismon', name: 'Baya Payapa', desc: 'Reduce a la mitad un movimiento Psíquico superefectivo.', price: 40, spriteKey: 'Baya Payapa', category: 'berry' },
-  { id: 'unlock_baya_colbur', name: 'Baya Colbur', desc: 'Reduce a la mitad un movimiento Siniestro superefectivo.', price: 40, spriteKey: 'Baya Colbur', category: 'berry' },
-  { id: 'unlock_baya_waca', name: 'Baya Waca', desc: 'Reduce a la mitad un movimiento Eléctrico superefectivo.', price: 40, spriteKey: 'Baya Waca', category: 'berry' },
-  { id: 'unlock_baya_rindo', name: 'Baya Rindo', desc: 'Reduce a la mitad un movimiento Planta superefectivo.', price: 40, spriteKey: 'Baya Rindo', category: 'berry' },
-  { id: 'unlock_baya_chilan', name: 'Baya Chilan', desc: 'Reduce a la mitad un movimiento Normal superefectivo.', price: 40, spriteKey: 'Baya Chilan', category: 'berry' },
-  { id: 'unlock_guts_band', name: 'Choice Specs', desc: '+50% At. Esp., pero solo un movimiento.', price: 70, spriteKey: 'Choice Specs', category: 'holdable' },
-  { id: 'unlock_vest_protector', name: 'Charcoal', desc: '+20% daño en movimientos de tipo Fuego.', price: 60, spriteKey: 'Charcoal', category: 'holdable' },
-  { id: 'unlock_focus_band', name: 'Focus Band', desc: '10% de probabilidad de aguantar un golpe letal.', price: 60, spriteKey: 'Focus Band', category: 'holdable' },
-  { id: 'unlock_dragon_fang', name: 'Dragon Fang', desc: '+20% daño en movimientos de tipo Dragón.', price: 60, spriteKey: 'Dragon Fang', category: 'holdable' },
-  { id: 'unlock_guardian_charm', name: 'Mystic Water', desc: '+20% daño en movimientos de tipo Agua.', price: 60, spriteKey: 'Mystic Water', category: 'holdable' },
-  { id: 'unlock_berserker_band', name: 'Expert Belt', desc: '+20% daño en movimientos superefectivos.', price: 70, spriteKey: 'Expert Belt', category: 'holdable' },
-  { id: 'unlock_phantom_cloak', name: 'Miracle Seed', desc: '+20% daño en movimientos de tipo Planta.', price: 60, spriteKey: 'Miracle Seed', category: 'holdable' },
-  { id: 'unlock_swift_feather', name: 'Sharp Beak', desc: '+20% daño en movimientos de tipo Volador.', price: 60, spriteKey: 'Sharp Beak', category: 'holdable' },
-  { id: 'unlock_iron_ball', name: 'Iron Ball', desc: 'Reduce la Velocidad a la mitad. Los Pokémon Volador reciben daño neutral de Tierra.', price: 40, spriteKey: 'Iron Ball', category: 'holdable' },
-  { id: 'unlock_vampire_fang', name: 'Black Glasses', desc: '+20% daño en movimientos de tipo Siniestro.', price: 60, spriteKey: 'Black Glasses', category: 'holdable' },
-  { id: 'unlock_cursed_blade', name: 'Twisted Spoon', desc: '+20% daño en movimientos de tipo Psíquico.', price: 60, spriteKey: 'Twisted Spoon', category: 'holdable' },
-  { id: 'unlock_clear_amulet', name: 'Amuleto Claro', desc: 'Impide que el rival baje tus estadísticas. Aparece en tiendas.', price: 70, spriteKey: 'Amuleto Claro', category: 'holdable' },
-  { id: 'unlock_safety_goggles', name: 'Gafas Protectoras', desc: 'Inmune al daño del clima y a los movimientos de polvo. Aparece en tiendas.', price: 60, spriteKey: 'Gafas Protectoras', category: 'holdable' },
-  { id: 'unlock_covert_cloak', name: 'Capa Furtiva', desc: 'Anula los efectos secundarios de los movimientos de daño rivales. Aparece en tiendas.', price: 80, spriteKey: 'Capa Furtiva', category: 'holdable' },
-  { id: 'unlock_loaded_dice', name: 'Dado Cargado', desc: 'Los movimientos de varios golpes siempre dan 4 o 5 golpes. Aparece en tiendas.', price: 70, spriteKey: 'Dado Cargado', category: 'holdable' },
-  { id: 'unlock_weakness_policy', name: 'Seguro Debilidad', desc: 'Al recibir un golpe superefectivo sube +2 Ataque y At. Esp. Se consume.', price: 80, spriteKey: 'Seguro Debilidad', category: 'holdable' },
-  { id: 'unlock_air_balloon', name: 'Globo Helio', desc: 'Inmunidad a Tierra hasta recibir un golpe. Se consume.', price: 65, spriteKey: 'Globo Helio', category: 'holdable' },
-  { id: 'unlock_white_herb', name: 'Hierba Blanca', desc: 'Restaura las estadísticas bajadas una vez. Se consume.', price: 55, spriteKey: 'Hierba Blanca', category: 'holdable' },
-  { id: 'unlock_mental_herb', name: 'Hierba Mental', desc: 'Cura la anulación o la confusión una vez. Se consume.', price: 50, spriteKey: 'Hierba Mental', category: 'holdable' },
-  { id: 'unlock_throat_spray', name: 'Espray Bucal', desc: 'Al usar un movimiento de sonido sube +1 At. Esp. Se consume.', price: 65, spriteKey: 'Espray Bucal', category: 'holdable' },
-  { id: 'unlock_protective_pads', name: 'Guantes Protectores', desc: 'Tus ataques no activan efectos de contacto del rival. Aparece en tiendas.', price: 55, spriteKey: 'Guantes Protectores', category: 'holdable' },
-  { id: 'unlock_daycare_node', name: 'Nodo Guardería', desc: 'Desbloquea nodos Guardería: recibe un huevo que ocupa un hueco del equipo y eclosiona tras 5 nodos; el Pokémon es aleatorio, de primera etapa y nivel 10.', price: 100, spriteKey: 'Huevo', category: 'upgrade' },
-  { id: 'unlock_mine_node', name: 'Nodo Mina', desc: 'Desbloquea nodos Mina: excava para encontrar tesoros desbloqueados en la Tienda Meta.', price: 75, spriteKey: 'Pieza Dorada', category: 'upgrade' },
-  { id: 'unlock_fishing_node', name: 'Nodo Pesca', desc: 'Desbloquea nodos Pesca: minijuego de caña para atrapar Pokémon de tipo Agua, con probabilidad shiny.', price: 100, spriteKey: 'Caña de Pescar', category: 'upgrade' },
-  { id: 'unlock_fossil_lab', name: 'Laboratorio de Fósiles', desc: 'Desbloquea nodos Laboratorio de Fósiles: elige entre 2 fósiles y revive un Pokémon especial.', price: 200, spriteKey: 'Fósil Hélix', category: 'upgrade' },
-  { id: 'unlock_mega_node', name: 'Nodo Mega', desc: 'Desbloquea nodos de Mega Piedra en Hard/Infinite.', price: 150, spriteKey: 'Mega Stone', category: 'upgrade' },
-  { id: 'unlock_gmax_node', name: 'Nodo G-MAX', desc: 'Desbloquea nodos G-MAX en Hard/Infinite.', price: 200, spriteKey: 'Dynamax Band', category: 'upgrade' },
-  { id: 'unlock_primal_node', name: 'Nodo Primal', desc: 'Desbloquea nodos Primal en Hard/Infinite. Otorgan Prisma Rojo o Azul.', price: 250, spriteKey: 'Prisma Rojo', category: 'upgrade' }, { id: 'unlock_casino_node', name: 'Nodo Casino', desc: 'Desbloquea nodos Casino en Hard/Infinite. Juega al Pachinko para ganar premios según tu puntuación.', price: 220, spriteKey: 'money', category: 'upgrade' },
-  { id: 'unlock_reroll', name: 'Reroll', desc: 'Permite rerollear la tienda 1 vez por visita.', price: 120, spriteKey: 'dice', category: 'upgrade' },
-  { id: 'unlock_reroll_2', name: 'Reroll II', desc: 'Otorga 1 reroll extra de tienda por visita.', price: 200, spriteKey: 'dice', category: 'upgrade', requires: 'unlock_reroll' },
-  { id: 'unlock_shop_slot', name: 'Espacio de Tienda', desc: 'Las tiendas ofrecen 1 objeto más.', price: 100, spriteKey: 'money', category: 'upgrade' },
-  { id: 'unlock_shop_slot_2', name: 'Espacio de Tienda II', desc: 'Las tiendas ofrecen 1 objeto más (se suma a la anterior).', price: 180, spriteKey: 'money', category: 'upgrade', requires: 'unlock_shop_slot' },
-  { id: 'unlock_shop_stock_1', name: 'Stock de Tienda I', desc: 'Puedes comprar 1 unidad extra de cada objeto en la tienda.', price: 80, spriteKey: 'money', category: 'upgrade' },
-  { id: 'unlock_shop_stock_2', name: 'Stock de Tienda II', desc: '+1 unidad extra de cada objeto (2 en total).', price: 120, spriteKey: 'money', category: 'upgrade', requires: 'unlock_shop_stock_1' },
-  { id: 'unlock_shop_stock_3', name: 'Stock de Tienda III', desc: '+1 unidad extra de cada objeto (3 en total).', price: 160, spriteKey: 'money', category: 'upgrade', requires: 'unlock_shop_stock_2' },
-  { id: 'unlock_shop_stock_4', name: 'Stock de Tienda IV', desc: '+1 unidad extra de cada objeto (4 en total).', price: 200, spriteKey: 'money', category: 'upgrade', requires: 'unlock_shop_stock_3' },
-  { id: 'unlock_history', name: 'Historial', desc: 'Desbloquea el historial de partidas en la barra superior.', price: 10, spriteKey: 'rule-book', category: 'upgrade' },
-  { id: 'start_pokeballs_5', name: 'Inicio: +5 Poké Balls', desc: 'Empiezas cada aventura con 5 Poké Balls extra.', price: 180, spriteKey: 'Poké Ball', category: 'upgrade' },
-  { id: 'unlock_caja_bonguri', name: 'Caja Bonguri', desc: 'Empiezas cada aventura con 2 Poké Balls y 1 ball de bonguri aleatoria.', price: 150, spriteKey: 'Caja Bonguri', category: 'upgrade' },
-  { id: 'unlock_estuche_mt', name: 'Estuche de MT', desc: 'Empiezas cada aventura con un Disco MT en el inventario.', price: 200, spriteKey: 'Estuche de MT', category: 'upgrade' },
-  { id: 'unlock_saco_bayas', name: 'Saco bayas', desc: 'Empiezas cada aventura con 1 baya extra aleatoria de las desbloqueadas.', price: 120, spriteKey: 'Saco bayas', category: 'upgrade' },
-  { id: 'unlock_dowsing', name: 'Detector de Objetos', desc: 'Los descansos dan 1 objeto extra.', price: 140, spriteKey: 'Detector de Objetos', category: 'upgrade' },
-  { id: 'unlock_dowsing_2', name: 'Detector de Objetos II', desc: 'Los descansos dan 1 objeto extra más (2 en total).', price: 200, spriteKey: 'Detector de Objetos', category: 'upgrade', requires: 'unlock_dowsing' },
-  { id: 'start_potion_1', name: 'Inicio: +1 Poción', desc: 'Empiezas cada aventura con 1 Poción extra.', price: 140, spriteKey: 'Potion', category: 'upgrade' },
-  { id: 'start_potion_2', name: 'Inicio: +1 Poción II', desc: 'Empiezas cada aventura con 1 Poción extra (se suma a la anterior).', price: 180, spriteKey: 'Potion', category: 'upgrade', requires: 'start_potion_1' },
-  { id: 'start_money_1', name: 'Inicio: +$100', desc: 'Empiezas cada aventura con $100 extra.', price: 120, spriteKey: 'money', category: 'upgrade' },
-  { id: 'start_money_2', name: 'Inicio: +$100 II', desc: 'Empiezas cada aventura con $100 extra (se suma a la anterior).', price: 160, spriteKey: 'money', category: 'upgrade', requires: 'start_money_1' },
-  { id: 'start_revive_1', name: 'Inicio: +1 Revive', desc: 'Empiezas cada aventura con 1 Revive extra.', price: 200, spriteKey: 'Revive', category: 'upgrade' },
-  { id: 'unlock_quick_ball', name: 'Quick Ball', desc: 'x5 en el primer turno. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Quick Ball', category: 'pokeball' },
-  { id: 'unlock_timer_ball', name: 'Timer Ball', desc: 'Mejora con los turnos (hasta x4). Aparece en tiendas y descansos.', price: 35, spriteKey: 'Timer Ball', category: 'pokeball' },
-  { id: 'unlock_dusk_ball', name: 'Dusk Ball', desc: 'x3 en oscuridad. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Dusk Ball', category: 'pokeball' },
-  { id: 'unlock_net_ball', name: 'Net Ball', desc: 'x3 contra Agua/Bicho. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Net Ball', category: 'pokeball' },
-  { id: 'unlock_level_ball', name: 'Level Ball', desc: 'Mejor si tu nivel supera al rival. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Level Ball', category: 'pokeball' },
-  { id: 'unlock_repeat_ball', name: 'Repeat Ball', desc: 'x3.5 si ya capturaste esa especie. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Repeat Ball', category: 'pokeball' },
-  { id: 'unlock_love_ball', name: 'Love Ball', desc: 'x8 si es misma familia. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Love Ball', category: 'pokeball' },
-  { id: 'unlock_friend_ball', name: 'Friend Ball', desc: 'Ratio base x1. Aparece en tiendas y descansos.', price: 30, spriteKey: 'Friend Ball', category: 'pokeball' },
-  { id: 'unlock_heavy_ball', name: 'Heavy Ball', desc: 'Mejor contra Pokémon pesados. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Heavy Ball', category: 'pokeball' },
-  { id: 'unlock_great_ball', name: 'Great Ball', desc: 'x1.5 de captura. Aparece en tiendas y descansos.', price: 25, spriteKey: 'Great Ball', category: 'pokeball' },
-  { id: 'unlock_ultra_ball', name: 'Ultra Ball', desc: 'x2 de captura. Aparece en tiendas y descansos.', price: 50, spriteKey: 'Ultra Ball', category: 'pokeball' },
-  { id: 'unlock_master_ball', name: 'Master Ball', desc: 'Captura cualquier Pokémon sin fallo. Aparece raramente en tiendas.', price: 100, spriteKey: 'Master Ball', category: 'pokeball', requiresAllBalls: true },
-  { id: 'unlock_fire_stone', name: 'Fire Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Fire Stone', category: 'evolution_stone' },
-  { id: 'unlock_water_stone', name: 'Water Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Water Stone', category: 'evolution_stone' },
-  { id: 'unlock_thunder_stone', name: 'Thunder Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Thunder Stone', category: 'evolution_stone' },
-  { id: 'unlock_leaf_stone', name: 'Leaf Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Leaf Stone', category: 'evolution_stone' },
-  { id: 'unlock_moon_stone', name: 'Moon Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Moon Stone', category: 'evolution_stone' },
-  { id: 'unlock_sun_stone', name: 'Sun Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Sun Stone', category: 'evolution_stone' },
-  { id: 'unlock_shiny_stone', name: 'Shiny Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Shiny Stone', category: 'evolution_stone' },
-  { id: 'unlock_dusk_stone', name: 'Dusk Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Dusk Stone', category: 'evolution_stone' },
-  { id: 'unlock_dawn_stone', name: 'Dawn Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Dawn Stone', category: 'evolution_stone' },
-  { id: 'unlock_ice_stone', name: 'Ice Stone', desc: 'Evoluciona a ciertos Pokémon. Aparece en tiendas y Spin.', price: 50, spriteKey: 'Ice Stone', category: 'evolution_stone' },
-  { id: 'unlock_metal_coat', name: 'Metal Coat', desc: 'Evoluciona a Steelix y Scizor. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Metal Coat', category: 'evolution_item' },
-  { id: 'unlock_kings_rock', name: "King's Rock", desc: 'Evoluciona a Politoed y Slowking. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: "King's Rock", category: 'evolution_item' },
-  { id: 'unlock_dragon_scale', name: 'Dragon Scale', desc: 'Evoluciona a Kingdra. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Dragon Scale', category: 'evolution_item' },
-  { id: 'unlock_up_grade', name: 'Up-Grade', desc: 'Evoluciona a Porygon2. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Up-Grade', category: 'evolution_item' },
-  { id: 'unlock_dubious_disc', name: 'Dubious Disc', desc: 'Evoluciona a Porygon-Z. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Dubious Disc', category: 'evolution_item' },
-  { id: 'unlock_reaper_cloth', name: 'Reaper Cloth', desc: 'Evoluciona a Dusknoir. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Reaper Cloth', category: 'evolution_item' },
-  { id: 'unlock_protector', name: 'Protector', desc: 'Evoluciona a Rhyperior. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Protector', category: 'evolution_item' },
-  { id: 'unlock_electirizer', name: 'Electirizer', desc: 'Evoluciona a Electivire. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Electirizer', category: 'evolution_item' },
-  { id: 'unlock_magmarizer', name: 'Magmarizer', desc: 'Evoluciona a Magmortar. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Magmarizer', category: 'evolution_item' },
-  { id: 'unlock_prism_scale', name: 'Prism Scale', desc: 'Evoluciona a Milotic. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Prism Scale', category: 'evolution_item' },
-  { id: 'unlock_sachet', name: 'Sachet', desc: 'Evoluciona a Aromatisse. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Sachet', category: 'evolution_item' },
-  { id: 'unlock_whipped_dream', name: 'Whipped Dream', desc: 'Evoluciona a Slurpuff. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Whipped Dream', category: 'evolution_item' },
-  { id: 'unlock_gorra_de_ash', name: 'Gorra de Ash', desc: 'Evoluciona a Greninja en Greninja-Ash. Aparece con el Comerciante Misterioso.', price: 50, spriteKey: 'Gorra de Ash', category: 'evolution_item' },
-  { id: 'unlock_auspicious_armor', name: 'Auspicious Armor', desc: 'Evoluciona a Charcadet en Armarouge. Aparece con el Comerciante Misterioso.', price: 50, spriteKey: 'Auspicious Armor', category: 'evolution_item' },
-  { id: 'unlock_malicious_armor', name: 'Malicious Armor', desc: 'Evoluciona a Charcadet en Ceruledge. Aparece con el Comerciante Misterioso.', price: 50, spriteKey: 'Malicious Armor', category: 'evolution_item' },
-  { id: 'unlock_tart_apple', name: 'Tart Apple', desc: 'Evoluciona a Applin en Flapple. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Tart Apple', category: 'evolution_item' },
-  { id: 'unlock_sweet_apple', name: 'Sweet Apple', desc: 'Evoluciona a Applin en Appletun. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Sweet Apple', category: 'evolution_item' },
-  { id: 'unlock_syrupy_apple', name: 'Syrupy Apple', desc: 'Evoluciona a Applin en Dipplin. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Syrupy Apple', category: 'evolution_item' },
-  { id: 'unlock_cracked_pot', name: 'Cracked Pot', desc: 'Evoluciona a Sinistea en Polteageist. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Cracked Pot', category: 'evolution_item' },
-  { id: 'unlock_peat_block', name: 'Peat Block', desc: 'Evoluciona a Ursaring en Ursaluna. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Peat Block', category: 'evolution_item' },
-  { id: 'unlock_unremarkable_teacup', name: 'Unremarkable Teacup', desc: 'Evoluciona a Poltchageist en Sinistcha. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Unremarkable Teacup', category: 'evolution_item' },
-  { id: 'unlock_metal_alloy', name: 'Metal Alloy', desc: 'Evoluciona a Duraludon en Archaludon. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Metal Alloy', category: 'evolution_item' },
-  { id: 'unlock_galarica_cuff', name: 'Galarica Cuff', desc: 'Evoluciona a Slowpoke de Galar en Slowbro de Galar. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Galarica Cuff', category: 'evolution_item' },
-  { id: 'unlock_galarica_wreath', name: 'Galarica Wreath', desc: 'Evoluciona a Slowpoke de Galar en Slowking de Galar. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Galarica Wreath', category: 'evolution_item' },
-  { id: 'music_menu_chill', name: 'Menú Relax', desc: 'Música de menú relajante y ambiental.', price: 40, spriteKey: 'Potion', category: 'music' },
-  { id: 'music_battle_epic', name: 'Batalla Épica', desc: 'Música de batalla más intensa y rápida.', price: 60, spriteKey: 'Potion', category: 'music' },
-  { id: 'unlock_disco_mt', name: 'Disco MT', desc: 'Desbloquea el Disco MT: un objeto consumible que enseña un movimiento a tu Pokémon, igual que el nodo Move Tutor. Aparece en tiendas.', price: 120, spriteKey: 'Disco MT', category: 'disco_mt' },
-  { id: 'unlock_protein', name: 'Proteína', desc: '+15 Ataque permanente. Aparece en tiendas.', price: 40, spriteKey: 'Proteína', category: 'consumable', requires: 'unlock_x_attack_2' },
-  { id: 'unlock_calcium', name: 'Calcio', desc: '+15 At. Esp. permanente. Aparece en tiendas.', price: 40, spriteKey: 'Calcio', category: 'consumable', requires: 'unlock_x_sp_attack_2' },
-  { id: 'unlock_iron', name: 'Hierro', desc: '+15 Defensa permanente. Aparece en tiendas.', price: 40, spriteKey: 'Hierro', category: 'consumable', requires: 'unlock_x_defense_2' },
-  { id: 'unlock_zinc', name: 'Zinc', desc: '+15 Def. Esp. permanente. Aparece en tiendas.', price: 40, spriteKey: 'Zinc', category: 'consumable', requires: 'unlock_x_sp_defense_2' },
-  { id: 'unlock_carbos', name: 'Carburante', desc: '+15 Velocidad permanente. Aparece en tiendas.', price: 40, spriteKey: 'Carburante', category: 'consumable', requires: 'unlock_x_speed_2' },
-  { id: 'unlock_sacred_ash', name: 'Sacred Ash', desc: 'Revive a todo el equipo debilitado. Aparece en tiendas.', price: 90, spriteKey: 'Sacred Ash', category: 'consumable', requires: 'unlock_max_revive' },
-  { id: 'unlock_polvo_energia', name: 'Polvo Energía', desc: 'Restaura 60 HP. Aparece en tiendas.', price: 20, spriteKey: 'Polvo Energía', category: 'consumable' },
-  { id: 'unlock_raiz_energia', name: 'Raíz Energía', desc: 'Restaura 120 HP. Aparece en tiendas.', price: 40, spriteKey: 'Raíz Energía', category: 'consumable' },
-  { id: 'unlock_polvo_curacion', name: 'Polvo Curación', desc: 'Cura problemas de estado. Aparece en tiendas.', price: 25, spriteKey: 'Polvo Curación', category: 'consumable' },
-  { id: 'unlock_mas_ps', name: 'Más PS', desc: '+15 HP máximo permanente. Aparece en tiendas.', price: 40, spriteKey: 'Más PS', category: 'consumable' },
-  { id: 'unlock_perla_grande', name: 'Perla Grande', desc: 'Se vende por $500. Aparece en drops y Spin.', price: 60, spriteKey: 'Perla Grande', category: 'treasure' },
-  { id: 'unlock_seta_pequena', name: 'Seta Pequeña', desc: 'Se vende por $50. Aparece en drops.', price: 20, spriteKey: 'Seta Pequeña', category: 'treasure' },
-  { id: 'unlock_polvo_estelar', name: 'Polvo Estelar', desc: 'Se vende por $100. Aparece en drops.', price: 25, spriteKey: 'Polvo Estelar', category: 'treasure' },
-  { id: 'unlock_seta_grande', name: 'Seta Grande', desc: 'Se vende por $100. Aparece en drops.', price: 25, spriteKey: 'Seta Grande', category: 'treasure' },
-  { id: 'unlock_perla', name: 'Perla', desc: 'Se vende por $100. Aparece en drops.', price: 25, spriteKey: 'Perla', category: 'treasure' },
-  { id: 'unlock_corazon_marino', name: 'Corazón Marino', desc: 'Se vende por $150. Aparece en drops.', price: 30, spriteKey: 'Corazón Marino', category: 'treasure' },
-  { id: 'unlock_correo_aereo', name: 'Correo Aéreo', desc: 'Se vende por $300. Aparece en drops.', price: 40, spriteKey: 'Correo Aéreo', category: 'treasure' },
-  { id: 'unlock_fragmento_estelar', name: 'Fragmento Estelar', desc: 'Se vende por $400. Aparece en drops.', price: 45, spriteKey: 'Fragmento Estelar', category: 'treasure' },
-  { id: 'unlock_pieza_dorada', name: 'Pieza Dorada', desc: 'Se vende por $500. Aparece en drops.', price: 60, spriteKey: 'Pieza Dorada', category: 'treasure' },
-  { id: 'unlock_perla_rara', name: 'Perla Rara', desc: 'Se vende por $800. Aparece en drops.', price: 80, spriteKey: 'Perla Rara', category: 'treasure' },
-  { id: 'unlock_cometa', name: 'Cometa', desc: 'Se vende por $1000. Aparece en drops.', price: 90, spriteKey: 'Cometa', category: 'treasure' },
-  { id: 'unlock_pieza_dorada_2', name: 'Pieza Dorada II', desc: 'Se vende por $1500. Aparece en drops.', price: 110, spriteKey: 'Pieza Dorada II', category: 'treasure' },
-  { id: 'unlock_hueso_raro', name: 'Hueso Raro', desc: 'Se vende por $250. Aparece en drops.', price: 50, spriteKey: 'Hueso Raro', category: 'treasure' },
-  { id: 'unlock_miel', name: 'Miel', desc: 'Se vende por $150. Aparece en drops.', price: 35, spriteKey: 'Miel', category: 'treasure' },
-  { id: 'unlock_fragmento_rojo', name: 'Fragmento Rojo', desc: 'Se vende por $100. Aparece en drops.', price: 25, spriteKey: 'Fragmento Rojo', category: 'treasure' },
-  { id: 'unlock_fragmento_azul', name: 'Fragmento Azul', desc: 'Se vende por $100. Aparece en drops.', price: 25, spriteKey: 'Fragmento Azul', category: 'treasure' },
-  { id: 'unlock_fragmento_amarillo', name: 'Fragmento Amarillo', desc: 'Se vende por $100. Aparece en drops.', price: 25, spriteKey: 'Fragmento Amarillo', category: 'treasure' },
-  { id: 'unlock_fragmento_verde', name: 'Fragmento Verde', desc: 'Se vende por $100. Aparece en drops.', price: 25, spriteKey: 'Fragmento Verde', category: 'treasure' },
-  { id: 'unlock_antidoto', name: 'Antídoto', desc: 'Cura el envenenamiento. Aparece en tiendas.', price: 15, spriteKey: 'Antídoto', category: 'consumable' },
-  { id: 'unlock_antiquemar', name: 'Antiquemar', desc: 'Cura las quemaduras. Aparece en tiendas.', price: 15, spriteKey: 'Antiquemar', category: 'consumable' },
-  { id: 'unlock_paralizador', name: 'Paralizador', desc: 'Cura la parálisis. Aparece en tiendas.', price: 15, spriteKey: 'Paralizador', category: 'consumable' },
-  { id: 'unlock_despertar', name: 'Despertar', desc: 'Despierta a un Pokémon dormido. Aparece en tiendas.', price: 15, spriteKey: 'Despertar', category: 'consumable' },
-  { id: 'unlock_descongelar', name: 'Descongelar', desc: 'Descongela a un Pokémon congelado. Aparece en tiendas.', price: 15, spriteKey: 'Descongelar', category: 'consumable' },
-  { id: 'unlock_baya_caquic', name: 'Baya Caquic', desc: 'Cura la confusión. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Caquic', category: 'berry' },
-  { id: 'unlock_baya_zreza', name: 'Baya Zreza', desc: 'Cura la parálisis. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Zreza', category: 'berry' },
-  { id: 'unlock_baya_atania', name: 'Baya Atania', desc: 'Cura las quemaduras. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Atania', category: 'berry' },
-  { id: 'unlock_baya_algama', name: 'Baya Algama', desc: 'Cura el envenenamiento. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Algama', category: 'berry' },
-  { id: 'unlock_baya_safre', name: 'Baya Safre', desc: 'Descongela a un Pokémon congelado. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Safre', category: 'berry' },
-  { id: 'unlock_baya_siendrepis', name: 'Baya Siendrepis', desc: 'Despierta a un Pokémon dormido. Aparece en tiendas y drops.', price: 15, spriteKey: 'Baya Siendrepis', category: 'berry' },
-  { id: 'unlock_baya_cuaja', name: 'Baya Cuaja', desc: 'Restaura 25 HP. Aparece en tiendas y drops.', price: 20, spriteKey: 'Baya Cuaja', category: 'berry' },
-  { id: 'unlock_baya_wiki', name: 'Baya Wiki', desc: 'Restaura 35 HP. Aparece en tiendas y drops.', price: 25, spriteKey: 'Baya Wiki', category: 'berry' },
-  { id: 'unlock_baya_mago', name: 'Baya Mago', desc: 'Restaura 45 HP. Aparece en tiendas y drops.', price: 30, spriteKey: 'Baya Mago', category: 'berry' },
-  { id: 'unlock_baya_aguav', name: 'Baya Aguav', desc: 'Restaura 55 HP. Aparece en tiendas y drops.', price: 35, spriteKey: 'Baya Aguav', category: 'berry' },
-  { id: 'unlock_baya_ango', name: 'Baya Ango', desc: 'Restaura 65 HP. Aparece en tiendas y drops.', price: 40, spriteKey: 'Baya Ango', category: 'berry' },
-  { id: 'unlock_luxury_ball', name: 'Luxury Ball', desc: 'Ratio de captura x1.2. Aparece en tiendas y descansos.', price: 30, spriteKey: 'Luxury Ball', category: 'pokeball' },
-  { id: 'unlock_premier_ball', name: 'Premier Ball', desc: 'Ratio estándar, elegante. Aparece en tiendas y descansos.', price: 25, spriteKey: 'Premier Ball', category: 'pokeball' },
-  { id: 'unlock_fast_ball', name: 'Fast Ball', desc: 'x4 contra Pokémon muy rápidos. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Fast Ball', category: 'pokeball' },
-  { id: 'unlock_nido_ball', name: 'Nidobola', desc: 'Mejor contra Pokémon de nivel bajo. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Nidobola', category: 'pokeball' },
-  { id: 'unlock_buceo_ball', name: 'Buceobola', desc: 'x3.5 contra Pokémon de tipo Agua. Aparece en tiendas y descansos.', price: 35, spriteKey: 'Buceobola', category: 'pokeball' },
-  { id: 'unlock_sana_ball', name: 'Sanabola', desc: 'Cura al Pokémon capturado. Aparece en tiendas y descansos.', price: 30, spriteKey: 'Sanabola', category: 'pokeball' },
-  { id: 'unlock_safari_ball', name: 'Safaribola', desc: 'Ratio base x1.5. Aparece en tiendas y descansos.', price: 30, spriteKey: 'Safaribola', category: 'pokeball' },
-  { id: 'unlock_sueno_ball', name: 'Sueñobola', desc: 'x4 contra Pokémon dormidos. Aparece en tiendas y descansos.', price: 40, spriteKey: 'Sueñobola', category: 'pokeball' },
-  { id: 'unlock_luna_ball', name: 'Ball Luna', desc: 'x4 contra Pokémon que evolucionan con Piedra Lunar. Aparece en tiendas y descansos.', price: 40, spriteKey: 'Ball Luna', category: 'pokeball' },
-  { id: 'unlock_ente_ball', name: 'Entebola', desc: 'x5 contra Pokémon legendarios. Aparece en tiendas y descansos.', price: 60, spriteKey: 'Entebola', category: 'pokeball', requiresAllBalls: true },
-  { id: 'unlock_focus_sash_2', name: 'Focus Sash II', desc: 'Aguanta un golpe a plena vida. +30 HP máximos.', price: 70, spriteKey: 'Focus Sash II', category: 'holdable', requires: 'unlock_focus_sash' },
-  { id: 'unlock_scope_lens_2', name: 'Scope Lens II', desc: 'Mayor probabilidad de crítico.', price: 70, spriteKey: 'Scope Lens II', category: 'holdable', requires: 'unlock_scope_lens' },
-  { id: 'unlock_shell_bell_2', name: 'Shell Bell II', desc: 'Recupera 1/6 del daño infligido.', price: 90, spriteKey: 'Shell Bell II', category: 'holdable', requires: 'unlock_shell_bell' },
-  { id: 'unlock_assault_vest_2', name: 'Assault Vest II', desc: '+65% Def. Esp., sin movimientos de estado.', price: 90, spriteKey: 'Assault Vest II', category: 'holdable', requires: 'unlock_assault_vest' },
-  { id: 'unlock_leftovers_2', name: 'Leftovers II', desc: 'Recupera 1/8 del HP máximo por turno.', price: 90, spriteKey: 'Leftovers II', category: 'holdable', requires: 'unlock_leftovers' },
-  { id: 'unlock_quick_claw_2', name: 'Quick Claw II', desc: '35% de probabilidad de atacar primero.', price: 70, spriteKey: 'Quick Claw II', category: 'holdable', requires: 'unlock_quick_claw' },
-  { id: 'unlock_diamansfera', name: 'Diamansfera', desc: '+20% daño en movimientos Acero y Dragón para Dialga.', price: 80, spriteKey: 'Diamansfera', category: 'holdable' },
-  { id: 'unlock_lustresfera', name: 'Lustresfera', desc: '+20% daño en movimientos Agua y Dragón para Palkia.', price: 80, spriteKey: 'Lustresfera', category: 'holdable' },
-  { id: 'unlock_griseosfera', name: 'Griseosfera', desc: '+20% daño en movimientos Dragón y Fantasma para Giratina.', price: 80, spriteKey: 'Griseosfera', category: 'holdable' },
-  { id: 'unlock_razor_claw', name: 'Razor Claw', desc: 'Evoluciona a Sneasel en Weavile. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Razor Claw', category: 'evolution_item' },
-  { id: 'unlock_razor_fang', name: 'Razor Fang', desc: 'Evoluciona a Gligar en Gliscor. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Razor Fang', category: 'evolution_item' },
-  { id: 'unlock_oval_stone', name: 'Oval Stone', desc: 'Evoluciona a Happiny en Chansey. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Oval Stone', category: 'evolution_item' },
-  { id: 'unlock_deep_sea_tooth', name: 'Deep Sea Tooth', desc: 'Evoluciona a Clamperl en Huntail. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Deep Sea Tooth', category: 'evolution_item' },
-  { id: 'unlock_deep_sea_scale', name: 'Deep Sea Scale', desc: 'Evoluciona a Clamperl en Gorebyss. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Deep Sea Scale', category: 'evolution_item' },
-  { id: 'unlock_manuscrito_sombras', name: 'Manuscrito sombras', desc: 'Evoluciona a Kubfu en Urshifu Brusco. Aparece con el Comerciante Misterioso.', price: 60, spriteKey: 'Manuscrito sombras', category: 'evolution_item' },
-  { id: 'unlock_mineral_negro', name: 'Mineral Negro', desc: 'Evoluciona a Scyther en Kleavor. Aparece con el Comerciante Misterioso.', price: 40, spriteKey: 'Mineral Negro', category: 'evolution_item' },
-  { id: 'unlock_manuscrito_aguas', name: 'Manuscrito aguas', desc: 'Evoluciona a Kubfu en Urshifu Fluido. Aparece con el Comerciante Misterioso.', price: 60, spriteKey: 'Manuscrito aguas', category: 'evolution_item' },
-  { id: 'unlock_repartir_exp', name: 'Repartir Exp', desc: 'Todos los Pokémon del PC ganan 1 nivel tras cada combate.', price: 130, spriteKey: 'Repartir Exp', category: 'holdable' },
-  { id: 'unlock_tarjeta_roja', name: 'Tarjeta Roja', desc: 'Si te golpean con daño y sobrevives, el rival cambia. Se consume.', price: 100, spriteKey: 'Tarjeta Roja', category: 'holdable' },
-]
 
 function fallbackSprite(e: React.SyntheticEvent<HTMLImageElement>) {
   const img = e.currentTarget
@@ -2209,372 +714,6 @@ function fallbackSprite(e: React.SyntheticEvent<HTMLImageElement>) {
   img.onerror = null
 }
 
-const TYPE_COLORS: Record<string, string> = {
-  normal: '#a8a878', fire: '#f08030', water: '#6890f0', electric: '#f8d030',
-  grass: '#78c850', ice: '#98d8d8', fighting: '#c03028', poison: '#a040a0',
-  ground: '#e0c068', flying: '#a890f0', psychic: '#f85888', bug: '#a8b820',
-  rock: '#b8a038', ghost: '#705898', dragon: '#7038f8', dark: '#705848',
-  steel: '#b8b8d0', fairy: '#ee99ac',
-}
-
-// Iconos de tipo del repositorio de sprites de PokeAPI (numerados por el id de
-// tipo: 1 normal, 2 lucha, 3 volador, 4 veneno, 5 tierra, 6 roca, 7 bicho,
-// 8 fantasma, 9 acero, 10 fuego, 11 agua, 12 planta, 13 eléctrico, 14 psíquico,
-// 15 hielo, 16 dragón, 17 siniestro, 18 hada).
-const TYPE_ICON_IDS: Record<string, number> = {
-  normal: 1, fighting: 2, flying: 3, poison: 4, ground: 5, rock: 6,
-  bug: 7, ghost: 8, steel: 9, fire: 10, water: 11, grass: 12,
-  electric: 13, psychic: 14, ice: 15, dragon: 16, dark: 17, fairy: 18,
-}
-
-function typeIconUrl(type: string): string {
-  const id = TYPE_ICON_IDS[type]
-  if (!id) return ''
-  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/types/generation-ix/scarlet-violet/small/${id}.png`
-}
-
-// Entrenadores normales (clase + nombre)
-const TRAINER_TYPES: Array<{ label: string; name: string; sprite: string }> = [
-  { label: 'Youngster', name: 'Miguel', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/youngster.png' },
-  { label: 'Youngster', name: 'Tommy', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/youngster.png' },
-  { label: 'Lass', name: 'Laura', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/lass.png' },
-  { label: 'Lass', name: 'Ana', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/lass.png' },
-  { label: 'Hiker', name: 'Jorge', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/hiker.png' },
-  { label: 'Hiker', name: 'Bruno', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/hiker.png' },
-  { label: 'Fisherman', name: 'Carlos', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/fisherman.png' },
-  { label: 'Fisherman', name: 'Pedro', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/fisherman.png' },
-  { label: 'Camper', name: 'Ricky', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/camper.png' },
-  { label: 'Biker', name: 'Gus', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/biker.png' },
-  { label: 'Beauty', name: 'Valeria', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/beauty.png' },
-  { label: 'Gentleman', name: 'Arthur', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/gentleman.png' },
-  { label: 'Sailor', name: 'Ramiro', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/sailor.png' },
-  { label: 'Bug Catcher', name: 'Diego', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/bugcatcher.png' },
-  { label: 'Picnicker', name: 'Mia', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/picnicker.png' },
-  { label: 'Ace Trainer', name: 'Sergio', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/acetrainer.png' },
-  { label: 'Ace Trainer', name: 'Elena', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/acetrainerf.png' },
-  { label: 'Black Belt', name: 'Kenji', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/blackbelt.png' },
-  { label: 'Psychic', name: 'Marco', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/psychic.png' },
-  { label: 'Swimmer', name: 'Max', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/swimmer.png' },
-]
-
-// Líderes de Gimnasio (solo aparecen en el Jefe Final)
-const GYM_LEADERS: Array<{ name: string; badge: string; sprite: string }> = [
-  { name: 'Brock', badge: 'Médalla Roca', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/brock.png' },
-  { name: 'Misty', badge: 'Médalla Cascada', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/misty.png' },
-  { name: 'Surge', badge: 'Médalla Trueno', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/ltsurge.png' },
-  { name: 'Erika', badge: 'Médalla Arco Iris', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/erika.png' },
-  { name: 'Sabrina', badge: 'Médalla Pantano', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/sabrina.png' },
-  { name: 'Blaine', badge: 'Médalla Volcán', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/blaine.png' },
-  { name: 'Giovanni', badge: 'Médalla Tierra', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/giovanni.png' },
-  { name: 'Falkner', badge: 'Médalla Ala', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/falkner.png' },
-  { name: 'Bugsy', badge: 'Médalla Colmíllo', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/bugsy.png' },
-  { name: 'Whitney', badge: 'Médalla Lisa', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/whitney.png' },
-  { name: 'Morty', badge: 'Médalla Niebla', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/morty.png' },
-  { name: 'Chuck', badge: 'Médalla Tormenta', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/chuck.png' },
-  { name: 'Jasmine', badge: 'Médalla Mineral', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/jasmine.png' },
-  { name: 'Pryce', badge: 'Médalla Glaciar', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/pryce.png' },
-  { name: 'Clair', badge: 'Médalla Ascenso', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/clair.png' },
-  { name: 'Roxanne', badge: 'Médalla Roca', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/roxanne.png' },
-  { name: 'Brawly', badge: 'Médalla Puño', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/brawly.png' },
-  { name: 'Wattson', badge: 'Médalla Dinámo', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/wattson.png' },
-  { name: 'Flannery', badge: 'Médalla Calor', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/flannery.png' },
-  { name: 'Norman', badge: 'Médalla Balance', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/norman.png' },
-  { name: 'Winona', badge: 'Médalla Pluma', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/winona.png' },
-  { name: 'Tate', badge: 'Médalla Mente', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/tate.png' },
-  { name: 'Juan', badge: 'Médalla Lluvia', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/juan.png' },
-  { name: 'Roark', badge: 'Médalla Carbona', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/roark.png' },
-  { name: 'Gardenia', badge: 'Médalla Bosque', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/gardenia.png' },
-  { name: 'Maylene', badge: 'Médalla Cobra', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/maylene.png' },
-  { name: 'Fantina', badge: 'Médalla Relevo', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/fantina.png' },
-  { name: 'Byron', badge: 'Médalla Mina', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/byron.png' },
-  { name: 'Candice', badge: 'Médalla Escarcha', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/candice.png' },
-  { name: 'Volkner', badge: 'Médalla Faro', sprite: 'https://play.pokemonshowdown.com/sprites/trainers/volkner.png' },
-]
-
-interface PokedexEntry {
-  id: number
-  name: string
-  sprite: string
-  types: string[]
-  seen: boolean
-  caught: boolean
-  shinySeen?: boolean
-  shinyCaught?: boolean
-  // Sprite shiny independiente para no sobrescribir el sprite normal.
-  shinySprite?: string
-}
-
-function nodeTypeLabel(node: RouteNode): string {
-  const en = getLanguage() === 'en'
-  switch (node.type) {
-    case 'battle': return en ? 'Battle' : 'Combate'
-    case 'rest': return en ? 'Rest' : 'Descanso'
-    case 'shop': return en ? 'Shop' : 'Tienda'
-    case 'boss': return en ? 'Boss' : 'Jefe'
-    case 'teamRocket': return 'TeamR'
-    case 'spin': return 'Spin'
-    case 'pokeRand': return 'PokeRand'
-    case 'move': return 'Move'
-    case 'mega': return 'Mega'
-    case 'gmax': return 'G-MAX'
-    case 'primal': return 'Primal'
-    case 'trade': return en ? 'Trade' : 'Intercambio'
-    case 'rival': return 'Rival'
-    case 'blackmarket': return en ? 'Black Market' : 'Mercado Negro'
-    case 'speculator': return en ? 'Speculator' : 'Especulador'
-    case 'safari': return 'Safari'
-    case 'orchard': return en ? 'Berry Orchard' : 'Huerto de Bayas'
-    case 'fossil': return en ? 'Fossil Lab' : 'Laboratorio de Fósiles'
-    case 'fishing': return en ? 'Fishing' : 'Pesca'
-    case 'mine': return en ? 'Mine' : 'Mina'
-    case 'daycare': return en ? 'Daycare' : 'Guardería'
-    case 'weather': return en ? 'Weather Station' : 'Estación Meteorológica'
-    case 'mirror': return en ? 'Mirror Battle' : 'Combate Espejo'
-    case 'ranch': return en ? 'Pokémon Ranch' : 'Rancho Pokémon'
-    case 'double': return en ? 'Double Battle' : 'Combate Doble'
-    case 'casino': return 'Casino'
-    case 'elite': return en ? 'Elite' : 'Elite'
-    case 'legendary': return en ? 'Legendary' : 'Legendario'
-    default: return node.type
-  }
-}
-
-// Genera un tramo de ruta cooperativa (nodos + jefe final) con nodos de
-// intercambio en posiciones proporcionales. Usa el RNG con semilla para que
-// ambos jugadores generen exactamente el mismo tramo.
-// Ruta de una etapa del Modo Original: 9 nodos (Tienda/Combate/Descanso/Rival)
-// + 1 jefe que otorga una medalla al final.
-function buildOriginalStageRoute(stageNum: number): RouteNode[] {
-  const types: Array<'battle' | 'shop' | 'rest' | 'rival'> = ['battle', 'battle', 'rest', 'battle', 'shop', 'rival', 'battle', 'rest', 'shop']
-  const nodes: RouteNode[] = []
-  for (let i = 0; i < types.length; i++) {
-    const label = types[i] === 'battle' ? `Combate #${i + 1}` : types[i] === 'rest' ? 'Descanso' : types[i] === 'shop' ? 'Tienda' : 'Rival'
-    nodes.push({ id: 3000 + stageNum * 100 + i, type: types[i], label, done: false })
-  }
-  nodes.push({ id: 4000 + stageNum, type: 'boss', label: `Jefe #${stageNum}`, done: false })
-  return nodes
-}
-
-function generateCoopRouteSegment(startId: number, totalNodes: number, rr: () => number, challenges: RunChallenges, difficulty: Difficulty = 'medium'): RouteNode[] {
-  const segment: RouteNode[] = []
-  let tradeCount = 2
-  if (difficulty === 'hard') tradeCount = 4
-  else if (difficulty === 'easy') tradeCount = 1
-  const tradePositions = new Set<number>()
-  if (difficulty === 'easy') {
-    tradePositions.add(Math.min(totalNodes - 1, Math.ceil(totalNodes / 2)))
-  } else {
-    for (let t = 1; t <= tradeCount; t++) {
-      tradePositions.add(Math.max(1, Math.floor((totalNodes * t) / (tradeCount + 1))))
-    }
-  }
-  for (let i = 1; i < totalNodes; i++) {
-    const id = startId + i - 1
-    let type: RouteNode['type'] = 'battle'
-    if (tradePositions.has(i)) {
-      type = 'trade'
-    } else {
-      const r = rr()
-      if (r < 0.18 && !challenges.noShops) {
-        type = 'shop'
-      } else if (r < 0.36 && !challenges.noRests) {
-        type = 'rest'
-      } else if (r < 0.50) {
-        type = 'teamRocket'
-      } else if (r < 0.62) {
-        type = 'spin'
-      }
-    }
-    segment.push({ id, type, label: `${nodeTypeLabel({ id, type, label: '', done: false })} #${id}`, done: false })
-  }
-  segment.push({ id: startId + totalNodes - 1, type: 'boss', label: `Combate Final (#${startId + totalNodes - 1})`, done: false })
-  return segment
-}
-
-const NODE_EMOJIS: Record<string, string> = {
-  battle: '⚔️',
-  rest: '🏕️',
-  shop: '🏪',
-  boss: '👑',
-  teamRocket: '®️',
-  spin: '🎰',
-  pokeRand: '🎲',
-  move: '🧬',
-  mega: '💎',
-  gmax: '⚡',
-  primal: '🔮',
-  trade: '🤝',
-  rival: '👤',
-  blackmarket: '🕶️',
-  speculator: '🙊',
-  safari: '🦁',
-  orchard: '🫐',
-  fossil: '🦖',
-  fishing: '🎣',
-  mine: '⛏️',
-  daycare: '🥚',
-  weather: '🌦️',
-  mirror: '🪞',
-  ranch: '🐑',
-  double: '🥊',
-  casino: '🃏',
-  elite: '🗻',
-  legendary: '🐉',
-}
-
-const NODE_TYPE_COLORS: Record<string, string> = {
-  battle: '#7d7ab5',
-  rest: '#37d16b',
-  shop: '#ffcb05',
-  boss: '#ee3b2f',
-  teamRocket: '#ee3b2f',
-  spin: '#a855f7',
-  pokeRand: '#4d9bff',
-  move: '#56e0cd',
-  mega: '#ff9ad6',
-  gmax: '#9da6ff',
-  primal: '#ff8a33',
-  trade: '#37d16b',
-  rival: '#f472b6',
-  blackmarket: '#fb923c',
-  speculator: '#ff8a33',
-  safari: '#22c55e',
-  orchard: '#a3e635',
-  fossil: '#d6a66a',
-  fishing: '#38bdf8',
-  mine: '#c08457',
-  daycare: '#fde68a',
-  weather: '#60a5fa',
-  mirror: '#c084fc',
-  ranch: '#a3e635',
-  double: '#facc15',
-  casino: '#f0abfc',
-  elite: '#cba3ff',
-  legendary: '#ffcb05',
-}
-
-// Especulador: los tipos más raros/poderosos pagan mejor. El multiplicador es
-// visible en la interfaz para que la venta sea clara.
-const SPECULATOR_TYPE_MULTIPLIERS: Record<string, number> = {
-  normal: 1.00,
-  bug: 1.00,
-  grass: 1.05,
-  water: 1.10,
-  fire: 1.10,
-  electric: 1.15,
-  flying: 1.15,
-  poison: 1.20,
-  ground: 1.20,
-  rock: 1.25,
-  fighting: 1.30,
-  ice: 1.30,
-  psychic: 1.35,
-  ghost: 1.40,
-  dark: 1.45,
-  steel: 1.50,
-  fairy: 1.55,
-  dragon: 1.60,
-}
-
-interface FossilOption {
-  item: string
-  speciesId: number
-  speciesName: string
-}
-
-interface DaycareEgg {
-  pokemon: Pokemon
-  nodesLeft: number
-  totalNodes: number
-}
-
-const FOSSIL_REVIVALS: FossilOption[] = [
-  { item: 'Fósil Hélix', speciesId: 138, speciesName: 'Omanyte' },
-  { item: 'Fósil Domo', speciesId: 140, speciesName: 'Kabuto' },
-  { item: 'Ámbar Viejo', speciesId: 142, speciesName: 'Aerodactyl' },
-  { item: 'Fósil Raíz', speciesId: 345, speciesName: 'Lileep' },
-  { item: 'Fósil Garra', speciesId: 347, speciesName: 'Anorith' },
-  { item: 'Fósil Cráneo', speciesId: 408, speciesName: 'Cranidos' },
-  { item: 'Fósil Coraza', speciesId: 410, speciesName: 'Shieldon' },
-  { item: 'Fósil Tapa', speciesId: 564, speciesName: 'Tirtouga' },
-  { item: 'Fósil Pluma', speciesId: 566, speciesName: 'Archen' },
-  { item: 'Fósil Mandíbula', speciesId: 696, speciesName: 'Tyrunt' },
-  { item: 'Fósil Vela', speciesId: 698, speciesName: 'Amaura' },
-]
-
-function speculatorTypeMultiplier(pokemon: Pokemon): number {
-  const primary = pokemon.types?.[0] ?? 'normal'
-  const secondary = pokemon.types?.[1]
-  const base = SPECULATOR_TYPE_MULTIPLIERS[primary] ?? 1
-  return secondary && secondary !== primary ? base + 0.05 : base
-}
-
-function speculatorPrice(pokemon: Pokemon): number {
-  const bst = pokemon.baseStatTotal
-    ?? pokemon.maxHp + pokemon.attack + pokemon.defense + pokemon.spAttack + pokemon.spDefense + pokemon.speed
-  const base = 25 + pokemon.level * 6 + Math.floor(bst / 10)
-  const typeMult = speculatorTypeMultiplier(pokemon)
-  const shinyMult = pokemon.shiny ? 2 : 1
-  return Math.max(20, Math.round(base * typeMult * shinyMult))
-}
-
-function getNodeMapLayout(nodeCount: number): { positions: Array<{ x: number; y: number }>; width: number; height: number } {
-  const perRow = nodeCount <= 6 ? nodeCount : Math.min(6, Math.max(4, Math.ceil(Math.sqrt(nodeCount * 2.5))))
-  const rows = Math.ceil(nodeCount / perRow)
-  const spacingX = 150
-  const spacingY = 145
-  const marginX = 75
-  const width = marginX * 2 + (perRow - 1) * spacingX
-  const height = 70 + (rows - 1) * spacingY + 90
-  const positions: Array<{ x: number; y: number }> = []
-  for (let i = 0; i < nodeCount; i++) {
-    const row = Math.floor(i / perRow)
-    const col = row % 2 === 0 ? i % perRow : perRow - 1 - (i % perRow)
-    const rowCount = Math.min(perRow, nodeCount - row * perRow)
-    const rowCenteredOffset = (row % 2 === 0 ? 1 : -1) * (perRow - rowCount) * spacingX / 2
-    positions.push({ x: marginX + rowCenteredOffset + col * spacingX, y: 70 + row * spacingY })
-  }
-  return { positions, width, height }
-}
-
-// Posición horizontal normalizada (0..1) de un nodo dentro de su fila.
-function branchRowX(row: number, rowSize: number): number {
-  return (row + 1) / (rowSize + 1)
-}
-
-// Devuelve los 2 nodos más próximos de la siguiente fila a un nodo dado. Regla
-// del Modo Ruta: cada nodo solo puede avanzar a los 2 nodos más cercanos.
-function nearestBranchNodes(prev: BranchNode, prevRowSize: number, nextRow: BranchNode[]): BranchNode[] {
-  if (nextRow.length <= 2) return [...nextRow]
-  const prevX = branchRowX(prev.row, prevRowSize)
-  return [...nextRow]
-    .sort((a, b) => Math.abs(branchRowX(a.row, nextRow.length) - prevX) - Math.abs(branchRowX(b.row, nextRow.length) - prevX))
-    .slice(0, 2)
-}
-
-// Diseño del mapa ramificado del Modo Ruta: cada columna se muestra como una
-// fila horizontal y el avance fluye hacia abajo (de arriba a abajo), dejando
-// más espacio entre nodos. Los nodos de cada fila se reparten en horizontal
-// (2-3-4-3-4-3-2 + jefe final en la última fila).
-function getBranchMapLayout(columns: BranchNode[][]): { positions: Map<number, { x: number; y: number }>; width: number; height: number } {
-  const spacingY = 180
-  const marginY = 80
-  const width = 660
-  const height = marginY * 2 + (columns.length - 1) * spacingY + 70
-  const positions = new Map<number, { x: number; y: number }>()
-  for (let c = 0; c < columns.length; c++) {
-    const n = columns[c].length
-    const y = marginY + c * spacingY
-    for (let r = 0; r < n; r++) {
-      const x = (width * (r + 1)) / (n + 1)
-      positions.set(columns[c][r].id, { x, y })
-    }
-  }
-  return { positions, width, height }
-}
-
-// Tooltip del Pokémon (al pasar el cursor por encima en combate): muestra la
-// habilidad, la naturaleza y los IVs del ejemplar en tarjetas de colores.
 function PokemonMetaTooltip({ p, showHeader = true }: { p: Pokemon; showHeader?: boolean }): ReactNode {
   const en = getLanguage() === 'en'
   const lang = en ? 'en' : 'es'
@@ -2801,47 +940,6 @@ function groupInventory(items: string[]): Array<{ name: string; count: number; d
 // progreso (2 → 6). En Infinite la ruta crece sin límite, así que escala de
 // forma monótona con los nodos completados para evitar picos y caídas en cada
 // lote de 5 nodos nuevos.
-function trainerTeamSize(routeIndex: number, routeLength: number, difficulty: string): number {
-  if (difficulty === 'infinite') {
-    return Math.max(2, Math.min(6, 2 + Math.floor((routeIndex + 1) / 5)))
-  }
-  const progress = routeIndex / Math.max(1, routeLength - 1)
-  return Math.max(2, Math.min(6, 2 + Math.floor(progress * 4)))
-}
-
-// Tamaño máximo de equipo para entrenadores normales (1 → 6). Igual que
-// trainerTeamSize: monótono en Infinite para evitar picos por el crecimiento
-// ilimitado de la ruta, y mantiene el rango 1..6 junto con su variación aleatoria.
-function trainerMaxSize(routeIndex: number, routeLength: number, difficulty: string): number {
-  if (difficulty === 'infinite') {
-    return Math.min(6, 1 + Math.floor(routeIndex / 5))
-  }
-  const progress = routeIndex / Math.max(1, routeLength - 1)
-  return Math.max(1, Math.min(6, Math.floor(progress * 6) + 1))
-}
-
-// Reparte los niveles de un equipo de entrenador dentro de los rangos conocidos
-// por dificultad, para que no todos los Pokémon tengan el mismo nivel.
-// El primer Pokémon (líder) es el más fuerte y el resto baja progresivamente.
-function trainerMemberLevelOffset(idx: number, teamSize: number, isBoss: boolean, difficulty: string): number {
-  const progress = idx / Math.max(1, teamSize - 1)
-  const jitter = Math.floor(Math.random() * 3) - 1 // -1, 0, +1
-  if (difficulty === 'easy') {
-    // En Fácil los entrenadores van por debajo del promedio del equipo.
-    return Math.round((1 - progress) * 2) - 2 + jitter
-  }
-  if (difficulty === 'infinite') {
-    // -1..+3 sobre el nivel máximo del equipo
-    return Math.round((1 - progress) * 4) - 1 + jitter
-  }
-  if (isBoss) {
-    // 0..+2 por encima del promedio del equipo
-    return Math.round((1 - progress) * 2) + jitter
-  }
-  // -1..+1 alrededor del promedio del equipo
-  return Math.round((1 - progress) * 2) - 1 + jitter
-}
-
 interface ProgressionData {
   completedMedium: number[]
   completedAny: number[]
@@ -2858,27 +956,6 @@ interface VictoryUnlocks {
   nextGenName: string | null
   unlockedHard: boolean
   unlockedInfinite: boolean
-}
-
-function getFirstHealthyIndex(team: Pokemon[], currentIndex: number): number {
-  return team.findIndex((pokemon, index) => index !== currentIndex && pokemon.hp > 0)
-}
-
-// Suaviza al rival del primer combate para que no pueda debilitar al starter
-// de un solo golpe: limita su ataque/at.especial según la defensa del equipo
-// del jugador y rebaja la potencia de sus movimientos.
-function softenFirstBattleEnemy(enemy: Pokemon, team: Pokemon[]): Pokemon {
-  const avgDef = team.reduce((s, p) => s + p.defense, 0) / Math.max(1, team.length)
-  const avgSpDef = team.reduce((s, p) => s + p.spDefense, 0) / Math.max(1, team.length)
-  const atkCap = Math.max(20, Math.round(avgDef * 1.2))
-  const spaCap = Math.max(20, Math.round(avgSpDef * 1.2))
-  const moves = enemy.moves.map((m) => (m.power ?? 0) > 50 ? { ...m, power: 50 } : m)
-  return {
-    ...enemy,
-    attack: Math.min(enemy.attack, atkCap),
-    spAttack: Math.min(enemy.spAttack, spaCap),
-    moves,
-  }
 }
 
 function MainApp() {
@@ -3000,6 +1077,11 @@ function MainApp() {
     } catch {
       return DEFAULT_ACCESSIBILITY
     }
+  })
+  // Modo de bajo rendimiento: si el dispositivo no mantiene ~40 fps, se pausan
+  // las animaciones decorativas de los canvas (el juego sigue igual).
+  const [lowPerformance, setLowPerformance] = useState<boolean>(() => {
+    try { return localStorage.getItem('pokerand_low_performance') === '1' } catch { return false }
   })
   const [playerCombatFloat, setPlayerCombatFloat] = useState<CombatFloatData | null>(null)
   const [enemyCombatFloat, setEnemyCombatFloat] = useState<CombatFloatData | null>(null)
@@ -3604,6 +1686,17 @@ function MainApp() {
 
   useEffect(() => { startMenuMusic() }, [])
 
+  // Precarga diferida de las pantallas pesadas para no bloquear el primer render.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void import('./dungeon/DungeonMode')
+      void import('./pokest/PokestDungeon')
+      void import('./minigames/CasinoMinigame')
+      void import('./minigames/MinigamePractice')
+    }, 1500)
+    return () => window.clearTimeout(timer)
+  }, [])
+
   useEffect(() => {
     if (!showIntro) return
     const previous = document.body.style.overflow
@@ -3722,17 +1815,44 @@ function MainApp() {
     else root.removeAttribute('data-gameboy')
   }, [metaProgression.gameboyMode])
 
+  // Detecta equipos que no mantienen una tasa de refresco fluida y pausa los
+  // fondos animados para priorizar la jugabilidad.
+  useEffect(() => {
+    if (lowPerformance) return
+    let raf = 0
+    let frames = 0
+    let start = 0
+    const timer = window.setTimeout(() => {
+      const sample = (now: number): void => {
+        if (!start) start = now
+        frames++
+        if (now - start < 2000) {
+          raf = requestAnimationFrame(sample)
+          return
+        }
+        const fps = frames / ((now - start) / 1000)
+        if (fps < 40 && document.visibilityState === 'visible') {
+          setLowPerformance(true)
+          try { localStorage.setItem('pokerand_low_performance', '1') } catch {}
+        }
+      }
+      raf = requestAnimationFrame(sample)
+    }, 3000)
+    return () => { window.clearTimeout(timer); cancelAnimationFrame(raf) }
+  }, [lowPerformance])
+
   // Preferencias de accesibilidad y ritmo de combate.
   useEffect(() => {
     const root = document.documentElement
     root.setAttribute('data-reduce-animations', String(accessibility.reduceAnimations))
+    root.setAttribute('data-low-performance', String(lowPerformance))
     root.setAttribute('data-high-contrast', String(accessibility.highContrast))
     root.setAttribute('data-colorblind', String(accessibility.colorBlind))
     root.setAttribute('data-readable-font', String(accessibility.readableFont))
     root.setAttribute('data-battle-speed', String(accessibility.battleSpeed))
     root.style.fontSize = `${Math.max(85, Math.min(130, accessibility.textScale))}%`
     localStorage.setItem('pokerand_accessibility', JSON.stringify(accessibility))
-  }, [accessibility])
+  }, [accessibility, lowPerformance])
 
   // Código secreto: escribir "adminsub" abre el modal de contraseña del modo secreto.
   useEffect(() => {
@@ -12791,10 +10911,10 @@ function MainApp() {
           </div>
         </div>
       )}
-      {screen !== 'dungeon' && screen !== 'pokest' && <BackgroundLayer backgroundId={metaProgression.activeBackground} />}
+      {screen !== 'dungeon' && screen !== 'pokest' && <BackgroundLayer backgroundId={metaProgression.activeBackground} paused={accessibility.reduceAnimations || lowPerformance} />}
       {screen !== 'dungeon' && screen !== 'pokest' && (
       <header className="topbar">
-        <TopbarCanvas />
+        <TopbarCanvas paused={accessibility.reduceAnimations || lowPerformance} />
         <div className="left-toolbar">
           <button
             className="tiny-btn"
@@ -12931,11 +11051,15 @@ function MainApp() {
       )}
 
       {screen === 'dungeon' && (
-        <DungeonMode language={language} onExit={() => setScreen('setup')} />
+        <Suspense fallback={<LazyLoadingPanel label={language === 'en' ? 'Loading dungeon...' : 'Cargando mazmorra...'} />}>
+          <DungeonMode language={language} onExit={() => setScreen('setup')} />
+        </Suspense>
       )}
 
       {screen === 'pokest' && createPortal(
-        <PokestDungeon language={language} onExit={() => setScreen('setup')} />,
+        <Suspense fallback={<LazyLoadingPanel label={language === 'en' ? 'Loading...' : 'Cargando...'} />}>
+          <PokestDungeon language={language} onExit={() => setScreen('setup')} />
+        </Suspense>,
         document.body,
       )}
 
@@ -17080,7 +15204,9 @@ function MainApp() {
                 <p className="muted" style={{ textAlign: 'center', margin: '0 0 0.5rem' }}>
                   {t('casino.desc')}
                 </p>
-                <CasinoMinigame onComplete={casinoComplete} />
+                <Suspense fallback={<LazyLoadingPanel label={t('casino.title')} />}>
+                  <CasinoMinigame onComplete={casinoComplete} />
+                </Suspense>
                 {casinoScore !== null && casinoReward && (
                   <div style={{ textAlign: 'center', marginTop: '0.75rem', padding: '0.75rem', border: '1px solid rgba(240, 171, 252, 0.4)', borderRadius: '10px', background: 'rgba(240, 171, 252, 0.08)' }}>
                     <p style={{ color: '#f0abfc', fontWeight: 'bold', fontSize: '1.1rem', margin: '0 0 0.25rem' }}>
@@ -18587,7 +16713,9 @@ function MainApp() {
       )}
 
       {showMinigamePractice && (
-        <MinigamePractice onClose={() => setShowMinigamePractice(false)} />
+        <Suspense fallback={<LazyLoadingPanel label={language === 'en' ? 'Loading minigames...' : 'Cargando minijuegos...'} />}>
+          <MinigamePractice onClose={() => setShowMinigamePractice(false)} />
+        </Suspense>
       )}
 
       {/* Run Stats on Victory */}

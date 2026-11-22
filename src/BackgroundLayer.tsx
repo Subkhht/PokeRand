@@ -3,7 +3,7 @@ import { BACKGROUNDS } from './game/backgrounds'
 import { drawBackground, type BgState } from './game/backgroundAnimations'
 import { subscribeBackgroundFrame } from './game/backgroundTicker'
 
-export default function BackgroundLayer({ backgroundId }: { backgroundId: string }): JSX.Element | null {
+export default function BackgroundLayer({ backgroundId, paused = false }: { backgroundId: string; paused?: boolean }): JSX.Element | null {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const stateRef = useRef<BgState>({})
   const mouseRef = useRef<{ x: number; y: number } | null>(null)
@@ -54,6 +54,19 @@ export default function BackgroundLayer({ backgroundId }: { backgroundId: string
     window.addEventListener('mousemove', onMove)
     window.addEventListener('click', onClick)
 
+    // Si el usuario reduce animaciones, dibujamos un único frame estático.
+    if (paused) {
+      const w = window.innerWidth
+      const h = window.innerHeight
+      ctx.clearRect(0, 0, w, h)
+      drawBackground(ctx, stateRef.current, backgroundId, 0.016, w, h, 0, null, {})
+      return () => {
+        window.removeEventListener('resize', resize)
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('click', onClick)
+      }
+    }
+
     // El fondo no necesita 60fps: se dibuja a ~30fps para aligerar la página.
     const FRAME = 1 / 30
     let acc = 0
@@ -73,7 +86,7 @@ export default function BackgroundLayer({ backgroundId }: { backgroundId: string
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('click', onClick)
     }
-  }, [backgroundId])
+  }, [backgroundId, paused])
 
   return (
     <canvas

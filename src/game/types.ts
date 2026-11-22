@@ -54,6 +54,8 @@ export interface RawLevelUpMove {
   level: number
 }
 
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'infinite' | 'coliseum' | 'original' | 'branch'
+
 export interface Pokemon {
   id: number
   name: string

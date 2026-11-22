@@ -648,13 +648,13 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v3.4.1', en: 'v3.4.1' },
+  'help.version': { es: 'v3.4.2', en: 'v3.4.2' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
   'changelog.intro': { es: 'La versión más reciente aparece abierta. Pulsa una versión para mostrar u ocultar sus cambios.', en: 'The latest version is expanded. Click a version to show or hide its changes.' },
   'changelog.latest': { es: 'Última', en: 'Latest' },
   'changelog.changes': { es: '{n} cambios', en: '{n} changes' },
   'changelog.change': { es: '1 cambio', en: '1 change' },
-  'changelog.button': { es: 'Ver cambios v3.4.1', en: 'See changes v3.4.1' },
+  'changelog.button': { es: 'Ver cambios v3.4.2', en: 'See changes v3.4.2' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -2025,6 +2025,14 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v3.4.2',
+    items: [
+      { es: '⚡ Optimización: la mazmorra, Pokest, el casino y los minijuegos ahora se cargan bajo demanda, y los datos/configuración se separaron en módulos. El bundle inicial baja aproximadamente un 50%.', en: '⚡ Optimization: the dungeon, Pokest, casino and minigames now load on demand, and data/config were split into modules. The initial bundle is roughly 50% smaller.' },
+      { es: '🖥️ Rendimiento: se eliminaron los desenfoques de fondo costosos, los canvas decorativos bajan a 30 fps y las miniaturas de fondos solo se animan cuando están visibles. La opción «Reducir animaciones» ahora también detiene los fondos animados, y los equipos que no mantienen 40 fps activan automáticamente un modo de bajo rendimiento.', en: '🖥️ Performance: costly background blurs were removed, decorative canvases are capped at 30 fps, and background thumbnails only animate while visible. The "Reduce animations" option now also stops animated backgrounds, and devices that cannot sustain 40 fps automatically enable a low-performance mode.' },
+      { es: '🛠️ Corregido el tooltip de los Pokémon del equipo, que había dejado de mostrarse tras una optimización de las listas.', en: '🛠️ Fixed the team Pokémon tooltip, which had stopped showing after a list optimization.' },
+    ],
+  },
   {
     version: 'v3.4.1',
     items: [

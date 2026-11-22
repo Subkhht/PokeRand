@@ -5958,3 +5958,23 @@ html[data-reduce-animations="true"] .damage-float {
   opacity: 1 !important;
   transform: translate(-50%, -18px) !important;
 }
+
+
+/* ------------------------------------------------------------
+   RENDIMIENTO: los desenfoques de fondo son muy costosos sobre
+   los canvas animados. Se mantienen los fondos semitransparentes
+   pero sin backdrop-filter.
+   ------------------------------------------------------------ */
+.panel,
+.topbar,
+.modal-backdrop,
+.meta-nav-bar,
+.theme-tooltip,
+.setup-card,
+.setup-hero,
+html:not([data-gameboy]) .panel,
+html:not([data-gameboy]) .topbar,
+html:not([data-gameboy]) .modal-backdrop {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
