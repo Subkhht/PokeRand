@@ -648,13 +648,13 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v3.4.2', en: 'v3.4.2' },
+  'help.version': { es: 'v3.4.3', en: 'v3.4.3' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
   'changelog.intro': { es: 'La versión más reciente aparece abierta. Pulsa una versión para mostrar u ocultar sus cambios.', en: 'The latest version is expanded. Click a version to show or hide its changes.' },
   'changelog.latest': { es: 'Última', en: 'Latest' },
   'changelog.changes': { es: '{n} cambios', en: '{n} changes' },
   'changelog.change': { es: '1 cambio', en: '1 change' },
-  'changelog.button': { es: 'Ver cambios v3.4.2', en: 'See changes v3.4.2' },
+  'changelog.button': { es: 'Ver cambios v3.4.3', en: 'See changes v3.4.3' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -2026,6 +2026,16 @@ export function metaItemDesc(id: string): string {
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
   {
+    version: 'v3.4.3',
+    items: [
+      { es: '📦 Mejorado el contraste del nombre y los PS de los Pokémon del PC, ahora mucho más legibles sobre el fondo de la casilla.', en: '📦 Improved the contrast of PC Pokémon names and HP, which are now much easier to read against the slot background.' },
+      { es: '⚔️ En los combates dobles ya se puede pulsar o arrastrar un Pokémon del equipo para cambiarlo por el activo seleccionado, gastando el turno como un cambio normal.', en: '⚔️ In double battles you can now click or drag a team Pokémon to switch it with the selected active Pokémon, spending the turn like a normal switch.' },
+      { es: '💥 Los combates dobles ahora permiten Mega Evolucionar, Gigamaximar, Primal Reversión y Forma Origen con el Pokémon activo seleccionado. El contador de turnos de Gigamax también funciona en dobles.', en: '💥 Double battles now allow Mega Evolution, Gigantamax, Primal Reversion and Origin Form with the selected active Pokémon. The Gigantamax turn counter also works in doubles.' },
+      { es: '⚡ Corregido el combate G-MAX: ahora permite volver a Mega Evolucionar y Gigamaximar a tus Pokémon, reiniciando los límites de transformación al empezar el combate.', en: '⚡ Fixed G-MAX battles: your Pokémon can now Mega Evolve and Gigantamax again, resetting the transformation limits at the start of the battle.' },
+      { es: '🔴 El botón de versión muestra un aviso rojo parpadeante cuando hay novedades sin leer. Desaparece al abrir el changelog y vuelve a aparecer con la próxima versión.', en: '🔴 The version button shows a blinking red notification when there are unread changes. It disappears after opening the changelog and returns with the next version.' },
+    ],
+  },
+  {
     version: 'v3.4.2',
     items: [
       { es: '⚡ Optimización: la mazmorra, Pokest, el casino y los minijuegos ahora se cargan bajo demanda, y los datos/configuración se separaron en módulos. El bundle inicial baja aproximadamente un 50%.', en: '⚡ Optimization: the dungeon, Pokest, casino and minigames now load on demand, and data/config were split into modules. The initial bundle is roughly 50% smaller.' },
@@ -2539,6 +2549,10 @@ const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }>
 
 export function getChangelog(): Array<{ version: string; items: string[] }> {
   return CHANGELOG.map(g => ({ version: g.version, items: g.items.map(i => i[currentLang]) }))
+}
+
+export function getLatestChangelogVersion(): string {
+  return CHANGELOG[0]?.version ?? ''
 }
 
 // Nombre localizado de un movimiento: en inglés usa el nombre de PokeAPI en

@@ -5978,3 +5978,13 @@ html:not([data-gameboy]) .modal-backdrop {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+
+
+/* Aviso parpadeante de novedades en el botón de versión. */
+@keyframes versionBadgeBlink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.88); }
+}
+.version-badge-blink {
+  animation: versionBadgeBlink 1.05s ease-in-out infinite;
+}

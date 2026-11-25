@@ -58,7 +58,7 @@ import BackgroundPreview from './BackgroundPreview'
 import { BACKGROUNDS } from './game/backgrounds'
 import type { User } from '@supabase/supabase-js'
 import type { Move, Pokemon, PokemonIVs, RouteNode, BranchNode, RunConfig, RunModifier, DefeatSummary, RunChallenges, RunStats, Achievement, AchievementState, MetaProgression, StatusType, Difficulty } from './game/types'
-import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, itemLocalizedName, metaItemDesc, moveName, statusLabel, statusAppliedLine, themeName, themeDesc, bgName, bgDesc, type Language, getChangelog } from './game/i18n'
+import { t, getLanguage, setLanguage as setI18nLanguage, achName, achDesc, runModName, runModDesc, runEventTitle, runEventDesc, itemDesc, itemLocalizedName, metaItemDesc, moveName, statusLabel, statusAppliedLine, themeName, themeDesc, bgName, bgDesc, type Language, getChangelog, getLatestChangelogVersion } from './game/i18n'
 
 // Pantallas pesadas cargadas bajo demanda para aligerar el bundle inicial.
 const DungeonMode = lazy(() => import('./dungeon/DungeonMode').then(m => ({ default: m.DungeonMode })))
@@ -1329,6 +1329,9 @@ function MainApp() {
   const [showRestartConfirm, setShowRestartConfirm] = useState<boolean>(false)
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false)
   const [showChangelog, setShowChangelog] = useState<boolean>(false)
+  const [seenChangelogVersion, setSeenChangelogVersion] = useState<string>(() => {
+    try { return localStorage.getItem('pokerand_seen_changelog') ?? '' } catch { return '' }
+  })
   const [changelogExpanded, setChangelogExpanded] = useState<string | null>(null)
   const [language, setLanguageState] = useState<Language>(getLanguage())
   const changeLanguage = (lang: Language): void => {
@@ -5799,6 +5802,26 @@ function MainApp() {
       if (!e || e.hp <= 0) return
       enemies[ei] = applyTurnAbilities(e, endLog, firstPlayer, doubleWeatherSuppressed)
     })
+
+    // Contador de turnos de Gigamax en dobles (jugador y rival).
+    const tickGmax = (unit: Pokemon): Pokemon => {
+      if (!unit.gmaxEvolved || !unit.gmaxTurnsLeft || unit.hp <= 0) return unit
+      const turns = unit.gmaxTurnsLeft - 1
+      if (turns > 0) return { ...unit, gmaxTurnsLeft: turns }
+      const restored = unit.megaOrig
+        ? { ...unit, gmaxEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...unit.megaOrig }
+        : { ...unit, gmaxEvolved: false, gmaxTurnsLeft: undefined }
+      endLog.push(t('b.gmaxBackNormal', { name: restored.name }))
+      return restored
+    }
+    actives.forEach((ti) => {
+      if (ti === undefined || !teamCopy[ti]) return
+      teamCopy[ti] = tickGmax(teamCopy[ti])
+    })
+    enemies.forEach((e, ei) => {
+      if (!e) return
+      enemies[ei] = tickGmax(e)
+    })
     // Mal Sueño (Bad Dreams) en dobles: daña a los rivales dormidos.
     if (firstPlayer?.ability === 'bad-dreams') {
       enemies.forEach((e, ei) => {
@@ -5829,6 +5852,7 @@ function MainApp() {
 
   function doubleSwitchPokemon(slot: number, teamIdx: number): void {
     if (doubleFinished) return
+    if (!team[teamIdx] || team[teamIdx].hp <= 0) return
     if (doubleActives[slot] === teamIdx) return
     const enemies = [...doubleEnemies]
     const teamCopy = team.map(p => ({ ...p }))
@@ -5844,6 +5868,19 @@ function MainApp() {
     // Efectos de salida del que se va (Cura Natural, Regeneración).
     if (outgoingIdx !== undefined && teamCopy[outgoingIdx]) {
       let out = teamCopy[outgoingIdx]
+      // Al salir del campo se revierte Mega/G-MAX/Primal/Origen.
+      if (out.megaOrig) {
+        out = {
+          ...out,
+          megaEvolved: false,
+          gmaxEvolved: false,
+          primalEvolved: false,
+          originEvolved: false,
+          gmaxTurnsLeft: undefined,
+          megaOrig: undefined,
+          ...out.megaOrig,
+        }
+      }
       if (hasAbility(out, 'natural-cure')) out = { ...out, status: undefined }
       if (hasAbility(out, 'regenerator')) out = { ...out, hp: Math.min(out.maxHp, out.hp + Math.floor(out.maxHp / 3)) }
       teamCopy[outgoingIdx] = out
@@ -6523,6 +6560,16 @@ function MainApp() {
         }
         seenInPokedex({ ...gmaxEnemy, id: gmaxFormId ?? gmaxEnemy.id, sprite: gmaxSprite })
         setIsTrainerBattle(false)
+        // Cada combate G-MAX es independiente: se permite volver a Mega/G-MAX.
+        setBattleMegaUsed(false)
+        setBattleGmaxUsed(false)
+        setBattlePrimalUsed(false)
+        setBattleOriginUsed(false)
+        setTeam(prev => prev.map((p) => {
+          const orig = p.megaOrig
+          if (orig) return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined, ...orig }
+          return { ...p, megaEvolved: false, gmaxEvolved: false, primalEvolved: false, originEvolved: false, gmaxTurnsLeft: undefined, megaOrig: undefined }
+        }))
         setEnemy(gmaxEnemy)
         setBattleLog(prev => [t('b.gmaxAppears', { name: gmaxEnemy.name }), ...prev].slice(0, 15))
         startBattleMusic()
@@ -9824,14 +9871,15 @@ function MainApp() {
     setCaptureModal(true)
   }
 
-  function megaEvolveActive(): void {
-    if (!activePokemon || activePokemon.holdItem !== 'Mega Stone' || battleMegaUsed || activePokemon.gmaxEvolved || !MEGA_CAPABLE_IDS.has(activePokemon.id)) return
-    const formId = MEGA_FORM_IDS[activePokemon.id]
+  function megaEvolveActive(targetIndex: number = activeIndex): void {
+    const target = team[targetIndex]
+    if (!target || target.holdItem !== 'Mega Stone' || battleMegaUsed || target.gmaxEvolved || !MEGA_CAPABLE_IDS.has(target.id)) return
+    const formId = MEGA_FORM_IDS[target.id]
     const megaFormId = Array.isArray(formId) ? formId[Math.floor(Math.random() * formId.length)] : formId
     const megaSprite = megaFormId
       ? MEGA_SPRITE_OVERRIDES[megaFormId] ?? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${megaFormId}.png`
       : null
-    setTeam(prev => prev.map((p, i) => i === activeIndex ? {
+    setTeam(prev => prev.map((p, i) => i === targetIndex ? {
       ...p,
       megaEvolved: true,
       megaOrig: { sprite: p.sprite, attack: p.attack, defense: p.defense, spAttack: p.spAttack, spDefense: p.spDefense, speed: p.speed },
@@ -9843,7 +9891,7 @@ function MainApp() {
       speed: Math.floor(p.speed * 1.15),
     } : p))
     if (megaFormId) {
-      registerInPokedex({ ...activePokemon, id: megaFormId, sprite: megaSprite ?? activePokemon.sprite })
+      registerInPokedex({ ...target, id: megaFormId, sprite: megaSprite ?? target.sprite })
     }
     setBattleMegaUsed(true)
     setMetaProgression(prev => {
@@ -9853,17 +9901,18 @@ function MainApp() {
       return updated
     })
     unlockAchievement('first_mega')
-    setBattleLog(prev => [t('b.megaEvolved', { name: activePokemon.name }), ...prev].slice(0, 15))
+    setBattleLog(prev => [t('b.megaEvolved', { name: target.name }), ...prev].slice(0, 15))
   }
 
-  function gmaxEvolveActive(): void {
-    if (!activePokemon || activePokemon.holdItem !== 'Dynamax Band' || battleGmaxUsed || activePokemon.gmaxEvolved || !GMAX_CAPABLE_IDS.has(activePokemon.id)) return
-    const formId = GMAX_FORM_IDS[activePokemon.id]
+  function gmaxEvolveActive(targetIndex: number = activeIndex): void {
+    const target = team[targetIndex]
+    if (!target || target.holdItem !== 'Dynamax Band' || battleGmaxUsed || target.gmaxEvolved || !GMAX_CAPABLE_IDS.has(target.id)) return
+    const formId = GMAX_FORM_IDS[target.id]
     const gmaxFormId = Array.isArray(formId) ? formId[Math.floor(Math.random() * formId.length)] : formId
     const gmaxSprite = gmaxFormId
       ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${gmaxFormId}.png`
       : null
-    setTeam(prev => prev.map((p, i) => i === activeIndex ? {
+    setTeam(prev => prev.map((p, i) => i === targetIndex ? {
       ...p,
       gmaxEvolved: true,
       gmaxTurnsLeft: 3,
@@ -9876,7 +9925,7 @@ function MainApp() {
       speed: Math.floor(p.speed * 1.15),
     } : p))
     if (gmaxFormId) {
-      registerInPokedex({ ...activePokemon, id: gmaxFormId, sprite: gmaxSprite ?? activePokemon.sprite })
+      registerInPokedex({ ...target, id: gmaxFormId, sprite: gmaxSprite ?? target.sprite })
     }
     setBattleGmaxUsed(true)
     setMetaProgression(prev => {
@@ -9886,17 +9935,18 @@ function MainApp() {
       return updated
     })
     unlockAchievement('first_gmax')
-    setBattleLog(prev => [t('b.gmaxEvolved', { name: activePokemon.name }), ...prev].slice(0, 15))
+    setBattleLog(prev => [t('b.gmaxEvolved', { name: target.name }), ...prev].slice(0, 15))
   }
 
-  function primalEvolveActive(): void {
-    if (!activePokemon || !activePokemon.holdItem || (activePokemon.holdItem !== 'Prisma Rojo' && activePokemon.holdItem !== 'Prisma Azul')) return
-    if (battlePrimalUsed || activePokemon.megaEvolved || activePokemon.gmaxEvolved || !PRIMAL_CAPABLE_IDS.has(activePokemon.id)) return
-    const formId = PRIMAL_FORM_IDS[activePokemon.id]
+  function primalEvolveActive(targetIndex: number = activeIndex): void {
+    const target = team[targetIndex]
+    if (!target || !target.holdItem || (target.holdItem !== 'Prisma Rojo' && target.holdItem !== 'Prisma Azul')) return
+    if (battlePrimalUsed || target.megaEvolved || target.gmaxEvolved || !PRIMAL_CAPABLE_IDS.has(target.id)) return
+    const formId = PRIMAL_FORM_IDS[target.id]
     const primalSprite = formId
       ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${formId}.png`
       : null
-    setTeam(prev => prev.map((p, i) => i === activeIndex ? {
+    setTeam(prev => prev.map((p, i) => i === targetIndex ? {
       ...p,
       primalEvolved: true,
       megaOrig: { sprite: p.sprite, attack: p.attack, defense: p.defense, spAttack: p.spAttack, spDefense: p.spDefense, speed: p.speed },
@@ -9908,22 +9958,23 @@ function MainApp() {
       speed: Math.floor(p.speed * 1.15),
     } : p))
     if (formId) {
-      registerInPokedex({ ...activePokemon, id: formId, sprite: primalSprite ?? activePokemon.sprite })
+      registerInPokedex({ ...target, id: formId, sprite: primalSprite ?? target.sprite })
     }
     setBattlePrimalUsed(true)
-    setBattleLog(prev => [t('b.primalEvolved', { name: activePokemon.name }), ...prev].slice(0, 15))
+    setBattleLog(prev => [t('b.primalEvolved', { name: target.name }), ...prev].slice(0, 15))
   }
 
-  function originEvolveActive(): void {
-    if (!activePokemon || !activePokemon.holdItem) return
-    const orb = activePokemon.holdItem
+  function originEvolveActive(targetIndex: number = activeIndex): void {
+    const target = team[targetIndex]
+    if (!target || !target.holdItem) return
+    const orb = target.holdItem
     if (orb !== 'Diamansfera' && orb !== 'Lustresfera' && orb !== 'Griseosfera') return
-    if (battleOriginUsed || activePokemon.megaEvolved || activePokemon.gmaxEvolved || activePokemon.primalEvolved || !ORIGIN_CAPABLE_IDS.has(activePokemon.id)) return
-    const formId = ORIGIN_FORM_IDS[activePokemon.id]
+    if (battleOriginUsed || target.megaEvolved || target.gmaxEvolved || target.primalEvolved || !ORIGIN_CAPABLE_IDS.has(target.id)) return
+    const formId = ORIGIN_FORM_IDS[target.id]
     const originSprite = formId
       ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${formId}.png`
       : null
-    setTeam(prev => prev.map((p, i) => i === activeIndex ? {
+    setTeam(prev => prev.map((p, i) => i === targetIndex ? {
       ...p,
       originEvolved: true,
       megaOrig: { sprite: p.sprite, attack: p.attack, defense: p.defense, spAttack: p.spAttack, spDefense: p.spDefense, speed: p.speed },
@@ -9935,13 +9986,50 @@ function MainApp() {
       speed: Math.floor(p.speed * 1.15),
     } : p))
     if (formId) {
-      registerInPokedex({ ...activePokemon, id: formId, sprite: originSprite ?? activePokemon.sprite })
+      registerInPokedex({ ...target, id: formId, sprite: originSprite ?? target.sprite })
     }
     setBattleOriginUsed(true)
-    setBattleLog(prev => [t('b.originEvolved', { name: activePokemon.name }), ...prev].slice(0, 15))
+    setBattleLog(prev => [t('b.originEvolved', { name: target.name }), ...prev].slice(0, 15))
+  }
+
+  function handleTeamSlotDrop(srcIndex: number, destIndex: number): void {
+    if (screen === 'double') {
+      const srcActive = doubleActives.indexOf(srcIndex)
+      const destActive = doubleActives.indexOf(destIndex)
+      if (srcActive === -1 && destActive !== -1) {
+        setDoubleActiveSlot(destActive)
+        doubleSwitchPokemon(destActive, srcIndex)
+        return
+      }
+      if (srcActive !== -1 && destActive === -1) {
+        doubleSwitchPokemon(srcActive, destIndex)
+        return
+      }
+      if (srcActive !== -1 && destActive !== -1) {
+        setDoubleActiveSlot(destActive)
+        return
+      }
+      // En dobles no reordenamos las casillas para no desalinear los activos.
+      return
+    }
+    reorderTeam(srcIndex, destIndex)
   }
 
   function switchActive(index: number): void {
+    // En combate doble, pulsar un Pokémon del equipo cambia el activo del slot
+    // seleccionado (o enfoca ese slot si ya está en el campo).
+    if (screen === 'double') {
+      const target = team[index]
+      if (!target || target.hp <= 0) return
+      const activeSlot = doubleActives.indexOf(index)
+      if (activeSlot !== -1) {
+        setDoubleActiveSlot(activeSlot)
+        return
+      }
+      if (doubleFinished) return
+      doubleSwitchPokemon(doubleActiveSlot, index)
+      return
+    }
     const target = team[index]
     if (!target || target.hp <= 0 || index === activeIndex) return
     if (screen === 'battle' && enemy && isTrappedByAbility(activePokemon, enemy)) {
@@ -10655,6 +10743,19 @@ function MainApp() {
     setLeaderboardLoading(false)
   }
 
+  const latestChangelogVersion = getLatestChangelogVersion()
+  const hasUnseenChangelog = latestChangelogVersion !== '' && seenChangelogVersion !== latestChangelogVersion
+
+  function openChangelog(): void {
+    playClick()
+    setChangelogExpanded(null)
+    setShowChangelog(true)
+    if (latestChangelogVersion) {
+      setSeenChangelogVersion(latestChangelogVersion)
+      try { localStorage.setItem('pokerand_seen_changelog', latestChangelogVersion) } catch {}
+    }
+  }
+
   function resetToSetup(): void {
     // Si venimos de COLISEUM, restaura los desafíos que tenía el jugador antes
     // de que el modo los forzara (Nivel Fijo etc.), para que no se hereden en
@@ -10984,8 +11085,9 @@ function MainApp() {
           <button
             type="button"
             onClick={() => { playClick(); setShowHelpModal(true) }}
-            title={t('help.title')}
+            title={hasUnseenChangelog ? t('changelog.title') : t('help.title')}
             style={{
+              position: 'relative',
               background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(155,152,207,0.4)',
               color: '#9b98cf', fontSize: '0.62rem', fontFamily: "'Courier New', monospace", cursor: 'pointer',
               padding: '3px 9px', borderRadius: '999px', lineHeight: 1,
@@ -10996,6 +11098,9 @@ function MainApp() {
             onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.webkitTextFillColor = '#9b98cf'; e.currentTarget.style.color = '#9b98cf' }}
           >
             {t('help.version')}
+            {hasUnseenChangelog && (
+              <span className="version-badge-blink" aria-label="Novedades sin ver" style={{ position: 'absolute', top: '-5px', right: '-5px', width: '13px', height: '13px', borderRadius: '50%', background: '#ef4444', color: '#fff', fontSize: '9px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, boxShadow: '0 0 0 2px #12122b' }}>!</span>
+            )}
           </button>
         </h1>
         <div className="topbar-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
@@ -13494,7 +13599,7 @@ function MainApp() {
                       e.preventDefault(); e.stopPropagation()
                       const src = dragSourceRef.current
                       if (!src) return
-                      if (src.type === 'team') reorderTeam(src.index, index)
+                      if (src.type === 'team') handleTeamSlotDrop(src.index, index)
                       else if (src.type === 'pc') movePCToTeam(src.index, index)
                       dragSourceRef.current = null
                       setDragItem(null)
@@ -13701,9 +13806,10 @@ function MainApp() {
                             style={{ width: '18px', height: '18px', imageRendering: 'pixelated', position: 'absolute', bottom: '4px', right: '4px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }}
                           />
                         )}
-                        <strong>{pokemon.name}{pokemon.shiny ? ' ✨' : ''}</strong>
-                        <span>
-                          {pokemon.hp}/{pokemon.maxHp}
+                        <strong style={{ color: '#f8fafc', fontSize: '0.82rem', lineHeight: 1.2, textAlign: 'center', textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>{pokemon.name}{pokemon.shiny ? ' ✨' : ''}</strong>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.78rem', fontWeight: 'bold' }}>
+                          <strong style={{ color: pokemon.hp <= 0 ? '#f87171' : '#7ceb95', textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>{pokemon.hp}</strong>
+                          <span style={{ color: '#a9a7d6' }}>/{pokemon.maxHp}</span>
                           <StatusBadge status={pokemon.status} compact />
                         </span>
                       </button>
@@ -15511,6 +15617,9 @@ function MainApp() {
                         )
                       })}
                     </div>
+                    <p style={{ margin: '0 0 0.55rem', color: '#7d7ab5', fontSize: '0.72rem', textAlign: 'center' }}>
+                      Pulsa o arrastra un Pokémon del equipo para cambiarlo. El cambio consume el turno.
+                    </p>
 
                     {(() => {
                       const slot = doubleActiveSlot
@@ -15583,6 +15692,46 @@ function MainApp() {
                             <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#7dd3fc', textAlign: 'center' }}>
                               Listo: {pokemon.name} usará <strong>{pokemon.moves[sel.moveIdx]?.name}</strong> contra <strong>{doubleEnemies[sel.target]?.name}</strong>.
                             </p>
+                          )}
+                          {pokemon.holdItem === 'Mega Stone' && !battleMegaUsed && !pokemon.gmaxEvolved && MEGA_CAPABLE_IDS.has(pokemon.id) && (
+                            <button
+                              className="cta"
+                              type="button"
+                              onClick={() => megaEvolveActive(teamIdx)}
+                              style={{ width: '100%', marginBottom: '0.5rem', background: '#e060a8' }}
+                            >
+                              💥 ¡Mega Evolucionar!
+                            </button>
+                          )}
+                          {pokemon.holdItem === 'Dynamax Band' && !battleGmaxUsed && !pokemon.gmaxEvolved && !pokemon.megaEvolved && GMAX_CAPABLE_IDS.has(pokemon.id) && (
+                            <button
+                              className="cta"
+                              type="button"
+                              onClick={() => gmaxEvolveActive(teamIdx)}
+                              style={{ width: '100%', marginBottom: '0.5rem', background: '#6b8cff' }}
+                            >
+                              ⚡ ¡Gigamaximar!
+                            </button>
+                          )}
+                          {(pokemon.holdItem === 'Prisma Rojo' || pokemon.holdItem === 'Prisma Azul') && !battlePrimalUsed && !pokemon.megaEvolved && !pokemon.gmaxEvolved && PRIMAL_CAPABLE_IDS.has(pokemon.id) && (
+                            <button
+                              className="cta"
+                              type="button"
+                              onClick={() => primalEvolveActive(teamIdx)}
+                              style={{ width: '100%', marginBottom: '0.5rem', background: '#ff8a33' }}
+                            >
+                              🔮 ¡Primal Reversion!
+                            </button>
+                          )}
+                          {(pokemon.holdItem === 'Diamansfera' || pokemon.holdItem === 'Lustresfera' || pokemon.holdItem === 'Griseosfera') && !battleOriginUsed && !pokemon.megaEvolved && !pokemon.gmaxEvolved && !pokemon.primalEvolved && !pokemon.originEvolved && ORIGIN_CAPABLE_IDS.has(pokemon.id) && (
+                            <button
+                              className="cta"
+                              type="button"
+                              onClick={() => originEvolveActive(teamIdx)}
+                              style={{ width: '100%', marginBottom: '0.5rem', background: '#4d9bff' }}
+                            >
+                              🌀 ¡Forma Origen!
+                            </button>
                           )}
                           {canSwitchNow && (
                             <button
@@ -15802,7 +15951,7 @@ function MainApp() {
                 {activePokemon.holdItem === 'Mega Stone' && !battleMegaUsed && !activePokemon.gmaxEvolved && MEGA_CAPABLE_IDS.has(activePokemon.id) && (
                   <button
                     className="cta"
-                    onClick={megaEvolveActive}
+                    onClick={() => megaEvolveActive()}
                     type="button"
                     style={{ marginTop: '8px', width: '100%', background: '#e060a8' }}
                   >
@@ -15812,7 +15961,7 @@ function MainApp() {
                 {activePokemon.holdItem === 'Dynamax Band' && !battleGmaxUsed && !activePokemon.gmaxEvolved && !activePokemon.megaEvolved && GMAX_CAPABLE_IDS.has(activePokemon.id) && (
                   <button
                     className="cta"
-                    onClick={gmaxEvolveActive}
+                    onClick={() => gmaxEvolveActive()}
                     type="button"
                     style={{ marginTop: '8px', width: '100%', background: '#6b8cff' }}
                   >
@@ -15822,7 +15971,7 @@ function MainApp() {
                 {(activePokemon.holdItem === 'Prisma Rojo' || activePokemon.holdItem === 'Prisma Azul') && !battlePrimalUsed && !activePokemon.megaEvolved && !activePokemon.gmaxEvolved && PRIMAL_CAPABLE_IDS.has(activePokemon.id) && (
                   <button
                     className="cta"
-                    onClick={primalEvolveActive}
+                    onClick={() => primalEvolveActive()}
                     type="button"
                     style={{ marginTop: '8px', width: '100%', background: '#ff8a33' }}
                   >
@@ -15832,7 +15981,7 @@ function MainApp() {
                 {(activePokemon.holdItem === 'Diamansfera' || activePokemon.holdItem === 'Lustresfera' || activePokemon.holdItem === 'Griseosfera') && !battleOriginUsed && !activePokemon.megaEvolved && !activePokemon.gmaxEvolved && !activePokemon.primalEvolved && !activePokemon.originEvolved && ORIGIN_CAPABLE_IDS.has(activePokemon.id) && (
                   <button
                     className="cta"
-                    onClick={originEvolveActive}
+                    onClick={() => originEvolveActive()}
                     type="button"
                     style={{ marginTop: '8px', width: '100%', background: '#4d9bff' }}
                   >
@@ -17309,8 +17458,11 @@ function MainApp() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
               <h2 style={{ margin: 0, color: '#ffcb05' }}>❓ {t('help.title')} <span style={{ fontSize: '0.7rem', color: '#7d7ab5', fontWeight: 'normal' }}>{t('help.version')}</span></h2>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <button className="tiny-btn" type="button" onClick={() => { playClick(); setChangelogExpanded(null); setShowChangelog(true) }} title={t('changelog.title')}>
+                <button className="tiny-btn" type="button" onClick={openChangelog} title={t('changelog.title')} style={{ position: 'relative' }}>
                   📜 {t('changelog.button')}
+                  {hasUnseenChangelog && (
+                    <span className="version-badge-blink" aria-label="Novedades sin ver" style={{ position: 'absolute', top: '-5px', right: '-5px', width: '13px', height: '13px', borderRadius: '50%', background: '#ef4444', color: '#fff', fontSize: '9px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, boxShadow: '0 0 0 2px #1c1c3a' }}>!</span>
+                  )}
                 </button>
                 <button className="tiny-btn" type="button" onClick={() => setShowHelpModal(false)} style={{ color: '#ff8a80' }}>{t('common.close')}</button>
               </div>
