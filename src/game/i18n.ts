@@ -648,13 +648,13 @@ const DICT: Record<string, Entry> = {
   'restart.title': { es: '¿Volver al inicio?', en: 'Back to start?' },
   'restart.desc': { es: 'Se perderá el progreso actual de la run. ¿Continuar?', en: 'Your current run progress will be lost. Continue?' },
   'restart.confirm': { es: 'Volver al inicio', en: 'Back to start' },
-  'help.version': { es: 'v3.4.3', en: 'v3.4.3' },
+  'help.version': { es: 'v3.4.4', en: 'v3.4.4' },
   'changelog.title': { es: '📜 Historial de versiones', en: '📜 Version history' },
   'changelog.intro': { es: 'La versión más reciente aparece abierta. Pulsa una versión para mostrar u ocultar sus cambios.', en: 'The latest version is expanded. Click a version to show or hide its changes.' },
   'changelog.latest': { es: 'Última', en: 'Latest' },
   'changelog.changes': { es: '{n} cambios', en: '{n} changes' },
   'changelog.change': { es: '1 cambio', en: '1 change' },
-  'changelog.button': { es: 'Ver cambios v3.4.3', en: 'See changes v3.4.3' },
+  'changelog.button': { es: 'Ver cambios v3.4.4', en: 'See changes v3.4.4' },
   'help.title': { es: '¿Cómo se juega?', en: 'How to play?' },
   'help.close': { es: 'Entendido', en: 'Got it' },
   'help.intro': { es: 'PokeRand es un roguelite de Pokémon: cada partida genera una ruta única de nodos. Avanza, combate, captura, evoluciona y derrota a los jefes para completar la generación.', en: 'PokeRand is a Pokémon roguelite: each run generates a unique path of nodes. Advance, battle, catch, evolve and defeat the bosses to complete the generation.' },
@@ -2025,6 +2025,12 @@ export function metaItemDesc(id: string): string {
 
 // --- Historial de versiones (agrupado por versión) ---
 const CHANGELOG: Array<{ version: string; items: { es: string; en: string }[] }> = [
+  {
+    version: 'v3.4.4',
+    items: [
+      { es: '🖼️ Corregidos los sprites locales de la carpeta items, que habían dejado de cargarse tras separar los datos de objetos en su propio módulo.', en: '🖼️ Fixed the local item sprites, which had stopped loading after moving the item data into its own module.' },
+    ],
+  },
   {
     version: 'v3.4.3',
     items: [

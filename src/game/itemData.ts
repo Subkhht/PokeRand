@@ -326,24 +326,24 @@ export const itemDescriptions: Record<string, string> = {
 // Sprites locales de objetos (carpeta src/assets/items). Se cargan automáticamente
 // con import.meta.glob y cada archivo se asocia a su objeto en LOCAL_ITEM_SPRITES.
 // Tienen prioridad sobre los sprites remotos de PokeAPI.
-export const localItemSpriteFiles = import.meta.glob('./assets/items/*.png', { eager: true, import: 'default' }) as Record<string, string>
+export const localItemSpriteFiles = import.meta.glob('../assets/items/*.png', { eager: true, import: 'default' }) as Record<string, string>
 
 export const LOCAL_ITEM_SPRITES: Record<string, string> = {
-  'Galarica Cuff': localItemSpriteFiles['./assets/items/Brazal_galanuez.png'] ?? '',
-  'Galarica Wreath': localItemSpriteFiles['./assets/items/Corona_galanuez.png'] ?? '',
-  'Gorra de Ash': localItemSpriteFiles['./assets/items/Ash\'s_Cap.png'] ?? '',
-  'Tart Apple': localItemSpriteFiles['./assets/items/Manzana_ácida.png'] ?? '',
-  'Sweet Apple': localItemSpriteFiles['./assets/items/Manzana_dulce.png'] ?? '',
-  'Syrupy Apple': localItemSpriteFiles['./assets/items/Manzana_melosa.png'] ?? '',
-  'Cracked Pot': localItemSpriteFiles['./assets/items/Tetera_agrietada.png'] ?? '',
-  'Peat Block': localItemSpriteFiles['./assets/items/Bloque_de_turba.png'] ?? '',
-  'Unremarkable Teacup': localItemSpriteFiles['./assets/items/Cuenco_mediocre.png'] ?? '',
-  'Metal Alloy': localItemSpriteFiles['./assets/items/Metal_compuesto.png'] ?? '',
-  'Mineral Negro': localItemSpriteFiles['./assets/items/Mineral_negro.png'] ?? '',
-  'Auspicious Armor': localItemSpriteFiles['./assets/items/Armadura_auspiciosa.png'] ?? '',
-  'Malicious Armor': localItemSpriteFiles['./assets/items/Armadura_maldita.png'] ?? '',
-  'Manuscrito sombras': localItemSpriteFiles['./assets/items/Manuscrito_de_las_Sombras.png'] ?? '',
-  'Manuscrito aguas': localItemSpriteFiles['./assets/items/Manuscrito_de_las_Aguas.png'] ?? '',
+  'Galarica Cuff': localItemSpriteFiles['../assets/items/Brazal_galanuez.png'] ?? '',
+  'Galarica Wreath': localItemSpriteFiles['../assets/items/Corona_galanuez.png'] ?? '',
+  'Gorra de Ash': localItemSpriteFiles['../assets/items/Ash\'s_Cap.png'] ?? '',
+  'Tart Apple': localItemSpriteFiles['../assets/items/Manzana_ácida.png'] ?? '',
+  'Sweet Apple': localItemSpriteFiles['../assets/items/Manzana_dulce.png'] ?? '',
+  'Syrupy Apple': localItemSpriteFiles['../assets/items/Manzana_melosa.png'] ?? '',
+  'Cracked Pot': localItemSpriteFiles['../assets/items/Tetera_agrietada.png'] ?? '',
+  'Peat Block': localItemSpriteFiles['../assets/items/Bloque_de_turba.png'] ?? '',
+  'Unremarkable Teacup': localItemSpriteFiles['../assets/items/Cuenco_mediocre.png'] ?? '',
+  'Metal Alloy': localItemSpriteFiles['../assets/items/Metal_compuesto.png'] ?? '',
+  'Mineral Negro': localItemSpriteFiles['../assets/items/Mineral_negro.png'] ?? '',
+  'Auspicious Armor': localItemSpriteFiles['../assets/items/Armadura_auspiciosa.png'] ?? '',
+  'Malicious Armor': localItemSpriteFiles['../assets/items/Armadura_maldita.png'] ?? '',
+  'Manuscrito sombras': localItemSpriteFiles['../assets/items/Manuscrito_de_las_Sombras.png'] ?? '',
+  'Manuscrito aguas': localItemSpriteFiles['../assets/items/Manuscrito_de_las_Aguas.png'] ?? '',
 }
 
 export const ITEM_SPRITES: Record<string, string> = {
